@@ -1,6 +1,6 @@
 ---
 name: new-campaign
-description: Core process. Creates a new Yllir campaign in an empty folder with a short interview (four questions, one confirmation). Invoked by the yllir entry skill.
+description: Core process. Creates a new Yllir campaign in an empty folder with a short interview (four questions, one confirmation). Always runs inside the process runner (yllir:process-runner), for the yllir entry skill.
 user-invocable: false
 ---
 
@@ -10,13 +10,13 @@ Creates the core files of a campaign in an empty folder. It asks only what the c
 
 ## Steps
 
-**Step 1 — Preconditions.** The `YLLIR SESSION CHECK` block must say `folder: empty` and `git: ok`. If either value differs, stop and return to the entry skill `yllir:yllir`.
+**Step 1 — Preconditions.** This process runs inside the process runner, which has no session check in its context. Read the folder state yourself: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and read its `folder` and `git` values. They must say `folder: empty` and `git: ok`. If either value differs, stop and report it in one plain sentence for the master, as the failure of this process.
 - Output: the two values confirmed.
 
 **Step 2 — Welcome.** Write the welcome in the campaign language. The campaign language is the language the master writes in. Use two sentences: a few questions follow, and then the campaign is ready to start. Put the welcome in the same message as the questions of Step 3.
 - Output: the welcome sentences, sent with Step 3.
 
-**Step 3 — Interview.** Ask these four questions in ONE message, numbered, and accept partial answers.
+**Step 3 — Interview.** Ask the master (the process runner turns this into a QUESTION result) these four questions in ONE message, numbered, and accept partial answers.
 1. The name of the campaign, and the language to write in.
 2. The role-playing game (and its edition), or their own system.
 3. The tone of the descriptions: evocative, plain, or other.
@@ -47,7 +47,7 @@ Output: the four answers, with the defaults used and the tone mapped to `--regis
 - the file of «Your rules», empty;
 - the first document: the description of the world, in a folder named with the word for «World» in the campaign language (Italian `Mondo`, English `World`, other languages: the translation of «World»).
 
-Nothing else. Ask for one confirmation. If the master's message already contained a clear confirmation, go on to Step 5 without asking again.
+Nothing else. Ask the master for one confirmation (the process runner turns this into a QUESTION result). If the master's message already contained a clear confirmation, go on to Step 5 without asking again.
 - Output: the confirmation given.
 
 **Step 5 — Create the core files.** Run:
@@ -103,7 +103,7 @@ Loop, starting with `ROUND=1`:
 1. Read `.campaign/state/write/report.txt` and its `status:` line.
 2. If `status` is `FIX_NEEDED` or `VERIFY_FAILED`: rewrite the draft file at the same path `.campaign/state/write/draft/<Folder>/<World name>.md`, removing or fixing exactly each problem listed in `details`. Use only the master's words, as Step 6 requires. Then invoke `yllir:write-sequence` again with the same inputs and `ROUND` plus one. Repeat this loop up to `ROUND` 3.
 3. If `status` is `DONE`: go to Step 8.
-4. If `status` is `CONFLICT` or `ASK`: put the question from the report to the master in plain words, and stop.
+4. If `status` is `CONFLICT` or `ASK`: ask the master the question from the report in plain words (the process runner turns this into a QUESTION result), and stop.
 5. If `status` is `FAILED`: go to the failure sentence below, and stop.
 
 After a failed `ROUND` 3 (still `FIX_NEEDED` or `VERIFY_FAILED`), tell the master in one plain sentence, in the campaign language and with the lexicon words, that the first document could not be completed and that the settings are ready. Stop. Do not mention rounds, statuses or problems.
@@ -112,12 +112,12 @@ For `FAILED`, say the same kind of sentence: the first document could not be com
 
 Output: `status: DONE`.
 
-**Step 8 — Close.** Only after `status: DONE`. Write:
-- one sentence that the campaign is ready and saved. Never show version codes, file paths in backticks, or formatting marks like `code`; say only that the campaign is saved;
+**Step 8 — Close.** Only after `status: DONE`. Your closing text is the `message for the master` of the runner's result, so write it as that message, in the campaign language, in plain text. It contains:
+- one sentence that the campaign is ready and saved. Never show version codes, file paths, backticks or formatting marks like `code`; say only that the campaign is saved;
 - two or three example sentences the master can say next, for example «describe the first place», «let's prepare the first session», «I have notes to bring in»;
 - one sentence that some of these will become available step by step.
 
-Offer, without insisting, a short practice session in the future.
+Offer, without insisting, a short practice session in the future. Do not add anything after this text: the process runner returns it to the entry skill.
 
 ## Examples
 

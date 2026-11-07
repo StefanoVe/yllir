@@ -17,7 +17,9 @@ Una conversazione con un agente ha una finestra di contesto limitata, e a un cer
 
 ### Prima versione: la portineria
 
-**Proposta.** Nel terminale o nell'app di Claude, da dentro una sessione l'agente non può aprirne un'altra né svuotare la propria: sono gesti dell'utente (da verificare sulle versioni reali degli strumenti). La sessione che il master vede resta quindi una sola, e fa da portineria:
+**Deciso (2026-11-07).** Ogni processo che scrive gira in un sub-agent esecutore; la portineria riconosce l'argomento, passa il riepilogo per riprendere e riporta l'esito al master. Verificato: in Claude Code un sub-agent può avviare altri sub-agent (revisori, estrattori), quindi i processi mantengono la propria revisione indipendente.
+
+**Proposta (testo originale).** Nel terminale o nell'app di Claude, da dentro una sessione l'agente non può aprirne un'altra né svuotare la propria: sono gesti dell'utente (da verificare sulle versioni reali degli strumenti). La sessione che il master vede resta quindi una sola, e fa da portineria:
 
 1. Riceve il messaggio del master e lo attribuisce a un argomento (vedi sotto). Il modello economico propone l'attribuzione, e l'agente principale, che è la portineria, decide.
 2. Non esegue il lavoro di persona: lo affida a un sub-agent che parte con un contesto pulito e riceve soltanto l'handoff di quell'argomento e il pacchetto dei documenti necessari. Il pacchetto segue la regola di visibilità del blocco riservato in [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md).
@@ -96,7 +98,7 @@ Nulla del meccanismo. Al massimo una riga come «Riprendo da dove avevamo lascia
 
 ## Questioni aperte
 
-- Soglia di riempimento: valore iniziale e come misurarla quando l'ambiente non la espone.
+- ~~Soglia di riempimento.~~ **Deciso (2026-11-07):** nessuna soglia. Il riepilogo per riprendere si aggiorna a ogni passo importante, e dopo un riassunto automatico l'hook di avvio (che parte anche su `compact`) ricarica l'argomento attivo.
 - Durata di un argomento chiuso: per quanto tempo l'handoff resta riprendibile prima di essere considerato concluso e archiviato.
 - Se la sessione live (vedi [Processi di core](Processi%20di%20core.md)) debba restare sempre un argomento unico, senza cambi automatici durante il gioco. Proposta: sì; le domande veloci al tavolo non cambiano argomento.
 - Quale strumento usare per le sessioni vere nella seconda strada, e se il lanciatore da terminale anticipi il master screen.

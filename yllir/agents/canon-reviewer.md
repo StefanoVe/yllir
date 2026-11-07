@@ -24,7 +24,9 @@ The prompt gives you:
    - It does not contradict the documents read in step 2. Quote the locator `<document>:<line>` as evidence.
    - It is written in `language.main`. Narrative parts follow `prose.register`: `elevated` is evocative, `plain` is sober, `colloquial` is conversational.
    - Format: the frontmatter comes first, with an `id` made of lowercase letters, digits and hyphens. There is exactly one `#` title, equal to the file name without `.md`. Sections use `##`. Read-aloud narrative text is one paragraph in `_italics_`. A place document has a `## Description` section (in the campaign language) that opens with an italic paragraph. The master block, if present, is the last content, and it is exactly: `<!-- master -->`, `## Master`, `### ...`, `<!-- /master -->`.
+     Exception: documents in a category of type `plot` (sessions; read `campaign.yaml` `structure`) have NO document title. Every `#` heading is a scene, `##` a minor action, `###` a check followed by a Successo/Fallimento list (or the translation). Master notes may be in ``` blocks. Do not ask for a single title or for a `## Description` section in these documents.
    - Nothing meant for the players reveals the master's private notes.
+   A contradiction that already exists between other documents is not a fault of the draft. Return FIX for it only if the draft states or relies on one side of it (then the problem is: remove that fact). If the draft avoids the contested fact, do not list it. Use ASK only when the requested content cannot be written without deciding which side is true.
 4. Output ONLY one JSON object, in one of these three forms:
    - `{"outcome":"APPLY","items":[]}` when no item failed.
    - `{"outcome":"FIX","items":[{"document":"<path>","problem":"<one sentence>","evidence":"<document>:<line> or INTENT"}]}` when a draft has a problem the author can fix.

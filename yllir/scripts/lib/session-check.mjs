@@ -10,6 +10,7 @@ import { validateConfig } from './config.mjs';
 import { checkFingerprints } from './instructions.mjs';
 import { listVersions, status } from './versions.mjs';
 import { parseYamlLite } from './yaml-lite.mjs';
+import { activeTopic, listTopics } from './topics.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
 const VERSION_PATH = '.campaign/version.yaml';
@@ -29,6 +30,7 @@ const NEXT_STEP = 'next: invoke the skill yllir:yllir before answering the maste
  *   instructions: 'up-to-date' | 'missing' | { changed: string[] } | null,
  *   framework_version: string | null,
  *   campaign_framework_version: string | null,
+ *   topics: { active: object | null, open: number } | null,
  * }}
  */
 export function sessionCheck(root) {
@@ -43,6 +45,7 @@ export function sessionCheck(root) {
     instructions: null,
     framework_version: attempt(readFrameworkVersion, null),
     campaign_framework_version: null,
+    topics: null,
   };
   if (folder !== 'campaign') {
     return result;
@@ -67,6 +70,7 @@ export function sessionCheck(root) {
     return { changed: [...fingerprints.changed] };
   }, null);
   result.campaign_framework_version = attempt(() => readCampaignVersion(dir), null);
+  result.topics = attempt(() => topicsState(dir), null);
   return result;
 }
 
@@ -107,6 +111,14 @@ export function formatCheck(result) {
         ? ''
         : ` (campaign made with ${result.campaign_framework_version})`;
     lines.push(`framework version: ${result.framework_version}${made}`);
+  }
+  if (result.topics?.active) {
+    const active = result.topics.active;
+    lines.push(`active topic: ${active.id} (${active.process}) — ${active.goal}`);
+    lines.push(`resume from: .campaign/state/topics/${active.id}.md`);
+  }
+  if (result.topics && result.topics.open > 0) {
+    lines.push(`open topics: ${result.topics.open}`);
   }
   lines.push(NEXT_STEP);
   return lines.join('\n');
@@ -166,6 +178,13 @@ function countFiles(root) {
 
 function isIgnored(relPath) {
   return IGNORED_PREFIXES.some((prefix) => relPath === prefix || relPath.startsWith(`${prefix}/`));
+}
+
+/** Active topic (or null) and the number of topics that are not closed. */
+function topicsState(dir) {
+  const active = activeTopic(dir);
+  const open = listTopics(dir).filter((topic) => topic.status !== 'closed').length;
+  return { active, open };
 }
 
 function readCampaignVersion(dir) {

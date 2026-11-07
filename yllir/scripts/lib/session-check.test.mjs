@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { formatCheck, sessionCheck } from './session-check.mjs';
 import { generateInstructions } from './instructions.mjs';
 import { ensureRepo, saveVersion } from './versions.mjs';
+import { newTopic } from './topics.mjs';
 
 // Git identity and config must come from the test only.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
@@ -103,6 +104,7 @@ describe('folder detection', () => {
     assert.equal(result.settings, null);
     assert.equal(result.instructions, null);
     assert.equal(result.campaign_framework_version, null);
+    assert.equal(result.topics, null);
   });
 
   test('a nonexistent root is other and does not throw', () => {
@@ -123,6 +125,7 @@ describe('campaign checks', () => {
     assert.equal(result.settings.ok, true);
     assert.equal(result.instructions, 'up-to-date');
     assert.equal(result.campaign_framework_version, FRAMEWORK_VERSION);
+    assert.deepEqual(result.topics, { active: null, open: 0 });
   });
 
   test('a saved campaign reports one version, nothing unsaved and up-to-date instructions', () => {
@@ -175,6 +178,34 @@ describe('campaign checks', () => {
   });
 });
 
+describe('topics', () => {
+  test('an active topic and a paused one are reported with the resume file and the open count', () => {
+    const root = campaign();
+    newTopic(root, { process: 'ricerca', goal: 'Il mercato delle ceneri', now: new Date('2026-11-07T10:00:00Z') });
+    newTopic(root, { process: 'scena', goal: 'Il porto di Morvalle', now: new Date('2026-11-06T10:00:00Z') });
+    const result = sessionCheck(root);
+    assert.equal(result.topics.active.goal, 'Il porto di Morvalle');
+    assert.equal(result.topics.open, 2);
+    assert.equal(
+      formatCheck(result),
+      [
+        'YLLIR SESSION CHECK (for the assistant, not for the master)',
+        'folder: campaign',
+        'git: ok',
+        'saved versions: 0',
+        'changes not yet saved: 6 files',
+        'settings: valid',
+        'instructions: up to date',
+        'framework version: ' + FRAMEWORK_VERSION + ' (campaign made with ' + FRAMEWORK_VERSION + ')',
+        `active topic: ${result.topics.active.id} (scena) — Il porto di Morvalle`,
+        `resume from: .campaign/state/topics/${result.topics.active.id}.md`,
+        'open topics: 2',
+        'next: invoke the skill yllir:yllir before answering the master.',
+      ].join('\n'),
+    );
+  });
+});
+
 describe('formatCheck', () => {
   test('prints the exact layout for a full campaign', () => {
     const text = formatCheck({
@@ -186,6 +217,7 @@ describe('formatCheck', () => {
       instructions: 'up-to-date',
       framework_version: '0.1.0',
       campaign_framework_version: '0.1.0',
+      topics: null,
     });
     assert.equal(
       text,
@@ -213,6 +245,7 @@ describe('formatCheck', () => {
       instructions: { changed: ['CLAUDE.md', '.campaign/instructions/agent.md'] },
       framework_version: '0.1.0',
       campaign_framework_version: null,
+      topics: null,
     });
     assert.equal(
       text,
@@ -239,6 +272,7 @@ describe('formatCheck', () => {
       instructions: 'missing',
       framework_version: null,
       campaign_framework_version: null,
+      topics: null,
     });
     assert.match(text, /^instructions: missing$/m);
     assert.match(text, /\nnext: invoke the skill yllir:yllir before answering the master\.$/);

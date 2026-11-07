@@ -32,6 +32,7 @@ Sono ammessi solo i campi della tabella. Ogni altro campo è un errore: un campo
 | --- | --- | --- | --- |
 | `id` | ogni documento della campagna | slug unico in tutta la campagna | identità stabile: route, codici QR, collegamenti |
 | `location` | soggetti con una posizione: personaggi, creature, oggetti, annunci | lista di `id` di luoghi; `[]` se non ha un luogo fisso | luogo attuale del soggetto; una creatura che vive in più luoghi li elenca tutti |
+| `played` | pagine di cronaca (**Deciso**, 2026-11-07) | lista di `id` delle sessioni o attività giocate quella sera; `[]` se nessuna | unica fonte per sapere che cosa è stato giocato: la preparazione verifica i prerequisiti da qui; lo scrive il processo «dopo la sessione» |
 | `depends_on` | sessioni e attività di trama | lista di `id` di sessioni o attività; `[]` se non ne ha | prerequisiti (vedi sezione 2) |
 | `print` | oggetti con carta | `to-print`, `printed` o `reprint` | stato fisico della carta; è l'unico posto in cui sta |
 | `template` | categorie con più modelli: Personaggi (`npc`, `vendor`), Creature (`enemy`, `creature`), Oggetti (`item`, `notice`) | uno dei valori indicati | modello della scheda, da cui il validatore ricava le sezioni obbligatorie |
@@ -130,7 +131,7 @@ _La nebbia sale dal molo prima dell'alba e si impiglia nelle reti stese._
 
 - Il registro della prosa (`elevated`, `plain`, `colloquial` o `mixed`) viene da `prose.register` della configurazione (vedi [Configurazione](Configurazione.md)). Vale per le descrizioni narrative: corsivi, descrizioni dei luoghi, dei soggetti e degli oggetti.
 - Le sezioni tecniche (statistiche, prezzi, metadati, tabelle, esiti delle prove) sono neutre e non cambiano con il registro.
-- I testi della campagna sono nella lingua di `language.primary`. I titoli delle sezioni dei modelli (`## Descrizione`, `## Effetti` e le altre) sono contenuto della campagna e si traducono dalla lingua configurata; i nomi dei metadati e dei tipi restano in inglese, come nel resto del framework.
+- I testi della campagna sono nella lingua di `language.main`. I titoli delle sezioni dei modelli (`## Descrizione`, `## Effetti` e le altre) sono contenuto della campagna e si traducono dalla lingua configurata; i nomi dei metadati e dei tipi restano in inglese, come nel resto del framework.
 
 ## 2. Testi di trama (sessioni e attività)
 
@@ -206,6 +207,7 @@ Gli interventi meta non sono narrazione e non definiscono l'identità di nulla.
 ```markdown
 ---
 id: cronaca-2026-11-14
+played: [il-faro-spento-01]
 ---
 
 # Il faro si spegne
@@ -219,7 +221,7 @@ Il gruppo scende al porto all'alba e trova la lanterna spenta. Ilde Varno non ri
 - Il registro del faro è sparito.
 ```
 
-La forma minima è: metadati con `id`, titolo `#`, una sezione `## Accaduto` in prosa al passato, e facoltativamente `## Fili aperti` come lista. Un blocco riservato è facoltativo. La cronaca non riscrive l'identità di nulla e non anticipa ciò che non è ancora accaduto.
+La forma minima è: metadati con `id` e `played`, titolo `#`, una sezione `## Accaduto` in prosa al passato, e facoltativamente `## Fili aperti` come lista. Un blocco riservato è facoltativo. La cronaca non riscrive l'identità di nulla e non anticipa ciò che non è ancora accaduto.
 
 ## 4. Modelli per tipo
 

@@ -129,7 +129,15 @@ export function removeCopy(campaign) {
  * is { ok, report, cost_usd, duration_ms, num_turns, error }, where error is
  * the first line of the failure message when ok is false.
  */
-export function runClaude({ cwd, prompt, model, allowedTools, timeoutMs, pluginDir = path.join(REPO_ROOT, 'yllir') }) {
+export function runClaude({
+  cwd,
+  prompt,
+  model,
+  allowedTools,
+  timeoutMs,
+  pluginDir = path.join(REPO_ROOT, 'yllir'),
+  continueConversation = false,
+}) {
   const args = [
     '-p',
     prompt,
@@ -139,6 +147,7 @@ export function runClaude({ cwd, prompt, model, allowedTools, timeoutMs, pluginD
     model,
     '--output-format',
     'json',
+    ...(continueConversation ? ['--continue'] : []),
     '--allowedTools',
     allowedTools,
   ];

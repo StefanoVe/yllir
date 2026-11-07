@@ -48,3 +48,24 @@ node testbench/runners/run-new-campaign-case.mjs testbench/cases/new-campaign/al
 ```
 
 With `--keep` the empty folder is kept and its final message and cost are saved beside it as `<dir>.run.json`, so `--grade-only` reproduces the record.
+
+Run the entry-point cases end to end (each case builds the morvalle fixture with two saved versions in a temporary folder, then runs the entry point on an existing campaign with the case prompt from `cases/entry/<case>/case.yaml`; costs money and takes a few minutes per run):
+
+```sh
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/go-back [--runs N] [--model haiku] [--keep]
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/where-and-question [--runs N] [--model haiku] [--keep]
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/not-available [--runs N] [--model haiku] [--keep]
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/go-back --setup-only
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/go-back --grade-only <dir> --run-json <dir>.run.json
+```
+
+The checks are E1 to E5 (go back: card restored, history kept, nothing else changed, plain words, Italian), W1 to W4 (where we left off and a question: no writes, summary, answer, plain words) and N1 to N4 (not available: no writes, says it is not there yet, offers what exists, plain words). With `--keep` the folder and its final message, cost and setup values are saved beside it as `<dir>.run.json`, which `--grade-only` needs.
+
+Run the prepare-session cases end to end (each builds the morvalle fixture with two saved versions, then runs the entry point with the case prompt; `prepare-proceed` runs one message, `prepare-two-turns` runs a first message that must ask the master before writing and then a reply run in the same folder with `--continue`; the reply is in `case.yaml`; costs money and takes minutes per run):
+
+```sh
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/prepare-proceed [--runs N] [--model haiku] [--keep]
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/prepare-two-turns [--runs N] [--model haiku] [--keep]
+```
+
+The checks are P1 to P9 (the new session file, its format, nothing else created, links, saved as one commit, the prerequisites are said, plain words, one closed topic, the review said APPLY); the two-turn case also checks Q1 and Q2 after the first message (a question is asked and nothing is written; the topic stays active with its question). P10 is informational: capitalised words in the session that no source names are recorded as `possible_invented_names` and never fail a run. With `--grade-only`, a two-turn case grades the final state, and the first-turn checks only when the run was kept with `--keep`.
