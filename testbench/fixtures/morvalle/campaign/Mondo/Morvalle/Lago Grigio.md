@@ -13,6 +13,8 @@ Le famiglie che vivono sulla riva pescano con reti di canapa. L'acqua non gela m
 
 Ci sono barche a remi legate al molo, poche ma ben tenute.
 
+Il lago è profondo trenta braccia nel punto più lontano dalla riva.
+
 <!-- master -->
 ## Master
 

@@ -5,8 +5,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildSubjectIndex, compareStrings } from './subjects.mjs';
-import { scanMentions } from './mentions.mjs';
+import { buildSubjectIndex, compareStrings } from '../../../../../scripts/lib/subjects.mjs';
+import { scanMentions } from '../../../../../scripts/lib/mentions.mjs';
 
 const REVIEW_STATES = new Set(['ambiguous', 'linked-elsewhere']);
 

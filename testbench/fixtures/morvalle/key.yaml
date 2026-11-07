@@ -329,6 +329,13 @@ mentions:
     expected: no-link
     note: a mention of a subject inside its own sheet is never linked
 
+  - id: A11
+    file: "Trama/La cenere che canta/Sessione 2.md"
+    snippet: "Il pescatore giura che il Lago Grigio è profondo quaranta braccia dopo le piogge."
+    subject: lago-grigio
+    context: bare
+    expected: link
+
 contradictions:
   - id: C01
     kind: date
@@ -390,3 +397,30 @@ non_issues:
       file: "Appunti/Idee.md"
       snippet: "- Ipotesi da valutare: forse Teodo Marr è il traditore che ha venduto la mappa del pozzo?"
     expected: never reported as an accusation or a fact
+
+excluded:
+  - id: X01
+    subject: lago-grigio
+    attribute: number.depth
+    a:
+      file: "Mondo/Morvalle/Lago Grigio.md"
+      snippet: "Il lago è profondo trenta braccia nel punto più lontano dalla riva."
+    b:
+      file: "Trama/La cenere che canta/Sessione 2.md"
+      snippet: "Il pescatore giura che il Lago Grigio è profondo quaranta braccia dopo le piogge."
+    expected: covered by audit.exclusions in campaign.yaml; never reported as a problem
+
+acceptable_findings:
+  - id: Y01
+    note: >
+      Seeded unintentionally: the Sessione 3 table places oria-brunel at Lago Grigio,
+      while her sheet's frontmatter says borgo-cenere. A real discrepancy (scene vs sheet);
+      reporting it is correct and is not a false alarm. Any non-perspective category is acceptable.
+    subject: oria-brunel
+    attribute: location.current
+    a:
+      file: "Personaggi/Oria Brunel.md"
+      snippet: "location: [borgo-cenere]"
+    b:
+      file: "Trama/La cenere che canta/Sessione 3.md"
+      snippet: "| Oria Brunel | Lago Grigio |"

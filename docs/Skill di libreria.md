@@ -432,5 +432,5 @@ Ogni scheda segue lo stesso schema. «Deterministico» indica ciò che deve dive
 - **Stampa:** libreria attivata da un modulo, o modulo puro? Nel documento è trattata come modulo opzionale con una skill di esecuzione; confermare.
 - **Modelli:** l'assegnazione dei modelli è in [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md), dove si discutono le scelte da confermare.
 - **Autorun:** oltre all'ingest e alla ricerca musicale (entrambe decise), deve partire da sola anche la ricerca nel canone su certe domande? Proposta: no.
-- **Esclusioni dell'audit:** il registro delle decisioni già prese (quali rilievi non sono più problemi) sta nella configurazione del progetto o in un file del modulo fonti? Proposta: configurazione.
+- **Esclusioni dell'audit:** **Deciso (2026-11-07):** il registro sta in `campaign.yaml`, nella sezione `audit.exclusions` (vedi [Configurazione](Configurazione.md)).
 - **Funzioni da valutare:** vedute e carte nautiche entrano nel catalogo come funzioni o restano fuori? Da decidere insieme alla questione aperta dell'indice sugli strumenti da confluire.

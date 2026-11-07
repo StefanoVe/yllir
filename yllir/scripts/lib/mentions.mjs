@@ -36,13 +36,15 @@ const WORD_CHAR = /[\p{L}\p{N}]/u;
 /**
  * @param {string} campaignRoot absolute path to the campaign folder
  * @param {{ subjects: object[] }} index result of buildSubjectIndex
+ * @param {{ includeNotes?: boolean }} [options] includeNotes also scans the notes folders
  * @returns {{ files: string[], occurrences: object[], summary: Record<string, number> }}
  */
-export function scanMentions(campaignRoot, index) {
+export function scanMentions(campaignRoot, index, { includeNotes = false } = {}) {
   const { structure } = readStructure(campaignRoot);
   const scanned = new Set();
   for (const category of structure ?? []) {
-    if (typeof category.folder !== 'string' || category.type === 'notes') continue;
+    if (typeof category.folder !== 'string') continue;
+    if (category.type === 'notes' && !includeNotes) continue;
     for (const sheet of listSheets(campaignRoot, category.folder)) scanned.add(sheet);
   }
   const files = [...scanned].sort(compareStrings);

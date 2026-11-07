@@ -75,6 +75,15 @@ structure:                       # facoltativo alla creazione. Categorie di docu
     style: id                    # facoltativo. Profilo di stile per gli artwork di questa categoria.
     cards: false                 # facoltativo. Se vero, gli oggetti producono carte illustrate.
 
+audit:                           # facoltativo. Decisione dell'autore (2026-11-07): il registro delle esclusioni sta qui.
+  exclusions:                    # rilievi che il master ha già deciso: l'audit non li ripropone.
+    - subject: id                # obbligatorio. Id del soggetto.
+      attribute: testo           # obbligatorio. Attributo del vocabolario dell'audit (per esempio number.depth).
+      values: []                 # obbligatorio. I valori ammessi insieme (lista); un rilievo coperto non arriva al giudizio.
+      reason: testo              # obbligatorio. Il motivo, con la frase del master.
+      date: data                 # obbligatorio. AAAA-MM-GG.
+                                 # Le voci le scrive il framework su richiesta del master; nessuna migrazione le riscrive.
+
 modules:                         # facoltativo. Solo moduli veri, ciascuno attivabile.
   print: false                   # facoltativo. Fogli di stampa delle carte.
   encyclopedia: false            # facoltativo. Enciclopedia pubblica della campagna.

@@ -123,7 +123,7 @@ framework-campagne/              Proposta: repository separato, nome da sceglier
       dark-fantasy/              Esempio di profilo di stile
       rotolo-dipinto/            Esempio di profilo di stile
     outputs/                     Stampa, enciclopedia, master screen, musica
-  scripts/                       Operazioni deterministiche, in Node.js (vedi sotto)
+  scripts/                       Operazioni deterministiche condivise da più skill o dal core, in Node.js (vedi sotto)
   templates/                     Modelli: configurazione, istruzioni per gli agenti, schede tipo
   migrations/                    Migrazioni dichiarate, una per passaggio di versione
   hooks/                         Controlli automatici all'avvio e prima o dopo una scrittura
@@ -135,7 +135,8 @@ Note sulla struttura:
 
 - **`manifest.yaml`** è l'unico punto in cui il pacchetto dichiara che cosa contiene. Il core non scopre le skill cercando file: legge l'elenco. Questo rende possibili le verifiche sulle dipendenze.
 - **`core/processes/`** contiene anche le regole comuni a tutti i processi, compresa la sequenza di scrittura.
-- **`scripts/`** contiene le operazioni che non cambiano per il modello usato: elenco di tutte le menzioni di un soggetto e dei suoi alias, controllo dei collegamenti, validazione del blocco riservato, rigenerazione degli indici derivati, controllo delle dipendenze fra sessioni, validazione della configurazione e della struttura delle cartelle. Sono scritti in Node.js (esempi `.mjs`).
+- **Script di una skill.** **Deciso (2026-11-07):** gli script propri di una skill stanno nella cartella della skill, accanto a `SKILL.md`, in `scripts/` (per esempio `skills/library/linker/scripts/`), insieme ai dati che usa solo lei. In `scripts/` alla radice del pacchetto resta solo il codice usato da più skill o dal core.
+- **`scripts/`** contiene le operazioni condivise che non cambiano per il modello usato: elenco di tutte le menzioni di un soggetto e dei suoi alias, controllo dei collegamenti, validazione del blocco riservato, rigenerazione degli indici derivati, controllo delle dipendenze fra sessioni, validazione della configurazione e della struttura delle cartelle. Sono scritti in Node.js (esempi `.mjs`).
 - **`templates/`** contiene i modelli da cui si generano le istruzioni per gli agenti (vedi la sezione successiva). Non contiene istruzioni scritte a mano per un solo agente.
 - **`hooks/`** contiene controlli che partono da soli (per esempio il confronto della versione all'avvio). La disponibilità degli hook varia fra Claude e Codex: è da verificare. Dove un hook non esiste, il controllo è eseguito dal core come primo passo del processo.
 - **`tests/`** contiene casi di prova per gli script e per le skill di libreria (per esempio: il collegamento a una menzione in un punto preciso; il rifiuto di un blocco riservato non chiuso). I casi girano con Claude e, se attivo, con Codex.

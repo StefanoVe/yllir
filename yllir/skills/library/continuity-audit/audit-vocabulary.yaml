@@ -1,0 +1,28 @@
+# Controlled vocabulary of fact attributes for the continuity audit.
+# An attribute is "<family>.<name>". Facts with other attributes are discarded.
+families:
+  - family: date
+    single: true
+    value: date          # must contain at least one digit; write years as digits
+    names: [founded, born, died, destroyed, began, ended]
+  - family: number
+    single: true
+    value: number        # digits only, optional decimal point: 45, 30, 2.5
+    names: any           # any kebab-case name: hit-points, depth, population, age
+  - family: location
+    single: true
+    value: ids           # one id, or several ids separated by commas, of places or of the subject carrying it
+    names: [current]
+  - family: origin
+    single: true
+    value: text
+    names: [made-by]
+  - family: status
+    single: true
+    value: text
+    names: [alive]
+  - family: relation
+    single: false
+    value: id            # the id of another subject
+    names: [parent-of, child-of, sibling-of, spouse-of, member-of, leads, serves, owns, carried-by]
+source_types: [author-clarification, source-claim, editorial-summary, hypothesis]

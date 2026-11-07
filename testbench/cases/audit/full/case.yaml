@@ -1,0 +1,7 @@
+case: audit-full
+fixture: morvalle
+skill: continuity-audit
+prompt: |
+  You are the Yllir core process. Invoke the skill yllir:continuity-audit with
+  MODE=full. The campaign root is the current directory. When the skill
+  finishes, output only the AUDIT REPORT it produced.

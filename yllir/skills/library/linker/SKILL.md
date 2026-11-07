@@ -24,7 +24,7 @@ Step 0. Run `mkdir -p .campaign/state/linker` from the campaign root (the folder
 ## Steps
 
 **Step 1 — Plan.** Run:
-`node "${CLAUDE_PLUGIN_ROOT}/scripts/plan-links.mjs" . --files "<FILES>" --subjects "<SUBJECTS>" --out .campaign/state/linker/plan.json`
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" . --files "<FILES>" --subjects "<SUBJECTS>" --out .campaign/state/linker/plan.json`
 Omit `--files` if FILES is empty. Omit `--subjects` if SUBJECTS is empty.
 - If the exit code is 1 or 2: stop. Report with status `FAILED` and the printed error lines.
 - If the output contains `proposals: 0` and `review: 0`: go to Step 5.
@@ -41,7 +41,7 @@ Do not add your own opinion or review the proposals yourself.
 - Otherwise: go to Step 3.
 
 **Step 3 — Apply.** Run:
-`node "${CLAUDE_PLUGIN_ROOT}/scripts/apply-links.mjs" . --plan .campaign/state/linker/plan.json --outcomes .campaign/state/linker/outcomes.json --out .campaign/state/linker/result.json`
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" . --plan .campaign/state/linker/plan.json --outcomes .campaign/state/linker/outcomes.json --out .campaign/state/linker/result.json`
 Read `.campaign/state/linker/result.json`.
 - If `ok` is true: go to Step 4.
 - If `rejected` or `missing_outcome` is not empty, and this is round 3 or later: go to Step 4 and report the remaining problems.

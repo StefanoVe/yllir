@@ -28,3 +28,14 @@ A mention may set `occurrence: N` (1-based) to pick the N-th scanner occurrence 
 The default fixture is `fixtures/morvalle`. The campaign is scanned in memory; nothing is written into the fixture. The runner prints one `FAIL` line per failing mention, one `UNEXPECTED` line per unexplained occurrence, and a summary. `--json` also writes a machine-readable report.
 
 Exit codes: 0 when every mention passes and there are no unexpected occurrences; 1 otherwise; 2 when the key or the campaign cannot be read.
+
+Run a case of the continuity audit end to end (runs `claude -p` with the plugin, so it costs money and takes 10+ minutes per run):
+
+```sh
+node testbench/runners/run-audit-case.mjs testbench/cases/audit/full [--runs N] [--model haiku] [--keep]
+node testbench/runners/run-audit-case.mjs testbench/cases/audit/full --grade-only <copyPath>
+```
+
+The agent works on a temporary git copy of `fixtures/morvalle/campaign/`. The runner grades `.campaign/state/audit/report.json` and the other audit files left in the copy against `key.yaml`: recall of the contradictions, no problem for perspectives, hypotheses or recorded exclusions, no change to the documents, and one judgment per candidate. False alarms are reported and do not fail a run. `--keep` keeps the copy for inspection; `--grade-only` grades a kept copy again without running the agent and prints the record without appending it to the results.
+
+Each run appends one JSON line to `results/<case>.jsonl` with the model, the hash of the audit instructions, the checks, the report text, cost and duration. Shared helpers for the runners are in `runners/lib/case-common.mjs`.

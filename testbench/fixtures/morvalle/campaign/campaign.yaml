@@ -44,3 +44,11 @@ structure:
   - id: appunti
     folder: Appunti
     type: notes
+
+audit:
+  exclusions:
+    - subject: lago-grigio
+      attribute: number.depth
+      values: ["30", "40"]
+      reason: "Il master: «la profondità del lago cambia con le piogge, va bene così»."
+      date: 2026-11-07

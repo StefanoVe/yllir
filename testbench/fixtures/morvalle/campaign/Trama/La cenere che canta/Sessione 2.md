@@ -11,6 +11,8 @@ Il gruppo sale verso il pozzo con la luce del mattino. Il bosco è silenzioso e 
 
 Il verme di brace ha 60 punti ferita e non fugge mai.
 
+Il pescatore giura che il Lago Grigio è profondo quaranta braccia dopo le piogge.
+
 Il sentiero si divide in due: a sinistra una scala di pietra, a destra un ponte di legno sopra un canale secco.
 
 ## La scala

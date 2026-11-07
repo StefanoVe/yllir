@@ -39,7 +39,7 @@ const BASE_FILES = {
 };
 
 /** Builds a temporary campaign, runs the index and the scan, and removes the folder. */
-function scan(files) {
+function scan(files, options) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
   try {
     const all = { 'campaign.yaml': CAMPAIGN, ...BASE_FILES, ...files };
@@ -49,7 +49,7 @@ function scan(files) {
       fs.writeFileSync(full, content);
     }
     const index = buildSubjectIndex(root);
-    const result = scanMentions(root, index);
+    const result = scanMentions(root, index, options);
     return { index, result };
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -278,6 +278,14 @@ test('notes folder is not scanned', () => {
   assert.equal(result.files.includes('Notes/Appunti.md'), false);
   assert.equal(inFile(result, 'Notes/Appunti.md').length, 0);
   assert.ok(result.files.includes('People/Oria Valdes.md'));
+});
+
+test('includeNotes option scans the notes folder', () => {
+  const { result } = scan({ 'Notes/Appunti.md': 'Oria Valdes\n' }, { includeNotes: true });
+  assert.equal(result.files.includes('Notes/Appunti.md'), true);
+  const [occ] = inFile(result, 'Notes/Appunti.md');
+  assert.equal(occ.subject, 'oria-valdes');
+  assert.equal(occ.state, 'bare');
 });
 
 test('files lists subject folders and plot folders, sorted', () => {
