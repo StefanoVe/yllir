@@ -6,6 +6,8 @@ user-invocable: false
 
 # Continuity audit
 
+When another skill invoked you (for example write-sequence), the AUDIT REPORT is the result for that skill, not a message for the master: never end your turn with it. As soon as the report is complete, go back to the step of the invoking skill and continue from there. Only when the master asked for the check directly does the invoking process present the result to the master, in plain words.
+
 Scripts build the subject index, validate facts and compare them. Sub-agents read documents, extract facts and judge candidates. You only run commands, launch sub-agents, save their answers and return the report. Never read campaign documents yourself, never extract facts yourself, never judge candidates yourself, and never edit campaign documents.
 
 ## Inputs
@@ -14,8 +16,9 @@ The caller gives:
 - `MODE`: `pre` or `full`. Default `pre`.
 - `FILES` and/or `SUBJECTS`: comma-separated campaign-relative paths and subject ids. Required in `pre` mode. In `full` mode, pass neither.
 - `CHANGE`: one sentence describing the planned modification. Pre mode only. Default: "not described".
+- `CONTINUE_WITH`: text given by the invoking skill naming the exact step to resume (for example "write-sequence step 3"). Default: "the step of the invoking skill that called the audit".
 
-If `MODE` is `pre` and both `FILES` and `SUBJECTS` are empty, stop and ask the caller which files or subjects to audit. Do not audit the whole campaign.
+If `MODE` is `pre` and both `FILES` and `SUBJECTS` are empty, end this skill with status `FAILED`, reason "no scope given" (the invoking skill continues and asks the master which files or subjects to audit). Do not audit the whole campaign.
 
 ## Working folder
 
@@ -26,10 +29,10 @@ Run `rm -rf .campaign/state/audit && mkdir -p .campaign/state/audit/facts`, then
 
 **Step 1 — Index and scope.** Run:
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" . --out .campaign/state/audit/subjects.json`
-- Exit 1: stop. Report status `FAILED` with the printed errors.
+- Exit 1: end this skill with status `FAILED` (the invoking skill continues), with the printed errors.
 - Exit 0: run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" . --mode <MODE> --files "<FILES>" --subjects "<SUBJECTS>" --out .campaign/state/audit/scope.json`. Omit `--files` if FILES is empty. Omit `--subjects` if SUBJECTS is empty. Omit both in `full` mode.
-- Exit 1 from audit-scope: stop. Report status `FAILED` with the printed errors.
-- Any other exit code: stop. Report status `FAILED`, reason "index not run" or "scope not run".
+- Exit 1 from audit-scope: end this skill with status `FAILED` (the invoking skill continues), with the printed errors.
+- Any other exit code: end this skill with status `FAILED` (the invoking skill continues), reason "index not run" or "scope not run".
 
 **Step 2 — Extract.** Read `.campaign/state/audit/scope.json`. Its `files` array holds entries `{ fid, document }`. Keep their order. Split them into batches of at most 4 entries. Launch one `yllir:audit-extractor` sub-agent per batch with the Agent tool, all in the same message. The prompt of each is exactly this, with the real values:
 ```
@@ -53,7 +56,7 @@ Keep the printed output. Each printed line `<fid>#<n> <reason>` is a discarded f
 **Step 4 — Compare.** Run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-compare.mjs" . --facts .campaign/state/audit/facts.json --out .campaign/state/audit/candidates.json`
 - Exit 0 or 1: keep the printed candidate lines and go to Step 5. Exit 1 means coverage is incomplete: the first printed line is `WARNING: coverage incomplete`. The comparison is still written and valid, so ignore the WARNING line when counting candidates.
-- Exit 2 or any other code: stop. Report status `FAILED`, reason "compare not run".
+- Exit 2 or any other code: end this skill with status `FAILED` (the invoking skill continues), reason "compare not run".
 
 **Step 5 — Judge.** Count the candidate lines printed by Step 4. A candidate line is a printed line that starts with `C` followed by digits (for example `C001 `). The summary line `facts: …` and the `WARNING` line are not candidates.
 - Zero candidates: write `[]` to `.campaign/state/audit/judgments.json` with the Write tool. Go to Step 6.
@@ -80,9 +83,9 @@ Save its answer exactly as received to `.campaign/state/audit/coverage-review.js
 Add `--coverage-review .campaign/state/audit/coverage-review.json` only when Step 6 ran.
 - Exit 0 (COMPLETE) or 1 (INCOMPLETE): go to "Return".
 - Exit 3 (INVALID): if you have already launched the judge again twice, go to "Return". Otherwise launch `yllir:audit-judge` again with the Step 5 prompt plus one line `PROBLEMS:` followed by the printed problem lines, one per line. Save its answer exactly as received to `judgments.json`. Run the Step 7 command again.
-- Exit 2 or any other code: stop. Report status `FAILED` with the printed lines.
+- Exit 2 or any other code: end this skill with status `FAILED` (the invoking skill continues), with the printed lines.
 
-**Return.** Your whole answer is the printed text of `audit-report.mjs`, verbatim. Add nothing before or after it.
+**Return.** Do not print the report. The invoking skill reads `.campaign/state/audit/report.txt`. Your last action is the report script run; then, in the same turn, do what `CONTINUE_WITH` says. Only if the master asked for the check directly (no invoking skill), tell the master the result in plain words in the campaign language. Never paste the report.
 
 ## Rules
 
@@ -94,20 +97,17 @@ Add `--coverage-review .campaign/state/audit/coverage-review.json` only when Ste
 
 ## Examples
 
-Correct return (COMPLETE, one problem, one perspective). The layout is what the script prints; your answer is that text only:
+The report stays in `.campaign/state/audit/report.txt`. Never print it and never paste it into a message.
+
+Correct last actions (pre mode, invoked by write-sequence with `CONTINUE_WITH` = "write-sequence step 3"; the report script exits 0, status COMPLETE, one problem):
+1. Run the report script, with its full command from Step 7. Its output is not shown to the master.
+2. In the same turn, without writing anything else first, start write-sequence step 3.
+
+Wrong last actions, do not do this:
 ```
 CONTINUITY AUDIT
 status: COMPLETE
-mode: pre
-scope: 2 documents, 1 subject (ada-rook)
 problems: 1
-- perspective, ada-rook, date.born
-  Characters/Ada Rook.md:14 (source-claim), Plot/Arc One/Session 2.md:9 (editorial-summary)
-not checked: none
+...
 ```
-
-Wrong return, do not produce this:
-```
-No contradictions found.
-```
-The executor wrote this without running `audit-report.mjs`. Only the report script can state the result.
+The executor printed the report block and ended the turn. The invoking skill never continues. A bare "No contradictions found." is also wrong: only the report script decides the status, and its result is read from `report.txt`.

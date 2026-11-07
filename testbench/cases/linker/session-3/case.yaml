@@ -6,5 +6,5 @@ files:
 prompt: |
   You are the Yllir core process. Invoke the skill yllir:linker with
   FILES="Trama/La cenere che canta/Sessione 3.md" and SUBJECTS empty.
-  The campaign root is the current directory. When the skill finishes,
-  output only the LINKER REPORT it produced.
+  The campaign root is the current directory.
+  When the skill finishes, tell me in one sentence whether the links were added.

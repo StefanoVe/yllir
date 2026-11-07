@@ -39,3 +39,12 @@ node testbench/runners/run-audit-case.mjs testbench/cases/audit/full --grade-onl
 The agent works on a temporary git copy of `fixtures/morvalle/campaign/`. The runner grades `.campaign/state/audit/report.json` and the other audit files left in the copy against `key.yaml`: recall of the contradictions, no problem for perspectives, hypotheses or recorded exclusions, no change to the documents, and one judgment per candidate. False alarms are reported and do not fail a run. `--keep` keeps the copy for inspection; `--grade-only` grades a kept copy again without running the agent and prints the record without appending it to the results.
 
 Each run appends one JSON line to `results/<case>.jsonl` with the model, the hash of the audit instructions, the checks, the report text, cost and duration. Shared helpers for the runners are in `runners/lib/case-common.mjs`.
+
+Run the new-campaign case end to end (the agent starts from an empty folder, answers the master's prompt from `cases/new-campaign/<case>/case.yaml`, and the runner grades the settings, the world document, the instructions, the saved version, the links, the plain words of the final message, the absence of extra files and the independent review; costs money and takes 10+ minutes per run):
+
+```sh
+node testbench/runners/run-new-campaign-case.mjs testbench/cases/new-campaign/all-answers [--runs N] [--model haiku] [--keep]
+node testbench/runners/run-new-campaign-case.mjs testbench/cases/new-campaign/all-answers --grade-only <dir>
+```
+
+With `--keep` the empty folder is kept and its final message and cost are saved beside it as `<dir>.run.json`, so `--grade-only` reproduces the record.

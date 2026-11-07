@@ -97,6 +97,14 @@ export function instructionsHash(files) {
 }
 
 /**
+ * Creates an empty temporary folder (no git) for a case that starts from nothing,
+ * and returns its path. Remove it with fs.rmSync(path, { recursive: true, force: true }).
+ */
+export function prepareEmpty() {
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-case-'));
+}
+
+/**
  * Copies the fixture campaign into a fresh temporary git repository, commits
  * it as the baseline and returns the path of the copy (the folder `campaign`
  * inside the temporary folder). Remove it with removeCopy.
