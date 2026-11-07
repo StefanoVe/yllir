@@ -114,7 +114,7 @@ Lo script percorre ogni Markdown e assegna a ogni occorrenza di una forma uno st
 | `excluded-italic` | in narrazione `_testo_` letta ai giocatori (convenzione di formattazione) | nessuna |
 | `excluded-code` | in un blocco con tre backtick o in codice inline | nessuna |
 | `excluded-comment` | in un commento HTML | nessuna |
-| `to-decide` | in una tabella o in un diagramma Mermaid | decisione dichiarata una volta per tipo di blocco |
+| `excluded-diagram` | in un diagramma Mermaid | nessuna: un link Markdown dentro un'etichetta rompe il diagramma (**Deciso**, 2026-11-07) |
 
 La convenzione del corsivo narrativo è una regola della campagna, non del framework: va dichiarata nella configurazione (vedi [Configurazione](Configurazione.md)), e lo script la legge da lì.
 
@@ -365,6 +365,7 @@ Queste lezioni portano a verificare invarianti, a usare controlli di fuga con un
 - I valori di partenza delle soglie vanno confermati dopo la prima misura: quali accettare, e per quali skill.
 - Chi scrive la chiave della fixture e come si aggiorna quando la campagna d’esempio cambia.
 - Se i casi di prova girano in automatico a ogni modifica di istruzioni, o solo a ogni rilascio, dato il costo di più esecuzioni per modello.
-- Come dichiarare nella scheda le figure tramite e lo stato delle forme (`fact` o `hypothesis`): a mano dal master, o proposte dallo script e confermate. Gli `aliases` sono la fonte dell’indice; la forma della dichiarazione per queste due informazioni non è ancora definita.
-- Come trattare i diagrammi Mermaid e le tabelle: esclusi per regola, oppure controllati con un passo a parte.
+- **MVP (decisione dell'autore, 2026-11-07):** nell'MVP l'indice usa solo titoli e `aliases`, tutti con stato `fact`. Le forme `hypothesis` e le figure tramite si dichiarano dopo; nella fixture la figura tramite si verifica come due soggetti distinti, ciascuno collegato al proprio. Resta aperto:
+  Come dichiarare nella scheda le figure tramite e lo stato delle forme (`fact` o `hypothesis`): a mano dal master, o proposte dallo script e confermate. Gli `aliases` sono la fonte dell’indice; la forma della dichiarazione per queste due informazioni non è ancora definita.
+- ~~Come trattare i diagrammi Mermaid e le tabelle.~~ **Deciso (2026-11-07):** nelle tabelle si collega come nel testo; nei diagrammi Mermaid mai (stato `excluded-diagram`).
 - Se il registro di copertura dell’audit debba essere conservato nella campagna o restare un file temporaneo.

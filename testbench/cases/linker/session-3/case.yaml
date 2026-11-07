@@ -1,0 +1,10 @@
+case: linker-session-3
+fixture: morvalle
+skill: linker
+files:
+  - "Trama/La cenere che canta/Sessione 3.md"
+prompt: |
+  You are the Yllir core process. Invoke the skill yllir:linker with
+  FILES="Trama/La cenere che canta/Sessione 3.md" and SUBJECTS empty.
+  The campaign root is the current directory. When the skill finishes,
+  output only the LINKER REPORT it produced.

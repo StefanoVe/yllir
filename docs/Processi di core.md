@@ -37,7 +37,7 @@ Ogni passo che crea o modifica un documento della campagna segue la stessa seque
 3. **Bozza.** Il testo viene preparato. Se la bozza è affidata a un modello economico, l'agente principale la rilegge contro la fonte prima di proseguire.
 4. **Revisione indipendente.** Sempre, da un sub-agent distinto da chi ha preparato la bozza, anche quando la prosa è dell'agente principale. Il revisore riceve soltanto ciò che serve al controllo, secondo la regola di visibilità in [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md). Esito: `APPLY` prosegue; `FIX` torna alla bozza (passo 3); `ASK` porta la decisione al master e ferma la scrittura interessata.
 5. **Scrittura.** Il documento viene creato o modificato. Se la bozza cambia dopo la revisione, si torna al passo 4.
-6. **Collegamenti.** Collegamenti (`linker`) sul documento scritto. Le proposte passano dalla revisione indipendente: quelle approvate si applicano, quelle dubbie vanno al master.
+6. **Collegamenti.** Collegamenti (`linker`) sul documento scritto e, quando la scrittura crea un soggetto o un alias nuovo, su ogni documento che lo menziona: l'indice dei soggetti dice quali sono (**Deciso**, 2026-11-07). Le proposte passano dalla revisione indipendente: quelle approvate si applicano, quelle dubbie vanno al master.
 7. **Derivati.** Rigenerazione dei derivati: mappa della trama (`plot-map`), viste per luogo, cache dei soggetti. La mappa della trama si aggiorna solo se cambiano ordine, ingressi, uscite o scelte della trama; altrimenti il controllo si chiude senza modifiche.
 8. **Verifica deterministica.** Sempre. Lo script di controllo verifica i link che non risolvono, i riferimenti mancanti, i file attesi assenti, il blocco riservato ben formato e la coerenza della mappa con i prerequisiti. Il suo esito prevale sulla valutazione dell'agente. Se fallisce, si torna alla bozza (passo 3) con una nuova revisione (passo 4).
 9. **Versione salvata.** Solo dopo la verifica superata, il framework salva una versione con una descrizione in frasi.
@@ -98,7 +98,7 @@ Le parole mostrate al master sono definite solo nel glossario di [Principi](Prin
 
 - la configurazione della campagna, con lingua, registro, sistema e i soli moduli necessari;
 - le istruzioni generate per gli agenti e il file delle personalizzazioni, vuoto;
-- la scheda radice del mondo, con la premessa della risposta 4 come primo testo;
+- la scheda radice del mondo, `Mondo/<Nome del mondo>.md` (**Deciso**, 2026-11-07), con la premessa della risposta 4 come primo testo. Quando nasce il primo sotto-luogo diventa una cartella con la scheda omonima, tramite uno spostamento di `continuity-keeper`;
 - il repository git locale della campagna, con la prima versione salvata.
 
 Le cartelle delle categorie, il documento di economia (`Storia/Economia.md`), i profili di stile e i moduli opzionali **non** si creano qui: nascono la prima volta che servono (la prima scheda di un personaggio crea `Personaggi/`, il primo prezzo propone `Storia/Economia.md`, la prima immagine chiede lo stile). È l'applicazione di YAGNI alla campagna: nessuna cartella vuota, nessuna domanda su cose che il master non sta ancora facendo.

@@ -1,0 +1,197 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { planLinks } from './link-plan.mjs';
+
+const CAMPAIGN = [
+  'name: Test',
+  'structure:',
+  '  - id: people',
+  '    folder: People',
+  '    type: subjects',
+  '  - id: plot',
+  '    folder: Trama',
+  '    type: plot',
+  '',
+].join('\n');
+
+function subject(id, title) {
+  return `---\nid: ${id}\n---\n\n# ${title}\n\nUn testo.\n`;
+}
+
+/** Writes a temporary campaign, runs `fn` on it and removes it afterwards. */
+function withCampaign(files, fn) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+  try {
+    const all = { 'campaign.yaml': CAMPAIGN, ...files };
+    for (const [rel, content] of Object.entries(all)) {
+      const full = path.join(root, rel);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content);
+    }
+    return fn(root);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+const BASE = {
+  'People/Teodo Marr.md': subject('teodo-marr', 'Teodo Marr'),
+  'People/Àlvar (Ferro).md': subject('alvar-ferro', 'Àlvar Ferro'),
+  'People/Oria Valdes.md': subject('oria-valdes', 'Oria Valdes'),
+};
+
+test('target is encoded for spaces and parentheses, accents kept', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/Nota.md': '# Nota\n\nIncontro con Àlvar Ferro al porto.\n',
+    },
+    (root) => {
+      const plan = planLinks(root);
+      assert.equal(plan.proposals.length, 1);
+      const [p] = plan.proposals;
+      assert.equal(p.sheet, 'People/Àlvar (Ferro).md');
+      assert.equal(p.target, '../People/Àlvar%20%28Ferro%29.md');
+    },
+  );
+});
+
+test('target from a nested folder', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/Arc/S1.md': '# Sessione 1\n\nParla Teodo Marr con il fabbro.\n',
+    },
+    (root) => {
+      const [p] = planLinks(root).proposals;
+      assert.equal(p.target, '../../People/Teodo%20Marr.md');
+    },
+  );
+});
+
+test('before and after show only the own replacement of each proposal', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/Nota.md': '# Nota\n\nTeodo Marr e Teodo Marr.\n',
+    },
+    (root) => {
+      const plan = planLinks(root);
+      assert.equal(plan.proposals.length, 2);
+      const [first, second] = plan.proposals;
+      assert.equal(first.pid, 'P001');
+      assert.equal(second.pid, 'P002');
+      assert.equal(first.before, 'Teodo Marr e Teodo Marr.');
+      assert.equal(second.before, 'Teodo Marr e Teodo Marr.');
+      assert.equal(first.col, 1);
+      assert.equal(second.col, 'Teodo Marr e '.length + 1);
+      assert.equal(
+        first.after,
+        '[Teodo Marr](../People/Teodo%20Marr.md) e Teodo Marr.',
+      );
+      assert.equal(
+        second.after,
+        'Teodo Marr e [Teodo Marr](../People/Teodo%20Marr.md).',
+      );
+    },
+  );
+});
+
+test('scope by files keeps only the given files', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/A.md': '# A\n\nC\'è Teodo Marr qui.\n',
+      'Trama/B.md': '# B\n\nC\'è Teodo Marr anche qui.\n',
+    },
+    (root) => {
+      const plan = planLinks(root, { files: ['Trama/A.md'] });
+      assert.deepEqual(plan.scope, ['Trama/A.md']);
+      assert.deepEqual(
+        plan.proposals.map((p) => p.file),
+        ['Trama/A.md'],
+      );
+    },
+  );
+});
+
+test('scope by subjects picks the files that mention the subject', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/A.md': '# A\n\nC\'è Teodo Marr qui.\n',
+      'Trama/B.md': '# B\n\nParla Oria Valdes con il monaco.\n',
+    },
+    (root) => {
+      // The subject's own sheet has a `self` mention of it, so it is in scope too.
+      const bySubject = planLinks(root, { subjects: ['oria-valdes'] });
+      assert.deepEqual(bySubject.scope, ['People/Oria Valdes.md', 'Trama/B.md']);
+      assert.deepEqual(
+        bySubject.proposals.map((p) => p.file),
+        ['Trama/B.md'],
+      );
+
+      const both = planLinks(root, { files: ['Trama/A.md'], subjects: ['oria-valdes'] });
+      assert.deepEqual(both.scope, ['People/Oria Valdes.md', 'Trama/A.md', 'Trama/B.md']);
+    },
+  );
+});
+
+test('unknown file in scope gives a scope error', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/A.md': '# A\n\nC\'è Teodo Marr qui.\n',
+    },
+    (root) => {
+      const plan = planLinks(root, { files: ['Trama/Nope.md'] });
+      assert.deepEqual(plan.scope, []);
+      assert.deepEqual(plan.errors, [{ file: 'Trama/Nope.md', message: 'file not in scan' }]);
+      assert.deepEqual(plan.proposals, []);
+    },
+  );
+});
+
+test('ambiguous and linked-elsewhere mentions go to review, not proposals', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'People/Lino A.md': subject('lino-a', 'Lino'),
+      'People/Lino B.md': subject('lino-b', 'Lino'),
+      'Trama/A.md': '# A\n\nIl fabbro Lino aspetta.\n',
+      'Trama/B.md': '# B\n\nVedi [Teodo Marr](../People/Altro.md) per dettagli.\n',
+    },
+    (root) => {
+      const plan = planLinks(root);
+      assert.deepEqual(plan.proposals, []);
+      assert.equal(plan.review.length, 2);
+
+      const [ambiguous, elsewhere] = plan.review;
+      assert.equal(ambiguous.rid, 'R001');
+      assert.equal(ambiguous.state, 'ambiguous');
+      assert.equal(ambiguous.subject, null);
+      assert.deepEqual(ambiguous.candidates, ['lino-a', 'lino-b']);
+      assert.equal(elsewhere.rid, 'R002');
+      assert.equal(elsewhere.state, 'linked-elsewhere');
+      assert.equal(elsewhere.link_target, 'People/Altro.md');
+    },
+  );
+});
+
+test('the same campaign gives byte-identical plans', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/A.md': '# A\n\nTeodo Marr e Oria Valdes.\n',
+      'Trama/Arc/B.md': '# B\n\nOria Valdes parla.\n',
+    },
+    (root) => {
+      const first = JSON.stringify(planLinks(root), null, 2);
+      const second = JSON.stringify(planLinks(root), null, 2);
+      assert.equal(first, second);
+    },
+  );
+});

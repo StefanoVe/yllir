@@ -28,3 +28,8 @@ yarn-debug.log*
 yarn-error.log*
 
 .DS_Store
+
+# Claude Code: local settings, memory and scratchpad (personal, never committed)
+/.claude/settings.local.json
+/.claude/memory/
+/.claude/scratchpad/

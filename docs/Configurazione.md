@@ -68,8 +68,10 @@ structure:                       # facoltativo alla creazione. Categorie di docu
                                  # Una categoria compare quando nasce la prima scheda.
   - id: testo                    # obbligatorio. Id stabile, usato dai processi; non cambia con il nome della cartella.
     folder: testo                # obbligatorio. Percorso relativo alla radice della campagna.
-    type: plot | chronicle | places | subjects | objects | free | master-only
+    type: plot | chronicle | places | subjects | objects | free | notes | master-only
                                  # obbligatorio. Determina quali regole di creazione e di collegamento si applicano.
+                                 # notes: spunti e bozze, non canone (Appunti/). Non entrano nell'indice dei soggetti
+                                 # e non si collegano in automatico; l'audit li legge come ipotesi.
     style: id                    # facoltativo. Profilo di stile per gli artwork di questa categoria.
     cards: false                 # facoltativo. Se vero, gli oggetti producono carte illustrate.
 
@@ -212,5 +214,5 @@ Il validatore viene eseguito all'avvio, dopo ogni modifica alla configurazione e
 - **Enumerativi chiusi o aperti.** Per `prose.register` e `structure[].type` la proposta è un elenco chiuso; resta da decidere chi può aggiungere valori e come.
 - **Gerarchia dei luoghi.** La configurazione dichiara solo le categorie. Non è deciso se anche la gerarchia di `Mondo` (continente, regione, luogo) debba essere descritta nel file o ricavata dalle cartelle.
 - **Lingue secondarie.** Non è deciso se una campagna possa avere enciclopedia o schede in più lingue e come si collegano.
-- **Wrapper per Claude.** Non è deciso se il file per Claude Code sia generato come file di istruzioni autonomo o sia un semplice rimando a quello in `.campaign/instructions/`.
+- **Wrapper per Claude e Codex.** **Deciso (2026-11-07):** nella radice della campagna il generatore scrive `CLAUDE.md` e `AGENTS.md` brevi, che rimandano soltanto a `.campaign/instructions/`, l'unica fonte, e a `.campaign/customizations.md`.
 - **Regole di processo fisse.** L'elenco delle regole che il template impone, e che la configurazione non può disattivare, va confrontato con [Processi di core](Processi%20di%20core.md) prima di essere fissato.

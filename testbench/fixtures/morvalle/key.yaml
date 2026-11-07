@@ -1,0 +1,392 @@
+fixture: morvalle
+scope_note: >
+  Mentions are listed only for the required sentences. All other prose names no subject.
+  Files in Appunti/ are out of linker scope.
+
+subjects:
+  - id: morvalle
+    sheet: Mondo/Morvalle/Morvalle.md
+    forms: [Morvalle]
+  - id: borgo-cenere
+    sheet: "Mondo/Morvalle/Borgo Cenere/Borgo Cenere.md"
+    forms: [Borgo Cenere]
+  - id: torre-dell-ascia
+    sheet: "Mondo/Morvalle/Borgo Cenere/Torre dell’Ascia.md"
+    forms: ["Torre dell’Ascia"]
+  - id: pozzo-di-narem
+    sheet: "Mondo/Morvalle/Pozzo di Nàrem.md"
+    forms: ["Pozzo di Nàrem"]
+  - id: lago-grigio
+    sheet: "Mondo/Morvalle/Lago Grigio.md"
+    forms: [Lago Grigio]
+  - id: oria-valdes
+    sheet: "Personaggi/Oria Valdes.md"
+    forms: [Oria Valdes, Oria]
+  - id: oria-brunel
+    sheet: "Personaggi/Oria Brunel.md"
+    forms: [Oria Brunel]
+  - id: teodo-marr
+    sheet: "Personaggi/Teodo Marr.md"
+    forms: [Teodo Marr, Mastro Teodo]
+  - id: lino-valdes
+    sheet: "Personaggi/Lino Valdes.md"
+    forms: [Lino Valdes]
+  - id: sibilla-aurne
+    sheet: "Personaggi/Sibilla Aurne.md"
+    forms: [Sibilla Aurne]
+  - id: fosco-il-ramaio
+    sheet: "Personaggi/Fosco il Ramaio.md"
+    forms: [Fosco il Ramaio]
+  - id: verme-di-brace
+    sheet: "Creature/Verme di brace.md"
+    forms: [Verme di brace]
+  - id: capra-cinerina
+    sheet: "Creature/Capra cinerina.md"
+    forms: [Capra cinerina]
+  - id: lanterna-di-morvalle
+    sheet: "Oggetti/Lanterna di Morvalle.md"
+    forms: [Lanterna di Morvalle]
+  - id: taglia-sul-verme-di-brace
+    sheet: "Oggetti/Taglia sul verme di brace.md"
+    forms: [Taglia sul verme di brace]
+  - id: voce-del-pozzo
+    sheet: "Storia/Voce del Pozzo.md"
+    forms: [Voce del Pozzo]
+  - id: fondazione-del-borgo
+    sheet: "Storia/Fondazione del borgo.md"
+    forms: [Fondazione del borgo]
+  - id: cronache-del-monaco
+    sheet: "Storia/Cronache del monaco.md"
+    forms: [Cronache del monaco]
+  - id: neri-calce
+    sheet: "Giocatori/Neri Calce.md"
+    forms: [Neri Calce]
+
+relations:
+  - from: sibilla-aurne
+    type: figure-through
+    to: voce-del-pozzo
+    note: speaks on behalf of the deity, is not the deity; never an alias
+
+mentions:
+  - id: M01
+    file: "Trama/La cenere che canta/Sessione 1.md"
+    snippet: "_La strada scende verso Borgo Cenere tra campi grigi._"
+    subject: borgo-cenere
+    context: italic
+    expected: no-link
+  - id: M02
+    file: "Trama/La cenere che canta/Sessione 1.md"
+    snippet: "Il gruppo arriva a Borgo Cenere al tramonto."
+    subject: borgo-cenere
+    context: bare
+    expected: link
+  - id: M03
+    file: "Trama/La cenere che canta/Sessione 1.md"
+    snippet: "Sibilla Aurne li accoglie sulla soglia del tempio."
+    subject: sibilla-aurne
+    context: bare
+    expected: link
+  - id: M04
+    file: "Trama/La cenere che canta/Sessione 2.md"
+    snippet: "Il verme di brace ha 60 punti ferita e non fugge mai."
+    subject: verme-di-brace
+    context: bare
+    expected: link
+  - id: M05
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "# L'arrivo a Borgo Cenere"
+    subject: borgo-cenere
+    context: title
+    expected: no-link
+  - id: M06
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "_Il vento porta la cenere dal Pozzo di Nàrem fino alle finestre._"
+    subject: pozzo-di-narem
+    context: italic
+    expected: no-link
+  - id: M07
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "Il gruppo incontra Teodo Marr davanti alla porta della locanda."
+    subject: teodo-marr
+    context: bare
+    expected: link
+  - id: M08
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "Mastro Teodo offre una stanza per la notte."
+    subject: teodo-marr
+    context: bare
+    expected: link
+    note: alias
+  - id: M09
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "[Oria Valdes](../../Personaggi/Oria%20Valdes.md) li aspetta al molo."
+    subject: oria-valdes
+    context: linked
+    expected: none
+  - id: M10
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "[Sibilla Aurne](../../Personaggi/Teodo%20Marr.md) recita la preghiera della sera."
+    subject: sibilla-aurne
+    context: linked-elsewhere
+    expected: fix-link
+    target: teodo-marr
+    note: link text names Sibilla Aurne, the target file is Teodo Marr
+  - id: M11
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "Oria chiede notizie del fratello scomparso."
+    subject: oria-valdes
+    candidates: [oria-valdes, oria-brunel]
+    context: ambiguous
+    expected: ask
+  - id: M12
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "La Torre dell'Ascia si vede dal sentiero."
+    subject: torre-dell-ascia
+    context: bare
+    expected: link
+    note: plain apostrophe vs typographic in title
+  - id: M13
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "Una pista porta al Pozzo di Narem."
+    subject: pozzo-di-narem
+    context: bare
+    expected: link
+    note: missing accent
+  - id: M14
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "Il gruppo trova la Lanterna di Morvalle sul tavolo."
+    subject: lanterna-di-morvalle
+    context: bare
+    expected: link
+    note: "longest match wins: Morvalle inside the item name is not a separate mention"
+  - id: M15a
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "Sibilla Aurne parla a nome della Voce del Pozzo."
+    subject: sibilla-aurne
+    context: bare
+    expected: link
+  - id: M15b
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "Sibilla Aurne parla a nome della Voce del Pozzo."
+    subject: voce-del-pozzo
+    context: bare
+    expected: link
+    note: figure-through, link each subject separately
+  - id: M16a
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "| Oria Brunel | Lago Grigio |"
+    subject: oria-brunel
+    context: table
+    expected: link
+  - id: M16b
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "| Oria Brunel | Lago Grigio |"
+    subject: lago-grigio
+    context: table
+    expected: link
+  - id: M17a
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: '    A["Torre dell''Ascia"] --> B["Pozzo di Nàrem"]'
+    subject: torre-dell-ascia
+    context: mermaid
+    expected: no-link
+  - id: M17b
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: '    A["Torre dell''Ascia"] --> B["Pozzo di Nàrem"]'
+    subject: pozzo-di-narem
+    context: mermaid
+    expected: no-link
+  - id: M18
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "Nota: se il gruppo tarda, Sibilla Aurne parte da sola."
+    subject: sibilla-aurne
+    context: code
+    expected: no-link
+  - id: M19
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "<!-- ricordare: Lino Valdes non sa ancora nulla -->"
+    subject: lino-valdes
+    context: comment
+    expected: no-link
+  - id: M20
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "``Nel registro compare la firma `Lino Valdes`, scritta di fretta.``"
+    subject: lino-valdes
+    context: code
+    expected: no-link
+  - id: M21a
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "> Potete chiedere a Teodo Marr la strada per il Lago Grigio."
+    subject: teodo-marr
+    context: bare
+    expected: link
+  - id: M21b
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "> Potete chiedere a Teodo Marr la strada per il Lago Grigio."
+    subject: lago-grigio
+    context: bare
+    expected: link
+  - id: M22
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "Al mercato qualcuno giura di aver visto Teodo Marr correre verso il lago."
+    subject: teodo-marr
+    context: bare
+    expected: link
+  - id: M23
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "Prima dell'alba Teodo Marr chiude la locanda e sparisce."
+    subject: teodo-marr
+    context: bare
+    expected: link
+  - id: M24
+    file: "Trama/La cenere che canta/Sessione 3.md"
+    snippet: "## Il prezzo di Fosco il Ramaio"
+    subject: fosco-il-ramaio
+    context: title
+    expected: no-link
+  - id: M25
+    file: "Personaggi/Oria Brunel.md"
+    snippet: "Conosce il segreto di Teodo Marr e lo userà se minacciata."
+    subject: teodo-marr
+    context: master-block
+    expected: link
+  - id: M26
+    file: "Oggetti/Taglia sul verme di brace.md"
+    snippet: "Si cerca chi liberi la galleria del pozzo dal verme di brace."
+    subject: verme-di-brace
+    context: bare
+    expected: link
+  - id: M27a
+    file: "Personaggi/Sibilla Aurne.md"
+    snippet: "Quando parla nel tempio, parla a nome della Voce del Pozzo, ma non è la Voce del Pozzo."
+    subject: voce-del-pozzo
+    occurrence: 1
+    context: bare
+    expected: link
+  - id: M27b
+    file: "Personaggi/Sibilla Aurne.md"
+    snippet: "Quando parla nel tempio, parla a nome della Voce del Pozzo, ma non è la Voce del Pozzo."
+    subject: voce-del-pozzo
+    occurrence: 2
+    context: bare
+    expected: link
+    note: second mention on the same line; figure-through sheet, never linked as an alias of sibilla-aurne
+  - id: M28
+    file: "Storia/Voce del Pozzo.md"
+    snippet: "Si fa sentire attraverso Sibilla Aurne, che non ne è l'incarnazione."
+    subject: sibilla-aurne
+    context: bare
+    expected: link
+    note: figure-through, link each subject separately
+  - id: M29
+    file: "Giocatori/Neri Calce.md"
+    snippet: "- Gancio: da bambino lavorava per Teodo Marr nella bottega del lago."
+    subject: teodo-marr
+    context: bare
+    expected: link
+  - id: A02
+    file: "Storia/Fondazione del borgo.md"
+    snippet: "Borgo Cenere fu fondato nell'anno 312 dell'Ascia dai pastori delle alture."
+    subject: borgo-cenere
+    context: bare
+    expected: link
+  - id: A04
+    file: "Personaggi/Oria Valdes.md"
+    snippet: "È la madre di Lino Valdes e vive con lui sulla riva del lago."
+    subject: lino-valdes
+    context: bare
+    expected: link
+  - id: A05a
+    file: "Cronaca/2026-10-03.md"
+    snippet: "Al molo il gruppo incontra Lino Valdes, padre di Oria Valdes, che ripara una rete."
+    subject: lino-valdes
+    context: bare
+    expected: link
+  - id: A05b
+    file: "Cronaca/2026-10-03.md"
+    snippet: "Al molo il gruppo incontra Lino Valdes, padre di Oria Valdes, che ripara una rete."
+    subject: oria-valdes
+    context: bare
+    expected: link
+  - id: A06
+    file: "Personaggi/Teodo Marr.md"
+    snippet: "Porta sempre con sé la Lanterna di Morvalle, anche quando dorme."
+    subject: lanterna-di-morvalle
+    context: bare
+    expected: link
+  - id: A09
+    file: "Storia/Cronache del monaco.md"
+    snippet: "Le cronache del monaco Ervo affermano che il Pozzo di Nàrem fu scavato dai giganti, ma nessun'altra fonte lo conferma."
+    subject: pozzo-di-narem
+    context: bare
+    expected: link
+  - id: A09b
+    file: "Storia/Cronache del monaco.md"
+    snippet: "Le cronache del monaco Ervo affermano che il Pozzo di Nàrem fu scavato dai giganti, ma nessun'altra fonte lo conferma."
+    subject: cronache-del-monaco
+    context: self
+    expected: no-link
+    note: a mention of a subject inside its own sheet is never linked
+
+contradictions:
+  - id: C01
+    kind: date
+    subject: borgo-cenere
+    attribute: founding year
+    a:
+      file: "Mondo/Morvalle/Borgo Cenere/Borgo Cenere.md"
+      snippet: "Il borgo fu fondato nell'anno 298 dell'Ascia, dopo la grande pioggia di cenere."
+    b:
+      file: "Storia/Fondazione del borgo.md"
+      snippet: "Borgo Cenere fu fondato nell'anno 312 dell'Ascia dai pastori delle alture."
+  - id: C02
+    kind: number
+    subject: verme-di-brace
+    attribute: hit points
+    a:
+      file: "Creature/Verme di brace.md"
+      snippet: "Punti ferita: 45"
+    b:
+      file: "Trama/La cenere che canta/Sessione 2.md"
+      snippet: "Il verme di brace ha 60 punti ferita e non fugge mai."
+  - id: C03
+    kind: relation
+    subject: oria-valdes / lino-valdes
+    attribute: inverted parent relation
+    a:
+      file: "Personaggi/Oria Valdes.md"
+      snippet: "È la madre di Lino Valdes e vive con lui sulla riva del lago."
+    b:
+      file: "Cronaca/2026-10-03.md"
+      snippet: "Al molo il gruppo incontra Lino Valdes, padre di Oria Valdes, che ripara una rete."
+  - id: C04
+    kind: location
+    subject: lanterna-di-morvalle
+    attribute: where it is now
+    a:
+      file: "Personaggi/Teodo Marr.md"
+      snippet: "Porta sempre con sé la Lanterna di Morvalle, anche quando dorme."
+    b:
+      file: "Oggetti/Lanterna di Morvalle.md"
+      snippet: "La lanterna è appesa da anni sopra la porta della torre, e nessuno la stacca."
+    note: "a carries it (location lago-grigio via teodo-marr); b places it at torre-dell-ascia (frontmatter location: [torre-dell-ascia])"
+
+non_issues:
+  - id: N01
+    kind: perspective
+    subject: pozzo-di-narem
+    a:
+      file: "Mondo/Morvalle/Pozzo di Nàrem.md"
+      snippet: "Il pozzo fu scavato dai primi coloni della valle."
+    b:
+      file: "Storia/Cronache del monaco.md"
+      snippet: "Le cronache del monaco Ervo affermano che il Pozzo di Nàrem fu scavato dai giganti, ma nessun'altra fonte lo conferma."
+    expected: classify as perspective/source claim, not as a contradiction
+  - id: N02
+    kind: hypothesis
+    subject: teodo-marr
+    a:
+      file: "Appunti/Idee.md"
+      snippet: "- Ipotesi da valutare: forse Teodo Marr è il traditore che ha venduto la mappa del pozzo?"
+    expected: never reported as an accusation or a fact

@@ -174,7 +174,7 @@ mia-campagna/
       topics/                    Argomenti di lavoro e handoff (vedi Gestione delle sessioni)
     cache/                       Derivati rigenerabili, per esempio subjects.json (si può cancellare)
   Mondo/                         Luoghi a cascata: l'unica categoria gerarchica
-    Mondo.md
+    Calvane.md                   Scheda radice del mondo, creata dall'intervista (Deciso: Mondo/<Nome del mondo>.md)
     Costa di Selce/
       Costa di Selce.md
       Porto di Selce.md
@@ -321,6 +321,6 @@ Punti da chiarire nel dettaglio (in [Configurazione](Configurazione.md) e [Aggio
 - **Forma dei moduli.** Va scelto se un modulo è una cartella con un manifest o un file singolo. Va deciso anche se gli adattatori di sistema e gli stili sono intercambiabili fra campagne o fissati alla creazione.
 - **Hook su Codex.** La disponibilità di hook e controlli all'avvio per Codex non è stata verificata. Se non esiste, il controllo di versione va eseguito dal core come primo passo, con costo di tempo per ogni sessione.
 - **Orchestrazione.** La tabella delle regole di dipendenza presume che il sub-agent di esecuzione non abbia scrittura diretta sui contenuti. Va verificato che il modello economico rispetti questo limite.
-- **Nomi predefiniti delle cartelle per lingua.** La campagna fissa i nomi alla creazione e la configurazione li dichiara. Resta da scegliere se esista un insieme di nomi predefiniti per ciascuna lingua, e con quale proprietario.
+- **Nomi delle cartelle per lingua.** **Deciso (2026-11-07):** non esiste una tabella di nomi predefiniti. L'agente traduce i nomi nella lingua della campagna e li mostra nella conferma unica dell'intervista; da lì la configurazione li fissa.
 - **Versioni salvate in una cartella dello stesso progetto.** Lo storico nella cartella della campagna cresce nel tempo. Va stabilito un limite o una politica di pulizia, decisa dal master.
 - **Strumenti esterni.** Il collegamento con applicazioni esterne (per esempio il programma di grafica) avviene tramite MCP o altro. Va scelto come le operazioni esterne vengono descritte nel manifest.
