@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { planLinks } from './link-plan.mjs';
+import { buildSubjectIndex } from '../../../../../scripts/lib/subjects.mjs';
 
 const CAMPAIGN = [
   'name: Test',
@@ -192,6 +193,67 @@ test('the same campaign gives byte-identical plans', () => {
       const first = JSON.stringify(planLinks(root), null, 2);
       const second = JSON.stringify(planLinks(root), null, 2);
       assert.equal(first, second);
+    },
+  );
+});
+
+const MASTER_CAMPAIGN = [
+  'name: Test',
+  'structure:',
+  '  - id: people',
+  '    folder: People',
+  '    type: subjects',
+  '  - id: giocatori',
+  '    folder: Giocatori',
+  '    type: master-only',
+  '  - id: chronicle',
+  '    folder: Cronache',
+  '    type: chronicle',
+  '',
+].join('\n');
+
+const MASTER_BASE = {
+  'campaign.yaml': MASTER_CAMPAIGN,
+  'People/Teodo Marr.md': subject('teodo-marr', 'Teodo Marr'),
+  'Giocatori/Ada Rook.md': subject('ada-rook', 'Ada Rook'),
+};
+
+test('public chronicle: master-only subject is not linked, normal subject is', () => {
+  withCampaign(
+    {
+      ...MASTER_BASE,
+      'Cronache/Sessione 1.md': '# Sessione 1\n\nParla Teodo Marr con Ada Rook al porto.\n',
+    },
+    (root) => {
+      const plan = planLinks(root);
+      assert.deepEqual(
+        plan.proposals.map((p) => p.subject),
+        ['teodo-marr'],
+      );
+      assert.deepEqual(plan.errors, []);
+    },
+  );
+});
+
+test('master-only subject stays in the subject index', () => {
+  withCampaign(MASTER_BASE, (root) => {
+    const index = buildSubjectIndex(root);
+    assert.ok(index.subjects.some((s) => s.id === 'ada-rook' && s.type === 'master-only'));
+  });
+});
+
+test('master-only document mentioning a master-only subject gets no link', () => {
+  withCampaign(
+    {
+      ...MASTER_BASE,
+      'Giocatori/Diario.md': '# Diario\n\nAda Rook scrive a Teodo Marr.\n',
+    },
+    (root) => {
+      const plan = planLinks(root);
+      assert.deepEqual(
+        plan.proposals.map((p) => [p.file, p.subject]),
+        [['Giocatori/Diario.md', 'teodo-marr']],
+      );
     },
   );
 });

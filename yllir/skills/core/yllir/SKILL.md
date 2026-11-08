@@ -39,7 +39,7 @@ This skill receives every message of the master. It checks the folder, keeps the
 
 **Step 6 — Recognise the request** by its meaning, not by keywords. Do exactly one of the following.
 
-- **Writing process** (create a campaign in an empty folder; prepare a session in a campaign folder). This entry skill never runs these processes itself. It delegates them:
+- **Writing process** (create a campaign in an empty folder; prepare a session; record the evening that was played). This entry skill never runs these processes itself. Telling what happened at the table («abbiamo finito», «ieri i giocatori…») is recording the evening; asking for the next session is preparing one. If both are plausible, ask one question. It delegates them:
   - (a) Choose the topic (campaign folder only). Read the block `YLLIR TURN CHECK` in your context.
     - Same topic as the active one, including an answer to its pending question: reuse it.
     - A different writing request: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/topics.mjs" new . --process <p> --goal "<English one-sentence goal>"`. Keep the `id` and `path` of its JSON result.
@@ -49,7 +49,7 @@ This skill receives every message of the master. It checks the folder, keeps the
   - (b) Before launching the runner, if TOPIC is not `none`, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/topics.mjs" check . --id <id>` and use its `changed` list as CHANGED_FILES (`none` when the list is empty). Then launch the sub-agent `yllir:process-runner` in the foreground and wait for its result in the same turn (never with run_in_background). Never tell the master that you will write later or that work continues in the background: your message is the runner's message for the master, after it has finished. Use exactly these keys, filled in:
     ```text
     CAMPAIGN_ROOT: <absolute path of the campaign root>
-    PROCESS: yllir:new-campaign (or yllir:prepare-session)
+    PROCESS: <one of yllir:new-campaign, yllir:prepare-session or yllir:after-session>
     TOPIC: <topic id, or none>
     HANDOFF: <absolute path of the handoff file, or none>
     CHANGED_FILES: <comma-separated campaign-relative paths from the topic check, or none>
@@ -73,11 +73,11 @@ This skill receives every message of the master. It checks the folder, keeps the
 
 - **Question about the campaign** (for example «chi è…», «dove si trova…»): read the relevant documents, answer briefly, and name the documents you used by their titles. Never write anything.
 
-- **Anything else** (record what happened at the table, change or create documents other than through these processes, import notes, tidy up): say in one or two plain sentences that this part is not available in this version yet. Then list what is available now: create a campaign, prepare the next session, go back to a saved version, and questions about the campaign.
+- **Anything else** (change or create documents other than through these processes, import notes, tidy up): say in one or two plain sentences that this part is not available in this version yet. Then list what is available now: create a campaign, prepare the next session, record the evening, go back to a saved version, and questions about the campaign.
 
 **Step 7 — Rules.** These apply to every step above.
 - Never write or change a campaign document yourself. Every write goes through `yllir:write-sequence`, run by a process.
-- Never run a writing process (`yllir:new-campaign`, `yllir:prepare-session`) in this skill: launch `yllir:process-runner` instead.
+- Never run a writing process (`yllir:new-campaign`, `yllir:prepare-session`, `yllir:after-session`) in this skill: launch `yllir:process-runner` instead.
 - Never show internal words, commands, file formats or error codes to the master.
 - Write to the master in plain text: no backticks, no code formatting, no file paths, no version codes.
 - Ask at most one question at a time.

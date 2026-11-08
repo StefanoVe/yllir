@@ -5,7 +5,12 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildSubjectIndex, compareStrings } from '../../../../../scripts/lib/subjects.mjs';
+import {
+  buildSubjectIndex,
+  compareStrings,
+  masterOnlyChecker,
+  readStructure,
+} from '../../../../../scripts/lib/subjects.mjs';
 import { scanMentions } from '../../../../../scripts/lib/mentions.mjs';
 
 const REVIEW_STATES = new Set(['ambiguous', 'linked-elsewhere']);
@@ -63,6 +68,8 @@ export function planFromScan(campaignRoot, { index, scan }, { files = null, subj
   }
 
   const sheetOf = new Map(index.subjects.map((subject) => [subject.id, subject.sheet]));
+  // A master-only subject is never linked, from any document (the subject stays in the index).
+  const isMasterOnly = masterOnlyChecker(readStructure(campaignRoot).structure ?? []);
   const linesCache = new Map();
   const linesOf = (file) => {
     if (!linesCache.has(file)) {
@@ -82,6 +89,7 @@ export function planFromScan(campaignRoot, { index, scan }, { files = null, subj
 
     if (occ.state === 'bare' && occ.subject !== null) {
       const sheet = sheetOf.get(occ.subject);
+      if (isMasterOnly(sheet)) continue;
       const target = encodeTarget(path.posix.relative(path.posix.dirname(occ.file), sheet));
       const before = linesOf(occ.file)[occ.line - 1] ?? '';
       const start = occ.col - 1;

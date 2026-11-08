@@ -71,3 +71,12 @@ node testbench/runners/run-entry-case.mjs testbench/cases/entry/prepare-two-turn
 ```
 
 The checks are P1 to P9 (the new session file, its format, nothing else created, links, saved as one commit, the prerequisites are said, plain words, one closed topic, the review said APPLY); the two-turn case also checks Q1 and Q2 after the first message (a question is asked and nothing is written; the topic stays active with its question). P10 is informational: capitalised words in the session that no source names are recorded as `possible_invented_names` and never fail a run. With `--grade-only`, a two-turn case grades the final state, and the first-turn checks only when the run was kept with `--keep`.
+
+Run the after-session cases end to end (same setup; costs money and takes minutes per run):
+
+```sh
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/after-proceed [--runs N] [--model haiku] [--keep]
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/after-too-thin [--runs N] [--model haiku] [--keep]
+```
+
+The checks are A1 to A7 (one new chronicle page with its id and the played session, the old page unchanged, nothing else changed, the plot map has no errors and the session is played, an Accaduto section of prose with no master block, every capitalised name is in the prompt or the subjects, saved as one commit, plain Italian words) and T1 to T3 (nothing written, one question asking for the evening in scenes, one open after-session topic with its question).

@@ -4,7 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { readStructure, listSheets, compareStrings } from './subjects.mjs';
+import { readStructure, listSheets, compareStrings, masterOnlyChecker } from './subjects.mjs';
 import { parseFrontmatter } from './frontmatter.mjs';
 import { analyzeMarkdown } from './zones.mjs';
 import { headingAnchor } from './normalize.mjs';
@@ -23,17 +23,11 @@ export function checkLinks(campaignRoot, { files = null } = {}) {
     throw new Error(structureErrors[0].message);
   }
 
-  const categories = structure
-    .filter((entry) => typeof entry.folder === 'string')
-    .map((entry) => {
-      const folder = path.posix.normalize(entry.folder).replace(/\/+$/, '');
-      const prefix = folder === '.' || folder === '' ? '' : `${folder}/`;
-      return { type: entry.type, folder, prefix };
-    });
+  const isMasterOnly = masterOnlyChecker(structure);
 
   const listed =
     files === null
-      ? listAllSheets(root, categories)
+      ? listAllSheets(root, structure)
       : files.map((file) => relOf(root, path.resolve(root, file)));
   const toCheck = [...new Set(listed)].sort(compareStrings);
 
@@ -56,17 +50,6 @@ export function checkLinks(campaignRoot, { files = null } = {}) {
       cache.set(rel, doc);
     }
     return cache.get(rel);
-  };
-
-  /** Category of a campaign-relative path: the one with the longest matching folder. */
-  const categoryOf = (rel) => {
-    let best = null;
-    for (const category of categories) {
-      if (rel.startsWith(category.prefix) && (best === null || category.prefix.length > best.prefix.length)) {
-        best = category;
-      }
-    }
-    return best;
   };
 
   for (const rel of toCheck) {
@@ -92,7 +75,7 @@ export function checkLinks(campaignRoot, { files = null } = {}) {
       errors.push({ file: rel, line: e.line, col: 1, target: null, code: 'markdown', message: e.message });
     }
 
-    const sourceIsMasterOnly = categoryOf(rel)?.type === 'master-only';
+    const sourceIsMasterOnly = isMasterOnly(rel);
     const sourceAbs = path.join(root, rel);
 
     for (const line of doc.lines) {
@@ -145,7 +128,7 @@ export function checkLinks(campaignRoot, { files = null } = {}) {
         }
 
         if (
-          categoryOf(targetRel)?.type === 'master-only' &&
+          isMasterOnly(targetRel) &&
           !sourceIsMasterOnly &&
           !line.inMaster
         ) {
@@ -159,10 +142,11 @@ export function checkLinks(campaignRoot, { files = null } = {}) {
 
   return { checked, links, errors };
 
-  function listAllSheets(rootDir, cats) {
+  function listAllSheets(rootDir, entries) {
     const found = new Set();
-    for (const category of cats) {
-      for (const sheet of listSheets(rootDir, category.folder)) found.add(sheet);
+    for (const entry of entries) {
+      if (typeof entry.folder !== 'string') continue;
+      for (const sheet of listSheets(rootDir, entry.folder)) found.add(sheet);
     }
     return [...found];
   }

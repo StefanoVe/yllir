@@ -38,6 +38,7 @@ import { buildSubjectIndex, compareStrings } from '../../yllir/scripts/lib/subje
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../yllir/scripts/lib/zones.mjs';
 import { foldForm } from '../../yllir/scripts/lib/fold.mjs';
+import { plotMap } from '../../yllir/scripts/lib/plot-map.mjs';
 
 const USAGE =
   'usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
@@ -117,6 +118,8 @@ const CASES = [
   'entry-not-available',
   'entry-prepare-proceed',
   'entry-prepare-two-turns',
+  'entry-after-proceed',
+  'entry-after-too-thin',
 ];
 
 function loadCase(caseDir) {
@@ -244,8 +247,8 @@ function commitCount(dir) {
   return Number(tryGit(dir, ['rev-list', '--count', 'HEAD'])?.trim());
 }
 
-/** Reasons from the topic handoffs: exactly one topic, process prepare-session, the given status. */
-function topicReasons(dir, status) {
+/** Reasons from the topic handoffs: exactly one topic, the given process (prepare-session by default), the given status. */
+function topicReasons(dir, status, topicProcess = 'prepare-session') {
   let topics;
   try {
     topics = listTopics(dir);
@@ -254,7 +257,7 @@ function topicReasons(dir, status) {
   }
   if (topics.length !== 1) return [`${topics.length} topics (want 1)`];
   const reasons = [];
-  if (topics[0].process !== 'prepare-session') reasons.push(`process is ${topics[0].process}`);
+  if (topics[0].process !== topicProcess) reasons.push(`process is ${topics[0].process}`);
   if (topics[0].status !== status) reasons.push(`status is ${topics[0].status} (want ${status})`);
   return reasons;
 }
@@ -356,8 +359,8 @@ function reviewResult(dir) {
 }
 
 /** Reasons why the topic does not hold an open question: one active topic with a non-empty, not "none", question section. */
-function openQuestionReasons(dir) {
-  const reasons = topicReasons(dir, 'active');
+function openQuestionReasons(dir, topicProcess = 'prepare-session') {
+  const reasons = topicReasons(dir, 'active', topicProcess);
   if (reasons.length === 0) {
     try {
       const section = readSection(dir, { id: listTopics(dir)[0].id, section: PREPARE_QUESTIONS }).trim();
@@ -413,9 +416,12 @@ function gradeTurnOne(dir, report) {
   return [result('Q1', q1), result('Q2', openQuestionReasons(dir))];
 }
 
-/** P10, informational only: capitalised words of the session body that no source names. */
-function possibleInventedNames(dir, prompt) {
-  const file = path.join(dir, PREPARE_FILE);
+/**
+ * Capitalised words of the body of a page (relPath) that neither the prompt nor a subject form names.
+ * Null when the file is missing. Headings are not checked; sentence and list-item starts are skipped.
+ */
+function unnamedCapitalisedWords(dir, relPath, prompt) {
+  const file = path.join(dir, relPath);
   if (!fs.existsSync(file)) return null;
   const { body, bodyStartLine } = parseFrontmatter(fs.readFileSync(file, 'utf8'));
   const known = new Set([
@@ -437,6 +443,198 @@ function possibleInventedNames(dir, prompt) {
     }
   }
   return [...found].sort(compareStrings);
+}
+
+/** P10, informational only: capitalised words of the session body that no source names. */
+function possibleInventedNames(dir, prompt) {
+  return unnamedCapitalisedWords(dir, PREPARE_FILE, prompt);
+}
+
+// ---------------------------------------------------------------- after-session cases
+
+const AFTER_CASES = ['entry-after-proceed', 'entry-after-too-thin'];
+const AFTER_PAGE = 'Cronaca/2026-11-05.md';
+const AFTER_PAGE_ID = 'cronaca-2026-11-05';
+const AFTER_PLAYED = 'la-cenere-che-canta-02';
+const AFTER_OLD_PAGE = 'Cronaca/2026-10-03.md';
+const AFTER_MIN_PROSE = 200;
+const AFTER_TOPIC_PROCESS = 'after-session';
+
+/** Raw bytes of a file at a given version (git show), or null. */
+function gitShow(dir, rev, relPath) {
+  try {
+    return execFileSync('git', ['-C', dir, 'show', `${rev}:${relPath}`], { stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch {
+    return null;
+  }
+}
+
+/** The files changed since version 2 as [status, path] rows, .campaign/ ignored. Null when git fails. */
+function changedSinceV2(dir, v2) {
+  const diff = tryGit(dir, ['diff', '--name-status', v2, 'HEAD']);
+  if (diff === null) return null;
+  return diff
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => line.split('\t'))
+    .map((row) => [row[0], row[row.length - 1]])
+    .filter(([, file]) => !file.startsWith('.campaign/'));
+}
+
+/** A1 (one new chronicle page, with its id and the played session; the old page byte for byte) and A2 (nothing else changed). */
+function afterFileResults(dir, v2) {
+  const a1 = [];
+  const a2 = [];
+  const rows = v2 ? changedSinceV2(dir, v2) : null;
+  if (rows === null) {
+    a1.push('git diff since version 2 failed');
+    a2.push('git diff since version 2 failed');
+  } else {
+    const inChronicle = rows.filter(([, file]) => file.startsWith('Cronaca/'));
+    if (JSON.stringify(inChronicle) !== JSON.stringify([['A', AFTER_PAGE]])) {
+      const shown = inChronicle.map(([status, file]) => `${status} ${file}`).join(', ') || 'none';
+      a1.push(`chronicle folder changes: ${shown} (want one new file ${AFTER_PAGE})`);
+    }
+    if (JSON.stringify(rows) !== JSON.stringify([['A', AFTER_PAGE]])) {
+      const shown = rows.map(([status, file]) => `${status} ${file}`).join(', ') || 'none';
+      a2.push(`changed since version 2: ${shown} (want only ${AFTER_PAGE})`);
+    }
+  }
+
+  const pagePath = path.join(dir, AFTER_PAGE);
+  if (!fs.existsSync(pagePath)) {
+    a1.push(`${AFTER_PAGE} does not exist`);
+  } else {
+    const { data, errors } = parseFrontmatter(fs.readFileSync(pagePath, 'utf8'));
+    if (!data) {
+      a1.push('no frontmatter');
+    } else {
+      for (const e of errors) a1.push(`frontmatter line ${e.line}: ${e.message}`);
+      if (data.id !== AFTER_PAGE_ID) a1.push(`id is ${JSON.stringify(data.id)}`);
+      if (JSON.stringify(data.played) !== JSON.stringify([AFTER_PLAYED])) {
+        a1.push(`played is ${JSON.stringify(data.played)}`);
+      }
+    }
+  }
+
+  const oldPath = path.join(dir, AFTER_OLD_PAGE);
+  const before = v2 ? gitShow(dir, v2, AFTER_OLD_PAGE) : null;
+  if (before === null) a1.push(`${AFTER_OLD_PAGE} is not in version 2`);
+  else if (!fs.existsSync(oldPath)) a1.push(`${AFTER_OLD_PAGE} was removed`);
+  else if (!fs.readFileSync(oldPath).equals(before)) a1.push(`${AFTER_OLD_PAGE} changed`);
+
+  return [result('A1', a1), result('A2', a2)];
+}
+
+/** A3: the plot map has no errors and the session is played. */
+function afterMapResult(dir) {
+  const reasons = [];
+  try {
+    const { sessions, errors } = plotMap(dir);
+    for (const e of errors.slice(0, 5)) reasons.push(`${e.file} ${e.code} ${e.message}`);
+    const session = sessions.find((s) => s.id === AFTER_PLAYED);
+    if (!session) reasons.push(`session ${AFTER_PLAYED} is not in the map`);
+    else if (!session.played) reasons.push(`session ${AFTER_PLAYED} is not played`);
+  } catch (err) {
+    reasons.push(`plotMap: ${err.message}`);
+  }
+  return result('A3', reasons);
+}
+
+/** A4: the page has an Accaduto section of at least AFTER_MIN_PROSE characters of prose, and no master notes block. */
+function afterContentResult(dir) {
+  const file = path.join(dir, AFTER_PAGE);
+  if (!fs.existsSync(file)) return result('A4', [`${AFTER_PAGE} does not exist`]);
+  const reasons = [];
+  const { body, bodyStartLine } = parseFrontmatter(fs.readFileSync(file, 'utf8'));
+  const { lines } = analyzeMarkdown(body ?? '', bodyStartLine);
+  const headings = lines.filter((line) => line.block === 'heading').map((line) => line.text.trim());
+  if (!headings.includes('## Accaduto')) reasons.push('no "## Accaduto" heading');
+  let inside = false;
+  let prose = '';
+  for (const line of lines) {
+    if (line.block === 'heading') {
+      inside = line.text.trim() === '## Accaduto';
+    } else if (inside && line.block === 'paragraph') {
+      prose += `${line.text.trim()} `;
+    }
+  }
+  if (prose.trim().length < AFTER_MIN_PROSE) {
+    reasons.push(`prose under ${AFTER_MIN_PROSE} characters (${prose.trim().length})`);
+  }
+  if (lines.some((line) => line.block === 'master-open' || line.block === 'master-close')) {
+    reasons.push('a master notes block is in the page');
+  }
+  if (headings.includes('## Master')) reasons.push('a "## Master" heading is in the page');
+  return result('A4', reasons);
+}
+
+/** A5: every capitalised word of the page is named by the prompt or by a subject form. */
+function afterNamesResult(dir, prompt) {
+  const words = unnamedCapitalisedWords(dir, AFTER_PAGE, prompt);
+  if (words === null) return result('A5', [`${AFTER_PAGE} does not exist`]);
+  return result('A5', words.map((word) => `named by neither the master nor the campaign: ${word}`));
+}
+
+/** A6: one commit more than the setup, a clean tree, and no broken links. */
+function afterSavedResult(dir) {
+  const reasons = [];
+  const count = commitCount(dir);
+  if (count !== 3) reasons.push(`commit count is ${Number.isNaN(count) ? 'unknown' : count} (want 3)`);
+  const status = tryGit(dir, ['status', '--porcelain']);
+  if (status === null) reasons.push('git status failed');
+  else if (status.trim() !== '') reasons.push(`git status not empty: ${status.trim().split('\n').join(' | ')}`);
+  try {
+    const { errors } = checkLinks(dir);
+    for (const e of errors.slice(0, 5)) reasons.push(`${e.file}:${e.line} ${e.code} ${e.message}`);
+    if (errors.length > 5) reasons.push(`${errors.length - 5} more`);
+  } catch (err) {
+    reasons.push(`checkLinks: ${err.message}`);
+  }
+  return result('A6', reasons);
+}
+
+/** A7: the final message passes the plain-words check and is Italian (at least two Italian markers). */
+function afterMessageResult(report) {
+  if (report === null || report === undefined) return result('A7', ['no final message']);
+  const reasons = [...plainWords(report).reasons];
+  const text = ` ${normalized(report)} `;
+  const markers = [' la ', ' di ', ' è ', ' che ', ' il ', ' non '].filter((m) => text.includes(m));
+  if (markers.length < 2) reasons.push(`Italian markers found: ${markers.join(', ') || 'none'}`);
+  return result('A7', reasons);
+}
+
+/** Checks A1 to A7 of entry-after-proceed. */
+function afterProceedResults({ dir, setup, report, prompt }) {
+  return [
+    ...afterFileResults(dir, setup?.v2 ?? null),
+    afterMapResult(dir),
+    afterContentResult(dir),
+    afterNamesResult(dir, prompt),
+    afterSavedResult(dir),
+    afterMessageResult(report),
+  ];
+}
+
+/**
+ * Checks T1 to T3 of entry-after-too-thin: nothing written, the final message is one question
+ * that asks for the evening in scenes, and one open after-session topic with its question.
+ */
+function afterTooThinResults({ dir, report }) {
+  const t1 = noWriteCheck(dir);
+
+  const t2 = [];
+  if (report === null || report === undefined) {
+    t2.push('no final message');
+  } else {
+    const marks = (report.match(/\?/g) ?? []).length;
+    if (marks !== 1) t2.push(`${marks} question marks (want 1)`);
+    if (!normalized(report).includes('scen')) t2.push('the message does not ask for the evening in scenes');
+    t2.push(...plainWords(report).reasons);
+  }
+
+  const t3 = openQuestionReasons(dir, AFTER_TOPIC_PROCESS);
+  return [result('T1', t1), result('T2', t2), result('T3', t3)];
 }
 
 // ---------------------------------------------------------------- checks per case
@@ -571,6 +769,11 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
     results.push(result('P7', plainReasons));
     plain = report === null || report === undefined ? null : plainWords(report);
     invented = dir && fs.existsSync(dir) ? possibleInventedNames(dir, prompt) : null;
+    for (const [id, ok, reasons] of results) record(id, ok, reasons);
+  } else if (AFTER_CASES.includes(caseName)) {
+    const args = { dir, setup, report, prompt };
+    const results = caseName === 'entry-after-proceed' ? afterProceedResults(args) : afterTooThinResults(args);
+    plain = report === null || report === undefined ? null : plainWords(report);
     for (const [id, ok, reasons] of results) record(id, ok, reasons);
   } else {
     throw new Error(`no checks for case ${caseName}`);
