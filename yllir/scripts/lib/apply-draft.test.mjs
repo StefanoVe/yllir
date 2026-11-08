@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyDraft } from './apply-draft.mjs';
+import { stripExitLine } from './cli-exit.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.join(here, '..', 'apply-draft.mjs');
@@ -112,13 +113,13 @@ test('apply-draft CLI prints JSON and uses exit codes 0, 1 and 2', () => {
     { encoding: 'utf8' },
   );
   assert.equal(ok.status, 0, ok.stderr);
-  assert.deepEqual(JSON.parse(ok.stdout), { written: ['Trama/Capitolo 1.md', 'Mondo/Lago.md'], errors: [] });
+  assert.deepEqual(JSON.parse(stripExitLine(ok.stdout)), { written: ['Trama/Capitolo 1.md', 'Mondo/Lago.md'], errors: [] });
 
   const refused = spawnSync(process.execPath, [CLI, root, '--draft-dir', drafts, '--files', 'CLAUDE.md'], {
     encoding: 'utf8',
   });
   assert.equal(refused.status, 1);
-  assert.equal(JSON.parse(refused.stdout).errors[0].code, 'protected-file');
+  assert.equal(JSON.parse(stripExitLine(refused.stdout)).errors[0].code, 'protected-file');
 
   const usage = spawnSync(process.execPath, [CLI, root, '--draft-dir', drafts], { encoding: 'utf8' });
   assert.equal(usage.status, 2);

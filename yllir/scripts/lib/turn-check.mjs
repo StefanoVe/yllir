@@ -1,7 +1,7 @@
 // Read-only check run on every user message (UserPromptSubmit hook). Its text
 // is added to the assistant's context so it keeps the active topic in view.
-// It never writes and never throws: on an error it prints the header and the
-// next line only.
+// It never writes and never throws: on an error it prints the header, the
+// campaign root and the next line only.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,15 +14,17 @@ const DASH = '—';
 
 /** Plain-text check for the assistant, one message at a time. */
 export function turnCheck(root) {
+  const dir = path.resolve(root);
+  const rootLine = `campaign root: ${realRoot(dir)}`;
   try {
-    return build(path.resolve(root));
+    return build(dir, rootLine);
   } catch {
-    return [HEADER, NEXT_STEP].join('\n');
+    return [HEADER, rootLine, NEXT_STEP].join('\n');
   }
 }
 
-function build(dir) {
-  const lines = [HEADER];
+function build(dir, rootLine) {
+  const lines = [HEADER, rootLine];
   const active = fs.existsSync(path.join(dir, 'campaign.yaml')) ? activeTopic(dir) : null;
   if (!active) {
     lines.push('active topic: none', NEXT_STEP);
@@ -42,6 +44,15 @@ function build(dir) {
   }
   lines.push(NEXT_STEP);
   return lines.join('\n');
+}
+
+/** Absolute real path of the folder, or the resolved path when it does not exist. */
+function realRoot(dir) {
+  try {
+    return fs.realpathSync(dir);
+  } catch {
+    return dir;
+  }
 }
 
 /** Section text, or null when the section cannot be read. */

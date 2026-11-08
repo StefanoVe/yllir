@@ -188,6 +188,13 @@ I controlli dicono che cosa è stato verificato. Il framework non dichiara la pu
 | Script deterministico | I file indicati come argomento | I file indicati come argomento | Nessuna, salvo le operazioni dichiarate | Nessuno | No |
 | Integrazione esterna | Solo il payload costruito dal core | Nulla nella campagna | Solo il proprio servizio | Nessuno | No |
 
+**Deciso (2026-11-08).** La garanzia tecnica passa da due livelli dell'ambiente, verificati con Claude Code in modalità restrittiva:
+
+- la campagna contiene un file di impostazioni di progetto (`.claude/settings.json`), generato dal framework come le istruzioni e rigenerato agli aggiornamenti, che autorizza solo l'avvio delle skill del framework e la scrittura nella cartella di lavoro `.campaign/state/`;
+- ogni skill autorizza soltanto i propri script, con il percorso esatto del pacchetto (`allowed-tools`). Uno script non elencato resta bloccato.
+
+Le skill non usano comandi di shell generici (creazione di cartelle, test su file, letture con `cat`, cancellazioni): li sostituiscono con gli strumenti di lettura e scrittura o con gli script. Al primo avvio Claude Code chiede una volta se la cartella è fidata: senza quella conferma le impostazioni di progetto non valgono.
+
 ### 6.2 Comandi pericolosi
 
 **Proposta.** Questi comandi possono essere eseguiti solo dal core, mai da un esecutore o da uno script di terzi, e solo dopo una conferma esplicita che dice in frasi che cosa cambierà e che cosa sarà perso:

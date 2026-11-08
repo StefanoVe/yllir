@@ -2,11 +2,14 @@
 name: linker
 description: Library skill. Adds Markdown links to every mention of a campaign subject in the given documents, using deterministic scripts and an independent reviewer. Invoked by Yllir core processes after a document is written, or when asked to link mentions in specific campaign files. Never invoked for anything outside a Yllir campaign.
 user-invocable: false
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" *), Read, Write, Agent
 ---
 
 # Linker
 
 This skill is always invoked by another skill (for example write-sequence). The result of this skill is the file `.campaign/state/linker/report.txt`, not a message for the master. The invoking skill reads that file to know the result.
+
+**Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: FAILED`, reason "permission refused".
 
 Scripts find mentions, write links and build the report. The reviewer judges. You only run commands, launch the reviewer and save its answer. Never search for mentions yourself, never edit campaign files by hand, and never write or edit the report yourself.
 
@@ -21,7 +24,7 @@ If both FILES and SUBJECTS are empty, stop and ask the caller which documents to
 
 ## Working folder
 
-Step 0. Run `mkdir -p .campaign/state/linker` from the campaign root (the folder containing `campaign.yaml`). Run `pwd` and keep its output as CAMPAIGN_ROOT. All files below go in `.campaign/state/linker/`:
+Step 0. From the campaign root (the folder containing `campaign.yaml`), keep CAMPAIGN_ROOT: it is the `campaign root:` line of the session check in your context; if that line is not there, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and read that line. All files below go in `.campaign/state/linker/`:
 `plan.json`, `outcomes.json`, `result.json`, `check.json`, `report.txt`.
 
 ## Steps

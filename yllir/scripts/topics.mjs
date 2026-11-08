@@ -21,6 +21,7 @@ import {
   newTopic,
   touchTopic,
 } from './lib/topics.mjs';
+import { exitWith, runCli } from './lib/cli-exit.mjs';
 
 const USAGE =
   'usage: node topics.mjs <new|touch|activate|close|ask|finish|list|active|check> <root> [options]';
@@ -98,18 +99,19 @@ function run({ command, root, opts }) {
   }
 }
 
-const parsed = parseArgs(process.argv.slice(2));
-if (parsed === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const parsed = parseArgs(process.argv.slice(2));
+  if (parsed === null) throw new Error(USAGE);
+
+  try {
+    const result = run(parsed);
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+    exitWith(0);
+  } catch (err) {
+    const code = KNOWN_CODES.includes(err.code) ? err.code : 'internal';
+    process.stdout.write(`${JSON.stringify({ error: code, message: err.message }, null, 2)}\n`);
+    exitWith(1);
+  }
 }
 
-try {
-  const result = run(parsed);
-  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-  process.exitCode = 0;
-} catch (err) {
-  const code = KNOWN_CODES.includes(err.code) ? err.code : 'internal';
-  process.stdout.write(`${JSON.stringify({ error: code, message: err.message }, null, 2)}\n`);
-  process.exitCode = 1;
-}
+runCli(main);

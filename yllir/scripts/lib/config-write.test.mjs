@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { parseYamlLite } from './yaml-lite.mjs';
 import { stringifyConfig, addCategory } from './config-write.mjs';
 import { validateConfig } from './config.mjs';
+import { stripExitLine } from './cli-exit.mjs';
 
 // Git is never needed here, but keep the test independent of the user's git setup.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
@@ -245,13 +246,13 @@ test('add-category CLI prints JSON and uses exit codes 0, 1 and 2', () => {
     encoding: 'utf8',
   });
   assert.equal(ok.status, 0, ok.stderr);
-  assert.deepEqual(JSON.parse(ok.stdout), { added: true, errors: [] });
+  assert.deepEqual(JSON.parse(stripExitLine(ok.stdout)), { added: true, errors: [] });
 
   const bad = spawnSync(process.execPath, [CLI, dir, '--id', 'luoghi', '--folder', 'Luoghi', '--type', 'bogus'], {
     encoding: 'utf8',
   });
   assert.equal(bad.status, 1);
-  assert.equal(JSON.parse(bad.stdout).added, false);
+  assert.equal(JSON.parse(stripExitLine(bad.stdout)).added, false);
 
   const usage = spawnSync(process.execPath, [CLI, dir, '--id', 'mondo', '--folder', 'Mondo'], { encoding: 'utf8' });
   assert.equal(usage.status, 2);

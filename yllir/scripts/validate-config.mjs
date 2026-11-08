@@ -6,6 +6,7 @@
 
 import path from 'node:path';
 import { validateConfig } from './lib/config.mjs';
+import { exitWith, runCli } from './lib/cli-exit.mjs';
 
 const USAGE = 'usage: node validate-config.mjs <campaignRoot> [--json]';
 
@@ -26,24 +27,25 @@ function parseArgs(argv) {
   return root === null ? null : { root, json };
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) throw new Error(USAGE);
+
+  const result = validateConfig(path.resolve(args.root));
+
+  if (args.json) {
+    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  } else {
+    for (const issue of result.errors) {
+      process.stdout.write(`error ${issue.code} ${issue.path}: ${issue.message}\n`);
+    }
+    for (const issue of result.warnings) {
+      process.stdout.write(`warning ${issue.code} ${issue.path}: ${issue.message}\n`);
+    }
+    process.stdout.write(`errors: ${result.errors.length}, warnings: ${result.warnings.length}\n`);
+  }
+
+  exitWith(result.ok ? 0 : 1);
 }
 
-const result = validateConfig(path.resolve(args.root));
-
-if (args.json) {
-  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-} else {
-  for (const issue of result.errors) {
-    process.stdout.write(`error ${issue.code} ${issue.path}: ${issue.message}\n`);
-  }
-  for (const issue of result.warnings) {
-    process.stdout.write(`warning ${issue.code} ${issue.path}: ${issue.message}\n`);
-  }
-  process.stdout.write(`errors: ${result.errors.length}, warnings: ${result.warnings.length}\n`);
-}
-
-process.exitCode = result.ok ? 0 : 1;
+runCli(main);

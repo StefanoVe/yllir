@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkLinks } from './lib/check-links.mjs';
 import { readStructure } from './lib/subjects.mjs';
+import { exitWith, runCli } from './lib/cli-exit.mjs';
 
 const USAGE = 'usage: node check-links.mjs <campaignRoot> [--files a.md,b.md] [--out <result.json>]';
 
@@ -38,32 +39,32 @@ function parseArgs(argv) {
   return root === null ? null : { root, files, out };
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) throw new Error(USAGE);
+
+  const campaignRoot = path.resolve(args.root);
+  const { structure, errors: structureErrors } = readStructure(campaignRoot);
+  if (structure === null) {
+    throw new Error(`${structureErrors[0].file}: ${structureErrors[0].message}`);
+  }
+
+  const result = checkLinks(campaignRoot, { files: args.files });
+
+  for (const error of result.errors) {
+    process.stdout.write(`${error.file}:${error.line}:${error.col} ${error.code} ${error.message}\n`);
+  }
+  process.stdout.write(
+    `checked: ${result.checked.length} files, links: ${result.links}, errors: ${result.errors.length}\n`,
+  );
+
+  if (args.out !== null) {
+    const outFile = path.resolve(args.out);
+    fs.mkdirSync(path.dirname(outFile), { recursive: true });
+    fs.writeFileSync(outFile, `${JSON.stringify(result, null, 2)}\n`);
+  }
+
+  exitWith(result.errors.length === 0 ? 0 : 1);
 }
 
-const campaignRoot = path.resolve(args.root);
-const { structure, errors: structureErrors } = readStructure(campaignRoot);
-if (structure === null) {
-  process.stderr.write(`${structureErrors[0].file}: ${structureErrors[0].message}\n`);
-  process.exit(2);
-}
-
-const result = checkLinks(campaignRoot, { files: args.files });
-
-for (const error of result.errors) {
-  process.stdout.write(`${error.file}:${error.line}:${error.col} ${error.code} ${error.message}\n`);
-}
-process.stdout.write(
-  `checked: ${result.checked.length} files, links: ${result.links}, errors: ${result.errors.length}\n`,
-);
-
-if (args.out !== null) {
-  const outFile = path.resolve(args.out);
-  fs.mkdirSync(path.dirname(outFile), { recursive: true });
-  fs.writeFileSync(outFile, `${JSON.stringify(result, null, 2)}\n`);
-}
-
-process.exitCode = result.errors.length === 0 ? 0 : 1;
+runCli(main);

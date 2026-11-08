@@ -5,7 +5,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { planLinks } from './lib/link-plan.mjs';
+import { planLinks } from './lib/link-plan.mjs';import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+
 
 const USAGE =
   'usage: node plan-links.mjs <campaignRoot> [--files a.md,b.md] [--subjects id1,id2] --out <plan.json>';
@@ -40,22 +41,25 @@ function parseList(value) {
   return items.length === 0 ? null : items;
 }
 
-const args = parseArgs(process.argv.slice(2));
-const files = args === null || args.files === null ? null : parseList(args.files);
-const subjects = args === null || args.subjects === null ? null : parseList(args.subjects);
-if (args === null || (args.files !== null && files === null) || (args.subjects !== null && subjects === null)) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const files = args === null || args.files === null ? null : parseList(args.files);
+  const subjects = args === null || args.subjects === null ? null : parseList(args.subjects);
+  if (args === null || (args.files !== null && files === null) || (args.subjects !== null && subjects === null)) {
+    throw new Error(USAGE);
+  }
+
+  const campaignRoot = path.resolve(args.root);
+  const plan = planLinks(campaignRoot, { files, subjects });
+
+  const outFile = path.resolve(args.out);
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  fs.writeFileSync(outFile, `${JSON.stringify(plan, null, 2)}\n`);
+
+  process.stdout.write(
+    `proposals: ${plan.proposals.length}, review: ${plan.review.length}, scope: ${plan.scope.length} files, errors: ${plan.errors.length}\n`,
+  );
+  exitWith(plan.errors.length === 0 ? 0 : 1);
 }
 
-const campaignRoot = path.resolve(args.root);
-const plan = planLinks(campaignRoot, { files, subjects });
-
-const outFile = path.resolve(args.out);
-fs.mkdirSync(path.dirname(outFile), { recursive: true });
-fs.writeFileSync(outFile, `${JSON.stringify(plan, null, 2)}\n`);
-
-process.stdout.write(
-  `proposals: ${plan.proposals.length}, review: ${plan.review.length}, scope: ${plan.scope.length} files, errors: ${plan.errors.length}\n`,
-);
-process.exitCode = plan.errors.length === 0 ? 0 : 1;
+runCli(main);

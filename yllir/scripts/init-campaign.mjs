@@ -6,6 +6,7 @@
 
 import path from 'node:path';
 import { initCampaign } from './lib/init-campaign.mjs';
+import { exitWith, runCli } from './lib/cli-exit.mjs';
 
 const USAGE =
   'usage: node init-campaign.mjs <root> --name "<name>" --language <xx> --register <elevated|plain|colloquial|mixed> [--world "<world>"] [--description "<description>"]';
@@ -39,18 +40,19 @@ function parseArgs(argv) {
   };
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) throw new Error(USAGE);
+
+  const result = initCampaign(path.resolve(args.root), {
+    name: args.name,
+    language: args.language,
+    register: args.register,
+    world: args.world,
+    description: args.description,
+  });
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  exitWith(result.errors.length === 0 ? 0 : 1);
 }
 
-const result = initCampaign(path.resolve(args.root), {
-  name: args.name,
-  language: args.language,
-  register: args.register,
-  world: args.world,
-  description: args.description,
-});
-process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-process.exitCode = result.errors.length === 0 ? 0 : 1;
+runCli(main);

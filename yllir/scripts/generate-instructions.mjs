@@ -7,6 +7,7 @@
 
 import path from 'node:path';
 import { checkFingerprints, generateInstructions } from './lib/instructions.mjs';
+import { exitWith, runCli } from './lib/cli-exit.mjs';
 
 const USAGE = 'usage: node generate-instructions.mjs <campaignRoot> [--check]';
 
@@ -28,34 +29,35 @@ function parseArgs(argv) {
   return root === null ? null : { root, check };
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
-}
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) throw new Error(USAGE);
 
-const campaignRoot = path.resolve(args.root);
+  const campaignRoot = path.resolve(args.root);
 
-if (args.check) {
-  const result = checkFingerprints(campaignRoot);
-  if (result.ok) {
-    process.stdout.write('fingerprints: ok\n');
-  } else if (result.missing_version_file) {
-    process.stdout.write('fingerprints: missing .campaign/version.yaml\n');
-  } else {
-    process.stdout.write(`changed: ${result.changed.join(', ')}\n`);
-  }
-  process.exitCode = result.ok ? 0 : 1;
-} else {
-  const result = generateInstructions(campaignRoot);
-  if (result.errors.length > 0) {
-    for (const error of result.errors) {
-      const where = error.line === null ? error.file : `${error.file}:${error.line}`;
-      process.stdout.write(`${where} ${error.code} ${error.message}\n`);
+  if (args.check) {
+    const result = checkFingerprints(campaignRoot);
+    if (result.ok) {
+      process.stdout.write('fingerprints: ok\n');
+    } else if (result.missing_version_file) {
+      process.stdout.write('fingerprints: missing .campaign/version.yaml\n');
+    } else {
+      process.stdout.write(`changed: ${result.changed.join(', ')}\n`);
     }
-    process.exitCode = 1;
+    exitWith(result.ok ? 0 : 1);
   } else {
-    process.stdout.write(`written: ${result.written.join(', ')}\n`);
-    process.exitCode = 0;
+    const result = generateInstructions(campaignRoot);
+    if (result.errors.length > 0) {
+      for (const error of result.errors) {
+        const where = error.line === null ? error.file : `${error.file}:${error.line}`;
+        process.stdout.write(`${where} ${error.code} ${error.message}\n`);
+      }
+      exitWith(1);
+    } else {
+      process.stdout.write(`written: ${result.written.join(', ')}\n`);
+      exitWith(0);
+    }
   }
 }
+
+runCli(main);

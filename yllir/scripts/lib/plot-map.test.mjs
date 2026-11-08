@@ -219,6 +219,7 @@ test('CLI prints the session lines and the summary, exit 0 without errors', () =
       'la-cenere-che-canta-02 ready deps: la-cenere-che-canta-01',
       'la-cenere-che-canta-03 waiting deps: la-cenere-che-canta-02',
       'sessions: 3, played: 1, ready: 1, errors: 0',
+      'exit: 0',
       '',
     ].join('\n'),
   );

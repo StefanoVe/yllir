@@ -6,6 +6,7 @@
 
 import path from 'node:path';
 import { applyDraft } from './lib/apply-draft.mjs';
+import { exitWith, runCli } from './lib/cli-exit.mjs';
 
 const USAGE = 'usage: node apply-draft.mjs <root> --draft-dir <dir> --files "a.md,b.md"';
 const VALUE_FLAGS = ['--draft-dir', '--files'];
@@ -30,16 +31,17 @@ function parseArgs(argv) {
   return { root, draftDir: options['--draft-dir'], files: options['--files'] };
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) throw new Error(USAGE);
+
+  const files = args.files
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item !== '');
+  const result = applyDraft(path.resolve(args.root), { draftDir: args.draftDir, files });
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  exitWith(result.errors.length === 0 ? 0 : 1);
 }
 
-const files = args.files
-  .split(',')
-  .map((item) => item.trim())
-  .filter((item) => item !== '');
-const result = applyDraft(path.resolve(args.root), { draftDir: args.draftDir, files });
-process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-process.exitCode = result.errors.length === 0 ? 0 : 1;
+runCli(main);

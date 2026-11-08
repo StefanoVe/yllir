@@ -13,6 +13,7 @@ import {
   listVersions,
   restore,
 } from './versions.mjs';
+import { stripExitLine } from './cli-exit.mjs';
 
 // Identity logic is exercised only when no global or system git config exists.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
@@ -58,6 +59,7 @@ test('ensureRepo on an empty dir creates the repo, ignore rules and identity', (
   const ignore = read(dir, '.gitignore');
   assert.ok(ignore.split('\n').includes('.campaign/state/'));
   assert.ok(ignore.split('\n').includes('.campaign/cache/'));
+  assert.ok(ignore.split('\n').includes('.claude/settings.local.json'));
   assert.equal(git(dir, 'config', '--get', 'user.name'), 'Yllir');
   assert.equal(git(dir, 'config', '--get', 'user.email'), 'yllir@localhost.invalid');
 });
@@ -78,6 +80,7 @@ test('ensureRepo is idempotent and does not duplicate ignore rules', () => {
   const lines = read(dir, '.gitignore').split('\n');
   assert.equal(lines.filter((line) => line === '.campaign/state/').length, 1);
   assert.equal(lines.filter((line) => line === '.campaign/cache/').length, 1);
+  assert.equal(lines.filter((line) => line === '.claude/settings.local.json').length, 1);
 });
 
 test('ensureRepo appends missing ignore rules to an existing .gitignore', () => {
@@ -88,6 +91,7 @@ test('ensureRepo appends missing ignore rules to an existing .gitignore', () => 
   assert.equal(lines[0], 'node_modules/');
   assert.ok(lines.includes('.campaign/state/'));
   assert.ok(lines.includes('.campaign/cache/'));
+  assert.ok(lines.includes('.claude/settings.local.json'));
 });
 
 test('status parses names with spaces, untracked files and renames', () => {
@@ -270,7 +274,7 @@ test('missing git reports no-git', () => {
 
 function runCli(args) {
   const result = spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
-  return { code: result.status, json: JSON.parse(result.stdout) };
+  return { code: result.status, json: JSON.parse(stripExitLine(result.stdout)) };
 }
 
 test('CLI smoke for every command', () => {

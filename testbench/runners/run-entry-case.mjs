@@ -41,7 +41,6 @@ import { foldForm } from '../../yllir/scripts/lib/fold.mjs';
 
 const USAGE =
   'usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
-const ALLOWED_TOOLS = 'Bash(node:*) Bash(mkdir:*) Bash(pwd) Bash(echo:*) Bash(test:*) Bash(cat:*) Read Write Grep Glob Agent Skill';
 const AGENT_TIMEOUT_MS = 1800000;
 const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle', 'campaign');
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
@@ -592,7 +591,7 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
 // ---------------------------------------------------------------- records
 
 /** Builds the JSONL record of one run. */
-function makeRecord({ caseName, run, date, model, hash, agentFailure, agent, graded, copy, gradeOnly }) {
+function makeRecord({ caseName, run, date, model, hash, permissionMode, agentFailure, agent, graded, copy, gradeOnly }) {
   const failures = [...(agentFailure ? [`agent error: ${agentFailure}`] : []), ...graded.failures];
   const record = {
     case: caseName,
@@ -600,6 +599,7 @@ function makeRecord({ caseName, run, date, model, hash, agentFailure, agent, gra
     date,
     model,
     instructions_hash: hash,
+    permission_mode: permissionMode ?? null,
     pass: graded.pass && !agentFailure,
     checks: graded.checks,
     failures,
@@ -632,7 +632,7 @@ function consoleView(record) {
  * of the state after the first turn, or null.
  */
 function runAgentTurns({ dir, caseData, model }) {
-  const common = { cwd: dir, model, allowedTools: ALLOWED_TOOLS, timeoutMs: AGENT_TIMEOUT_MS };
+  const common = { cwd: dir, model, timeoutMs: AGENT_TIMEOUT_MS };
   const first = runClaude({ ...common, prompt: caseData.prompt });
   if (caseData.reply === undefined) return { agent: first, turnOne: null };
   if (!first.ok) return { agent: { ...first, turn1_report: null }, turnOne: null };
@@ -647,6 +647,7 @@ function runAgentTurns({ dir, caseData, model }) {
     duration_ms: sum(first.duration_ms, second.duration_ms),
     num_turns: sum(first.num_turns, second.num_turns),
     error: second.ok ? null : second.error,
+    permission_mode: first.permission_mode,
     turn1_report: first.report,
   };
   return { agent, turnOne };
@@ -698,6 +699,7 @@ function main() {
       date: new Date().toISOString(),
       model: opts.model,
       hash,
+      permissionMode: saved.permission_mode ?? null,
       agentFailure: saved.error ?? null,
       agent: saved.report === null || saved.report === undefined ? null : saved,
       graded,
@@ -735,6 +737,7 @@ function main() {
         date,
         model: opts.model,
         hash,
+        permissionMode: agent.permission_mode,
         agentFailure: agent.ok ? null : agent.error,
         agent,
         graded,
@@ -749,6 +752,7 @@ function main() {
             duration_ms: agent.duration_ms,
             num_turns: agent.num_turns,
             error: agent.ok ? null : agent.error,
+            permission_mode: agent.permission_mode,
             setup: { v1: setup.v1, v2: setup.v2, teodo_v1_text: setup.teodoV1Text },
             turn1_report: agent.turn1_report,
             turn_one_results: turnOne ? turnOne.results : undefined,

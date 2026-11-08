@@ -5,6 +5,7 @@
 
 import path from 'node:path';
 import { addCategory } from './lib/config-write.mjs';
+import { exitWith, runCli } from './lib/cli-exit.mjs';
 
 const USAGE = 'usage: node add-category.mjs <root> --id <slug> --folder "<folder>" --type <type>';
 const VALUE_FLAGS = ['--id', '--folder', '--type'];
@@ -29,12 +30,13 @@ function parseArgs(argv) {
   return { root, id: options['--id'], folder: options['--folder'], type: options['--type'] };
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) throw new Error(USAGE);
+
+  const result = addCategory(path.resolve(args.root), { id: args.id, folder: args.folder, type: args.type });
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  exitWith(result.errors.length === 0 ? 0 : 1);
 }
 
-const result = addCategory(path.resolve(args.root), { id: args.id, folder: args.folder, type: args.type });
-process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
-process.exitCode = result.errors.length === 0 ? 0 : 1;
+runCli(main);

@@ -48,6 +48,12 @@ function setSection(file, name, body) {
   fs.writeFileSync(file, lines.join('\n'));
 }
 
+/** The campaign root line for a root that exists (real path) or not (resolved path). */
+function rootLine(root) {
+  const real = fs.existsSync(root) ? fs.realpathSync(root) : path.resolve(root);
+  return `campaign root: ${real}`;
+}
+
 function listFiles(dir) {
   const out = [];
   const walk = (current, rel) => {
@@ -66,21 +72,24 @@ function listFiles(dir) {
 
 describe('turnCheck', () => {
   test('a folder without campaign.yaml has no active topic', () => {
+    const root = tempDir();
     assert.equal(
-      turnCheck(tempDir()),
-      [HEADER, 'active topic: none', NEXT].join('\n'),
+      turnCheck(root),
+      [HEADER, rootLine(root), 'active topic: none', NEXT].join('\n'),
     );
   });
 
   test('a nonexistent root does not throw', () => {
+    const root = path.join(tempDir(), 'missing');
     assert.equal(
-      turnCheck(path.join(tempDir(), 'missing')),
-      [HEADER, 'active topic: none', NEXT].join('\n'),
+      turnCheck(root),
+      [HEADER, rootLine(root), 'active topic: none', NEXT].join('\n'),
     );
   });
 
   test('a campaign with no topics has no active topic', () => {
-    assert.equal(turnCheck(campaign()), [HEADER, 'active topic: none', NEXT].join('\n'));
+    const root = campaign();
+    assert.equal(turnCheck(root), [HEADER, rootLine(root), 'active topic: none', NEXT].join('\n'));
   });
 
   test('an active topic shows its next step, its pending question and the other open topics', () => {
@@ -97,6 +106,7 @@ describe('turnCheck', () => {
       turnCheck(root),
       [
         HEADER,
+        rootLine(root),
         `active topic: ${active.id} — Il porto di Morvalle — next step: Scrivere la scena del porto.`,
         'pending questions: Il molo è di legno o di pietra?',
         `other open topics: ${first.id} — Il mercato delle ceneri`,
@@ -112,6 +122,7 @@ describe('turnCheck', () => {
       turnCheck(root),
       [
         HEADER,
+        rootLine(root),
         expectedActive(root, 'Il porto di Morvalle', 'none'),
         'pending questions: none',
         NEXT,
@@ -146,16 +157,15 @@ describe('turnCheck', () => {
     const root = campaign();
     newTopic(root, { process: 'scena', goal: 'Il porto di Morvalle', now: new Date('2026-11-03T10:00:00Z') });
     fs.writeFileSync(path.join(root, '.campaign/state/topics', 'rotto.md'), 'niente frontmatter\n');
-    assert.equal(turnCheck(root), [HEADER, NEXT].join('\n'));
+    assert.equal(turnCheck(root), [HEADER, rootLine(root), NEXT].join('\n'));
   });
 });
 
 describe('user-prompt CLI', () => {
   test('exits 0 and prints the check for a nonexistent root', () => {
-    const output = execFileSync(process.execPath, [CLI, path.join(tempDir(), 'missing')], {
-      encoding: 'utf8',
-    });
-    assert.equal(output, `${[HEADER, 'active topic: none', NEXT].join('\n')}\n`);
+    const root = path.join(tempDir(), 'missing');
+    const output = execFileSync(process.execPath, [CLI, root], { encoding: 'utf8' });
+    assert.equal(output, `${[HEADER, rootLine(root), 'active topic: none', NEXT].join('\n')}\n`);
   });
 
   test('prints the active topic of a campaign and writes nothing', () => {

@@ -6,7 +6,8 @@
 // Exit codes: 0 report written, 2 usage error.
 
 import path from 'node:path';
-import { writeLinkerReport } from './lib/linker-report.mjs';
+import { writeLinkerReport } from './lib/linker-report.mjs';import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+
 
 const USAGE =
   'usage: node linker-report.mjs <root> --plan <plan.json> [--outcomes <outcomes.json>] [--result <result.json>] ' +
@@ -54,22 +55,23 @@ function parseArgs(argv) {
   return opts;
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) throw new Error(USAGE);
+
+  const { status, outFile } = writeLinkerReport({
+    root: path.resolve(args.root),
+    planFile: path.resolve(args.plan),
+    outcomesFile: args.outcomes === null ? null : path.resolve(args.outcomes),
+    resultFile: args.result === null ? null : path.resolve(args.result),
+    checkExit: args['check-exit'],
+    statusReason: args['status-reason'],
+    continueWith: args['continue-with'],
+    outFile: path.resolve(args.out),
+  });
+
+  process.stdout.write(`report: ${outFile}, status: ${status}\n`);
+  exitWith(0);
 }
 
-const { status, outFile } = writeLinkerReport({
-  root: path.resolve(args.root),
-  planFile: path.resolve(args.plan),
-  outcomesFile: args.outcomes === null ? null : path.resolve(args.outcomes),
-  resultFile: args.result === null ? null : path.resolve(args.result),
-  checkExit: args['check-exit'],
-  statusReason: args['status-reason'],
-  continueWith: args['continue-with'],
-  outFile: path.resolve(args.out),
-});
-
-process.stdout.write(`report: ${outFile}, status: ${status}\n`);
-process.exitCode = 0;
+runCli(main);

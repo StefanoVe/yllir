@@ -108,9 +108,16 @@ describe('folder detection', () => {
   });
 
   test('a nonexistent root is other and does not throw', () => {
-    const result = sessionCheck(path.join(tempDir(), 'missing'));
+    const missing = path.join(tempDir(), 'missing');
+    const result = sessionCheck(missing);
     assert.equal(result.folder, 'other');
+    assert.equal(result.root, path.resolve(missing));
     assert.equal(result.framework_version, FRAMEWORK_VERSION);
+  });
+
+  test('the root is the real path of the campaign folder', () => {
+    const root = campaign();
+    assert.equal(sessionCheck(root).root, fs.realpathSync(root));
   });
 });
 
@@ -120,8 +127,8 @@ describe('campaign checks', () => {
     const result = sessionCheck(root);
     assert.equal(result.folder, 'campaign');
     assert.deepEqual(result.versions, { count: 0, last: null });
-    // campaign.yaml, CLAUDE.md, AGENTS.md, agent.md, customizations.md, version.yaml
-    assert.equal(result.unsaved, 6);
+    // campaign.yaml, CLAUDE.md, AGENTS.md, agent.md, customizations.md, version.yaml, settings.json
+    assert.equal(result.unsaved, 7);
     assert.equal(result.settings.ok, true);
     assert.equal(result.instructions, 'up-to-date');
     assert.equal(result.campaign_framework_version, FRAMEWORK_VERSION);
@@ -190,10 +197,11 @@ describe('topics', () => {
       formatCheck(result),
       [
         'YLLIR SESSION CHECK (for the assistant, not for the master)',
+        `campaign root: ${fs.realpathSync(root)}`,
         'folder: campaign',
         'git: ok',
         'saved versions: 0',
-        'changes not yet saved: 6 files',
+        'changes not yet saved: 7 files',
         'settings: valid',
         'instructions: up to date',
         'framework version: ' + FRAMEWORK_VERSION + ' (campaign made with ' + FRAMEWORK_VERSION + ')',
@@ -209,6 +217,7 @@ describe('topics', () => {
 describe('formatCheck', () => {
   test('prints the exact layout for a full campaign', () => {
     const text = formatCheck({
+      root: '/campagne/le-isole-dambra',
       folder: 'campaign',
       git: 'ok',
       versions: { count: 3, last: { message: 'Creata la campagna «Le isole d\'ambra»', date: '2026-11-07' } },
@@ -223,6 +232,7 @@ describe('formatCheck', () => {
       text,
       [
         'YLLIR SESSION CHECK (for the assistant, not for the master)',
+        'campaign root: /campagne/le-isole-dambra',
         'folder: campaign',
         'git: ok',
         'saved versions: 3 (last: "Creata la campagna «Le isole d\'ambra»" on 2026-11-07)',
@@ -237,6 +247,7 @@ describe('formatCheck', () => {
 
   test('omits null lines and prints problems, zero versions and changed files', () => {
     const text = formatCheck({
+      root: '/tmp/cartella',
       folder: 'other',
       git: 'missing',
       versions: { count: 0, last: null },
@@ -251,6 +262,7 @@ describe('formatCheck', () => {
       text,
       [
         'YLLIR SESSION CHECK (for the assistant, not for the master)',
+        'campaign root: /tmp/cartella',
         'folder: other',
         'git: missing',
         'saved versions: 0',
@@ -264,6 +276,7 @@ describe('formatCheck', () => {
 
   test('prints instructions missing', () => {
     const text = formatCheck({
+      root: '/tmp/campagna',
       folder: 'campaign',
       git: 'ok',
       versions: null,

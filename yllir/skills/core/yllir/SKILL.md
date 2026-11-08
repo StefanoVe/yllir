@@ -2,19 +2,22 @@
 name: yllir
 description: Entry point of Yllir. Invoke it first for every message of the master in a Yllir campaign folder or in an empty folder: it recognises what the master wants and runs the right process.
 user-invocable: true
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/topics.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/runner-result.mjs" *), Read, Agent
 ---
 
 # Yllir entry point
 
 This skill receives every message of the master. It checks the folder, keeps the master's words, and runs exactly one process. Writing processes run in a sub-agent (`yllir:process-runner`), never in this skill. Run every command from the campaign root (the folder the master opened). Never run a command from another folder.
 
+**Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: FAILED`, reason "permission refused".
+
 ## Steps
 
-**Step 1 — Check.** Find the block that starts with `YLLIR SESSION CHECK` in your context. Keep its values: `folder`, `git`, `saved versions`, `changes not yet saved`, `settings`, `instructions`.
+**Step 1 — Check.** Find the block that starts with `YLLIR SESSION CHECK` in your context. Keep its values: `folder`, `git`, `campaign root`, `saved versions`, `changes not yet saved`, `settings`, `instructions`.
 - If the block is not in your context: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and keep its output the same way.
 - Output: the values of the block, kept for the next steps.
 
-**Step 2 — Lexicon.** Run `cat "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/lexicon.md"` and read the table.
+**Step 2 — Lexicon.** Read `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/lexicon.md` and read the table.
 - From now on, every sentence to the master uses only the words of the lexicon, in the campaign language. The campaign language is `language.main` in `campaign.yaml`. In an empty folder, it is the language the master writes in.
 - Output: the lexicon in your context.
 
@@ -42,20 +45,21 @@ This skill receives every message of the master. It checks the folder, keeps the
     - A return to an earlier open topic: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/topics.mjs" activate . --id <id>`. If the return is ambiguous, ask the master one question that shows at most three open topics by their goal, in plain words.
     - Quick questions do not change the topic.
     - In an empty folder there are no topics yet: use `TOPIC: none` and `HANDOFF: none`.
-  - (b) Launch the sub-agent `yllir:process-runner` in the foreground and wait for its result in the same turn (never with run_in_background). Never tell the master that you will write later or that work continues in the background: your message is the runner's message for the master, after it has finished. Use exactly these keys, filled in:
+  - (b) Before launching the runner, if TOPIC is not `none`, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/topics.mjs" check . --id <id>` and use its `changed` list as CHANGED_FILES (`none` when the list is empty). Then launch the sub-agent `yllir:process-runner` in the foreground and wait for its result in the same turn (never with run_in_background). Never tell the master that you will write later or that work continues in the background: your message is the runner's message for the master, after it has finished. Use exactly these keys, filled in:
     ```text
     CAMPAIGN_ROOT: <absolute path of the campaign root>
     PROCESS: yllir:new-campaign (or yllir:prepare-session)
     TOPIC: <topic id, or none>
     HANDOFF: <absolute path of the handoff file, or none>
+    CHANGED_FILES: <comma-separated campaign-relative paths from the topic check, or none>
     LANGUAGE: <ISO code of the language the master writes in>
     MASTER_MESSAGE:
     <the master's message, verbatim; when the master answers a question of the runner, the earlier question followed by the answer>
     ```
-  - (c) Read its `RUNNER RESULT`.
-    - If `status: QUESTION` and TOPIC is not `none`: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/topics.mjs" active .`. If the question is not recorded yet (the handoff's `## Questions for the master` is empty or `none`; read the handoff file to check), run `node "${CLAUDE_PLUGIN_ROOT}/scripts/topics.mjs" ask . --id <TOPIC> --question "<the runner's question, in English>" --next "continue the process with the master's answer"` yourself.
-    - Then send the master exactly the text under `message for the master:`, and nothing else. Do not add a summary, a status or a file path.
-  - (d) If the runner's answer is not a `RUNNER RESULT` block, launch it once more with the same prompt. If it fails again, tell the master in one sentence that the operation could not be completed.
+  - (c) Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/runner-result.mjs" . --file .campaign/state/runner/result.txt --topic <TOPIC or none>`. The script checks the runner's result file, applies the topic change (question or finish) and prints its output.
+    - Exit 0: send the master exactly the lines after `message for the master:` in its output, and nothing else. Do not add a summary, a status or a file path.
+    - Exit 1: launch `yllir:process-runner` once more with the same prompt as in (b), plus a line `PROBLEMS:` followed by the `- ` lines the command printed, one per line. Then run the same command again. If it exits 1 a second time, tell the master in one plain sentence that the operation could not be completed.
+  - (d) If the runner's final answer is not `result written`, do not send anything: run the command in (c) anyway. A missing or invalid file is a problem for that command, and (c) handles it.
 
 - **Go back** (for example «torna a com'era», «annulla l'ultima modifica»):
   - (a) Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" list . --limit 10`.
@@ -80,7 +84,7 @@ This skill receives every message of the master. It checks the folder, keeps the
 
 ## Examples
 
-Correct, writing request (the master, in an empty folder, writes «crea una campagna»): no topic is needed. Launch `yllir:process-runner` with `PROCESS: yllir:new-campaign`, `TOPIC: none`, `HANDOFF: none` and the master's message verbatim. Its result is a `RUNNER RESULT` block; send the master only its `message for the master:` text, in plain Italian.
+Correct, writing request (the master, in an empty folder, writes «crea una campagna»): no topic is needed. Launch `yllir:process-runner` with `PROCESS: yllir:new-campaign`, `TOPIC: none`, `HANDOFF: none` and the master's message verbatim. The runner's result file passes the runner-result command (exit 0); send the master only the text after its `message for the master:` line, in plain Italian.
 
 Wrong, writing request: running `yllir:new-campaign` (or writing the draft and calling `yllir:write-sequence`) directly in this skill. The entry skill never runs a writing process itself.
 

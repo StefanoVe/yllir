@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildSubjectIndex } from './lib/subjects.mjs';
+import { exitWith, runCli } from './lib/cli-exit.mjs';
 
 const USAGE = 'usage: node build-index.mjs <campaignRoot> [--out <file>]';
 
@@ -30,23 +31,24 @@ function parseArgs(argv) {
   return root === null ? null : { root, out };
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) throw new Error(USAGE);
+
+  const campaignRoot = path.resolve(args.root);
+  const index = buildSubjectIndex(campaignRoot);
+
+  const outFile =
+    args.out === null
+      ? path.join(campaignRoot, '.campaign', 'cache', 'subjects.json')
+      : path.resolve(args.out);
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  fs.writeFileSync(outFile, `${JSON.stringify(index, null, 2)}\n`);
+
+  process.stdout.write(
+    `subjects: ${index.subjects.length}, homonyms: ${index.homonyms.length}, errors: ${index.errors.length}\n`,
+  );
+  exitWith(index.errors.length === 0 ? 0 : 1);
 }
 
-const campaignRoot = path.resolve(args.root);
-const index = buildSubjectIndex(campaignRoot);
-
-const outFile =
-  args.out === null
-    ? path.join(campaignRoot, '.campaign', 'cache', 'subjects.json')
-    : path.resolve(args.out);
-fs.mkdirSync(path.dirname(outFile), { recursive: true });
-fs.writeFileSync(outFile, `${JSON.stringify(index, null, 2)}\n`);
-
-process.stdout.write(
-  `subjects: ${index.subjects.length}, homonyms: ${index.homonyms.length}, errors: ${index.errors.length}\n`,
-);
-process.exitCode = index.errors.length === 0 ? 0 : 1;
+runCli(main);

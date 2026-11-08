@@ -27,7 +27,6 @@ import {
 
 const USAGE =
   'usage: node testbench/runners/run-linker-case.mjs <caseDir> [--runs N] [--model haiku] [--keep]';
-const ALLOWED_TOOLS = 'Bash(node:*) Bash(mkdir:*) Bash(pwd) Read Write Grep Glob Agent';
 const AGENT_TIMEOUT_MS = 900000;
 const LINK_RE = /\[([^\]]+)\]\(([^)]*)\)/g;
 
@@ -234,7 +233,6 @@ function main() {
         cwd: campaign,
         prompt: caseData.prompt,
         model: opts.model,
-        allowedTools: ALLOWED_TOOLS,
         timeoutMs: AGENT_TIMEOUT_MS,
       });
       if (!agent.ok) {
@@ -244,6 +242,7 @@ function main() {
           date,
           model: opts.model,
           instructions_hash: hash,
+          permission_mode: agent.permission_mode,
           pass: false,
           checks: {},
           failures: [`agent error: ${agent.error}`],
@@ -266,6 +265,7 @@ function main() {
           date,
           model: opts.model,
           instructions_hash: hash,
+          permission_mode: agent.permission_mode,
           pass: graded.pass,
           checks: graded.checks,
           failures: graded.failures,

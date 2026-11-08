@@ -11,7 +11,7 @@ import path from 'node:path';
 export const KINDS = ['framework', 'manual', 'restore'];
 
 const TRAILER = 'Yllir-Kind';
-const IGNORED_RULES = ['.campaign/state/', '.campaign/cache/'];
+const IGNORED_RULES = ['.campaign/state/', '.campaign/cache/', '.claude/settings.local.json'];
 const IDENTITY = [
   ['user.name', 'Yllir'],
   ['user.email', 'yllir@localhost.invalid'],

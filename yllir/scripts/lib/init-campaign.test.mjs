@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { initCampaign } from './init-campaign.mjs';
 import { parseYamlLite } from './yaml-lite.mjs';
 import { validateConfig } from './config.mjs';
+import { stripExitLine } from './cli-exit.mjs';
 
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
 process.env.GIT_CONFIG_NOSYSTEM = '1';
@@ -164,13 +165,13 @@ test('init-campaign CLI prints JSON and uses exit codes 0, 1 and 2', () => {
   ];
   const ok = spawnSync(process.execPath, args, { encoding: 'utf8' });
   assert.equal(ok.status, 0, ok.stderr);
-  const result = JSON.parse(ok.stdout);
+  const result = JSON.parse(stripExitLine(ok.stdout));
   assert.deepEqual(result.errors, []);
   assert.equal(result.slug, 'le-isole-d-ambra');
 
   const again = spawnSync(process.execPath, args, { encoding: 'utf8' });
   assert.equal(again.status, 1);
-  assert.equal(JSON.parse(again.stdout).errors[0].code, 'already-campaign');
+  assert.equal(JSON.parse(stripExitLine(again.stdout)).errors[0].code, 'already-campaign');
 
   const usage = spawnSync(process.execPath, [CLI, tmp(), '--name', 'X', '--language', 'it'], { encoding: 'utf8' });
   assert.equal(usage.status, 2);

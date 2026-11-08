@@ -19,6 +19,7 @@ import {
   touchTopic,
 } from './topics.mjs';
 import { slugify } from './normalize.mjs';
+import { stripExitLine } from './cli-exit.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.join(here, '..', 'topics.mjs');
@@ -313,27 +314,27 @@ test('CLI smoke for each command', () => {
 
   const created1 = run(['new', root, '--process', 'prepare-session', '--goal', 'Prepare session 4']);
   assert.equal(created1.status, 0, created1.stderr);
-  const { id } = JSON.parse(created1.stdout);
+  const { id } = JSON.parse(stripExitLine(created1.stdout));
   assert.match(id, /^\d{4}-\d{2}-\d{2}-prepare-session-4$/);
 
   fs.mkdirSync(path.join(root, 'Trama'), { recursive: true });
   fs.writeFileSync(path.join(root, 'Trama', 'a.md'), 'a');
   const touched = run(['touch', root, '--id', id, '--files', 'Trama/a.md, Trama/b.md']);
   assert.equal(touched.status, 0, touched.stderr);
-  assert.deepEqual(JSON.parse(touched.stdout), { id, changedSections: ['Files'] });
+  assert.deepEqual(JSON.parse(stripExitLine(touched.stdout)), { id, changedSections: ['Files'] });
 
   const checked = run(['check', root, '--id', id]);
   assert.equal(checked.status, 0, checked.stderr);
-  assert.deepEqual(JSON.parse(checked.stdout), { id, changed: [] });
+  assert.deepEqual(JSON.parse(stripExitLine(checked.stdout)), { id, changed: [] });
 
   const second = run(['new', root, '--process', 'scene', '--goal', 'Docks']);
-  const secondId = JSON.parse(second.stdout).id;
+  const secondId = JSON.parse(stripExitLine(second.stdout)).id;
   assert.equal(second.status, 0, second.stderr);
 
   const listed = run(['list', root]);
   assert.equal(listed.status, 0, listed.stderr);
   assert.deepEqual(
-    JSON.parse(listed.stdout).map((e) => [e.id, e.status]),
+    JSON.parse(stripExitLine(listed.stdout)).map((e) => [e.id, e.status]),
     [
       [secondId, 'active'],
       [id, 'paused'],
@@ -341,19 +342,19 @@ test('CLI smoke for each command', () => {
   );
 
   const active = run(['active', root]);
-  assert.equal(JSON.parse(active.stdout).id, secondId);
+  assert.equal(JSON.parse(stripExitLine(active.stdout)).id, secondId);
 
   const activated = run(['activate', root, '--id', id]);
   assert.equal(activated.status, 0, activated.stderr);
-  assert.equal(JSON.parse(run(['active', root]).stdout).id, id);
+  assert.equal(JSON.parse(stripExitLine(run(['active', root]).stdout)).id, id);
 
   const closed = run(['close', root, '--id', id]);
   assert.equal(closed.status, 0, closed.stderr);
-  assert.equal(JSON.parse(run(['active', root]).stdout), null);
+  assert.equal(JSON.parse(stripExitLine(run(['active', root]).stdout)), null);
 
   const unknown = run(['check', root, '--id', '2026-01-01-nope']);
   assert.equal(unknown.status, 1);
-  assert.equal(JSON.parse(unknown.stdout).error, 'no-topic');
+  assert.equal(JSON.parse(stripExitLine(unknown.stdout)).error, 'no-topic');
 
   assert.equal(run(['check', root]).status, 2);
   assert.equal(run(['frobnicate', root]).status, 2);
@@ -486,21 +487,21 @@ test('CLI smoke for ask and finish', () => {
   const run = (args) => spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
 
   const created = run(['new', root, '--process', 'scene', '--goal', 'Docks']);
-  const { id } = JSON.parse(created.stdout);
+  const { id } = JSON.parse(stripExitLine(created.stdout));
 
   const asked = run(['ask', root, '--id', id, '--question', 'Chi c\'è?', '--next', 'Andare avanti']);
   assert.equal(asked.status, 0, asked.stderr);
-  assert.deepEqual(JSON.parse(asked.stdout), { id, status: 'active' });
+  assert.deepEqual(JSON.parse(stripExitLine(asked.stdout)), { id, status: 'active' });
 
   const missing = run(['ask', root, '--id', id, '--question', 'Chi c\'è?']);
   assert.equal(missing.status, 2);
 
   const finished = run(['finish', root, '--id', id, '--done', 'Porto visitato']);
   assert.equal(finished.status, 0, finished.stderr);
-  assert.deepEqual(JSON.parse(finished.stdout), { id, status: 'closed' });
-  assert.equal(JSON.parse(run(['active', root]).stdout), null);
+  assert.deepEqual(JSON.parse(stripExitLine(finished.stdout)), { id, status: 'closed' });
+  assert.equal(JSON.parse(stripExitLine(run(['active', root]).stdout)), null);
 
   const unknown = run(['finish', root, '--id', '2026-01-01-nope', '--done', 'x']);
   assert.equal(unknown.status, 1);
-  assert.equal(JSON.parse(unknown.stdout).error, 'no-topic');
+  assert.equal(JSON.parse(stripExitLine(unknown.stdout)).error, 'no-topic');
 });

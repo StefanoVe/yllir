@@ -35,7 +35,6 @@ import { analyzeMarkdown } from '../../yllir/scripts/lib/zones.mjs';
 
 const USAGE =
   'usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--grade-only <dir>]';
-const ALLOWED_TOOLS = 'Bash(node:*) Bash(mkdir:*) Bash(pwd) Bash(echo:*) Bash(test:*) Bash(cat:*) Read Write Grep Glob Agent Skill';
 const AGENT_TIMEOUT_MS = 1800000;
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
 const AGENT_FILE = '.campaign/instructions/agent.md';
@@ -333,7 +332,7 @@ function gradeCase({ caseData, dir, report }) {
 }
 
 /** Builds the JSONL record of one run. */
-function makeRecord({ caseName, run, date, model, hash, agentFailure, agent, graded, copy }) {
+function makeRecord({ caseName, run, date, model, hash, permissionMode, agentFailure, agent, graded, copy }) {
   const failures = [...(agentFailure ? [`agent error: ${agentFailure}`] : []), ...graded.failures];
   const record = {
     case: caseName,
@@ -341,6 +340,7 @@ function makeRecord({ caseName, run, date, model, hash, agentFailure, agent, gra
     date,
     model,
     instructions_hash: hash,
+    permission_mode: permissionMode ?? null,
     pass: graded.pass && !agentFailure,
     checks: graded.checks,
     failures,
@@ -379,6 +379,7 @@ function main() {
       date: new Date().toISOString(),
       model: opts.model,
       hash,
+      permissionMode: agent ? agent.permission_mode : null,
       agentFailure: null,
       agent,
       graded,
@@ -400,7 +401,6 @@ function main() {
         cwd: dir,
         prompt: caseData.prompt,
         model: opts.model,
-        allowedTools: ALLOWED_TOOLS,
         timeoutMs: AGENT_TIMEOUT_MS,
       });
       const graded = gradeCase({ caseData, dir, report: agent.ok ? agent.report : null });
@@ -410,6 +410,7 @@ function main() {
         date,
         model: opts.model,
         hash,
+        permissionMode: agent.permission_mode,
         agentFailure: agent.ok ? null : agent.error,
         agent: agent.ok ? agent : null,
         graded,
@@ -418,7 +419,7 @@ function main() {
       if (opts.keep) {
         fs.writeFileSync(
           `${dir}.run.json`,
-          JSON.stringify({ report: agent.report, cost_usd: agent.cost_usd, duration_ms: agent.duration_ms, num_turns: agent.num_turns }),
+          JSON.stringify({ report: agent.report, cost_usd: agent.cost_usd, duration_ms: agent.duration_ms, num_turns: agent.num_turns, permission_mode: agent.permission_mode }),
         );
       }
     } finally {

@@ -8,10 +8,15 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { parseYamlLite } from '../../../yllir/scripts/lib/yaml-lite.mjs';
+import { generateInstructions } from '../../../yllir/scripts/lib/instructions.mjs';
 
 export const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..', '..');
 const RESULTS_DIR = path.join(REPO_ROOT, 'testbench', 'results');
 const MAX_BUFFER = 64 * 1024 * 1024;
+// Strict permissions: the rules the framework generates for a campaign, passed explicitly
+// because project settings are ignored in untrusted folders. See testbench/README.md.
+const STRICT_SETTINGS = path.join(import.meta.dirname, 'strict-settings.json');
+const PERMISSION_MODE = 'strict';
 
 function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
@@ -113,6 +118,11 @@ export function prepareCopy(fixtureDir) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-case-'));
   const campaign = path.join(tmp, 'campaign');
   fs.cpSync(path.join(fixtureDir, 'campaign'), campaign, { recursive: true });
+  // Generated instructions go into the baseline, so only what the agent writes shows as changed.
+  const generated = generateInstructions(campaign);
+  if (generated.errors.length > 0) {
+    throw new Error(`generateInstructions failed: ${generated.errors.join('; ')}`);
+  }
   git(campaign, ['init', '-q']);
   git(campaign, ['add', '-A']);
   git(campaign, ['-c', 'user.name=testbench', '-c', 'user.email=testbench@example.invalid', 'commit', '-qm', 'baseline']);
@@ -125,15 +135,15 @@ export function removeCopy(campaign) {
 }
 
 /**
- * Runs the agent under test with `claude -p` in cwd. Never throws: the result
- * is { ok, report, cost_usd, duration_ms, num_turns, error }, where error is
- * the first line of the failure message when ok is false.
+ * Runs the agent under test with `claude -p` in cwd, in strict permission mode
+ * (no prompts, only the rules in strict-settings.json). Never throws: the result
+ * is { ok, report, cost_usd, duration_ms, num_turns, error, permission_mode },
+ * where error is the first line of the failure message when ok is false.
  */
 export function runClaude({
   cwd,
   prompt,
   model,
-  allowedTools,
   timeoutMs,
   pluginDir = path.join(REPO_ROOT, 'yllir'),
   continueConversation = false,
@@ -148,8 +158,12 @@ export function runClaude({
     '--output-format',
     'json',
     ...(continueConversation ? ['--continue'] : []),
-    '--allowedTools',
-    allowedTools,
+    '--permission-mode',
+    'manual',
+    '--permission-prompts',
+    'none',
+    '--settings',
+    STRICT_SETTINGS,
   ];
   try {
     const stdout = execFileSync('claude', args, {
@@ -169,6 +183,7 @@ export function runClaude({
       duration_ms: num(data.duration_ms),
       num_turns: num(data.num_turns),
       error: null,
+      permission_mode: PERMISSION_MODE,
     };
   } catch (err) {
     return {
@@ -178,6 +193,7 @@ export function runClaude({
       duration_ms: null,
       num_turns: null,
       error: err.message.split('\n')[0],
+      permission_mode: PERMISSION_MODE,
     };
   }
 }

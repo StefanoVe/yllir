@@ -29,7 +29,6 @@ import {
 
 const USAGE =
   'usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--grade-only <copyPath>]';
-const ALLOWED_TOOLS = 'Bash(node:*) Bash(mkdir:*) Bash(rm:*) Bash(pwd) Bash(echo:*) Read Write Grep Glob Agent';
 const AGENT_TIMEOUT_MS = 1800000;
 const AUDIT_DIR = path.join('.campaign', 'state', 'audit');
 
@@ -278,7 +277,7 @@ function gradeCopy({ key, fixtureCampaign, copy }) {
 }
 
 /** Builds the JSONL record of one run from the grading result. */
-function makeRecord({ caseName, run, date, model, hash, agentFailure, agent, graded, copy }) {
+function makeRecord({ caseName, run, date, model, hash, permissionMode, agentFailure, agent, graded, copy }) {
   const failures = [...(agentFailure ? [`agent error: ${agentFailure}`] : []), ...graded.failures];
   const record = {
     case: caseName,
@@ -286,6 +285,7 @@ function makeRecord({ caseName, run, date, model, hash, agentFailure, agent, gra
     date,
     model,
     instructions_hash: hash,
+    permission_mode: permissionMode ?? null,
     pass: graded.pass && !agentFailure,
     checks: graded.checks,
     failures,
@@ -332,6 +332,7 @@ function main() {
       model: opts.model,
       hash,
       agentFailure: null,
+      permissionMode: null,
       agent: { report: readText(path.join(copy, AUDIT_DIR, 'report.txt')), cost_usd: null, duration_ms: null, num_turns: null },
       graded,
       copy,
@@ -352,7 +353,6 @@ function main() {
         cwd: campaign,
         prompt: caseData.prompt,
         model: opts.model,
-        allowedTools: ALLOWED_TOOLS,
         timeoutMs: AGENT_TIMEOUT_MS,
       });
       // The copy is graded even when the agent failed: a partial audit still shows what happened.
@@ -363,6 +363,7 @@ function main() {
         date,
         model: opts.model,
         hash,
+        permissionMode: agent.permission_mode,
         agentFailure: agent.ok ? null : agent.error,
         agent: agent.ok ? agent : null,
         graded,

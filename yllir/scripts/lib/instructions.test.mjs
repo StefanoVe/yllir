@@ -123,15 +123,16 @@ describe('renderTemplate', () => {
 });
 
 describe('generateInstructions', () => {
-  test('creates the five files with the exact wrapper texts', () => {
+  test('creates the six files with the exact wrapper texts', () => {
     const root = campaignWith(MINIMAL_CONFIG);
     const result = generateInstructions(root);
     assert.deepEqual(result.errors, []);
-    assert.equal(result.written.length, 5);
+    assert.equal(result.written.length, 6);
     for (const file of [
       '.campaign/instructions/agent.md',
       'CLAUDE.md',
       'AGENTS.md',
+      '.claude/settings.json',
       '.campaign/customizations.md',
       '.campaign/version.yaml',
     ]) {
@@ -172,7 +173,38 @@ describe('generateInstructions', () => {
     assert.equal(fs.readFileSync(path.join(root, '.campaign/customizations.md'), 'utf8'), '# Your rules\n');
   });
 
-  test('writes version.yaml that parses, lists three sorted fingerprints and the framework version', () => {
+  test('writes .claude/settings.json with exactly the project permissions', () => {
+    const root = campaignWith(MINIMAL_CONFIG);
+    generateInstructions(root);
+    assert.equal(
+      fs.readFileSync(path.join(root, '.claude/settings.json'), 'utf8'),
+      [
+        '{',
+        '  "permissions": {',
+        '    "allow": [',
+        '      "Skill(yllir:*)",',
+        '      "Edit(.campaign/state/**)"',
+        '    ]',
+        '  }',
+        '}',
+        '',
+      ].join('\n'),
+    );
+  });
+
+  test('never reads or writes .claude/settings.local.json', () => {
+    const root = campaignWith(MINIMAL_CONFIG);
+    fs.mkdirSync(path.join(root, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.claude/settings.local.json'), '{"mia": true}\n');
+    const result = generateInstructions(root);
+    assert.deepEqual(result.errors, []);
+    assert.ok(!result.written.some((file) => file.includes('settings.local.json')));
+    assert.equal(fs.readFileSync(path.join(root, '.claude/settings.local.json'), 'utf8'), '{"mia": true}\n');
+    const { data } = parseYamlLite(fs.readFileSync(path.join(root, '.campaign/version.yaml'), 'utf8'));
+    assert.ok(!data.generated.some((entry) => entry.path.includes('settings.local.json')));
+  });
+
+  test('writes version.yaml that parses, lists four sorted fingerprints and the framework version', () => {
     const root = campaignWith(MINIMAL_CONFIG);
     generateInstructions(root);
     const { data, errors } = parseYamlLite(fs.readFileSync(path.join(root, '.campaign/version.yaml'), 'utf8'));
@@ -181,7 +213,7 @@ describe('generateInstructions', () => {
     assert.equal(data.schema, 1);
     assert.deepEqual(
       data.generated.map((entry) => entry.path),
-      ['.campaign/instructions/agent.md', 'AGENTS.md', 'CLAUDE.md'],
+      ['.campaign/instructions/agent.md', '.claude/settings.json', 'AGENTS.md', 'CLAUDE.md'],
     );
     for (const entry of data.generated) {
       assert.match(entry.sha256, /^[0-9a-f]{64}$/);
@@ -193,7 +225,13 @@ describe('generateInstructions', () => {
     const second = campaignWith(MINIMAL_CONFIG);
     generateInstructions(first);
     generateInstructions(second);
-    for (const file of ['.campaign/instructions/agent.md', 'CLAUDE.md', 'AGENTS.md', '.campaign/version.yaml']) {
+    for (const file of [
+      '.campaign/instructions/agent.md',
+      'CLAUDE.md',
+      'AGENTS.md',
+      '.claude/settings.json',
+      '.campaign/version.yaml',
+    ]) {
       assert.deepEqual(
         fs.readFileSync(path.join(first, file)),
         fs.readFileSync(path.join(second, file)),
@@ -226,6 +264,19 @@ describe('checkFingerprints', () => {
     assert.equal(edited.ok, false);
     assert.deepEqual(edited.changed, ['CLAUDE.md']);
     assert.equal(edited.missing_version_file, false);
+  });
+
+  test('reports a hand-edited .claude/settings.json, and ignores settings.local.json', () => {
+    const root = campaignWith(MINIMAL_CONFIG);
+    generateInstructions(root);
+    fs.mkdirSync(path.join(root, '.claude'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.claude/settings.local.json'), '{"mia": true}\n');
+    assert.deepEqual(checkFingerprints(root), { ok: true, changed: [], missing_version_file: false });
+
+    fs.writeFileSync(path.join(root, '.claude/settings.json'), '{}\n');
+    const edited = checkFingerprints(root);
+    assert.equal(edited.ok, false);
+    assert.deepEqual(edited.changed, ['.claude/settings.json']);
   });
 
   test('reports a missing version file', () => {

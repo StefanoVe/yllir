@@ -2,11 +2,14 @@
 name: new-campaign
 description: Core process. Creates a new Yllir campaign in an empty folder with a short interview (four questions, one confirmation). Always runs inside the process runner (yllir:process-runner), for the yllir entry skill.
 user-invocable: false
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/init-campaign.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" *), Read, Write, Skill
 ---
 
 # New campaign
 
 Creates the core files of a campaign in an empty folder. It asks only what the core files need. Run every command from the campaign root (the folder the master opened). Keep every value you read from the session check.
+
+**Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: FAILED`, reason "permission refused".
 
 ## Steps
 
@@ -59,7 +62,7 @@ Nothing else. Ask the master for one confirmation (the process runner turns this
 - Slug: lowercase, ASCII letters and digits, words joined by hyphens. For `Mondo`, the slug is `mondo`.
 - Output: the JSON of both commands, read and kept.
 
-**Step 6 — Draft the world document.** You write this draft yourself. The spec assigns the first draft of the world document to the main assistant. Its path in the campaign is `<Folder>/<World name>.md`. Create the draft folder with `mkdir -p .campaign/state/write/draft/<Folder>`, then write the draft to `.campaign/state/write/draft/<Folder>/<World name>.md` in exactly this form:
+**Step 6 — Draft the world document.** You write this draft yourself. The spec assigns the first draft of the world document to the main assistant. Its path in the campaign is `<Folder>/<World name>.md`. Write the draft to `.campaign/state/write/draft/<Folder>/<World name>.md` in exactly this form:
 
 ```markdown
 ---

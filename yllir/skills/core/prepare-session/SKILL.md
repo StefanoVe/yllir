@@ -2,11 +2,14 @@
 name: prepare-session
 description: Core process. Prepares the next session of a Yllir campaign as a new plot document: checks what was played, reads the documents involved, runs a read-only continuity check, drafts the scenes and writes them through the write sequence. Runs inside the process runner.
 user-invocable: false
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/plot-map.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" *), Read, Write, Skill
 ---
 
 # Prepare session
 
 Prepares the next session as a new plot document. Run every command from the campaign root (the folder that contains `campaign.yaml`). Keep every value you read from a script, and never guess one.
+
+**Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: FAILED`, reason "permission refused".
 
 **Scope of this version.** This process:
 - creates a NEW session document;
@@ -66,7 +69,7 @@ These lists never block the preparation. If the file is missing, record "check n
 **Step 6 — Characters' entry points.** Read every document in the category whose `type` is `master-only` in `structure` of `campaign.yaml` (these are the players' characters). For each such document that names a subject of step 4, write one line: which character, and the hook written there. Keep these as ENTRY_POINTS. If none, ENTRY_POINTS is empty.
 - Output: the ENTRY_POINTS list (may be empty).
 
-**Step 7 — Draft.** Write the session to `.campaign/state/write/draft/<new file>`. Create the folder first with `mkdir -p` on its parent. Use exactly this form:
+**Step 7 — Draft.** Write the session to `.campaign/state/write/draft/<new file>`. Use exactly this form:
 
 ```markdown
 ---

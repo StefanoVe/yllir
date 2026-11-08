@@ -22,6 +22,7 @@ const NEXT_STEP = 'next: invoke the skill yllir:yllir before answering the maste
 
 /**
  * @returns {{
+ *   root: string,
  *   folder: 'empty' | 'campaign' | 'other',
  *   git: 'ok' | 'missing',
  *   versions: { count: number, last: { message: string, date: string } | null } | null,
@@ -37,6 +38,7 @@ export function sessionCheck(root) {
   const dir = path.resolve(root);
   const folder = detectFolder(dir);
   const result = {
+    root: realRoot(dir),
     folder,
     git: gitState(),
     versions: null,
@@ -76,7 +78,7 @@ export function sessionCheck(root) {
 
 /** Plain-text report for the assistant. Lines whose value is null are omitted. */
 export function formatCheck(result) {
-  const lines = [HEADER, `folder: ${result.folder}`, `git: ${result.git}`];
+  const lines = [HEADER, `campaign root: ${result.root}`, `folder: ${result.folder}`, `git: ${result.git}`];
 
   if (result.versions !== null) {
     const { count, last } = result.versions;
@@ -125,6 +127,15 @@ export function formatCheck(result) {
 }
 
 // ---------------------------------------------------------------- sub-checks
+
+/** Absolute real path of the folder, or the resolved path when it does not exist. */
+function realRoot(dir) {
+  try {
+    return fs.realpathSync(dir);
+  } catch {
+    return dir;
+  }
+}
 
 function detectFolder(dir) {
   try {

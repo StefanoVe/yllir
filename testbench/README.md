@@ -8,6 +8,8 @@ The testbench holds synthetic campaigns, each with an answer key, and the runner
 
 Rule: an agent under test receives only a COPY of `campaign/`. It never sees `key.yaml`, because an agent that can read the key measures copying, not finding. Runners read both files from the repository.
 
+Permissions: the case runners run the agent in strict mode, as a real master's campaign runs it: `claude -p` gets `--permission-mode manual --permission-prompts none` (anything that would prompt is refused, nothing is asked) and `--settings runners/lib/strict-settings.json`, which allows only `Skill(yllir:*)` and `Edit(.campaign/state/**)`. Each skill's own `allowed-tools` adds to these. The runners used to pass a broad `--allowedTools` list (shell, read, write, search), which granted far more than a master has. The explicit `--settings` file stands in for two things a real setup has and a test folder lacks: the project settings, which Claude Code ignores in an untrusted folder, and the rule the installer writes at user level in an empty folder. Each record stores `permission_mode: "strict"`, so results from older runs, which lack the field, can be told apart.
+
 Layout:
 
 ```text
