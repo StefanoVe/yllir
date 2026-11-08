@@ -4,10 +4,10 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { readStructure, listSheets, compareStrings, masterOnlyChecker } from './subjects.mjs';
-import { parseFrontmatter } from './frontmatter.mjs';
-import { analyzeMarkdown } from './zones.mjs';
-import { headingAnchor } from './normalize.mjs';
+import { readStructure, listSheets, compareStrings, masterOnlyChecker } from '../../../../../scripts/lib/subjects.mjs';
+import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
+import { analyzeMarkdown } from '../../../../../scripts/lib/zones.mjs';
+import { headingAnchor } from '../../../../../scripts/lib/normalize.mjs';
 
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 

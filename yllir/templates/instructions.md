@@ -13,6 +13,10 @@ Everything the master reads (messages, documents, saved-version sentences) is in
 
 Framework files and these instructions are in English. Do not translate them.
 
+## Plugin root
+
+Yllir plugin root: {{plugin.root}}. Wherever a skill or agent file mentions `${CLAUDE_PLUGIN_ROOT}`, use this path if the variable is empty.
+
 ## Words the master sees
 
 Use only the master-facing words listed in the lexicon of the `yllir` skill. Never say: skill, script, git, commit, repository, YAML, frontmatter, sub-agent, model, hook, MCP, template.

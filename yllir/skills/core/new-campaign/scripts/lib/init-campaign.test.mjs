@@ -6,9 +6,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { initCampaign } from './init-campaign.mjs';
-import { parseYamlLite } from './yaml-lite.mjs';
-import { validateConfig } from './config.mjs';
-import { stripExitLine } from './cli-exit.mjs';
+import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
+import { validateConfig } from '../../../../../scripts/lib/config.mjs';
+import { stripExitLine } from '../../../../../scripts/lib/cli-exit.mjs';
 
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
 process.env.GIT_CONFIG_NOSYSTEM = '1';

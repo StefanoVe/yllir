@@ -71,7 +71,7 @@ For a campaign language other than Italian or English, translate the English col
 
 ## Fixed sentences for failures
 
-When something fails, use the row that matches: an operation that could not be finished; a check that found a problem with a link; a problem in the campaign settings; a first document that could not be completed. Use these sentences as they are.
+When something fails, use the row that matches: an operation that could not be finished; a check that found a problem with a link; a problem in the campaign settings; a first document that could not be completed; an earlier update that was not finished; an update that could not be applied. Use these sentences as they are.
 
 | Italian | English |
 |---|---|
@@ -79,3 +79,13 @@ When something fails, use the row that matches: an operation that could not be f
 | Un controllo ha trovato un problema in un collegamento; per ora resta aperto. | A check found a problem with a link; it is still open for now. |
 | Le impostazioni della campagna hanno un problema. Posso provare a sistemarlo, vuoi? | The campaign settings have a problem. I can try to fix it, do you want me to? |
 | Il primo documento non è stato completato, ma le impostazioni sono pronte. | The first document could not be completed, but the settings are ready. |
+| Un aggiornamento precedente non è stato terminato. | An earlier update was not finished. |
+| Non sono riuscito ad applicare questo aggiornamento. Non è stato cambiato nulla. | I could not apply this update. Nothing was changed. |
+
+## Fixed sentence for a finished update
+
+Use this sentence as it is when the assistant has been updated. It is not a failure.
+
+| Italian | English |
+|---|---|
+| L'assistente è stato aggiornato. Nulla di tuo è cambiato. | The assistant has been brought up to date. Nothing of yours has changed. |

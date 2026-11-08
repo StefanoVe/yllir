@@ -5,8 +5,8 @@
 // Exit codes: 0 valid, 1 errors found, 2 usage error.
 
 import path from 'node:path';
-import { validateConfig } from './lib/config.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { validateConfig } from '../../../../scripts/lib/config.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node validate-config.mjs <campaignRoot> [--json]';
 

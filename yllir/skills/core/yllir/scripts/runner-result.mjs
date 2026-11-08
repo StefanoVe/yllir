@@ -7,10 +7,10 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyRunnerResult } from './lib/runner-result.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node runner-result.mjs <root> --file <path> [--topic <id|none>]';
-const LEXICON = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'core', 'yllir', 'lexicon.md');
+const LEXICON = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'lexicon.md');
 const OPTIONS = ['file', 'topic'];
 
 function parseArgs(argv) {

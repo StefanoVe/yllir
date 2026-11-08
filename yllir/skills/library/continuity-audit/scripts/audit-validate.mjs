@@ -8,7 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { validateFacts } from './lib/audit-facts.mjs';
-import { loadVocabulary } from './lib/audit-vocabulary.mjs';import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+import { loadVocabulary } from './lib/audit-vocabulary.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 
 const USAGE =

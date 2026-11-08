@@ -5,17 +5,17 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseYamlLite } from './yaml-lite.mjs';
+import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { stringifyConfig, addCategory } from './config-write.mjs';
-import { validateConfig } from './config.mjs';
-import { stripExitLine } from './cli-exit.mjs';
+import { validateConfig } from '../../../../../scripts/lib/config.mjs';
+import { stripExitLine } from '../../../../../scripts/lib/cli-exit.mjs';
 
 // Git is never needed here, but keep the test independent of the user's git setup.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
 process.env.GIT_CONFIG_NOSYSTEM = '1';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURE = path.resolve(here, '../../../testbench/fixtures/morvalle/campaign/campaign.yaml');
+const FIXTURE = path.resolve(here, '../../../../../../testbench/fixtures/morvalle/campaign/campaign.yaml');
 const CLI = path.join(here, '..', 'add-category.mjs');
 
 const created = [];

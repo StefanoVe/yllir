@@ -6,7 +6,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYamlLite } from '../../../../scripts/lib/yaml-lite.mjs';
-import { compareFacts, exclusionsFromConfig } from './lib/audit-compare.mjs';import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+import { compareFacts, exclusionsFromConfig } from './lib/audit-compare.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 
 const USAGE = 'usage: node audit-compare.mjs <root> --facts <facts.json> --out <candidates.json>';

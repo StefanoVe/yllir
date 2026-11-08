@@ -5,7 +5,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { planLinks } from './lib/link-plan.mjs';import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+import { planLinks } from './lib/link-plan.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 
 const USAGE =

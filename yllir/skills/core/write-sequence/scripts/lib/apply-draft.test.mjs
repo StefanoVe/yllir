@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyDraft } from './apply-draft.mjs';
-import { stripExitLine } from './cli-exit.mjs';
+import { stripExitLine } from '../../../../../scripts/lib/cli-exit.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.join(here, '..', 'apply-draft.mjs');

@@ -5,8 +5,10 @@
 // expected values, and appends one JSON line per run to
 // testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep]
+// Usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex]
 //        node testbench/runners/run-new-campaign-case.mjs <caseDir> --grade-only <dir>
+// --agent codex runs the agent with `codex exec` instead of `claude -p`; codex gets
+// no model unless --model is given explicitly.
 // --grade-only grades a kept folder again without running the agent, prints the
 // record and does not append it to the results file. With --keep, the agent's
 // final message and cost are saved beside the kept folder as <dir>.run.json so that
@@ -27,16 +29,17 @@ import {
   parseCommonArgs,
   prepareEmpty,
   printSummary,
-  runClaude,
+  recordHeader,
+  runAgent,
 } from './lib/case-common.mjs';
 import { validateConfig } from '../../yllir/scripts/lib/config.mjs';
 import { checkFingerprints } from '../../yllir/scripts/lib/instructions.mjs';
-import { checkLinks } from '../../yllir/scripts/lib/check-links.mjs';
+import { checkLinks } from '../../yllir/skills/library/linker/scripts/lib/check-links.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../yllir/scripts/lib/zones.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--grade-only <dir>]';
+  'usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex] [--grade-only <dir>]';
 const AGENT_TIMEOUT_MS = 1800000;
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
 const AGENT_FILE = '.campaign/instructions/agent.md';
@@ -83,7 +86,7 @@ const SEED_FLAGS = [
 
 /** Creates the seed campaign in dir with the framework's init script. Throws when it is refused. */
 function applySeed(dir, seed) {
-  const args = [path.join(REPO_ROOT, 'yllir', 'scripts', 'init-campaign.mjs'), dir];
+  const args = [path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'new-campaign', 'scripts', 'init-campaign.mjs'), dir];
   for (const [key, flag] of SEED_FLAGS) {
     if (seed[key] !== undefined) args.push(flag, seed[key]);
   }
@@ -364,14 +367,14 @@ function gradeCase({ caseData, dir, report }) {
   return { checks, pass: Object.values(checks).every(Boolean), failures, neverSayFound, technicalFound };
 }
 
-/** Builds the JSONL record of one run. */
-function makeRecord({ caseName, run, date, model, hash, permissionMode, agentFailure, agent, graded, copy }) {
+/** Builds the JSONL record of one run. header is recordHeader(opts): the agent and the model. */
+function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFailure, agent, graded, copy }) {
   const failures = [...(agentFailure ? [`agent error: ${agentFailure}`] : []), ...graded.failures];
   const record = {
     case: caseName,
     run,
     date,
-    model,
+    ...header,
     instructions_hash: hash,
     permission_mode: permissionMode ?? null,
     pass: graded.pass && !agentFailure,
@@ -397,10 +400,12 @@ function consoleView(record) {
 }
 
 function main() {
-  const opts = parseCommonArgs(process.argv.slice(2), USAGE, { valueOptions: ['--grade-only'] });
+  const argv = process.argv.slice(2);
+  const opts = parseCommonArgs(argv, USAGE, { valueOptions: ['--grade-only'] });
   const caseData = loadCase(opts.caseDir);
   const hash = instructionsHash(instructionFiles());
   const gradeOnly = opts.values['--grade-only'];
+  const header = recordHeader({ agent: opts.agent, modelLabel: opts.modelLabel });
 
   if (gradeOnly !== undefined) {
     const dir = path.resolve(gradeOnly);
@@ -412,7 +417,7 @@ function main() {
       caseName: caseData.case,
       run: 1,
       date: new Date().toISOString(),
-      model: opts.model,
+      header,
       hash,
       permissionMode: agent ? agent.permission_mode : null,
       agentFailure: null,
@@ -422,7 +427,7 @@ function main() {
     });
     record.grade_only = true;
     console.log(JSON.stringify(consoleView(record)));
-    process.exitCode = printSummary([record], opts.model, hash) === 1 ? 0 : 1;
+    process.exitCode = printSummary([record], opts.modelLabel, hash, opts.agent) === 1 ? 0 : 1;
     return;
   }
 
@@ -433,10 +438,12 @@ function main() {
     let record;
     try {
       if (caseData.seed !== undefined) applySeed(dir, caseData.seed);
-      const agent = runClaude({
+      const agent = runAgent({
+        agent: opts.agent,
         cwd: dir,
         prompt: caseData.prompt,
         model: opts.model,
+        modelGiven: opts.modelGiven,
         timeoutMs: AGENT_TIMEOUT_MS,
       });
       const graded = gradeCase({ caseData, dir, report: agent.ok ? agent.report : null });
@@ -444,7 +451,7 @@ function main() {
         caseName: caseData.case,
         run: i,
         date,
-        model: opts.model,
+        header,
         hash,
         permissionMode: agent.permission_mode,
         agentFailure: agent.ok ? null : agent.error,
@@ -470,7 +477,7 @@ function main() {
     summaries.push(record);
   }
 
-  const passed = printSummary(summaries, opts.model, hash);
+  const passed = printSummary(summaries, opts.modelLabel, hash, opts.agent);
   process.exitCode = passed === summaries.length ? 0 : 1;
 }
 

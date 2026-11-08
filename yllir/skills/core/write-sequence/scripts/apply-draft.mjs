@@ -6,7 +6,7 @@
 
 import path from 'node:path';
 import { applyDraft } from './lib/apply-draft.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node apply-draft.mjs <root> --draft-dir <dir> --files "a.md,b.md"';
 const VALUE_FLAGS = ['--draft-dir', '--files'];

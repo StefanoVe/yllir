@@ -6,11 +6,11 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applyRunnerResult, checkMessage, loadNeverSay } from './runner-result.mjs';
-import { activeTopic, listTopics, newTopic, readSection } from './topics.mjs';
+import { activeTopic, listTopics, newTopic, readSection } from '../../../../../scripts/lib/topics.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.join(here, '..', 'runner-result.mjs');
-const LEXICON = path.join(here, '..', '..', 'skills', 'core', 'yllir', 'lexicon.md');
+const LEXICON = path.join(here, '..', '..', 'lexicon.md');
 const NEVER = loadNeverSay(LEXICON);
 
 const created = [];

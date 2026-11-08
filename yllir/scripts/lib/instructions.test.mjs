@@ -252,6 +252,21 @@ describe('generateInstructions', () => {
   });
 });
 
+describe('plugin root in the instructions', () => {
+  test('states the absolute plugin folder for an empty CLAUDE_PLUGIN_ROOT', () => {
+    const root = campaignWith(MINIMAL_CONFIG);
+    generateInstructions(root);
+    const pluginRoot = path.resolve(REPO, 'yllir');
+    const agent = fs.readFileSync(path.join(root, '.campaign/instructions/agent.md'), 'utf8');
+    assert.ok(
+      agent.includes(
+        `Yllir plugin root: ${pluginRoot}. Wherever a skill or agent file mentions \`\${CLAUDE_PLUGIN_ROOT}\`, use this path if the variable is empty.`,
+      ),
+    );
+    assert.equal(checkFingerprints(root).ok, true);
+  });
+});
+
 describe('checkFingerprints', () => {
   test('is ok after generation, and reports a hand-edited file', () => {
     const root = campaignWith(MINIMAL_CONFIG);

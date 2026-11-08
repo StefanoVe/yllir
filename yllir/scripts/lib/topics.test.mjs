@@ -22,7 +22,7 @@ import { slugify } from './normalize.mjs';
 import { stripExitLine } from './cli-exit.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const CLI = path.join(here, '..', 'topics.mjs');
+const CLI = path.join(here, '..', '..', 'skills', 'core', 'yllir', 'scripts', 'topics.mjs');
 
 const created = [];
 after(() => {

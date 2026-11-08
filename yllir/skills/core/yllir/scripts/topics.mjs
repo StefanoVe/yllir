@@ -20,8 +20,8 @@ import {
   listTopics,
   newTopic,
   touchTopic,
-} from './lib/topics.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+} from '../../../../scripts/lib/topics.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE =
   'usage: node topics.mjs <new|touch|activate|close|ask|finish|list|active|check> <root> [options]';

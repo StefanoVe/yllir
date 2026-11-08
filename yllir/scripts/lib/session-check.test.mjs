@@ -313,6 +313,54 @@ describe('formatCheck', () => {
     );
   });
 
+  test('a different campaign version adds the alignment line right after the version line', () => {
+    const text = formatCheck({
+      root: '/campagne/le-isole-dambra',
+      folder: 'campaign',
+      git: 'ok',
+      versions: null,
+      unsaved: null,
+      settings: null,
+      instructions: 'up-to-date',
+      framework_version: '0.2.0',
+      campaign_framework_version: '0.1.0',
+      topics: null,
+    });
+    assert.match(text, /^framework version: 0\.2\.0 \(campaign made with 0\.1\.0\)\ncampaign alignment: needed\nnext: /m);
+  });
+
+  test('equal campaign and framework versions add no alignment line', () => {
+    const text = formatCheck({
+      root: '/campagne/le-isole-dambra',
+      folder: 'campaign',
+      git: 'ok',
+      versions: null,
+      unsaved: null,
+      settings: null,
+      instructions: 'up-to-date',
+      framework_version: '0.2.0',
+      campaign_framework_version: '0.2.0',
+      topics: null,
+    });
+    assert.doesNotMatch(text, /campaign alignment/);
+  });
+
+  test('a null campaign version adds no alignment line', () => {
+    const text = formatCheck({
+      root: '/campagne/le-isole-dambra',
+      folder: 'campaign',
+      git: 'ok',
+      versions: null,
+      unsaved: null,
+      settings: null,
+      instructions: 'up-to-date',
+      framework_version: '0.2.0',
+      campaign_framework_version: null,
+      topics: null,
+    });
+    assert.doesNotMatch(text, /campaign alignment/);
+  });
+
   test('prints instructions missing', () => {
     const text = formatCheck({
       root: '/tmp/campagna',
@@ -353,6 +401,86 @@ describe('session-start CLI', () => {
     const before = listFiles(root);
     execFileSync(process.execPath, [CLI, root], { encoding: 'utf8' });
     assert.deepEqual(listFiles(root), before);
+  });
+});
+
+describe('update notice', () => {
+  /** Published plugin folder with one news file for the given version. */
+  function publishedSource(version, news) {
+    const dir = tempDir();
+    write(dir, '.claude-plugin/plugin.json', JSON.stringify({ name: 'yllir', version }));
+    for (const [file, text] of Object.entries(news)) {
+      write(dir, `news/${file}`, text);
+    }
+    return dir;
+  }
+
+  /** Runs fn with YLLIR_PUBLISHED_SOURCE set to value (undefined removes it). */
+  function withPublishedSource(value, fn) {
+    const saved = process.env.YLLIR_PUBLISHED_SOURCE;
+    if (value === undefined) {
+      delete process.env.YLLIR_PUBLISHED_SOURCE;
+    } else {
+      process.env.YLLIR_PUBLISHED_SOURCE = value;
+    }
+    try {
+      return fn();
+    } finally {
+      if (saved === undefined) {
+        delete process.env.YLLIR_PUBLISHED_SOURCE;
+      } else {
+        process.env.YLLIR_PUBLISHED_SOURCE = saved;
+      }
+    }
+  }
+
+  test('without YLLIR_PUBLISHED_SOURCE the update field is null and the output ends at the next step', () => {
+    withPublishedSource(undefined, () => {
+      const root = campaign();
+      const result = sessionCheck(root);
+      assert.equal(result.update, null);
+      const text = formatCheck(result);
+      assert.doesNotMatch(text, /YLLIR UPDATE AVAILABLE/);
+      assert.ok(text.endsWith('\nnext: invoke the skill yllir:yllir before answering the master.'));
+    });
+  });
+
+  test('a newer published version adds the update block after the next step, with a blank line', () => {
+    const source = publishedSource('9.9.9', { '9.9.9.it.md': 'Nuove regole per i dadi.' });
+    withPublishedSource(source, () => {
+      const root = campaign();
+      const result = sessionCheck(root);
+      assert.deepEqual(result.update, { installed: FRAMEWORK_VERSION, published: '9.9.9', news: 'Nuove regole per i dadi.' });
+      const text = formatCheck(result);
+      assert.ok(
+        text.endsWith(
+          [
+            '',
+            'next: invoke the skill yllir:yllir before answering the master.',
+            '',
+            'YLLIR UPDATE AVAILABLE (for the assistant, not for the master)',
+            `installed: ${FRAMEWORK_VERSION}`,
+            'published: 9.9.9',
+            'news for the master:',
+            '  Nuove regole per i dadi.',
+            "next: after answering the master's first request, tell the master in plain words, with no technical terms, " +
+              'that a newer version exists and what it changes (use the news), and ask whether to update now. ' +
+              'The master decides. Do not update without a yes. Right after telling the master, run the update script with --postpone once, so the notice is not repeated until tomorrow.',
+          ].join('\n'),
+        ),
+      );
+    });
+  });
+
+  test('sessionCheck does not write the notice memory', () => {
+    const source = publishedSource('9.9.9', { '9.9.9.it.md': 'news' });
+    withPublishedSource(source, () => {
+      const root = campaign();
+      const before = listFiles(root);
+      sessionCheck(root);
+      assert.deepEqual(listFiles(root), before);
+      assert.equal(fs.existsSync(path.join(root, '.campaign', 'state')), false);
+    });
   });
 });
 

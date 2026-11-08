@@ -4,9 +4,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseYamlLite } from './yaml-lite.mjs';
-import { validateConfig } from './config.mjs';
-import { generateInstructions } from './instructions.mjs';
+import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
+import { validateConfig } from '../../../../../scripts/lib/config.mjs';
+import { generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
 
 const FILE = 'campaign.yaml';
 const TOP_ORDER = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit'];

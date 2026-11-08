@@ -7,9 +7,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildSubjectIndex } from './lib/subjects.mjs';
-import { scanMentions } from './lib/mentions.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { buildSubjectIndex } from '../../../../scripts/lib/subjects.mjs';
+import { scanMentions } from '../../../../scripts/lib/mentions.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node scan-mentions.mjs <campaignRoot> [--out <file>]';
 const SUMMARY_ORDER = [

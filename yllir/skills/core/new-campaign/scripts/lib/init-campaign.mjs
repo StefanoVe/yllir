@@ -5,10 +5,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { stringifyConfig } from './config-write.mjs';
-import { ensureRepo } from './versions.mjs';
-import { generateInstructions } from './instructions.mjs';
-import { validateConfig } from './config.mjs';
-import { slugify } from './normalize.mjs';
+import { ensureRepo } from '../../../../../scripts/lib/versions.mjs';
+import { generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
+import { validateConfig } from '../../../../../scripts/lib/config.mjs';
+import { slugify } from '../../../../../scripts/lib/normalize.mjs';
 
 const FILE = 'campaign.yaml';
 const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];

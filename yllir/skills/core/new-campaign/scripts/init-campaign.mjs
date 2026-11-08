@@ -6,7 +6,7 @@
 
 import path from 'node:path';
 import { initCampaign } from './lib/init-campaign.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE =
   'usage: node init-campaign.mjs <root> --name "<name>" --language <xx> --register <elevated|plain|colloquial|mixed> [--world "<world>"] [--description "<description>"]';

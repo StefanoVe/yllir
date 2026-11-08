@@ -51,6 +51,8 @@ node testbench/runners/run-new-campaign-case.mjs testbench/cases/new-campaign/al
 
 With `--keep` the empty folder is kept and its final message and cost are saved beside it as `<dir>.run.json`, so `--grade-only` reproduces the record.
 
+Every runner takes the same `--agent claude|codex` option (default `claude`), handled in `parseCommonArgs` and run through `runAgent` in `runners/lib/case-common.mjs`, so Claude and Codex results are comparable. `--agent codex` runs the agent with `codex exec` (workspace-write sandbox) and gives it no model unless `--model` is passed; each record stores `agent` (`claude` or `codex`) and `model` (the model, or `codex-default`). The summary's last line names the agent too. A multi-turn case under Codex resumes the last session in the folder with `codex exec resume`. Codex reads the plugin through `yllir/.codex-plugin/plugin.json`, whose `skills` is the single folder `./skills/` (it holds both `core` and `library`). The runner only grants Codex writes to `.git` (which its workspace-write sandbox blocks by default) and tells Codex in the prompt where the plugin is, standing in for plugin discovery; the skills and generated instructions are expected to handle the rest. A real Codex install needs the same `.git` permission for the saved versions to work.
+
 Run the entry-point cases end to end (each case builds the morvalle fixture with two saved versions in a temporary folder, then runs the entry point on an existing campaign with the case prompt from `cases/entry/<case>/case.yaml`; costs money and takes a few minutes per run):
 
 ```sh
@@ -80,3 +82,17 @@ node testbench/runners/run-entry-case.mjs testbench/cases/entry/after-too-thin [
 ```
 
 The checks are A1 to A7 (one new chronicle page with its id and the played session, the old page unchanged, nothing else changed, the plot map has no errors and the session is played, an Accaduto section of prose with no master block, every capitalised name is in the prompt or the subjects, saved as one commit, plain Italian words) and T1 to T3 (nothing written, one question asking for the evening in scenes, one open after-session topic with its question).
+
+## Running the suite
+
+`runners/run-suite.mjs` runs every case under `cases/` through its runner, one child process per (case, agent, run), at most `--parallel` at a time (default 8). Each child appends its own record to `results/`. The suite prints a table of `p/n` per case and agent, a TOTAL line and the reasons of the failed jobs. It exits 0 only when every job passes.
+
+```sh
+node testbench/runners/run-suite.mjs                                  # quick: claude, 1 run, no audit
+node testbench/runners/run-suite.mjs --runs 3 --agent both --with-audit   # release measurement
+node testbench/runners/run-suite.mjs --only entry/ --agent codex          # a subset
+```
+
+- quick (default): one run per case with claude, audit skipped. Use it while developing.
+- release: `--runs 3 --agent both --with-audit`. Includes the audit cases, which take 10+ minutes per run, so expect a long run.
+- runs are parallel: jobs share the machine and the agent quota, so lower `--parallel` if the agent rate-limits.

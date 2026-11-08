@@ -2,7 +2,7 @@
 name: after-session
 description: Core process. Records one evening that was played as a chronicle page: checks the plot map, reads the documents involved, marks the sessions that were played, writes only what the master said through the write sequence, and lists what was not written into the cards. Runs inside the process runner.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/plot-map.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/today.mjs" *), Read, Write, Skill
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/plot-map.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/after-session/scripts/today.mjs" *), Read, Write, Skill
 ---
 
 # After session
@@ -42,7 +42,7 @@ From `campaign.yaml` keep:
 - Output: the list of the concrete events, in the master's words (kept for steps 4, 5 and 6).
 
 **Step 3 — Date.**
-- Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/today.mjs"` in every case. Its first line is today's date, in `YYYY-MM-DD`. Exit code not 0: stop and say the fixed sentence of the lexicon for an operation that could not be completed.
+- Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/after-session/scripts/today.mjs"` in every case. Its first line is today's date, in `YYYY-MM-DD`. Exit code not 0: stop and say the fixed sentence of the lexicon for an operation that could not be completed.
 - If MASTER_MESSAGE names a date, use it. Convert it to `YYYY-MM-DD`. A day and month with no year means the year of today, as printed by the command above.
 - Otherwise use today's date.
 - The new file is `<date>.md` inside the CHRONICLE FOLDER. The id is `cronaca-<date>`.

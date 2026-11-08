@@ -11,6 +11,7 @@ import { checkFingerprints } from './instructions.mjs';
 import { listVersions, status } from './versions.mjs';
 import { parseYamlLite } from './yaml-lite.mjs';
 import { activeTopic, listTopics } from './topics.mjs';
+import { checkUpdate, formatUpdateNotice } from './update-check.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
 const VERSION_PATH = '.campaign/version.yaml';
@@ -34,6 +35,7 @@ const NEXT_STEP = 'next: invoke the skill yllir:yllir before answering the maste
  *   framework_version: string | null,
  *   campaign_framework_version: string | null,
  *   topics: { active: object | null, open: number } | null,
+ *   update: { installed: string, published: string, news: string | null } | null,
  * }}
  */
 export function sessionCheck(root) {
@@ -50,6 +52,7 @@ export function sessionCheck(root) {
     framework_version: attempt(readFrameworkVersion, null),
     campaign_framework_version: null,
     topics: null,
+    update: null,
   };
   if (folder !== 'campaign') {
     return result;
@@ -75,6 +78,7 @@ export function sessionCheck(root) {
   }, null);
   result.campaign_framework_version = attempt(() => readCampaignVersion(dir), null);
   result.topics = attempt(() => topicsState(dir), null);
+  result.update = attempt(() => checkUpdate(dir), null);
   return result;
 }
 
@@ -115,6 +119,12 @@ export function formatCheck(result) {
         ? ''
         : ` (campaign made with ${result.campaign_framework_version})`;
     lines.push(`framework version: ${result.framework_version}${made}`);
+    if (
+      result.campaign_framework_version !== null &&
+      result.campaign_framework_version !== result.framework_version
+    ) {
+      lines.push('campaign alignment: needed');
+    }
   }
   if (result.topics?.active) {
     const active = result.topics.active;
@@ -125,6 +135,9 @@ export function formatCheck(result) {
     lines.push(`open topics: ${result.topics.open}`);
   }
   lines.push(NEXT_STEP);
+  if (result.update) {
+    lines.push('', formatUpdateNotice(result.update));
+  }
   return lines.join('\n');
 }
 

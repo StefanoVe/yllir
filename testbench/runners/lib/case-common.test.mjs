@@ -1,9 +1,13 @@
-// Unit tests for parseStream, the stream-json parser behind runClaude.
+// Unit tests for parseStream (the stream-json parser behind runClaude), parseCommonArgs,
+// recordHeader and printSummary.
 // Run with: node --test testbench/runners/lib/case-common.test.mjs
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseStream } from './case-common.mjs';
+import { parseStream, parseCommonArgs, recordHeader, printSummary } from './case-common.mjs';
+
+const USAGE = 'usage: test <caseDir>';
+const CASE = ['case-dir'];
 
 const lines = (...objects) => objects.map((o) => JSON.stringify(o)).join('\n');
 
@@ -100,4 +104,64 @@ test('skips lines that are not JSON and reports no result when absent', () => {
   assert.equal(parsed.result, null);
   assert.equal(parsed.tool_calls, 1);
   assert.deepEqual(parsed.denied, []);
+});
+
+test('parseCommonArgs defaults to claude with haiku', () => {
+  const opts = parseCommonArgs(CASE, USAGE);
+  assert.equal(opts.agent, 'claude');
+  assert.equal(opts.model, 'haiku');
+  assert.equal(opts.modelGiven, false);
+  assert.equal(opts.modelLabel, 'haiku');
+});
+
+test('parseCommonArgs with --agent codex and no --model labels the model codex-default', () => {
+  const opts = parseCommonArgs([...CASE, '--agent', 'codex'], USAGE);
+  assert.equal(opts.agent, 'codex');
+  assert.equal(opts.modelGiven, false);
+  assert.equal(opts.modelLabel, 'codex-default');
+});
+
+test('parseCommonArgs with --agent codex and --model uses that model as label', () => {
+  const opts = parseCommonArgs([...CASE, '--agent', 'codex', '--model', 'gpt-x'], USAGE);
+  assert.equal(opts.modelGiven, true);
+  assert.equal(opts.model, 'gpt-x');
+  assert.equal(opts.modelLabel, 'gpt-x');
+});
+
+test('parseCommonArgs labels a claude run with its model', () => {
+  const opts = parseCommonArgs([...CASE, '--model', 'sonnet'], USAGE);
+  assert.equal(opts.agent, 'claude');
+  assert.equal(opts.modelGiven, true);
+  assert.equal(opts.modelLabel, 'sonnet');
+});
+
+test('parseCommonArgs rejects an unknown agent with the usage text', () => {
+  assert.throws(() => parseCommonArgs([...CASE, '--agent', 'bogus'], USAGE), (err) => {
+    assert.equal(err.message, `--agent must be claude or codex\n${USAGE}`);
+    return true;
+  });
+  assert.throws(() => parseCommonArgs([...CASE, '--agent'], USAGE), /--agent must be claude or codex/);
+});
+
+test('recordHeader returns the agent and the model label', () => {
+  assert.deepEqual(recordHeader({ agent: 'codex', modelLabel: 'codex-default' }), {
+    agent: 'codex',
+    model: 'codex-default',
+  });
+});
+
+test('printSummary names the agent only when it is given', () => {
+  const results = [{ run: 1, pass: true, failures: [] }];
+  const printed = [];
+  const original = console.log;
+  console.log = (text) => printed.push(text);
+  try {
+    assert.equal(printSummary(results, 'haiku', 'abc', 'codex'), 1);
+    assert.equal(printSummary(results, 'haiku', 'abc'), 1);
+  } finally {
+    console.log = original;
+  }
+  const [withAgent, withoutAgent] = printed.map((text) => text.split('\n').pop());
+  assert.equal(withAgent, 'pass rate: 1/1  agent: codex  model: haiku  instructions: abc');
+  assert.equal(withoutAgent, 'pass rate: 1/1  model: haiku  instructions: abc');
 });

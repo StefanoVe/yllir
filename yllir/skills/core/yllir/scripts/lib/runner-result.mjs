@@ -7,17 +7,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { askTopic, finishTopic } from './topics.mjs';
+import { askTopic, finishTopic } from '../../../../../scripts/lib/topics.mjs';
 
-const DEFAULT_LEXICON = path.resolve(
-  import.meta.dirname,
-  '..',
-  '..',
-  'skills',
-  'core',
-  'yllir',
-  'lexicon.md',
-);
+const DEFAULT_LEXICON = path.resolve(import.meta.dirname, '..', '..', 'lexicon.md');
 
 const STATUSES = ['DONE', 'QUESTION', 'FAILED'];
 const HEADER = 'RUNNER RESULT';

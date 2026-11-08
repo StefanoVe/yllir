@@ -42,7 +42,7 @@ The script copies cached facts into `.campaign/state/audit/facts/` for every doc
 - Exit 0: go to Step 2 if M is not 0; if M is 0, skip Step 2 and go to Step 3.
 - Any other exit code: end this skill with status `FAILED` (the invoking skill continues), reason "cache not run".
 
-**Step 2 — Extract.** Take the `<fid> <document>` lines listed by Step 1b, in their order. Split them into batches of at most 4 entries. Launch one `yllir:audit-extractor` sub-agent per batch with the Agent tool, all in the same message. The prompt of each is exactly this, with the real values:
+**Step 2 — Extract.** Take the `<fid> <document>` lines listed by Step 1b, in their order. Split them into batches of at most 4 entries. Launch one `yllir:audit-extractor` sub-agent (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-extractor.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) per batch with the Agent tool, all in the same message. The prompt of each is exactly this, with the real values:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 SUBJECTS_INDEX: <CAMPAIGN_ROOT>/.campaign/state/audit/subjects.json
@@ -72,7 +72,7 @@ Then go to Step 4. Exit code not 0: end this skill with status `FAILED` (the inv
 
 **Step 5 — Judge.** Count the candidate lines printed by Step 4. A candidate line is a printed line that starts with `C` followed by digits (for example `C001 `). The summary line `facts: …` and the `WARNING` line are not candidates.
 - Zero candidates: write `[]` to `.campaign/state/audit/judgments.json` with the Write tool. Go to Step 6.
-- One or more: launch `yllir:audit-judge` with the Agent tool. The prompt is exactly these lines, with the real values:
+- One or more: launch `yllir:audit-judge` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-judge.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. The prompt is exactly these lines, with the real values:
   ```
   CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
   CANDIDATES: <CAMPAIGN_ROOT>/.campaign/state/audit/candidates.json
@@ -82,7 +82,7 @@ Then go to Step 4. Exit code not 0: end this skill with status `FAILED` (the inv
   ```
   Save its answer exactly as received to `.campaign/state/audit/judgments.json` with the Write tool. Do not judge the candidates yourself.
 
-**Step 6 — Coverage review.** Run this step only when Step 4 printed zero candidates. Launch `yllir:audit-coverage-reviewer` with the Agent tool. The prompt is exactly these lines:
+**Step 6 — Coverage review.** Run this step only when Step 4 printed zero candidates. Launch `yllir:audit-coverage-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-coverage-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. The prompt is exactly these lines:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 FACTS: <CAMPAIGN_ROOT>/.campaign/state/audit/facts.json

@@ -2,11 +2,11 @@
 // Runs one entry-point case end to end on an existing campaign. The setup is
 // deterministic: it copies the morvalle fixture campaign into a temporary folder,
 // generates the instructions, saves version 1, changes one card (Teodo Marr) and
-// saves version 2. Then `claude -p` runs the entry point with the case prompt
-// (the master's message), and the runner grades what the agent left in the folder.
-// One JSON line per run is appended to testbench/results/<case>.jsonl.
+// saves version 2. Then the agent (`claude -p`, or `codex exec` with --agent codex) runs
+// the entry point with the case prompt (the master's message), and the runner grades what
+// the agent left in the folder. One JSON line per run is appended to testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--keep]
+// Usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude|codex] [--keep]
 //        node testbench/runners/run-entry-case.mjs <caseDir> --setup-only
 //        node testbench/runners/run-entry-case.mjs <caseDir> --grade-only <dir> --run-json <file>
 // --setup-only runs the setup, prints the folder, the two versions and the git log,
@@ -28,11 +28,12 @@ import {
   loadYamlMapping,
   parseCommonArgs,
   printSummary,
-  runClaude,
+  recordHeader,
+  runAgent,
 } from './lib/case-common.mjs';
 import { generateInstructions } from '../../yllir/scripts/lib/instructions.mjs';
 import { ensureRepo, listVersions, saveVersion } from '../../yllir/scripts/lib/versions.mjs';
-import { checkLinks } from '../../yllir/scripts/lib/check-links.mjs';
+import { checkLinks } from '../../yllir/skills/library/linker/scripts/lib/check-links.mjs';
 import { listTopics, readSection } from '../../yllir/scripts/lib/topics.mjs';
 import { buildSubjectIndex, compareStrings } from '../../yllir/scripts/lib/subjects.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
@@ -41,7 +42,7 @@ import { foldForm } from '../../yllir/scripts/lib/fold.mjs';
 import { plotMap } from '../../yllir/scripts/lib/plot-map.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
+  'usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude|codex] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
 const AGENT_TIMEOUT_MS = 1800000;
 const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle', 'campaign');
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
@@ -794,13 +795,13 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
 // ---------------------------------------------------------------- records
 
 /** Builds the JSONL record of one run. */
-function makeRecord({ caseName, run, date, model, hash, permissionMode, agentFailure, agent, graded, copy, gradeOnly }) {
+function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFailure, agent, graded, copy, gradeOnly }) {
   const failures = [...(agentFailure ? [`agent error: ${agentFailure}`] : []), ...graded.failures];
   const record = {
     case: caseName,
     run,
     date,
-    model,
+    ...header,
     instructions_hash: hash,
     permission_mode: permissionMode ?? null,
     pass: graded.pass && !agentFailure,
@@ -836,14 +837,14 @@ function consoleView(record) {
  * combined result (cost and duration summed, turn1_report the first message), turnOne the grade
  * of the state after the first turn, or null.
  */
-function runAgentTurns({ dir, caseData, model }) {
-  const common = { cwd: dir, model, timeoutMs: AGENT_TIMEOUT_MS };
-  const first = runClaude({ ...common, prompt: caseData.prompt });
+function runAgentTurns({ dir, caseData, model, agent: agentName, modelGiven }) {
+  const common = { agent: agentName, cwd: dir, model, modelGiven, timeoutMs: AGENT_TIMEOUT_MS };
+  const first = runAgent({ ...common, prompt: caseData.prompt });
   if (caseData.reply === undefined) return { agent: first, turnOne: null };
   if (!first.ok) return { agent: { ...first, turn1_report: null }, turnOne: null };
 
   const turnOne = { results: gradeTurnOne(dir, first.report) };
-  const second = runClaude({ ...common, prompt: caseData.reply, continueConversation: true });
+  const second = runAgent({ ...common, prompt: caseData.reply, continueConversation: true });
   const sum = (a, b) => (a === null || b === null ? null : a + b);
   const agent = {
     ok: second.ok,
@@ -872,6 +873,7 @@ function main() {
   );
   const caseData = loadCase(opts.caseDir);
   const hash = instructionsHash(instructionFiles());
+  const header = recordHeader({ agent: opts.agent, modelLabel: opts.modelLabel });
 
   if (setupOnly) {
     const setup = setupTwoVersions();
@@ -904,7 +906,7 @@ function main() {
       caseName: caseData.case,
       run: 1,
       date: new Date().toISOString(),
-      model: opts.model,
+      header,
       hash,
       permissionMode: saved.permission_mode ?? null,
       agentFailure: saved.error ?? null,
@@ -917,7 +919,7 @@ function main() {
       record.note = 'grade-only: the checks of the first turn (Q1, Q2) were not run; they need a run kept with --keep';
     }
     console.log(JSON.stringify(consoleView(record)));
-    process.exitCode = printSummary([record], opts.model, hash) === 1 ? 0 : 1;
+    process.exitCode = printSummary([record], opts.modelLabel, hash, opts.agent) === 1 ? 0 : 1;
     return;
   }
 
@@ -928,7 +930,13 @@ function main() {
     const dir = setup.dir;
     let record;
     try {
-      const { agent, turnOne } = runAgentTurns({ dir, caseData, model: opts.model });
+      const { agent, turnOne } = runAgentTurns({
+        dir,
+        caseData,
+        model: opts.model,
+        agent: opts.agent,
+        modelGiven: opts.modelGiven,
+      });
       const graded = gradeCase({
         caseName: caseData.case,
         dir,
@@ -942,7 +950,7 @@ function main() {
         caseName: caseData.case,
         run: i,
         date,
-        model: opts.model,
+        header,
         hash,
         permissionMode: agent.permission_mode,
         agentFailure: agent.ok ? null : agent.error,
@@ -980,7 +988,7 @@ function main() {
     summaries.push(record);
   }
 
-  const passed = printSummary(summaries, opts.model, hash);
+  const passed = printSummary(summaries, opts.modelLabel, hash, opts.agent);
   process.exitCode = passed === summaries.length ? 0 : 1;
 }
 

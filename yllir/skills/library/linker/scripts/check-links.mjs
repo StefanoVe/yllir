@@ -7,8 +7,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkLinks } from './lib/check-links.mjs';
-import { readStructure } from './lib/subjects.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { readStructure } from '../../../../scripts/lib/subjects.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node check-links.mjs <campaignRoot> [--files a.md,b.md] [--out <result.json>]';
 

@@ -6,7 +6,8 @@
 // Exit codes: 0 report written, 2 usage error.
 
 import path from 'node:path';
-import { writeLinkerReport } from './lib/linker-report.mjs';import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+import { writeLinkerReport } from './lib/linker-report.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 
 const USAGE =

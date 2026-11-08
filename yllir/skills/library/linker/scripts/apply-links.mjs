@@ -5,7 +5,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { applyLinks } from './lib/apply-links.mjs';import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+import { applyLinks } from './lib/apply-links.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 
 const USAGE =

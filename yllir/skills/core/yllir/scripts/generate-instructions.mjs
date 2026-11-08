@@ -6,8 +6,8 @@
 // Exit codes: 0 written or fingerprints ok, 1 errors or changed files, 2 usage error.
 
 import path from 'node:path';
-import { checkFingerprints, generateInstructions } from './lib/instructions.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { checkFingerprints, generateInstructions } from '../../../../scripts/lib/instructions.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node generate-instructions.mjs <campaignRoot> [--check]';
 

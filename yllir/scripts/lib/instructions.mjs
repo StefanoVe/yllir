@@ -17,6 +17,9 @@ import { parseYamlLite } from './yaml-lite.mjs';
 
 const DEFAULT_TEMPLATE = path.resolve(import.meta.dirname, '../../templates/instructions.md');
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
+// The plugin folder: the parent of the scripts folder. Codex does not set
+// CLAUDE_PLUGIN_ROOT, so the generated instructions state this path.
+export const PLUGIN_ROOT = path.resolve(import.meta.dirname, '../..');
 
 const CONFIG_PATH = 'campaign.yaml';
 const AGENT_PATH = '.campaign/instructions/agent.md';
@@ -276,7 +279,8 @@ export function generateInstructions(campaignRoot, { templatePath = DEFAULT_TEMP
   if (templateText === null) {
     return fail([{ file: templatePath, line: null, code: 'missing-template', message: 'template not found' }]);
   }
-  const rendered = renderTemplate(templateText, parsed.data);
+  // The generator's own values are added under `plugin`, after campaign.yaml.
+  const rendered = renderTemplate(templateText, { ...parsed.data, plugin: { root: PLUGIN_ROOT } });
   if (rendered.errors.length > 0) {
     return fail(rendered.errors.map((error) => ({ file: templatePath, ...error })));
   }

@@ -5,7 +5,7 @@
 
 import path from 'node:path';
 import { addCategory } from './lib/config-write.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node add-category.mjs <root> --id <slug> --folder "<folder>" --type <type>';
 const VALUE_FLAGS = ['--id', '--folder', '--type'];

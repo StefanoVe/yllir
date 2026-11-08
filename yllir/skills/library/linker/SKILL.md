@@ -2,7 +2,7 @@
 name: linker
 description: Library skill. Adds Markdown links to every mention of a campaign subject in the given documents, using deterministic scripts and an independent reviewer. Invoked by Yllir core processes after a document is written, or when asked to link mentions in specific campaign files. Never invoked for anything outside a Yllir campaign.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" *), Read, Write, Agent
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" *), Read, Write, Agent
 ---
 
 # Linker
@@ -36,7 +36,7 @@ Omit `--files` if FILES is empty. Omit `--subjects` if SUBJECTS is empty.
 - If the output contains `proposals: 0` and `review: 0`: go to Step 5 with no status reason.
 - Otherwise: go to Step 2.
 
-**Step 2 — Review.** Launch the sub-agent `yllir:linker-reviewer` with the Agent tool. Its prompt is exactly these two lines, with the real absolute paths:
+**Step 2 — Review.** Launch the sub-agent `yllir:linker-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/linker-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. Its prompt is exactly these two lines, with the real absolute paths:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 PLAN: <CAMPAIGN_ROOT>/.campaign/state/linker/plan.json
@@ -54,7 +54,7 @@ Read `.campaign/state/linker/result.json`.
 - Otherwise: launch `yllir:linker-reviewer` again. Its prompt is the two PLAN lines of Step 2 plus a line `PIDS: <comma-separated pids from rejected and missing_outcome>` and a line `REASONS:` followed by one line per pid, `<pid>: <reason from result.json>`. Merge its new entries into `outcomes.json`: replace each entry with the same `id`, add the rest. Save the merged array with the Write tool. Then run Step 3 again. At most 3 rounds of Step 3 in total.
 
 **Step 4 — Verify.** Build the file list from `scope` in `plan.json` (the array of files), joined with commas. Run:
-`node "${CLAUDE_PLUGIN_ROOT}/scripts/check-links.mjs" . --files "<comma-separated scope files>" --out .campaign/state/linker/check.json`
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" . --files "<comma-separated scope files>" --out .campaign/state/linker/check.json`
 Keep the exit code as CHECK_EXIT (0, 1, or any other value). Then go to Step 5. The report script turns CHECK_EXIT into the check result; never decide the status yourself.
 
 **Step 5 — Report.** Run this command. It writes the report file. Use `--check-exit none` if Step 4 did not run:

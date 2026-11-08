@@ -6,7 +6,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node json-check.mjs <file> [--array|--object]';
 

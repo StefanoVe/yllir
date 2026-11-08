@@ -2,7 +2,7 @@
 name: prepare-session
 description: Core process. Prepares the next session of a Yllir campaign as a new plot document: checks what was played, reads the documents involved, runs a read-only continuity check, drafts the scenes and writes them through the write sequence. Runs inside the process runner.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/plot-map.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" *), Read, Write, Skill
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/plot-map.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/new-campaign/scripts/add-category.mjs" *), Read, Write, Skill
 ---
 
 # Prepare session
@@ -32,7 +32,7 @@ Read `.campaign/cache/plot-map.json` with the Read tool. Keep `sessions`, `arcs`
 
 **Step 2 — Target.** Decide the arc and the new session.
 - The arc is: the arc named in MASTER_MESSAGE; or the only arc in `arcs`; or the arc of the most recent session in `sessions` (last in map order). If two arcs are plausible, ask the master ONE question: which arc (name both). Then stop.
-- The plot folder is the `folder` of the entry with `type: plot` in `structure` of `campaign.yaml`. If no such entry exists, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" . --id plot --folder "<Folder>" --type plot`, with `<Folder>` the word «Plot» in the campaign language: `Trama` for `it`, `Plot` for `en`, the translation for any other language. Exit code 1: explain the problem in one sentence and stop. Exit code 0: keep the folder name it reports.
+- The plot folder is the `folder` of the entry with `type: plot` in `structure` of `campaign.yaml`. If no such entry exists, run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/new-campaign/scripts/add-category.mjs" . --id plot --folder "<Folder>" --type plot`, with `<Folder>` the word «Plot» in the campaign language: `Trama` for `it`, `Plot` for `en`, the translation for any other language. Exit code 1: explain the problem in one sentence and stop. Exit code 0: keep the folder name it reports.
 - The campaign language is `language.main` in `campaign.yaml`.
 - The new file is `<plot folder>/<arc>/<word> <next_number>.md`, where `<next_number>` is `next_number` of the arc in `arcs`, and `<word>` is «Sessione» for `it`, «Session» for `en`, or the translation. Example: `Plot/The Long Night/Session 2.md`.
 - The new id is `<slug of the arc>-<next_number with two digits>`. Example: `the-long-night-02`.
@@ -43,6 +43,7 @@ Read `.campaign/cache/plot-map.json` with the Read tool. Keep `sessions`, `arcs`
 **Step 3 — Prerequisites.** For each id in `depends_on`, find the session with that id in `sessions` and read its `played` value.
 - If every prerequisite is played, or there are none: go to step 4.
 - If any is not played: unless MASTER_MESSAGE already says to prepare anyway, ask the master whether to prepare anyway. Name the sessions in plain words (their names, not their ids). Then stop. When the master answers, record the answer as a decision, and go on.
+- If MASTER_MESSAGE already says to prepare anyway: go on to step 4 without asking. Remember the names of the sessions that were not played: the final message must say that they were not played (step 9, the message for the master).
 - Output: the prerequisites checked, and the decision if one was asked.
 
 **Step 4 — Documents involved.**
@@ -130,7 +131,7 @@ Output: `status: DONE`.
 
 **Step 9 — Message for the master.** Only after `status: DONE`. Write ONE message in the campaign language, in plain words:
 - one sentence: the session is ready, with its name (the file name without `.md`);
-- if any prerequisite was not played: one sentence naming those sessions (plain words);
+- if any prerequisite was not played: the message MUST contain one sentence that names those sessions and says they were not played yet, using the word «played» in the campaign language (for Italian: «giocata»). This holds even when the master told you to go on without asking;
 - if MISSING is not empty: one sentence «these have no document yet: <names>»;
 - each NOTE from step 5, in one plain sentence;
 - each CONTESTED fact from step 5, in one plain sentence: which two documents disagree, and that the session was written without that fact. Never choose a version;

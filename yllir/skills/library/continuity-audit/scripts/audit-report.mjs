@@ -6,7 +6,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildReport } from './lib/audit-report.mjs';import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+import { buildReport } from './lib/audit-report.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 
 const USAGE =
