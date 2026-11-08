@@ -190,7 +190,7 @@ I controlli dicono che cosa è stato verificato. Il framework non dichiara la pu
 
 **Deciso (2026-11-08).** La garanzia tecnica passa da due livelli dell'ambiente, verificati con Claude Code in modalità restrittiva:
 
-- la campagna contiene un file di impostazioni di progetto (`.claude/settings.json`), generato dal framework come le istruzioni e rigenerato agli aggiornamenti, che autorizza solo l'avvio delle skill del framework e la scrittura nella cartella di lavoro `.campaign/state/`;
+- la campagna contiene un file di impostazioni di progetto (`.claude/settings.json`), generato dal framework come le istruzioni e rigenerato agli aggiornamenti, che autorizza solo l'avvio delle skill del framework e la scrittura nella cartella di lavoro `.campaign/state/`, più la sola esecuzione dello script `runner-result.mjs` del pacchetto (una seconda fonte di permesso, per evitare che l'esito di un processo venga bloccato dopo il ritorno dell'esecutore);
 - ogni skill autorizza soltanto i propri script, con il percorso esatto del pacchetto (`allowed-tools`). Uno script non elencato resta bloccato.
 
 Le skill non usano comandi di shell generici (creazione di cartelle, test su file, letture con `cat`, cancellazioni): li sostituiscono con gli strumenti di lettura e scrittura o con gli script. Al primo avvio Claude Code chiede una volta se la cartella è fidata: senza quella conferma le impostazioni di progetto non valgono.

@@ -17,13 +17,15 @@ const VERSION_PATH = '.campaign/version.yaml';
 // Paths the framework never counts as changes (same rules as versions.mjs).
 const IGNORED_PREFIXES = ['.campaign/state', '.campaign/cache'];
 const VERSION_LIMIT = 1000000;
+// Root-level notes that are not world cards.
+const ROOT_NOTES = ['CLAUDE.md', 'AGENTS.md', 'README.md'];
 const HEADER = 'YLLIR SESSION CHECK (for the assistant, not for the master)';
 const NEXT_STEP = 'next: invoke the skill yllir:yllir before answering the master.';
 
 /**
  * @returns {{
  *   root: string,
- *   folder: 'empty' | 'campaign' | 'other',
+ *   folder: 'empty' | 'campaign' | 'unfinished' | 'other',
  *   git: 'ok' | 'missing',
  *   versions: { count: number, last: { message: string, date: string } | null } | null,
  *   unsaved: number | null,
@@ -139,12 +141,47 @@ function realRoot(dir) {
 
 function detectFolder(dir) {
   try {
-    if (fs.existsSync(path.join(dir, 'campaign.yaml'))) return 'campaign';
+    if (fs.existsSync(path.join(dir, 'campaign.yaml'))) {
+      // A first new-campaign run that stopped halfway: config written, no saved
+      // version and no world card. Any doubt (a failed check) keeps 'campaign'.
+      return attempt(() => isUnfinished(dir), false) ? 'unfinished' : 'campaign';
+    }
     const names = fs.readdirSync(dir);
     return names.every((name) => name.startsWith('.')) ? 'empty' : 'other';
   } catch {
     return 'other';
   }
+}
+
+/** True when the campaign has no saved version and no .md card yet. */
+function isUnfinished(dir) {
+  if (savedVersionCount(dir) > 0) return false;
+  return !hasCard(dir);
+}
+
+function savedVersionCount(dir) {
+  if (!status(dir).isRepo) return 0;
+  return listVersions(dir, { limit: 1 }).length;
+}
+
+/**
+ * Any .md file in the campaign, except the instruction files at the root and
+ * anything inside dot-named entries (the framework's own state).
+ */
+function hasCard(root) {
+  const walk = (dir, rel) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name.startsWith('.')) continue;
+      const relPath = rel === '' ? entry.name : `${rel}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (walk(path.join(dir, entry.name), relPath)) return true;
+      } else if (entry.isFile() && entry.name.endsWith('.md') && !ROOT_NOTES.includes(relPath)) {
+        return true;
+      }
+    }
+    return false;
+  };
+  return walk(root, '');
 }
 
 function gitState() {

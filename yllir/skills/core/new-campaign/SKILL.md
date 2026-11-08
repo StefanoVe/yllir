@@ -13,8 +13,11 @@ Creates the core files of a campaign in an empty folder. It asks only what the c
 
 ## Steps
 
-**Step 1 — Preconditions.** This process runs inside the process runner, which has no session check in its context. Read the folder state yourself: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and read its `folder` and `git` values. They must say `folder: empty` and `git: ok`. If either value differs, stop and report it in one plain sentence for the master, as the failure of this process.
-- Output: the two values confirmed.
+**Step 1 — Preconditions.** This process runs inside the process runner, which has no session check in its context. Read the folder state yourself: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and read its `folder` and `git` values. They must say `git: ok` and `folder: empty` or `folder: unfinished`. If either value differs, stop and say the fixed sentence of the lexicon «could not finish an operation», as the failure of this process.
+- The prompt may contain `RESUME: yes`; ignore the line, rely on the `folder` value.
+- If `folder: empty`: continue with Step 2.
+- If `folder: unfinished` (resume): do NOT run `init-campaign.mjs` again. Read `campaign.yaml` with the Read tool to get the campaign name, language, register, world name and description (keys: `campaign.name`, `campaign.world`, `campaign.description`, `language.main`, `prose.register`). The folder is the one named with the word for «World» in that language, as in Step 4; its slug is as in Step 5. Read `campaign.yaml` for a categories entry for that folder; if there is none, run `add-category.mjs` with the same arguments as in Step 5. Then continue at Step 6 and Step 7. Skip Steps 2, 3 and 4 (the welcome, the interview and the confirmation): the master already gave them. In Step 6, the description in `campaign.yaml` is the master's words.
+- Output: the values confirmed, and whether this is a new campaign or a resume.
 
 **Step 2 — Welcome.** Write the welcome in the campaign language. The campaign language is the language the master writes in. Use two sentences: a few questions follow, and then the campaign is ready to start. Put the welcome in the same message as the questions of Step 3.
 - Output: the welcome sentences, sent with Step 3.
@@ -56,9 +59,9 @@ Nothing else. Ask the master for one confirmation (the process runner turns this
 **Step 5 — Create the core files.** Run:
 `node "${CLAUDE_PLUGIN_ROOT}/scripts/init-campaign.mjs" . --name "<campaign name>" --language <language code> --register <elevated|plain|colloquial|mixed> --world "<world name>" --description "<answer 4 condensed to one sentence>"`
 - Language code: lowercase ISO 639-1, for example `it` or `en`.
-- If the exit code is not 0: explain the problem in one sentence and stop.
+- If the exit code is not 0: say the fixed sentence of the lexicon «could not finish an operation», and stop.
 - If it succeeds: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" . --id <slug of the folder name> --folder "<Folder>" --type places`.
-- If the exit code is not 0: explain the problem in one sentence and stop.
+- If the exit code is not 0: say the fixed sentence of the lexicon «could not finish an operation», and stop.
 - Slug: lowercase, ASCII letters and digits, words joined by hyphens. For `Mondo`, the slug is `mondo`.
 - Output: the JSON of both commands, read and kept.
 
@@ -109,9 +112,9 @@ Loop, starting with `ROUND=1`:
 4. If `status` is `CONFLICT` or `ASK`: ask the master the question from the report in plain words (the process runner turns this into a QUESTION result), and stop.
 5. If `status` is `FAILED`: go to the failure sentence below, and stop.
 
-After a failed `ROUND` 3 (still `FIX_NEEDED` or `VERIFY_FAILED`), tell the master in one plain sentence, in the campaign language and with the lexicon words, that the first document could not be completed and that the settings are ready. Stop. Do not mention rounds, statuses or problems.
+After a failed `ROUND` 3 (still `FIX_NEEDED` or `VERIFY_FAILED`), say the fixed sentence of the lexicon «the first document could not be completed, but the settings are ready», in the campaign language. Stop. Do not mention rounds, statuses or problems.
 
-For `FAILED`, say the same kind of sentence: the first document could not be completed, and the settings are ready. Stop.
+For `FAILED`, say the same fixed sentence: the first document could not be completed, but the settings are ready. Stop.
 
 Output: `status: DONE`.
 

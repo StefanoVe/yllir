@@ -10,7 +10,9 @@
 // --grade-only grades a kept folder again without running the agent, prints the
 // record and does not append it to the results file. With --keep, the agent's
 // final message and cost are saved beside the kept folder as <dir>.run.json so that
-// --grade-only can reproduce the record.
+// --grade-only can reproduce the record. An optional top-level `seed` mapping in
+// case.yaml (name, language, register, world, description) makes each run start
+// from a campaign already created by init-campaign.mjs, so the case is a resume.
 // Exit codes: 0 every run passes; 1 some run fails; 2 the case cannot be used.
 
 import fs from 'node:fs';
@@ -59,7 +61,38 @@ function loadCase(caseDir) {
   for (const field of ['premise_words', 'allowed_proper_nouns']) {
     if (!Array.isArray(e[field])) throw new Error(`case.yaml: expected.${field} must be a list`);
   }
+  if (data.seed !== undefined) {
+    if (data.seed === null || typeof data.seed !== 'object' || Array.isArray(data.seed)) {
+      throw new Error('case.yaml: seed must be a mapping');
+    }
+    for (const [key, value] of Object.entries(data.seed)) {
+      if (typeof value !== 'string') throw new Error(`case.yaml: seed.${key} must be a string`);
+    }
+  }
   return data;
+}
+
+/** The init-campaign.mjs flags for the seed values that are present, in a fixed order. */
+const SEED_FLAGS = [
+  ['name', '--name'],
+  ['language', '--language'],
+  ['register', '--register'],
+  ['world', '--world'],
+  ['description', '--description'],
+];
+
+/** Creates the seed campaign in dir with the framework's init script. Throws when it is refused. */
+function applySeed(dir, seed) {
+  const args = [path.join(REPO_ROOT, 'yllir', 'scripts', 'init-campaign.mjs'), dir];
+  for (const [key, flag] of SEED_FLAGS) {
+    if (seed[key] !== undefined) args.push(flag, seed[key]);
+  }
+  try {
+    execFileSync(process.execPath, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (err) {
+    const output = `${err.stdout ?? ''}${err.stderr ?? ''}`.trim();
+    throw new Error(`seed: init-campaign.mjs failed (exit ${err.status}): ${output}`);
+  }
 }
 
 /** The files that define the process under test: skills, agents, templates, hooks and scripts (no tests). */
@@ -399,6 +432,7 @@ function main() {
     const date = new Date().toISOString();
     let record;
     try {
+      if (caseData.seed !== undefined) applySeed(dir, caseData.seed);
       const agent = runClaude({
         cwd: dir,
         prompt: caseData.prompt,

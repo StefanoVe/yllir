@@ -65,11 +65,14 @@ const VALID_CONFIG = [
 
 const INVALID_CONFIG = 'schema: 1\nlanguage:\n  main: it\n';
 
-/** Campaign folder with a valid config and generated instructions, no git. */
+/**
+ * Campaign folder with a valid config, generated instructions and one world
+ * card, no git. The card keeps it from counting as unfinished.
+ */
 function campaign(config = VALID_CONFIG) {
   const root = tempDir();
   write(root, 'campaign.yaml', config);
-  fs.mkdirSync(path.join(root, 'Trama'));
+  write(root, 'Trama/Scena di apertura.md', '# Scena di apertura\n');
   generateInstructions(root);
   return root;
 }
@@ -127,8 +130,8 @@ describe('campaign checks', () => {
     const result = sessionCheck(root);
     assert.equal(result.folder, 'campaign');
     assert.deepEqual(result.versions, { count: 0, last: null });
-    // campaign.yaml, CLAUDE.md, AGENTS.md, agent.md, customizations.md, version.yaml, settings.json
-    assert.equal(result.unsaved, 7);
+    // Scena di apertura.md, campaign.yaml, CLAUDE.md, AGENTS.md, agent.md, customizations.md, version.yaml, settings.json
+    assert.equal(result.unsaved, 8);
     assert.equal(result.settings.ok, true);
     assert.equal(result.instructions, 'up-to-date');
     assert.equal(result.campaign_framework_version, FRAMEWORK_VERSION);
@@ -166,6 +169,7 @@ describe('campaign checks', () => {
   test('a campaign without instructions reports them as missing', () => {
     const root = tempDir();
     write(root, 'campaign.yaml', VALID_CONFIG);
+    write(root, 'Trama/Scena di apertura.md', '# Scena di apertura\n');
     assert.equal(sessionCheck(root).instructions, 'missing');
   });
 
@@ -185,6 +189,41 @@ describe('campaign checks', () => {
   });
 });
 
+describe('unfinished campaigns', () => {
+  test('campaign.yaml only, no git repository, is unfinished', () => {
+    const root = tempDir();
+    write(root, 'campaign.yaml', VALID_CONFIG);
+    const result = sessionCheck(root);
+    assert.equal(result.folder, 'unfinished');
+    assert.equal(result.versions, null);
+    assert.equal(result.settings, null);
+    assert.equal(result.instructions, null);
+    assert.match(formatCheck(result), /^folder: unfinished$/m);
+  });
+
+  test('campaign.yaml in a git repository with one saved version is a campaign', () => {
+    const root = tempDir();
+    write(root, 'campaign.yaml', VALID_CONFIG);
+    ensureRepo(root);
+    saveVersion(root, { message: 'Creata la campagna', kind: 'framework' });
+    assert.equal(sessionCheck(root).folder, 'campaign');
+  });
+
+  test('campaign.yaml with a world card and no commits is a campaign', () => {
+    const root = tempDir();
+    write(root, 'campaign.yaml', VALID_CONFIG);
+    write(root, 'Mondo/X.md', '# X\n');
+    assert.equal(sessionCheck(root).folder, 'campaign');
+  });
+
+  test('campaign.yaml with only CLAUDE.md is unfinished', () => {
+    const root = tempDir();
+    write(root, 'campaign.yaml', VALID_CONFIG);
+    write(root, 'CLAUDE.md', '# istruzioni\n');
+    assert.equal(sessionCheck(root).folder, 'unfinished');
+  });
+});
+
 describe('topics', () => {
   test('an active topic and a paused one are reported with the resume file and the open count', () => {
     const root = campaign();
@@ -201,7 +240,7 @@ describe('topics', () => {
         'folder: campaign',
         'git: ok',
         'saved versions: 0',
-        'changes not yet saved: 7 files',
+        'changes not yet saved: 8 files',
         'settings: valid',
         'instructions: up to date',
         'framework version: ' + FRAMEWORK_VERSION + ' (campaign made with ' + FRAMEWORK_VERSION + ')',

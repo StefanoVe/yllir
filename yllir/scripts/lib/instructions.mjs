@@ -28,7 +28,15 @@ const SETTINGS_PATH = '.claude/settings.json';
 // Project permissions: the skills of this framework and their own state folder.
 // The master's rules go in .claude/settings.local.json, which is never generated.
 const SETTINGS_TEXT = `${JSON.stringify(
-  { permissions: { allow: ['Skill(yllir:*)', 'Edit(.campaign/state/**)'] } },
+  {
+    permissions: {
+      allow: [
+        'Skill(yllir:*)',
+        'Edit(.campaign/state/**)',
+        'Bash(node "*/scripts/runner-result.mjs" *)',
+      ],
+    },
+  },
   null,
   2,
 )}\n`;

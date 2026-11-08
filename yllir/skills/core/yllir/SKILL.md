@@ -23,14 +23,15 @@ This skill receives every message of the master. It checks the folder, keeps the
 
 **Step 3 — Folder.** Use the `folder` value from Step 1.
 - `git: missing`: say in one sentence that the campaign needs a free program called Git to keep its saved versions, and that you will guide the installation if the master wants. Write nothing. Stop.
-- `folder: empty`: run the writing process `yllir:new-campaign` as described in Step 6. Stop.
+- `folder: empty`: run the writing process `yllir:new-campaign` as described in Step 6 (TOPIC `none`, HANDOFF `none`). Stop.
+- `folder: unfinished` (a campaign was started before and not finished): run `yllir:new-campaign` the same way as for `folder: empty`, and add the line `RESUME: yes` to the runner prompt, after `LANGUAGE:`. Tell the master nothing technical about the earlier attempt: the process gives the master its message. Stop.
 - `folder: other`: ask one question: are these notes to bring into a campaign (say that this is not available yet in this version), or should a new campaign be created in an empty folder instead? Write nothing. Stop.
 - `folder: campaign`: continue to Step 4.
 - Output: one of the four branches above, with its message.
 
 **Step 4 — Health (campaign only, silent fixes first).**
 - `instructions: missing` or `instructions: changed by hand`: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/generate-instructions.mjs" .`. If the value said `changed by hand`, tell the master in one sentence that a file managed by the assistant was restored, and that their own rules belong in «Your rules».
-- `settings: problems: …`: explain each problem in one plain sentence and offer to fix it. Write no campaign content until it is fixed.
+- `settings: problems: …`: say the fixed sentence of the lexicon for a campaign settings problem, and offer to fix it. Write no campaign content until it is fixed.
 - Output: the instructions are up to date, and the settings are valid or the master has been told about the problems.
 
 **Step 5 — Where we left off.** Only if this is the first message of the conversation: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" list . --limit 3`. Tell the master in at most three short lines what the last saved versions were, using their sentences and dates. If the list is empty, say that nothing has been saved yet. Then handle the message (Step 6).
@@ -58,7 +59,7 @@ This skill receives every message of the master. It checks the folder, keeps the
     ```
   - (c) Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/runner-result.mjs" . --file .campaign/state/runner/result.txt --topic <TOPIC or none>`. The script checks the runner's result file, applies the topic change (question or finish) and prints its output.
     - Exit 0: send the master exactly the lines after `message for the master:` in its output, and nothing else. Do not add a summary, a status or a file path.
-    - Exit 1: launch `yllir:process-runner` once more with the same prompt as in (b), plus a line `PROBLEMS:` followed by the `- ` lines the command printed, one per line. Then run the same command again. If it exits 1 a second time, tell the master in one plain sentence that the operation could not be completed.
+    - Exit 1: launch `yllir:process-runner` once more with the same prompt as in (b), plus a line `PROBLEMS:` followed by the `- ` lines the command printed, one per line. Then run the same command again. If it exits 1 a second time, say the fixed sentence of the lexicon for an operation that could not be completed.
   - (d) If the runner's final answer is not `result written`, do not send anything: run the command in (c) anyway. A missing or invalid file is a problem for that command, and (c) handles it.
 
 - **Go back** (for example «torna a com'era», «annulla l'ultima modifica»):
@@ -67,7 +68,7 @@ This skill receives every message of the master. It checks the folder, keeps the
   - (c) Ask one confirmation question: which version you will go back to, and that the later versions stay in the history and can be recovered. If the master's message already contains a clear confirmation (for example «procedi», «confermo», «sì, fallo») and the target from (b) is unambiguous, skip this question and go to (d); in your final message name the version you went back to. Keep the question when the target is ambiguous.
   - (d) After a «yes»: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" status .`. If `clean` is false, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save-manual . --message "<sentence in the campaign language: Changes made by hand before going back>"`.
   - (e) Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" restore . --to <hash> --message "<sentence in the campaign language: Went back to the version «…»>"`. Add `--paths "<campaign-relative path>"` only if the master named one document. Read the JSON result.
-  - (f) Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/check-links.mjs" .`. If the exit code is 1, tell the master in one sentence that a check found a problem with a link and that it is still open.
+  - (f) Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/check-links.mjs" .`. If the exit code is 1, say the fixed sentence of the lexicon for a problem with a link.
   - (g) Tell the master in one sentence what is now as it was, and how to undo this too («go back» again, to the version just saved).
 
 - **Question about the campaign** (for example «chi è…», «dove si trova…»): read the relevant documents, answer briefly, and name the documents you used by their titles. Never write anything.
@@ -81,6 +82,7 @@ This skill receives every message of the master. It checks the folder, keeps the
 - Write to the master in plain text: no backticks, no code formatting, no file paths, no version codes.
 - Ask at most one question at a time.
 - Never say something is done without the result of the command that did it.
+- When a command or check fails, say only the matching fixed sentence of the lexicon, or the closest one. Never explain permissions, commands, file formats or why it failed. Never write the words YAML, JSON, Claude, command, permission, script or a file name. The only exception is the sentence of Step 3 for `git: missing`, which names Git.
 
 ## Examples
 

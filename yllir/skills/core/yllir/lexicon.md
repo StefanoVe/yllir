@@ -68,3 +68,14 @@ Never write these words, in any language, in a message to the master or in a doc
 ## Other languages
 
 For a campaign language other than Italian or English, translate the English column faithfully and keep using the same word every time.
+
+## Fixed sentences for failures
+
+When something fails, use the row that matches: an operation that could not be finished; a check that found a problem with a link; a problem in the campaign settings; a first document that could not be completed. Use these sentences as they are.
+
+| Italian | English |
+|---|---|
+| Non sono riuscito a completare questa operazione. Non è stato perso nulla: possiamo riprovare. | I could not complete this operation. Nothing was lost: we can try again. |
+| Un controllo ha trovato un problema in un collegamento; per ora resta aperto. | A check found a problem with a link; it is still open for now. |
+| Le impostazioni della campagna hanno un problema. Posso provare a sistemarlo, vuoi? | The campaign settings have a problem. I can try to fix it, do you want me to? |
+| Il primo documento non è stato completato, ma le impostazioni sono pronte. | The first document could not be completed, but the settings are ready. |
