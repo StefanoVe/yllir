@@ -293,6 +293,8 @@ function makeRecord({ caseName, run, date, model, hash, permissionMode, agentFai
     cost_usd: agent ? agent.cost_usd : null,
     duration_ms: agent ? agent.duration_ms : null,
     num_turns: agent ? agent.num_turns : null,
+    denied: agent?.denied ?? [],
+    tool_calls: agent?.tool_calls ?? null,
     metrics: graded.metrics,
     missed: graded.missed,
     false_alarms: graded.false_alarms,

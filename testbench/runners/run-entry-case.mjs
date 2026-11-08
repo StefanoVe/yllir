@@ -609,6 +609,8 @@ function makeRecord({ caseName, run, date, model, hash, permissionMode, agentFai
     cost_usd: agent ? agent.cost_usd : null,
     duration_ms: agent ? agent.duration_ms : null,
     num_turns: agent ? agent.num_turns : null,
+    denied: agent?.denied ?? [],
+    tool_calls: agent?.tool_calls ?? null,
   };
   if (copy !== undefined) record.copy = copy;
   if (gradeOnly) record.grade_only = true;
@@ -646,6 +648,8 @@ function runAgentTurns({ dir, caseData, model }) {
     cost_usd: sum(first.cost_usd, second.cost_usd),
     duration_ms: sum(first.duration_ms, second.duration_ms),
     num_turns: sum(first.num_turns, second.num_turns),
+    denied: [...first.denied, ...second.denied],
+    tool_calls: sum(first.tool_calls, second.tool_calls),
     error: second.ok ? null : second.error,
     permission_mode: first.permission_mode,
     turn1_report: first.report,
@@ -751,6 +755,8 @@ function main() {
             cost_usd: agent.cost_usd,
             duration_ms: agent.duration_ms,
             num_turns: agent.num_turns,
+            denied: agent.denied,
+            tool_calls: agent.tool_calls,
             error: agent.ok ? null : agent.error,
             permission_mode: agent.permission_mode,
             setup: { v1: setup.v1, v2: setup.v2, teodo_v1_text: setup.teodoV1Text },

@@ -350,6 +350,8 @@ function makeRecord({ caseName, run, date, model, hash, permissionMode, agentFai
     cost_usd: agent ? agent.cost_usd : null,
     duration_ms: agent ? agent.duration_ms : null,
     num_turns: agent ? agent.num_turns : null,
+    denied: agent?.denied ?? [],
+    tool_calls: agent?.tool_calls ?? null,
   };
   if (copy !== undefined) record.copy = copy;
   return record;
@@ -419,7 +421,7 @@ function main() {
       if (opts.keep) {
         fs.writeFileSync(
           `${dir}.run.json`,
-          JSON.stringify({ report: agent.report, cost_usd: agent.cost_usd, duration_ms: agent.duration_ms, num_turns: agent.num_turns, permission_mode: agent.permission_mode }),
+          JSON.stringify({ report: agent.report, cost_usd: agent.cost_usd, duration_ms: agent.duration_ms, num_turns: agent.num_turns, denied: agent.denied, tool_calls: agent.tool_calls, permission_mode: agent.permission_mode }),
         );
       }
     } finally {

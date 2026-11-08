@@ -251,6 +251,8 @@ function main() {
           cost_usd: null,
           duration_ms: null,
           num_turns: null,
+          denied: agent.denied,
+          tool_calls: agent.tool_calls,
         };
       } else {
         const graded = grade({
@@ -274,6 +276,8 @@ function main() {
           cost_usd: agent.cost_usd,
           duration_ms: agent.duration_ms,
           num_turns: agent.num_turns,
+          denied: agent.denied,
+          tool_calls: agent.tool_calls,
         };
       }
     } finally {

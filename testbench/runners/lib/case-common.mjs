@@ -134,11 +134,84 @@ export function removeCopy(campaign) {
   fs.rmSync(path.dirname(campaign), { recursive: true, force: true });
 }
 
+const DENIED_RE = /Permission for this tool use was denied|requires approval/;
+const INPUT_FIELD = new Map([
+  ['Bash', 'command'],
+  ['Skill', 'skill'],
+  ['Agent', 'subagent_type'],
+  ['Write', 'file_path'],
+  ['Edit', 'file_path'],
+  ['Read', 'file_path'],
+]);
+
+/** The input field that identifies a tool call (see INPUT_FIELD), or null for other tools. */
+function inputSummary(name, input) {
+  const field = INPUT_FIELD.get(name);
+  if (field === undefined || input === null || typeof input !== 'object') return null;
+  return typeof input[field] === 'string' ? input[field] : null;
+}
+
+/** The text of a tool_result block: its content as a string, or the text of its text blocks. */
+function resultText(content) {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content.map((block) => (block && typeof block.text === 'string' ? block.text : '')).join('\n');
+}
+
+/**
+ * Parses the stream-json output of `claude -p --output-format stream-json --verbose`.
+ * Lines that are not JSON are skipped. Returns:
+ *   result: the object of the last line with type "result", or null;
+ *   denied: one { name, input, sub } per tool result refused by a permission rule
+ *           (input is the first 300 characters of the call's input summary);
+ *           name and input are null when the refused tool_use was not seen;
+ *   tool_calls: the number of tool_use blocks.
+ * sub is true for calls made inside a sub-agent (a line with parent_tool_use_id).
+ */
+export function parseStream(text) {
+  const calls = new Map();
+  const denied = [];
+  let toolCalls = 0;
+  let result = null;
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (line === '') continue;
+    let obj;
+    try {
+      obj = JSON.parse(line);
+    } catch {
+      continue;
+    }
+    if (obj === null || typeof obj !== 'object') continue;
+    if (obj.type === 'result') result = obj;
+    const content = obj.message?.content;
+    if (!Array.isArray(content)) continue;
+    const sub = obj.parent_tool_use_id !== undefined && obj.parent_tool_use_id !== null;
+    for (const block of content) {
+      if (block === null || typeof block !== 'object') continue;
+      if (block.type === 'tool_use') {
+        toolCalls += 1;
+        calls.set(block.id, { name: block.name, input: inputSummary(block.name, block.input), sub });
+      } else if (block.type === 'tool_result' && DENIED_RE.test(resultText(block.content))) {
+        const call = calls.get(block.tool_use_id);
+        denied.push({
+          name: call ? call.name : null,
+          input: call && call.input !== null ? call.input.slice(0, 300) : null,
+          sub: call ? call.sub : false,
+        });
+      }
+    }
+  }
+  return { result, denied, tool_calls: toolCalls };
+}
+
 /**
  * Runs the agent under test with `claude -p` in cwd, in strict permission mode
  * (no prompts, only the rules in strict-settings.json). Never throws: the result
- * is { ok, report, cost_usd, duration_ms, num_turns, error, permission_mode },
- * where error is the first line of the failure message when ok is false.
+ * is { ok, report, cost_usd, duration_ms, num_turns, denied, tool_calls, error,
+ * permission_mode }, where error is the first line of the failure message when
+ * ok is false, denied is the list parseStream returns and tool_calls is the number
+ * of tool calls (null when the run failed).
  */
 export function runClaude({
   cwd,
@@ -156,7 +229,8 @@ export function runClaude({
     '--model',
     model,
     '--output-format',
-    'json',
+    'stream-json',
+    '--verbose',
     ...(continueConversation ? ['--continue'] : []),
     '--permission-mode',
     'manual',
@@ -173,8 +247,8 @@ export function runClaude({
       maxBuffer: MAX_BUFFER,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    const data = JSON.parse(stdout);
-    if (typeof data.result !== 'string') throw new Error('no result text in JSON output');
+    const { result: data, denied, tool_calls: toolCalls } = parseStream(stdout);
+    if (data === null || typeof data.result !== 'string') throw new Error('no result text in JSON output');
     const num = (value) => (typeof value === 'number' ? value : null);
     return {
       ok: true,
@@ -182,6 +256,8 @@ export function runClaude({
       cost_usd: num(data.total_cost_usd),
       duration_ms: num(data.duration_ms),
       num_turns: num(data.num_turns),
+      denied,
+      tool_calls: toolCalls,
       error: null,
       permission_mode: PERMISSION_MODE,
     };
@@ -192,6 +268,8 @@ export function runClaude({
       cost_usd: null,
       duration_ms: null,
       num_turns: null,
+      denied: [],
+      tool_calls: null,
       error: err.message.split('\n')[0],
       permission_mode: PERMISSION_MODE,
     };
