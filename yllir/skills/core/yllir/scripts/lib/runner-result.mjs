@@ -198,6 +198,7 @@ function parseResult(text, neverSay) {
   }
 
   const status = fields.status;
+  const model = fields.model || 'unknown';
   if (status === undefined || status === '') {
     problems.push('the status field is missing');
   } else if (!STATUSES.includes(status)) {
@@ -232,6 +233,7 @@ function parseResult(text, neverSay) {
 
   return {
     status: STATUSES.includes(status) ? status : null,
+    model,
     question: fields.question ?? '',
     next: fields['next step'] ?? '',
     done: fields.done ?? '',
@@ -246,7 +248,8 @@ function parseResult(text, neverSay) {
  * Parses a runner result file, checks its message, and when that passes applies
  * the topic bookkeeping: QUESTION asks the topic, DONE finishes it, FAILED
  * leaves it alone.
- * @returns {{ ok: boolean, status: string|null, message: string, problems: string[] }}
+ * The model is the value of the optional `model:` line, or `unknown`. It is never checked.
+ * @returns {{ ok: boolean, status: string|null, model?: string, message: string, problems: string[] }}
  */
 export function applyRunnerResult(
   root,
@@ -261,9 +264,9 @@ export function applyRunnerResult(
 
   const neverSay = loadNeverSay(lexiconPath);
   const parsed = parseResult(text, neverSay);
-  const { status, message } = parsed;
+  const { status, message, model } = parsed;
   if (parsed.problems.length > 0) {
-    return { ok: false, status, message, problems: parsed.problems };
+    return { ok: false, status, model, message, problems: parsed.problems };
   }
 
   if (topic !== undefined && topic !== 'none') {
@@ -277,11 +280,12 @@ export function applyRunnerResult(
       return {
         ok: false,
         status,
+        model,
         message,
         problems: [`the topic could not be updated: ${err.message}`],
       };
     }
   }
 
-  return { ok: true, status, message, asks: parsed.asks, problems: [] };
+  return { ok: true, status, model, message, asks: parsed.asks, problems: [] };
 }

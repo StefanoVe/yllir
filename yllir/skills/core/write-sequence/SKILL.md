@@ -57,7 +57,7 @@ Every script below is run from the campaign root, as `node "${CLAUDE_PLUGIN_ROOT
 - If the ADAPTER REPORT `status:` line is `FAILED`, end this skill with `status: FAILED`, reason "system rules check not run". Do not launch the reviewer or write documents.
 - If the skill returns `status: FAILED`, the report is missing or unreadable, or its `status:` line is absent or unknown, end this skill with `status: FAILED`, reason "system rules check not run". Do not launch the reviewer or write documents.
 
-**4. Independent review.** Launch the sub-agent `yllir:canon-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly; in Codex, always start the sub-agent with the model Luna, because Codex gives a sub-agent the model of the main agent unless you name one) with the Agent tool. Its prompt is exactly these four lines, with real values:
+**4. Independent review.** Launch the sub-agent `yllir:canon-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. Its prompt is exactly these four lines, with real values:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 DRAFT_DIR: <CAMPAIGN_ROOT>/.campaign/state/write/draft

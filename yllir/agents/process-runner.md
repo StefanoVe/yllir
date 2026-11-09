@@ -36,7 +36,7 @@ Run every command from CAMPAIGN_ROOT, or pass it as the root argument. Never run
 
 2. **Handoff.** Only if TOPIC is not `none`: read the file HANDOFF. Every file listed in CHANGED_FILES (none, if it says `none`) has been edited since the last step: read it again before you rely on it.
 
-3. **Process.** Invoke the skill PROCESS (if your tool has no way to invoke a skill, read the process file with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs; for PROCESS `yllir:<p>` the file is `${CLAUDE_PLUGIN_ROOT}/skills/core/<p>/SKILL.md`) with MASTER_MESSAGE, MODE (only when the prompt has a `MODE: revise` or a `MODE: complete` line; pass it as that same line, `MODE: revise` or `MODE: complete`, and pass nothing otherwise; `MODE: complete` is passed to the process exactly like `MODE: revise`) and, if there is one, the handoff content as its inputs. Follow it fully, including its write sequence. Processes called by you keep writing their reports to files, as they do now.
+3. **Process.** Invoke the skill PROCESS (if your tool has no way to invoke a skill, read the process file with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs; for PROCESS `yllir:<p>` the file is `${CLAUDE_PLUGIN_ROOT}/skills/core/<p>/SKILL.md`) with MASTER_MESSAGE, MODE (only when the prompt has a `MODE: revise` or a `MODE: complete` line; pass it as that same line, `MODE: revise` or `MODE: complete`, and pass nothing otherwise; `MODE: complete` is passed to the process exactly like `MODE: revise`) and, if there is one, the handoff content as its inputs. Follow it fully, including its write sequence. Processes called by you keep writing their reports to files, as they do now. When the process tells you to launch a sub-agent, and you are running in Codex, set the model of that sub-agent to GPT-6 Luna in the launch call.
 
 4. **Questions.** When the process says to ask the master something, or to wait for a confirmation, do not ask anyone. Then:
    - end with status QUESTION (see Result), with the question and the next step in English; the entry skill records them in the topic.
@@ -50,6 +50,7 @@ Run every command from CAMPAIGN_ROOT, or pass it as the root argument. Never run
 ```text
 RUNNER RESULT
 status: DONE | QUESTION | FAILED
+model: <the exact name of the model you are running on, as stated in your own system information; write unknown if you do not know>
 question: <QUESTION only: the question, in English, one line>
 next step: <QUESTION only: what to do after the answer, in English, one line>
 ask: <QUESTION only, optional, 1 to 4 lines: header | question | option 1 ; option 2>
@@ -58,6 +59,8 @@ files written: <DONE only: campaign-relative paths, comma-separated, or none>
 message for the master:
 <one short message in LANGUAGE>
 ```
+
+   The model line is a check for the entry skill. Never guess it: copy the model name from your own system information, or write unknown.
 
    Rules for the message:
    - use only the master's words from the lexicon;

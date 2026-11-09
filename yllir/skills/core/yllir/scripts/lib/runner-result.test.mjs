@@ -163,6 +163,7 @@ describe('applyRunnerResult parsing', () => {
     assert.deepEqual(r, {
       ok: true,
       status: 'QUESTION',
+      model: 'unknown',
       message: 'Vuoi che la scena resti in cantina?',
       asks: [],
       problems: [],
@@ -278,6 +279,60 @@ describe('applyRunnerResult parsing', () => {
   });
 });
 
+describe('model field', () => {
+  /** Puts a model line right after the status line, as the runner writes it. */
+  function withModel(lines, modelLine) {
+    const out = [...lines];
+    out.splice(2, 0, modelLine);
+    return out;
+  }
+
+  test('a model line is returned as the model', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), withModel(questionLines(), 'model: GPT-6 Luna'));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, true, r.problems.join(' | '));
+    assert.equal(r.model, 'GPT-6 Luna');
+  });
+
+  test('a result without a model line has the model unknown', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), questionLines());
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, true, r.problems.join(' | '));
+    assert.equal(r.model, 'unknown');
+  });
+
+  test('an empty model line has the model unknown', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), withModel(questionLines(), 'model:'));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, true, r.problems.join(' | '));
+    assert.equal(r.model, 'unknown');
+  });
+
+  test('a bad message still fails with the same problems when a model line is present', () => {
+    const { root, id } = campaign();
+    const before = handoff(root, id);
+    const file = writeResult(tmp(), withModel(questionLines('Usa il file notes/scene.md.'), 'model: GPT-6 Luna'));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, false);
+    assert.deepEqual(r.problems, ['the message contains a file path: notes/scene.md']);
+    assert.equal(handoff(root, id), before);
+  });
+
+  test('the CLI prints the model line between status and the message', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), withModel(questionLines(), 'model: GPT-6 Luna'));
+    const run = spawnSync(process.execPath, [CLI, root, '--file', file, '--topic', id], { encoding: 'utf8' });
+    assert.equal(run.status, 0);
+    assert.equal(
+      run.stdout,
+      'status: QUESTION\nmodel: GPT-6 Luna\nmessage for the master:\nVuoi che la scena resti in cantina?\nexit: 0\n',
+    );
+  });
+});
+
 describe('applyRunnerResult message problems', () => {
   const cases = [
     ['a never-say word', 'Ho usato uno script.', /"script"/],
@@ -344,7 +399,7 @@ describe('runner-result CLI', () => {
     assert.equal(run.status, 0);
     assert.equal(
       run.stdout,
-      'status: QUESTION\nmessage for the master:\nVuoi che la scena resti in cantina?\nexit: 0\n',
+      'status: QUESTION\nmodel: unknown\nmessage for the master:\nVuoi che la scena resti in cantina?\nexit: 0\n',
     );
     assert.equal(activeTopic(root).id, id);
   });
@@ -525,6 +580,7 @@ describe('ask lines', () => {
       run.stdout,
       [
         'status: QUESTION',
+        'model: unknown',
         'message for the master:',
         'Vuoi che la scena resti in cantina?',
         ASK_LOCATION,

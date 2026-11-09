@@ -40,14 +40,14 @@ External subjects are included automatically as link targets. The script reads t
 - If the output contains `proposals: 0` and `review: 0`: go to Step 5 with no status reason.
 - Otherwise: go to Step 2.
 
-**Step 2 — Review.** Launch the sub-agent `yllir:linker-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/linker-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly; in Codex, always start the sub-agent with the model Luna, because Codex gives a sub-agent the model of the main agent unless you name one) with the Agent tool. Its prompt is exactly these two lines, with the real absolute paths:
+**Step 2 — Review.** Launch the sub-agent `yllir:linker-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/linker-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. Its prompt is exactly these two lines, with the real absolute paths:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 PLAN: <CAMPAIGN_ROOT>/.campaign/state/linker/plan.json
 ```
 Do not add your own opinion or review the proposals yourself.
 - The reviewer answers with a JSON array. Save its answer exactly as received to `.campaign/state/linker/outcomes.json` with the Write tool.
-- If the answer is not a JSON array: launch the reviewer again once with the same prompt. If the second answer is also not a JSON array: go to Step 5 with `--status-reason "review not available"`. Nothing is applied without a review.
+- If the answer is not a JSON array: launch the reviewer again once with the same prompt. In Codex, set the model to GPT-6 Luna, as in the first launch. If the second answer is also not a JSON array: go to Step 5 with `--status-reason "review not available"`. Nothing is applied without a review.
 - Otherwise: go to Step 3.
 
 **Step 3 — Apply.** Run:
@@ -55,7 +55,7 @@ Do not add your own opinion or review the proposals yourself.
 Read `.campaign/state/linker/result.json`.
 - If `ok` is true: go to Step 4.
 - If `rejected` or `missing_outcome` is not empty, and this is round 3 or later: go to Step 4.
-- Otherwise: launch `yllir:linker-reviewer` again. Its prompt is the two PLAN lines of Step 2 plus a line `PIDS: <comma-separated pids from rejected and missing_outcome>` and a line `REASONS:` followed by one line per pid, `<pid>: <reason from result.json>`. Merge its new entries into `outcomes.json`: replace each entry with the same `id`, add the rest. Save the merged array with the Write tool. Then run Step 3 again. At most 3 rounds of Step 3 in total.
+- Otherwise: launch `yllir:linker-reviewer` again. In Codex, set the model to GPT-6 Luna, as in the first launch. Its prompt is the two PLAN lines of Step 2 plus a line `PIDS: <comma-separated pids from rejected and missing_outcome>` and a line `REASONS:` followed by one line per pid, `<pid>: <reason from result.json>`. Merge its new entries into `outcomes.json`: replace each entry with the same `id`, add the rest. Save the merged array with the Write tool. Then run Step 3 again. At most 3 rounds of Step 3 in total.
 
 **Step 4 — Verify.** Build the file list from `scope` in `plan.json` (the array of files), joined with commas. Run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" . --files "<comma-separated scope files>" --out .campaign/state/linker/check.json`

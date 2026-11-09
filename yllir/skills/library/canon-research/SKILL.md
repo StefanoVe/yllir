@@ -39,7 +39,7 @@ External sources are included automatically. The script searches the external fo
 - If the exit code is 1 or 2: go to Step 4 with reason "search failed: <the error lines, joined by ; >".
 - If the exit code is 0: go to Step 2. Zero hits is a valid result: the researcher then reports silence.
 
-**Step 2 — Research.** Launch the sub-agent `yllir:canon-researcher` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-researcher.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly; in Codex, always start the sub-agent with the model Luna, because Codex gives a sub-agent the model of the main agent unless you name one) with the Agent tool. Its prompt is exactly these three lines, with the real absolute paths and the real question:
+**Step 2 — Research.** Launch the sub-agent `yllir:canon-researcher` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-researcher.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. Its prompt is exactly these three lines, with the real absolute paths and the real question:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 QUESTION: <QUESTION>
@@ -48,14 +48,14 @@ SEARCH: <CAMPAIGN_ROOT>/.campaign/state/research/search.json
 Do not add your own answer, do not add words to the question, and do not read the documents yourself.
 The researcher must read every file listed in `search.json`, external ones included (`external_documents`); a file that cannot be opened is reported as not read, never silently left out.
 - The researcher answers with one JSON object. Save its answer exactly as received, with no character changed, to `.campaign/state/research/answer.json` with the Write tool. If the Write tool refuses because the file already exists, read it with the Read tool and write it again.
-- If the answer is not a single JSON object (it has text before or after the braces, or it is not JSON): launch the researcher again once with the same prompt, and save its answer the same way if it is a single JSON object.
+- If the answer is not a single JSON object (it has text before or after the braces, or it is not JSON): launch the researcher again once with the same prompt, and save its answer the same way if it is a single JSON object. In Codex, set the model to GPT-6 Luna, as in the first launch.
 - If the second answer is also not a JSON object: do not write `answer.json`. Go to Step 3 anyway; the report will say FAILED.
 - Otherwise go to Step 3.
 
 **Step 3 — Report.** Run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/canon-research/scripts/research-report.mjs" . --search .campaign/state/research/search.json --answer .campaign/state/research/answer.json --continue-with "<CONTINUE_WITH>" --out .campaign/state/research/report.txt`
 Read the exit code from the `exit:` line (0 DONE, 1 NEEDS_ATTENTION, 3 FAILED, 2 usage).
-- If the exit code is 1 and the output has lines starting with `- ` (the problems), and this is the first run of this command: launch `yllir:canon-researcher` again (same way as in Step 2) with the same three lines of Step 2 plus a line `PROBLEMS:` and, after it, every line of the output that starts with `- `, copied exactly. Save its answer as in Step 2 (if it is not a single JSON object, keep the previous `answer.json` and go on). Then run this Step 3 command again, exactly as written. That is the second and last run.
+- If the exit code is 1 and the output has lines starting with `- ` (the problems), and this is the first run of this command: launch `yllir:canon-researcher` again (same way as in Step 2) with the same three lines of Step 2 plus a line `PROBLEMS:` and, after it, every line of the output that starts with `- `, copied exactly. In Codex, set the model to GPT-6 Luna, as in the first launch. Save its answer as in Step 2 (if it is not a single JSON object, keep the previous `answer.json` and go on). Then run this Step 3 command again, exactly as written. That is the second and last run.
 - Otherwise: this Step 3 command is your last action in this skill. Go to Step 5.
 
 Do not print the report and do not write it by hand.

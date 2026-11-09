@@ -44,7 +44,7 @@ The script copies cached facts into `.campaign/state/audit/facts/` for every doc
 - Exit 0: go to Step 2 if M is not 0; if M is 0, skip Step 2 and go to Step 3.
 - Any other exit code: end this skill with status `FAILED` (the invoking skill continues), reason "cache not run".
 
-**Step 2 — Extract.** Take the `<fid> <document>` lines listed by Step 1b, in their order. Split them into batches of at most 4 entries. Launch one `yllir:audit-extractor` sub-agent (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-extractor.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly; in Codex, always start the sub-agent with the model Luna, because Codex gives a sub-agent the model of the main agent unless you name one) per batch with the Agent tool, all in the same message. The prompt of each is exactly this, with the real values:
+**Step 2 — Extract.** Take the `<fid> <document>` lines listed by Step 1b, in their order. Split them into batches of at most 4 entries. Launch one `yllir:audit-extractor` sub-agent (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-extractor.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) per batch with the Agent tool, all in the same message. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. The prompt of each is exactly this, with the real values:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 SUBJECTS_INDEX: <CAMPAIGN_ROOT>/.campaign/state/audit/subjects.json
@@ -61,7 +61,7 @@ Wait until every extractor has finished. Do not extract facts yourself.
 Keep the printed output. Each printed line `<fid>#<n> <reason>` is a discarded fact.
 - Exit 0 and no discarded-fact lines: go to Step 4.
 - Otherwise, if you have already run 2 retry rounds: go to Step 4. The report will say what was not checked.
-- Otherwise, start a retry round. Take the fids whose `status` is `to-read` in the `coverage` list of `facts.json`, plus every fid with a discarded-fact line. Launch `yllir:audit-extractor` for them, one batch of at most 4 per sub-agent, all in the same message. Use the Step 2 prompt, with `DOCUMENTS` listing only those fids. Add a `FIX:` block at the end, with one line per discarded fact of that fid, `<fid>#<n> <reason>`. Fids that are only `to-read` get no `FIX:` block. Then run the Step 3 command again.
+- Otherwise, start a retry round. Take the fids whose `status` is `to-read` in the `coverage` list of `facts.json`, plus every fid with a discarded-fact line. Launch `yllir:audit-extractor` for them, one batch of at most 4 per sub-agent, all in the same message. In Codex, set the model to GPT-6 Luna, as in the first launch. Use the Step 2 prompt, with `DOCUMENTS` listing only those fids. Add a `FIX:` block at the end, with one line per discarded fact of that fid, `<fid>#<n> <reason>`. Fids that are only `to-read` get no `FIX:` block. Then run the Step 3 command again.
 
 **Store cache.** Every route out of Step 3 (validated, or retry limit reached) comes here, after the last audit-validate run and before anything else. Run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-cache.mjs" store . --facts .campaign/state/audit/facts.json --cache-dir .campaign/cache/facts`
@@ -74,7 +74,7 @@ Then go to Step 4. Exit code not 0: end this skill with status `FAILED` (the inv
 
 **Step 5 — Judge.** Count the candidate lines printed by Step 4. A candidate line is a printed line that starts with `C` followed by digits (for example `C001 `). The summary line `facts: …` and the `WARNING` line are not candidates.
 - Zero candidates: write `[]` to `.campaign/state/audit/judgments.json` with the Write tool. Go to Step 6.
-- One or more: launch `yllir:audit-judge` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-judge.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly; in Codex, always start the sub-agent with the model Luna, because Codex gives a sub-agent the model of the main agent unless you name one) with the Agent tool. The prompt is exactly these lines, with the real values:
+- One or more: launch `yllir:audit-judge` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-judge.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. The prompt is exactly these lines, with the real values:
   ```
   CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
   CANDIDATES: <CAMPAIGN_ROOT>/.campaign/state/audit/candidates.json
@@ -84,7 +84,7 @@ Then go to Step 4. Exit code not 0: end this skill with status `FAILED` (the inv
   ```
   Save its answer exactly as received to `.campaign/state/audit/judgments.json` with the Write tool. Do not judge the candidates yourself.
 
-**Step 6 — Coverage review.** Run this step only when Step 4 printed zero candidates. Launch `yllir:audit-coverage-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-coverage-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly; in Codex, always start the sub-agent with the model Luna, because Codex gives a sub-agent the model of the main agent unless you name one) with the Agent tool. The prompt is exactly these lines:
+**Step 6 — Coverage review.** Run this step only when Step 4 printed zero candidates. Launch `yllir:audit-coverage-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-coverage-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. The prompt is exactly these lines:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 FACTS: <CAMPAIGN_ROOT>/.campaign/state/audit/facts.json
@@ -96,7 +96,7 @@ Save its answer exactly as received to `.campaign/state/audit/coverage-review.js
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-report.mjs" --scope .campaign/state/audit/scope.json --facts .campaign/state/audit/facts.json --candidates .campaign/state/audit/candidates.json --judgments .campaign/state/audit/judgments.json --out .campaign/state/audit/report.json --text .campaign/state/audit/report.txt`
 Add `--coverage-review .campaign/state/audit/coverage-review.json` only when Step 6 ran.
 - Exit 0 (COMPLETE) or 1 (INCOMPLETE): go to "Return".
-- Exit 3 (INVALID): if you have already launched the judge again twice, go to "Return". Otherwise launch `yllir:audit-judge` again with the Step 5 prompt plus one line `PROBLEMS:` followed by the printed problem lines, one per line. Save its answer exactly as received to `judgments.json`. Run the Step 7 command again.
+- Exit 3 (INVALID): if you have already launched the judge again twice, go to "Return". Otherwise launch `yllir:audit-judge` again with the Step 5 prompt plus one line `PROBLEMS:` followed by the printed problem lines, one per line. In Codex, set the model to GPT-6 Luna, as in the first launch. Save its answer exactly as received to `judgments.json`. Run the Step 7 command again.
 - Exit 2 or any other code: end this skill with status `FAILED` (the invoking skill continues), with the printed lines.
 
 **Return.** Do not print the report. The invoking skill reads `.campaign/state/audit/report.txt`. Your last action is the report script run; then, in the same turn, do what `CONTINUE_WITH` says. Only if the master asked for the check directly (no invoking skill), tell the master the result in plain words in the campaign language. Never paste the report.

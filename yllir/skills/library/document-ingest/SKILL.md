@@ -174,7 +174,7 @@ Uncovered warnings. Each `uncovered: <locator> <token>` line names a number or a
 
 **Step 5 — Independent review.** On resume, skip this step. Otherwise, do this for each id of IDS, one after the other.
 
-5a. Launch the sub-agent `yllir:ingest-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/ingest-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly; in Codex, always start the sub-agent with the model Luna, because Codex gives a sub-agent the model of the main agent unless you name one) with the Agent tool. Its prompt is exactly these two lines, with the real absolute paths and the real id:
+5a. Launch the sub-agent `yllir:ingest-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/ingest-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. Its prompt is exactly these two lines, with the real absolute paths and the real id:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 ID: <id>

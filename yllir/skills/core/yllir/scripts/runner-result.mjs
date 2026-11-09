@@ -46,6 +46,7 @@ function main() {
     process.stdout.write(
       [
         `status: ${result.status}`,
+        `model: ${result.model}`,
         'message for the master:',
         result.message,
         ...result.asks.map(formatAskLine),
