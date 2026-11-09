@@ -14,8 +14,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { checkFingerprints, generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
+import { plotMap } from '../../../../../skills/library/plot-map/scripts/lib/plot-map.mjs';
+import { writeSessionMaps } from '../../../../../skills/library/plot-map/scripts/lib/session-map.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { listVersions, restore, saveManualChanges, saveVersion, status } from '../../../../../scripts/lib/versions.mjs';
+import { migrateSessions } from './migrate-sessions.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../../../../.claude-plugin/plugin.json');
 const CONFIG_PATH = 'campaign.yaml';
@@ -37,6 +40,7 @@ const DAY_MS = 86_400_000;
  *   restore_point: string | null,
  *   rewritten: string[],
  *   restored_by_hand: string[],
+ *   migrated: string[],
  *   errors: Array<{ code: string, message: string, file?: string, line?: number | null }>,
  * }} UpdateResult
  */
@@ -193,8 +197,16 @@ function runUpdate(root, out, { dryRun, resume, today }) {
       out.errors = plan.errors;
       return out;
     }
+    const dry = migrateSessions(root, { dryRun: true });
+    const fatal = dry.errors.filter((e) => e.code !== 'migrate-skipped');
+    if (fatal.length > 0) {
+      out.errors = dry.errors;
+      return out;
+    }
     out.status = 'would-update';
     out.rewritten = plan.written;
+    out.migrated = dry.migrated;
+    out.errors = dry.errors;
     return out;
   }
 
@@ -234,13 +246,23 @@ function runUpdate(root, out, { dryRun, resume, today }) {
   try {
     const generated = generateInstructions(root);
     if (generated.errors.length === 0) {
-      out.rewritten = generated.written;
-      saveVersion(root, { message: `Updated Yllir to ${to}`, kind: 'framework' });
-      writeUpdateState(root, { ...state, status: 'completed', completed_on: today });
-      out.status = 'updated';
-      return out;
+      const migration = migrateSessions(root);
+      const fatal = migration.errors.filter((e) => e.code !== 'migrate-skipped');
+      if (fatal.length === 0) {
+        out.migrated = migration.migrated;
+        const map = plotMap(root);
+        writeSessionMaps(root, map.sessions);
+        out.rewritten = generated.written;
+        out.errors = migration.errors;
+        saveVersion(root, { message: `Updated Yllir to ${to}`, kind: 'framework' });
+        writeUpdateState(root, { ...state, status: 'completed', completed_on: today });
+        out.status = 'updated';
+        return out;
+      }
+      out.errors = migration.errors;
+    } else {
+      out.errors = generated.errors;
     }
-    out.errors = generated.errors;
   } catch (err) {
     out.errors = [{ code: err.code ?? 'update-failed', message: err.message }];
   }
@@ -346,7 +368,7 @@ function readInstalledVersion() {
 // ---------------------------------------------------------------- helpers
 
 function newResult(from, to) {
-  return { status: 'failed', from, to, restore_point: null, rewritten: [], restored_by_hand: [], errors: [] };
+  return { status: 'failed', from, to, restore_point: null, rewritten: [], restored_by_hand: [], migrated: [], errors: [] };
 }
 
 function failWith(out, code, message) {

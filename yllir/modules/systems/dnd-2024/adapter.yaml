@@ -1,0 +1,93 @@
+id: dnd-2024
+name: "D&D 2024"
+version: 1
+headings:
+  statistics:
+    it: Statistiche
+    en: Statistics
+  description:
+    it: Descrizione
+    en: Description
+  effects:
+    it: Effetti
+    en: Effects
+encounters: turn-based
+progression:
+  method: milestone
+  experience_points: false
+difficulty:
+  method: band-and-cr
+  bands: [low, moderate, high]
+resources:
+  - id: hp
+    recovery: rest
+  - id: temp_hp
+    recovery: never
+  - id: spell_slots
+    recovery: long_rest
+  - id: limited_uses
+    recovery: declared_by_sheet
+  - id: recharge
+    recovery: declared_by_sheet
+  - id: legendary_actions
+    recovery: turn
+  - id: reactions
+    recovery: round
+conditions:
+  - blinded
+  - charmed
+  - deafened
+  - exhaustion
+  - frightened
+  - grappled
+  - incapacitated
+  - invisible
+  - paralyzed
+  - petrified
+  - poisoned
+  - prone
+  - restrained
+  - stunned
+  - unconscious
+condition_durations: [end_of_turn, until_save, until_rest, until_removed, rounds]
+creature_sheet:
+  section: statistics
+  required:
+    - id: ac
+      label_it: CA
+      label_en: AC
+    - id: hp
+      label_it: PF
+      label_en: HP
+    - id: speed
+      label_it: Velocità
+      label_en: Speed
+    - id: str
+      label_it: FOR
+      label_en: STR
+    - id: dex
+      label_it: DES
+      label_en: DEX
+    - id: con
+      label_it: COS
+      label_en: CON
+    - id: int
+      label_it: INT
+      label_en: INT
+    - id: wis
+      label_it: SAG
+      label_en: WIS
+    - id: cha
+      label_it: CAR
+      label_en: CHA
+  optional: [saves, skills, senses, proficiency_bonus, resistances, immunities, initiative, cr, phases, recharge_abilities, limited_uses, legendary_actions, reactions, traits, defeat_effects]
+item_sheet:
+  mechanical_fields: [activation, check, dc, duration, limits, resources, attunement, charges, frequency, bonus, dice, conditions, value]
+  printable_fields: [title, description]
+tracking: [initiative_order, phases_with_thresholds, recharges, reactions]
+do_not:
+  - roll dice for the master
+  - choose targets
+  - decide the outcome of attacks, saves or checks
+  - add resistances, immunities or reductions the sheet does not declare
+  - rewrite a player character sheet

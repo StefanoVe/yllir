@@ -103,6 +103,8 @@ L'adattatore `dnd-2024` è il primo adattatore del framework e descrive un siste
 
 ### Manifest
 
+Nel manifest reale sono presenti anche le intestazioni delle sezioni delle schede, oltre ai campi e alle operazioni qui descritti.
+
 - `encounters: turn-based`, con round, iniziativa dichiarata dal master e turni per combattente.
 - `resources`: PF e PF temporanei per creature; fasi con soglie; capacità con ricarica; usi limitati; punti per azioni leggendarie; reazioni per turno.
 - `conditions`: quelle del sistema, ciascuna con durata dichiarata.
@@ -154,6 +156,16 @@ Il tracker degli scontri è la skill `combat-tracker` della libreria: usa l'adat
 - I nomi dei campi (PF, CD, CA) sono quelli del sistema: restano nell'adattatore, e il core non li usa come proprie parole.
 - La separazione fra lore, indicazioni per il master e regole non deve dipendere solo dalle istruzioni: va resa verificabile dal validatore, altrimenti dipende dalla distrazione dell'agente.
 - Le istruzioni devono restare essenziali; con un modello economico vanno ridotte alle operazioni, con casi di prova che le verificano.
+
+### Stato dell'implementazione
+
+L'adattatore è implementato in `yllir/modules/systems/dnd-2024/adapter.yaml`, in YAML ristretto. Dichiara `id`, `name`, `version`, `encounters`, `progression`, `difficulty`, `resources`, `conditions`, `condition_durations`, `creature_sheet`, `item_sheet`, `tracking`, `do_not` e `headings`. `difficulty` usa il metodo `band-and-cr`, con fasce e GS (`low`, `moderate`, `high`), ma la tabella fascia-GS non è ancora presente. `conditions` comprende le 15 condizioni dell'edizione 2024. `creature_sheet` distingue campi obbligatori, con etichette in italiano e inglese, e campi facoltativi; `item_sheet` dichiara i campi meccanici, mentre la carta stampabile contiene solo titolo e descrizione. `headings` definisce le intestazioni delle sezioni statistiche, descrizione ed effetti in italiano e inglese.
+
+Il caricamento e la validazione sono in `yllir/scripts/lib/adapter.mjs`, condiviso perché usato anche da `config.mjs`; le operazioni sono in `yllir/skills/library/system-adapter/scripts/lib/adapter-ops.mjs`. La skill di libreria `system-adapter`, in `yllir/skills/library/system-adapter/`, le espone tramite `adapter-run.mjs`, che legge adattatore e lingua da `campaign.yaml` e scrive un rapporto. Le operazioni disponibili sono `validate-sheet`, `card-fields`, `progression-event`, `info` e `check-drafts`. `config.mjs` accetta l'id di un adattatore installato oppure `none`. `validate_sheet` richiede nella scheda di una creatura la sezione delle statistiche e ciascuna etichetta obbligatoria come token intero; per un oggetto richiede le sezioni descrizione ed effetti. `card_fields` restituisce solo titolo e descrizione, mai effetti o blocco riservato. `progression_event` registra una milestone solo se dichiarata dal master.
+
+Collegamenti nel core: al passo 3b di `write-sequence`, le bozze di creature (template `enemy` o `creature`) e oggetti (template `item`) passano da `check-drafts` prima della revisione indipendente; se manca qualcosa, il processo si ferma e chiede una correzione. `after-session` registra una milestone nella cronaca solo quando il master la dichiara e l'adattatore la conferma. Le istruzioni generate della campagna rimandano alla skill.
+
+`init_encounter`, `record_event` e `advance_turn` non sono implementate: appartengono alla skill `combat-tracker`, che ancora non esiste. `rate_encounter` non è implementata perché la tabella che associa le fasce ai GS deve essere verificata sul testo ufficiale 2024. Il metodo è dichiarato, ma la tabella manca.
 
 ## Esempio: sistema narrativo senza combattimento a turni
 

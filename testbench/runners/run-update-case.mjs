@@ -5,6 +5,9 @@
 //   stale-campaign   the campaign was made with an older version (version.yaml is rewound to 0.0.1),
 //                    the master has a line in customizations.md and a hand-added line in agent.md,
 //                    and the tree is saved. The entry point must update silently.
+//   legacy-sessions  the same, and the sessions are in the old layout (Trama/<Arc>/<N>.md with one
+//                    `# ` heading per event). The update must convert them to Trama/<N>/<N>.md and
+//                    Trama/<N>/Eventi/<event>.md, keep the text of every event and rebuild the links.
 //   newer-published  a campaign at the installed version, and a published source (folder named by
 //                    YLLIR_PUBLISHED_SOURCE) with a newer version and its news. The master asks a
 //                    question; the answer must end with a question about updating and nothing is updated.
@@ -42,6 +45,8 @@ import { generateInstructions } from '../../yllir/scripts/lib/instructions.mjs';
 import { ensureRepo, saveManualChanges, saveVersion, status } from '../../yllir/scripts/lib/versions.mjs';
 import { checkLinks } from '../../yllir/skills/library/linker/scripts/lib/check-links.mjs';
 import { parseYamlLite } from '../../yllir/scripts/lib/yaml-lite.mjs';
+import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
+import { plotMap } from '../../yllir/skills/library/plot-map/scripts/lib/plot-map.mjs';
 
 const USAGE =
   'usage: node testbench/runners/run-update-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude|codex] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
@@ -63,12 +68,18 @@ const HAND_LINE = `Regola scritta a mano, da non perdere: ${HAND_MARKER}.`;
 const NEWS =
   'La nuova versione rende più precisi i collegamenti tra personaggi e luoghi. ' +
   'Le sessioni già giocate restano come sono, e la tua campagna non cambia da sola.';
-const SCENARIOS = ['stale-campaign', 'newer-published', 'declined'];
+const SCENARIOS = ['stale-campaign', 'legacy-sessions', 'newer-published', 'declined'];
 const CASE_SCENARIO = {
   'update-stale-campaign': 'stale-campaign',
+  'update-legacy-sessions': 'legacy-sessions',
   'update-newer-published': 'newer-published',
   'update-declined': 'declined',
 };
+// Scenarios whose campaign is rewound to OLD_VERSION and saved with the master's changes.
+const REWOUND = ['stale-campaign', 'legacy-sessions'];
+const TRAMA = 'Trama';
+const EVENT_FOLDER = 'Eventi';
+const EVENT_LINK = /\]\(([^)\s]+)\)/;
 const EXTRA_TECHNICAL_WORDS = ['framework', 'hash', 'fingerprint'];
 const ACK_WORDS = ['domani', 'ricord', 'va bene', "d'accordo", 'nessun problema', 'certo', 'perfetto'];
 const VERSION_RE = /\b\d+\.\d+\.\d+\b/g;
@@ -328,6 +339,81 @@ export function gradeDeclined({ dir, setup, report }) {
   return [result('D1', d1), result('D2', d2), result('D3', d3), result('D4', d4)];
 }
 
+/** The file name of an event: the characters that cannot be in a file name are removed. */
+export function eventFileName(title) {
+  return title.replace(/[/\\:*?"<>|]/g, '');
+}
+
+/** Campaign-relative path of the main file of a session. */
+const mainPath = (session) => `${TRAMA}/${session}/${session}.md`;
+
+/** Campaign-relative path of the file of one event of a session. */
+const eventPath = (session, title) => `${TRAMA}/${session}/${EVENT_FOLDER}/${eventFileName(title)}.md`;
+
+/** Legacy layout checks L1 to L4 on top of the stale-campaign checks S1 to S6. */
+export function gradeLegacy({ dir, setup, report }) {
+  const stale = gradeStale({ dir, setup, report });
+  const sessions = Object.entries(setup.scenes);
+
+  const l1 = [];
+  for (const old of setup.oldFiles) {
+    if (fs.existsSync(path.join(dir, old))) l1.push(`old file still there: ${old}`);
+  }
+  for (const [session, scenes] of sessions) {
+    if (!fs.existsSync(path.join(dir, mainPath(session)))) l1.push(`${mainPath(session)} is missing`);
+    for (const scene of scenes) {
+      if (!fs.existsSync(path.join(dir, eventPath(session, scene.title)))) {
+        l1.push(`${eventPath(session, scene.title)} is missing`);
+      }
+    }
+  }
+
+  const l2 = [];
+  try {
+    const map = plotMap(dir);
+    for (const e of map.errors.slice(0, 3)) l2.push(`${e.code} ${e.file}`);
+    const ids = map.sessions.map((s) => s.id).sort();
+    const want = [...setup.sessionIds].sort();
+    if (JSON.stringify(ids) !== JSON.stringify(want)) {
+      l2.push(`sessions are ${ids.join(', ') || 'none'} (want ${want.join(', ')})`);
+    }
+  } catch (err) {
+    l2.push(`plotMap: ${err.message}`);
+  }
+
+  // A missing event file is reported by L1 only.
+  const l3 = [];
+  for (const [session, scenes] of sessions) {
+    for (const scene of scenes) {
+      const text = readText(dir, eventPath(session, scene.title));
+      if (text === null) continue;
+      if (parseFrontmatter(text).body.trim() !== scene.body) l3.push(`${scene.title}: text changed`);
+    }
+  }
+
+  const l4 = [];
+  for (const [session, scenes] of sessions) {
+    const main = readText(dir, mainPath(session));
+    if (main === null) {
+      l4.push(`${mainPath(session)} is missing`);
+      continue;
+    }
+    if (!/^generated: true$/m.test(main)) l4.push(`${session}: no generated: true`);
+    for (const scene of scenes) {
+      const link = `(${EVENT_FOLDER}/${eventFileName(scene.title).replace(/ /g, '%20')}.md)`;
+      if (!main.includes(link)) l4.push(`${session}: no link ${link}`);
+    }
+  }
+
+  return [
+    ...stale,
+    result('L1', l1),
+    result('L2', l2),
+    result('L3', l3),
+    result('L4', l4),
+  ];
+}
+
 /**
  * Grades one run of a scenario. Returns { checks, pass, failures, technical_found, notice }:
  * checks maps each check id to a boolean; notice is what update-notice.yaml holds (information only).
@@ -335,6 +421,7 @@ export function gradeDeclined({ dir, setup, report }) {
 export function gradeScenario({ scenario, dir, setup, report, todays }) {
   const grade = {
     'stale-campaign': () => gradeStale({ dir, setup, report }),
+    'legacy-sessions': () => gradeLegacy({ dir, setup, report }),
     'newer-published': () => gradeNewer({ dir, setup, report, todays }),
     declined: () => gradeDeclined({ dir, setup, report, todays }),
   }[scenario];
@@ -356,8 +443,123 @@ export function gradeScenario({ scenario, dir, setup, report, todays }) {
 
 // ---------------------------------------------------------------- setup
 
+/** The event names of a session, in the order of the links under its "## Events" heading. */
+function eventNamesOf(body) {
+  const names = [];
+  let inEvents = false;
+  for (const line of body.split('\n')) {
+    if (line.startsWith('## ')) {
+      inEvents = line.trim() === '## Events';
+      continue;
+    }
+    if (!inEvents) continue;
+    const match = EVENT_LINK.exec(line);
+    if (match !== null) names.push(path.posix.basename(decodeURIComponent(match[1]), '.md'));
+  }
+  return names;
+}
+
+/** Comma-separated items for a flow list in frontmatter. */
+const listText = (items) => (Array.isArray(items) ? items : []).join(', ');
+
+const EXTERNAL_LINK = /^[a-z][a-z0-9+.-]*:/i; // http:, https:, mailto:, ...
+const MARKDOWN_LINK = /\[([^\]\n]*)\]\(([^)\s]+)\)/g;
+
+/**
+ * Rewrites the relative links of a Markdown body so that each one still points to the same file
+ * when the body moves from folder fromDir to folder toDir (both campaign-relative, posix). The
+ * target keeps its percent-encoding and its #anchor. Links with a scheme, absolute links, pure
+ * anchors and everything inside a ``` fenced block are kept as they are.
+ */
+export function rebaseLinks(body, fromDir, toDir) {
+  let fenced = false;
+  return body
+    .split('\n')
+    .map((line) => {
+      if (/^\s*```/.test(line)) {
+        fenced = !fenced;
+        return line;
+      }
+      if (fenced) return line;
+      return line.replace(MARKDOWN_LINK, (whole, text, target) => {
+        if (EXTERNAL_LINK.test(target) || target.startsWith('/') || target.startsWith('#')) return whole;
+        const hash = target.indexOf('#');
+        const rawPath = hash < 0 ? target : target.slice(0, hash);
+        const anchor = hash < 0 ? '' : target.slice(hash);
+        const resolved = path.posix.join(fromDir, rawPath);
+        const rel = path.posix.relative(toDir, resolved) || '.';
+        return `[${text}](${rel}${anchor})`;
+      });
+    })
+    .join('\n');
+}
+
+/**
+ * Rewrites every session of Trama/ into the old layout, in place. Each folder Trama/<N>/ becomes
+ * the file Trama/<arc>/<N>.md, or Trama/<N>.md when the session has no arc, with only id, depends_on
+ * and location in the frontmatter and one "# <event>" block per event, in the order of the "## Events"
+ * links. The event links are rebased to the old file's folder (see rebaseLinks), so that they resolve
+ * to the same files; the event texts are otherwise kept as they are. The scenes returned for the
+ * grading hold the ORIGINAL (new-layout) body, because the migration rebases the links back.
+ * Returns { scenes, sessionIds, oldFiles }. Throws when the result is wrong.
+ */
+export function toLegacyLayout(dir) {
+  const tramaDir = path.join(dir, TRAMA);
+  const sessions = fs
+    .readdirSync(tramaDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(tramaDir, entry.name, `${entry.name}.md`)))
+    .map((entry) => entry.name)
+    .sort();
+  if (sessions.length === 0) throw new Error(`toLegacyLayout: no session in ${TRAMA}/`);
+
+  const layout = { scenes: {}, sessionIds: [], oldFiles: [] };
+  for (const session of sessions) {
+    const { data, body } = parseFrontmatter(fs.readFileSync(path.join(dir, mainPath(session)), 'utf8'));
+    if (data === null || typeof data.id !== 'string') throw new Error(`toLegacyLayout: ${session} has no id`);
+
+    const oldFile = typeof data.arc === 'string' && data.arc !== '' ? `${TRAMA}/${data.arc}/${session}.md` : `${TRAMA}/${session}.md`;
+    const oldDir = path.posix.dirname(oldFile);
+
+    const scenes = eventNamesOf(body).map((name) => {
+      const text = fs.readFileSync(path.join(dir, TRAMA, session, EVENT_FOLDER, `${name}.md`), 'utf8');
+      return { title: name, body: parseFrontmatter(text).body.trim() };
+    });
+    const blocks = scenes.map((scene) => {
+      const eventDir = `${TRAMA}/${session}/${EVENT_FOLDER}`;
+      const rebased = rebaseLinks(scene.body, eventDir, oldDir);
+      if (rebased.split('\n').some((line) => line.startsWith('# '))) {
+        throw new Error(`toLegacyLayout: ${scene.title} has a line starting with "# "`);
+      }
+      return `# ${scene.title}\n\n${rebased}\n\n`;
+    });
+
+    const header = ['---', `id: ${data.id}`, `depends_on: [${listText(data.depends_on)}]`, `location: [${listText(data.location)}]`, '---', ''];
+    fs.mkdirSync(path.join(dir, oldDir), { recursive: true });
+    fs.writeFileSync(path.join(dir, oldFile), `${header.join('\n')}\n${blocks.join('')}`);
+    fs.rmSync(path.join(tramaDir, session), { recursive: true, force: true });
+
+    layout.scenes[session] = scenes;
+    layout.sessionIds.push(data.id);
+    layout.oldFiles.push(oldFile);
+  }
+  checkLegacyLayout(dir, layout);
+  return layout;
+}
+
+/** Throws unless the old files exist and the new session folders are gone. */
+function checkLegacyLayout(dir, layout) {
+  for (const old of layout.oldFiles) {
+    if (!fs.existsSync(path.join(dir, old))) throw new Error(`toLegacyLayout: ${old} was not written`);
+  }
+  for (const session of Object.keys(layout.scenes)) {
+    if (fs.existsSync(path.join(dir, mainPath(session))) || fs.existsSync(path.join(dir, TRAMA, session))) {
+      throw new Error(`toLegacyLayout: ${TRAMA}/${session} still exists`);
+    }
+  }
+}
+
 /** Runs a function with git's global and system configuration switched off, then restores the environment. */
-function withIsolatedGit(fn) {
+export function withIsolatedGit(fn) {
   const names = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM'];
   const saved = names.map((name) => [name, process.env[name]]);
   process.env.GIT_CONFIG_GLOBAL = '/dev/null';
@@ -397,6 +599,7 @@ function makePublishedSource(installed) {
 export function setupScenario(scenario) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-update-'));
   let publishedDir = null;
+  let layout = null;
   try {
     const dir = path.join(tmp, 'campaign');
     fs.cpSync(FIXTURE, dir, { recursive: true });
@@ -407,11 +610,12 @@ export function setupScenario(scenario) {
       ensureRepo(dir);
       const v1 = saveVersion(dir, { message: V1_MESSAGE, kind: 'framework' });
       if (!v1.saved) throw new Error('setup: version 1 was not saved');
-      if (scenario === 'stale-campaign') {
+      if (REWOUND.includes(scenario)) {
         const versionPath = path.join(dir, VERSION_PATH);
         fs.writeFileSync(versionPath, setFrameworkVersion(fs.readFileSync(versionPath, 'utf8'), OLD_VERSION));
         fs.appendFileSync(path.join(dir, CUSTOMIZATIONS_PATH), `\n${MASTER_LINE}\n`);
         fs.appendFileSync(path.join(dir, AGENT_PATH), `\n${HAND_LINE}\n`);
+        if (scenario === 'legacy-sessions') layout = toLegacyLayout(dir);
         const saved = saveManualChanges(dir, MANUAL_MESSAGE);
         if (!saved.saved) throw new Error('setup: the changes before the update were not saved');
       }
@@ -419,7 +623,7 @@ export function setupScenario(scenario) {
     });
     const commits = Number(tryGit(dir, ['rev-list', '--count', 'HEAD'])?.trim());
     if (Number.isNaN(commits)) throw new Error('setup: git log failed');
-    if (scenario !== 'stale-campaign') {
+    if (!REWOUND.includes(scenario)) {
       const published = makePublishedSource(installed);
       publishedDir = published.dir;
     }
@@ -431,6 +635,11 @@ export function setupScenario(scenario) {
       marker: HAND_MARKER,
       published: publishedDir === null ? null : nextMinorVersion(installed),
     };
+    if (layout !== null) {
+      setup.scenes = layout.scenes;
+      setup.sessionIds = layout.sessionIds;
+      setup.oldFiles = layout.oldFiles;
+    }
     return { tmp, dir, setup, publishedDir };
   } catch (err) {
     fs.rmSync(tmp, { recursive: true, force: true });

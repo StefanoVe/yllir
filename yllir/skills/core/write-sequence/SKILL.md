@@ -50,6 +50,13 @@ Every script below is run from the campaign root, as `node "${CLAUDE_PLUGIN_ROOT
 
 **3. Draft.** For each document in DOCUMENTS, Read `.campaign/state/write/draft/<document>`: if Read says it does not exist, or the file is empty, the draft is missing. If any draft is missing: end this skill with `status: FAILED`, reason "draft missing", and list the missing paths (the calling process continues).
 
+**3b. System rules check.** Invoke `yllir:system-adapter` with `OPERATION=check-drafts`, `FILES` set to the comma-separated draft paths `.campaign/state/write/draft/<document>` for every path in DOCUMENTS, and `CONTINUE_WITH="write-sequence step 3b: read the ADAPTER REPORT, then step 4"`. If your tool cannot invoke a named skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/system-adapter/SKILL.md` with the Read tool or `cat`, and follow it exactly as if invoked, using these inputs. When it finishes, read `.campaign/state/system-adapter/report.txt` with the Read tool; this is the ADAPTER REPORT.
+- If the report status is `OK`, record `system rules: passed` and continue.
+- If the report status is `NOT_APPLICABLE`, record `system rules: no adapter` and continue.
+- If the report status is `NEEDS_ATTENTION`, end this skill with `status: FIX_NEEDED`; in report details, list every `problem:` line with the draft path prefix `.campaign/state/write/draft/` removed. Do not launch the reviewer and do not write documents.
+- If the ADAPTER REPORT `status:` line is `FAILED`, end this skill with `status: FAILED`, reason "system rules check not run". Do not launch the reviewer or write documents.
+- If the skill returns `status: FAILED`, the report is missing or unreadable, or its `status:` line is absent or unknown, end this skill with `status: FAILED`, reason "system rules check not run". Do not launch the reviewer or write documents.
+
 **4. Independent review.** Launch the sub-agent `yllir:canon-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. Its prompt is exactly these four lines, with real values:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
@@ -102,6 +109,7 @@ status: DONE | CONFLICT | FIX_NEEDED | ASK | VERIFY_FAILED | FAILED
 documents: <paths, comma-separated>
 continuity: <COMPLETE | INCOMPLETE | nothing to compare yet | conflict>
 review: <APPLY | FIX | ASK | not run>
+system rules: <passed | no adapter | n problems | not run>
 links: <applied n | FAILED | not run>
 verification: <passed | n errors | not run>
 saved version: <hash | none>
@@ -119,12 +127,29 @@ status: DONE
 documents: World/Varn.md, World/Old Mill.md
 continuity: nothing to compare yet
 review: APPLY
+system rules: passed
 links: applied 2
 verification: passed
 saved version: 3f2a9c1
 details:
 - none
 continue with: write-sequence step 7 (derived files), then steps 8 and 9
+```
+
+When the adapter reports problems, use the count in the `system rules:` field and list every problem in `details:`:
+```
+WRITE REPORT
+status: FIX_NEEDED
+documents: Creatures/Guardiano.md
+continuity: nothing to compare yet
+review: not run
+system rules: 1 problem
+links: not run
+verification: not run
+saved version: none
+details:
+- Creatures/Guardiano.md: missing-field: missing field: con
+continue with: <CONTINUE_WITH>
 ```
 
 Wrong example, do not do this: step 4 is skipped, and the document is written with the Write tool before any review exists. Documents are written only by `apply-draft.mjs`, and only after `review.json` says `APPLY`.

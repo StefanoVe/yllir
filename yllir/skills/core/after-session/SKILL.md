@@ -2,7 +2,7 @@
 name: after-session
 description: Core process. Records one evening that was played as a chronicle page: checks the plot map, reads the documents involved, marks the sessions that were played, writes only what the master said through the write sequence, and lists what was not written into the cards. Runs inside the process runner.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/plot-map.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/after-session/scripts/today.mjs" *), Read, Write, Skill
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/plot-map/scripts/plot-map.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/after-session/scripts/today.mjs" *), Read, Write, Skill
 ---
 
 # After session
@@ -16,6 +16,7 @@ Records the evening that was played as one chronicle page. Run every command fro
 - does NOT change character, place, item, creature or plot documents, and creates no document other than the chronicle page;
 - does NOT rewrite an existing chronicle page. If the master asks to change a page already written, say in one sentence that this is not available yet, and stop;
 - lists the canon changes the master may want as things NOT written into the cards. It never proposes them as already done;
+- records a milestone in the chronicle only when the master explicitly declares one and the system adapter confirms it;
 - has no session log yet: the only source is MASTER_MESSAGE.
 
 **Questions to the master.** Ask the master in plain words, then stop. Write the question as your message; the process runner turns it into a QUESTION result. Every question ends with a question mark: a statement is not a question.
@@ -25,7 +26,7 @@ Records the evening that was played as one chronicle page. Run every command fro
 ## Steps
 
 **Step 1 — Map and campaign settings.** Run these three commands in this order:
-- `node "${CLAUDE_PLUGIN_ROOT}/scripts/plot-map.mjs" . --out .campaign/cache/plot-map.json`
+- `node "${CLAUDE_PLUGIN_ROOT}/skills/library/plot-map/scripts/plot-map.mjs" . --out .campaign/cache/plot-map.json`
 - `node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" . --out .campaign/cache/subjects.json`
 - read `campaign.yaml` with the Read tool.
 
@@ -40,6 +41,9 @@ From `campaign.yaml` keep:
 - If it has fewer than two (for example only «we finished» or «it went well»): the message to the master is exactly this ONE question, with no greeting and no statement before it, and it must end with a question mark: Italian «Com'è andata la serata? Raccontamela con una frase per ogni scena.»; English «How did the evening go? Tell me in one sentence per scene.»; for any other campaign language, translate it, keeping the question mark. Then stop.
 - Never invent an event to reach two.
 - Output: the list of the concrete events, in the master's words (kept for steps 4, 5 and 6).
+
+**Step 2b — Milestone.** Inspect MASTER_MESSAGE for an explicit declaration by the master that the party reached a milestone. Examples include «siamo saliti di livello», «è una milestone», «they level up», and «this is a milestone». Do not infer a declaration from events, wording about progress, or a session ending. If there is no explicit declaration, set MILESTONE = none and continue silently. Otherwise invoke `yllir:system-adapter` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/system-adapter/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `OPERATION=progression-event`, `EVENT_KIND=milestone`, `DECLARED_BY_MASTER=yes`, `CONTINUE_WITH="after-session step 2b: read the ADAPTER REPORT, then step 3"`. If invocation fails, set MILESTONE = none and continue silently without reading any existing report. Otherwise read `.campaign/state/system-adapter/report.txt`; if it is missing or unreadable, set MILESTONE = none and continue silently. Set MILESTONE = yes only when the report has `status: OK` and its `result:` line contains a JSON object with the field `"milestone":true` (other JSON fields are allowed). For every other status or result, set MILESTONE = none and continue silently. Do not show or quote the report.
+- Output: MILESTONE (`yes` or `none`).
 
 **Step 3 — Date.**
 - Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/after-session/scripts/today.mjs"` in every case. Its first line is today's date, in `YYYY-MM-DD`. Exit code not 0: stop and say the fixed sentence of the lexicon for an operation that could not be completed.
@@ -62,7 +66,7 @@ From `campaign.yaml` keep:
 1. Take the names in MASTER_MESSAGE, and the names of the played sessions (their `name`).
 2. For each name, compare it with each form of each subject (the `text` of each form). Compare ignoring case and accents. A match is a subject id.
 3. Read the document of each matched subject. Its path is the `sheet` of the subject. Read the whole document, master notes included.
-4. Read the file of each played session (its `file` in the map). Read the whole file, master notes included.
+4. Read the main file of each played session (its `file` in the map), and every file listed in its `events` (the scene text is there). Read the whole file, master notes included.
 5. A name the master uses that matches no subject is MISSING. Do not create a document for it.
 - Output: the list of documents read (paths), the list of subject ids, and the MISSING names.
 
@@ -104,6 +108,7 @@ Rules for the draft:
 - Never write a master notes block in the page.
 - `## Fili aperti` is a list of open questions and promises from the account. If there are none, omit the whole `## Fili aperti` section.
 - Also keep the list NOT_WRITTEN: each thing the master said that you did not write into the page, in one short plain sentence. Include new facts about known subjects, new named characters and new named places. This list may be empty.
+- If MILESTONE is `yes`, add one plain sentence in the CAMPAIGN LANGUAGE, using the master's words, that the master declared a milestone. For example: «Il master ha dichiarato: “siamo saliti di livello”» or “The master declared: ‘they level up.’” Do not mention levels, XP, or rules beyond the master's own quoted words. If MILESTONE is `none`, add no milestone sentence.
 - Output: the draft file exists at its path; NOT_WRITTEN is kept.
 
 **Step 8 — Write sequence.** Invoke the skill `yllir:write-sequence` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with:
@@ -141,6 +146,10 @@ No paths, no ids, no codes, no backticks, no formatting marks.
 ## Examples
 
 Correct: the master writes «ieri abbiamo finito la scena al porto: Varn ha trovato la barca, e il gruppo ha deciso di non parlare con il capitano». The message has two concrete events, the session «Il porto» has `ready: true` and matches the account, so it is marked as played. The page has two paragraphs in the past tense, using only these two events. The message for the master says the evening is recorded, names the session, and says that a detail about Varn (for example a new fact about her past) was not written into the cards yet, then asks what to prepare next.
+
+Correct: the master explicitly says «siamo saliti di livello» or «è una milestone» (or «they level up» or «this is a milestone»). If the adapter report is `OK` and its `result:` JSON contains `"milestone":true`, include one sentence in the page saying the master declared a milestone, in the master's words.
+
+Wrong: the master describes finding a clue and defeating an obstacle, but does not declare a milestone. Inferring one from those events and adding a milestone sentence is wrong.
 
 Wrong (date as title): the page is titled «# 2026-11-05». A date is not a title: the title names what happened, for example «Il ponte che cede».
 

@@ -123,6 +123,16 @@ describe('renderTemplate', () => {
 });
 
 describe('generateInstructions', () => {
+  test('includes system-adapter writing rules when a game-rules adapter is configured', () => {
+    const root = campaignWith(MINIMAL_CONFIG.replace('adapter: none', 'adapter: example'));
+    const result = generateInstructions(root);
+    assert.deepEqual(result.errors, []);
+    const instructions = fs.readFileSync(path.join(root, '.campaign/instructions/agent.md'), 'utf8');
+    assert.match(instructions, /When the adapter is not `none`, the write sequence must check creature and item sheets through `yllir:system-adapter`\./);
+    assert.match(instructions, /Ask that skill with `OPERATION=info` to learn what the system forbids\./);
+    assert.match(instructions, /Never write a game rule from memory\./);
+  });
+
   test('creates the six files with the exact wrapper texts', () => {
     const root = campaignWith(MINIMAL_CONFIG);
     const result = generateInstructions(root);

@@ -3,6 +3,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { readStructure } from '../../../../../scripts/lib/subjects.mjs';
+import { plotMap } from '../../../../../skills/library/plot-map/scripts/lib/plot-map.mjs';
+import { writeSessionMaps } from '../../../../../skills/library/plot-map/scripts/lib/session-map.mjs';
 
 const PROTECTED_NAMES = ['campaign.yaml', 'CLAUDE.md', 'AGENTS.md'];
 const PROTECTED_FOLDERS = ['.campaign', '.git'];
@@ -88,7 +91,32 @@ export function applyDraft(root, { draftDir, files } = {}) {
     }
     written.push(item.rel);
   }
+
+  // Derived files: the main file of each plot session is rebuilt from its events.
+  for (const rel of regenerateSessionMaps(dir, written)) {
+    if (!written.includes(rel)) written.push(rel);
+  }
   return { written, errors };
+}
+
+/**
+ * Rebuilds the main files of the plot sessions when one of the written files lies
+ * inside a plot category. Does nothing when no written file is in a plot category,
+ * or when the plot map cannot be read (campaign-config error).
+ * @returns {string[]} campaign-relative paths of the main files written
+ */
+function regenerateSessionMaps(root, written) {
+  const { structure } = readStructure(root);
+  if (structure === null) return [];
+  const plotFolders = structure
+    .filter((c) => c.type === 'plot' && typeof c.folder === 'string')
+    .map((c) => path.posix.normalize(c.folder));
+  const inPlot = written.some((rel) => plotFolders.some((folder) => rel.startsWith(`${folder}/`)));
+  if (!inPlot) return [];
+
+  const map = plotMap(root);
+  if (map.errors.some((e) => e.code === 'campaign-config')) return [];
+  return writeSessionMaps(root, map.sessions).written;
 }
 
 /** Returns null when the path may be written, or the reason it may not. */

@@ -85,6 +85,8 @@ The checks are A1 to A7 (one new chronicle page with its id and the played sessi
 
 The question-hypothesis case (`cases/entry/question-hypothesis`, run with `node testbench/runners/run-entry-case.mjs testbench/cases/entry/question-hypothesis [--runs N] [--model haiku] [--keep]`) asks about an accusation that exists only as a hypothesis in the notes file `Appunti/Idee.md`, and asks who Oria is, where two characters share that name. The checks are Q1 to Q5: no writes, the canon research report exists in `.campaign/state/research/`, the accusation is not stated as fact and the message says it is a hypothesis or not in the documents, both Valdes and Brunel are named, and plain words.
 
+Run the update cases end to end (`cases/update/<case>`; the copy is built deterministically, the agent answers the case prompt, costs money and takes minutes per run): `node testbench/runners/run-update-case.mjs testbench/cases/update/legacy-sessions [--runs N] [--model haiku] [--keep]`, and `--setup-only` to print the folders. `legacy-sessions` starts from a campaign whose sessions are in the old layout (`Trama/<Arc>/<N>.md`) and checks S1 to S6 (the stale-campaign checks) plus L1 to L4: the new layout on disk, the plot map without errors and with the same sessions, the text of every event kept, and the links and `generated: true` in each main file.
+
 ## Running the suite
 
 `runners/run-suite.mjs` runs every case under `cases/` through its runner, one child process per (case, agent, run), at most `--parallel` at a time (default 8). Each child appends its own record to `results/`. The suite prints a table of `p/n` per case and agent, a TOTAL line and the reasons of the failed jobs. It exits 0 only when every job passes.

@@ -6,13 +6,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYamlLite } from './yaml-lite.mjs';
+import { listAdapters, pluginRootFromHere } from './adapter.mjs';
 
 const FILE = 'campaign.yaml';
 const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit'];
 const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];
 const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only'];
 const MODULE_KEYS = ['print', 'encyclopedia', 'master_screen', 'music'];
-const INSTALLED_ADAPTERS = ['none'];
+const INSTALLED_ADAPTERS = ['none', ...listAdapters(pluginRootFromHere())];
 const INSTALLED_STYLES = [];
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const LANG_RE = /^[a-z]{2}$/;

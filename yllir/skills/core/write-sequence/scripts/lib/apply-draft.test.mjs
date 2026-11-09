@@ -125,3 +125,77 @@ test('apply-draft CLI prints JSON and uses exit codes 0, 1 and 2', () => {
   assert.equal(usage.status, 2);
   assert.match(usage.stderr, /usage: node apply-draft\.mjs/);
 });
+
+const PLOT_CAMPAIGN = [
+  'name: Test',
+  'structure:',
+  '  - id: trama',
+  '    folder: Trama',
+  '    type: plot',
+  '  - id: luoghi',
+  '    folder: Mondo',
+  '    type: places',
+  '',
+].join('\n');
+
+test('a session draft with two events applies the generated main file', () => {
+  const root = tmp();
+  const drafts = tmp();
+  write(root, 'campaign.yaml', PLOT_CAMPAIGN);
+  write(drafts, 'Trama/Il faro/Il faro.md', [
+    '---',
+    'id: il-faro',
+    'depends_on: []',
+    'location: []',
+    'generated: true',
+    '---',
+    '',
+    'Generated file. Do not edit by hand.',
+    '',
+  ].join('\n'));
+  write(drafts, 'Trama/Il faro/Eventi/Arrivo.md', [
+    '---',
+    'id: il-faro-arrivo',
+    'session: il-faro',
+    'depends_on: []',
+    'location: []',
+    '---',
+    '',
+    '_La nebbia sale dal molo._',
+    '',
+  ].join('\n'));
+  write(drafts, 'Trama/Il faro/Eventi/Fuga.md', [
+    '---',
+    'id: il-faro-fuga',
+    'session: il-faro',
+    'depends_on: [il-faro-arrivo]',
+    'location: []',
+    '---',
+    '',
+    '_Le scale scricchiolano._',
+    '',
+  ].join('\n'));
+
+  const files = ['Trama/Il faro/Il faro.md', 'Trama/Il faro/Eventi/Arrivo.md', 'Trama/Il faro/Eventi/Fuga.md'];
+  const result = applyDraft(root, { draftDir: drafts, files });
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.written, files);
+
+  const main = fs.readFileSync(path.join(root, 'Trama', 'Il faro', 'Il faro.md'), 'utf8');
+  assert.match(main, /^id: il-faro$/m);
+  assert.match(main, /^generated: true$/m);
+  assert.match(main, /```mermaid\nflowchart TD\n  e1\["Arrivo"\]\n  e2\["Fuga"\]\n  e1 --> e2\n```/);
+  assert.match(main, /\[Arrivo\]\(Eventi\/Arrivo\.md\)/);
+  assert.match(main, /\[Fuga\]\(Eventi\/Fuga\.md\)/);
+  assert.doesNotMatch(main, /Generated file\. Do not edit by hand\.\n\n\n/);
+});
+
+test('a campaign with no plot documents in the written files behaves as before', () => {
+  const root = tmp();
+  const drafts = tmp();
+  write(root, 'campaign.yaml', PLOT_CAMPAIGN);
+  write(drafts, 'Mondo/Lago.md', '# Lago grigio\n');
+  const result = applyDraft(root, { draftDir: drafts, files: ['Mondo/Lago.md'] });
+  assert.deepEqual(result, { written: ['Mondo/Lago.md'], errors: [] });
+  assert.deepEqual(fs.readdirSync(root).sort(), ['Mondo', 'campaign.yaml']);
+});

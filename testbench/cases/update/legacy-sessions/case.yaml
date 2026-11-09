@@ -1,0 +1,4 @@
+case: update-legacy-sessions
+scenario: legacy-sessions
+prompt: |
+  Ciao, riprendiamo la campagna.

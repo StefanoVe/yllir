@@ -70,177 +70,177 @@ relations:
 
 mentions:
   - id: M01
-    file: "Trama/La cenere che canta/Sessione 1.md"
+    file: "Trama/Sessione 1/Eventi/La strada verso la valle.md"
     snippet: "_La strada scende verso Borgo Cenere tra campi grigi._"
     subject: borgo-cenere
     context: italic
     expected: no-link
   - id: M02
-    file: "Trama/La cenere che canta/Sessione 1.md"
+    file: "Trama/Sessione 1/Eventi/La strada verso la valle.md"
     snippet: "Il gruppo arriva a Borgo Cenere al tramonto."
     subject: borgo-cenere
     context: bare
     expected: link
   - id: M03
-    file: "Trama/La cenere che canta/Sessione 1.md"
+    file: "Trama/Sessione 1/Eventi/La strada verso la valle.md"
     snippet: "Sibilla Aurne li accoglie sulla soglia del tempio."
     subject: sibilla-aurne
     context: bare
     expected: link
   - id: M04
-    file: "Trama/La cenere che canta/Sessione 2.md"
+    file: "Trama/Sessione 2/Eventi/Verso il pozzo.md"
     snippet: "Il verme di brace ha 60 punti ferita e non fugge mai."
     subject: verme-di-brace
     context: bare
     expected: link
   - id: M05
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "# L'arrivo a Borgo Cenere"
     subject: borgo-cenere
     context: title
     expected: no-link
   - id: M06
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "_Il vento porta la cenere dal Pozzo di Nàrem fino alle finestre._"
     subject: pozzo-di-narem
     context: italic
     expected: no-link
   - id: M07
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "Il gruppo incontra Teodo Marr davanti alla porta della locanda."
     subject: teodo-marr
     context: bare
     expected: link
   - id: M08
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "Mastro Teodo offre una stanza per la notte."
     subject: teodo-marr
     context: bare
     expected: link
     note: alias
   - id: M09
-    file: "Trama/La cenere che canta/Sessione 3.md"
-    snippet: "[Oria Valdes](../../Personaggi/Oria%20Valdes.md) li aspetta al molo."
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
+    snippet: "[Oria Valdes](../../../Personaggi/Oria%20Valdes.md) li aspetta al molo."
     subject: oria-valdes
     context: linked
     expected: none
   - id: M10
-    file: "Trama/La cenere che canta/Sessione 3.md"
-    snippet: "[Sibilla Aurne](../../Personaggi/Teodo%20Marr.md) recita la preghiera della sera."
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
+    snippet: "[Sibilla Aurne](../../../Personaggi/Teodo%20Marr.md) recita la preghiera della sera."
     subject: sibilla-aurne
     context: linked-elsewhere
     expected: fix-link
     target: teodo-marr
     note: link text names Sibilla Aurne, the target file is Teodo Marr
   - id: M11
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "Oria chiede notizie del fratello scomparso."
     subject: oria-valdes
     candidates: [oria-valdes, oria-brunel]
     context: ambiguous
     expected: ask
   - id: M12
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "La Torre dell'Ascia si vede dal sentiero."
     subject: torre-dell-ascia
     context: bare
     expected: link
     note: plain apostrophe vs typographic in title
   - id: M13
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "Una pista porta al Pozzo di Narem."
     subject: pozzo-di-narem
     context: bare
     expected: link
     note: missing accent
   - id: M14
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "Il gruppo trova la Lanterna di Morvalle sul tavolo."
     subject: lanterna-di-morvalle
     context: bare
     expected: link
     note: "longest match wins: Morvalle inside the item name is not a separate mention"
   - id: M15a
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "Sibilla Aurne parla a nome della Voce del Pozzo."
     subject: sibilla-aurne
     context: bare
     expected: link
   - id: M15b
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "Sibilla Aurne parla a nome della Voce del Pozzo."
     subject: voce-del-pozzo
     context: bare
     expected: link
     note: figure-through, link each subject separately
   - id: M16a
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "| Oria Brunel | Lago Grigio |"
     subject: oria-brunel
     context: table
     expected: link
   - id: M16b
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "| Oria Brunel | Lago Grigio |"
     subject: lago-grigio
     context: table
     expected: link
   - id: M17a
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: '    A["Torre dell''Ascia"] --> B["Pozzo di Nàrem"]'
     subject: torre-dell-ascia
     context: mermaid
     expected: no-link
   - id: M17b
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: '    A["Torre dell''Ascia"] --> B["Pozzo di Nàrem"]'
     subject: pozzo-di-narem
     context: mermaid
     expected: no-link
   - id: M18
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "Nota: se il gruppo tarda, Sibilla Aurne parte da sola."
     subject: sibilla-aurne
     context: code
     expected: no-link
   - id: M19
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "<!-- ricordare: Lino Valdes non sa ancora nulla -->"
     subject: lino-valdes
     context: comment
     expected: no-link
   - id: M20
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "``Nel registro compare la firma `Lino Valdes`, scritta di fretta.``"
     subject: lino-valdes
     context: code
     expected: no-link
   - id: M21a
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "> Potete chiedere a Teodo Marr la strada per il Lago Grigio."
     subject: teodo-marr
     context: bare
     expected: link
   - id: M21b
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "> Potete chiedere a Teodo Marr la strada per il Lago Grigio."
     subject: lago-grigio
     context: bare
     expected: link
   - id: M22
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "Al mercato qualcuno giura di aver visto Teodo Marr correre verso il lago."
     subject: teodo-marr
     context: bare
     expected: link
   - id: M23
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "Prima dell'alba Teodo Marr chiude la locanda e sparisce."
     subject: teodo-marr
     context: bare
     expected: link
   - id: M24
-    file: "Trama/La cenere che canta/Sessione 3.md"
+    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "## Il prezzo di Fosco il Ramaio"
     subject: fosco-il-ramaio
     context: title
@@ -330,7 +330,7 @@ mentions:
     note: a mention of a subject inside its own sheet is never linked
 
   - id: A11
-    file: "Trama/La cenere che canta/Sessione 2.md"
+    file: "Trama/Sessione 2/Eventi/Verso il pozzo.md"
     snippet: "Il pescatore giura che il Lago Grigio è profondo quaranta braccia dopo le piogge."
     subject: lago-grigio
     context: bare
@@ -355,7 +355,7 @@ contradictions:
       file: "Creature/Verme di brace.md"
       snippet: "Punti ferita: 45"
     b:
-      file: "Trama/La cenere che canta/Sessione 2.md"
+      file: "Trama/Sessione 2/Eventi/Verso il pozzo.md"
       snippet: "Il verme di brace ha 60 punti ferita e non fugge mai."
   - id: C03
     kind: relation
@@ -406,7 +406,7 @@ excluded:
       file: "Mondo/Morvalle/Lago Grigio.md"
       snippet: "Il lago è profondo trenta braccia nel punto più lontano dalla riva."
     b:
-      file: "Trama/La cenere che canta/Sessione 2.md"
+      file: "Trama/Sessione 2/Eventi/Verso il pozzo.md"
       snippet: "Il pescatore giura che il Lago Grigio è profondo quaranta braccia dopo le piogge."
     expected: covered by audit.exclusions in campaign.yaml; never reported as a problem
 
@@ -422,5 +422,5 @@ acceptable_findings:
       file: "Personaggi/Oria Brunel.md"
       snippet: "location: [borgo-cenere]"
     b:
-      file: "Trama/La cenere che canta/Sessione 3.md"
+      file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
       snippet: "| Oria Brunel | Lago Grigio |"

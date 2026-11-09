@@ -135,20 +135,47 @@ _La nebbia sale dal molo prima dell'alba e si impiglia nelle reti stese._
 
 ## 2. Testi di trama (sessioni e attività)
 
-I testi di trama stanno nella categoria `Trama/`, con un file per sessione o per attività. Le attività minori seguono la stessa forma e si distinguono solo per il titolo.
+I testi di trama stanno nella categoria `Trama/`, con una cartella per sessione o per attività. Le attività minori seguono la stessa forma e si distinguono solo per il titolo.
+
+**Proposta (2026-11-09, scelta dell'autore).** Ogni sessione ha un file principale e un file dedicato per ogni evento principale:
+
+```text
+Trama/
+  <Sessione>/
+    <Sessione>.md          file principale: mappa concettuale degli eventi (derivato)
+    Eventi/
+      <Evento 1>.md        un file per evento principale
+      <Evento 2>.md
+```
+
+- Un evento principale è ciò che prima era un titolo `#`. Gli eventi minori (`##`) e le prove (`###`) restano dentro il file del loro evento e non hanno file propri.
+- Il file principale è un **derivato**: lo genera uno script dai metadati degli eventi (vedi 2.8) e non si modifica a mano. Contiene la mappa concettuale (grafo Mermaid) e l'elenco degli eventi, ciascuno con un link al suo file.
+- Gli eventi non sono ripetuti nel file principale: vi compaiono solo come nodi e link. Un'informazione ha un solo posto (principio 16 di [Principi](Principi.md)).
 
 ### 2.1 Metadati
 
 **Proposta.**
 
-- `id` e `depends_on` sono obbligatori. Una sessione senza prerequisiti dichiara `depends_on: []`, così il vuoto è esplicito e non è una dimenticanza.
-- `depends_on` elenca gli `id` delle sessioni o attività che devono essere giocate prima. Non conta l'ordine dei file: solo il campo crea una dipendenza.
-- `location` è facoltativo e indica il luogo principale della scena.
+- `id` e `depends_on` sono obbligatori, sia nel file principale della sessione sia in ogni file evento. Chi non ha prerequisiti dichiara `depends_on: []`, così il vuoto è esplicito e non è una dimenticanza.
+- Nel file principale, `depends_on` elenca gli `id` delle sessioni o attività che devono essere giocate prima. In un file evento elenca gli `id` degli eventi (della stessa sessione o di altre) che devono accadere prima. Non conta l'ordine dei file: solo il campo crea una dipendenza.
+- Un file evento dichiara anche `session`, l'`id` della sua sessione, perché ogni evento appartiene a una sola sessione.
+- `location` è facoltativo e indica il luogo principale della scena o dell'evento.
 
 ```yaml
 ---
 id: il-faro-spento-02
 depends_on: [il-faro-spento-01]
+location: [porto-di-selce]
+---
+```
+
+Un file evento (`Trama/Il faro spento 2/Eventi/Arrivo al porto.md`), con i suoi dati fittizi:
+
+```yaml
+---
+id: il-faro-spento-02-arrivo
+session: il-faro-spento-02
+depends_on: []
 location: [porto-di-selce]
 ---
 ```
@@ -159,11 +186,11 @@ location: [porto-di-selce]
 
 | Livello | Forma | Uso |
 | --- | --- | --- |
-| `#` | `# Titolo` | evento principale: una scena, un incontro, un passaggio significativo |
-| `##` | `## Titolo` | azione o evento minore dentro la scena: esplorazione, interazioni, passaggi secondari |
+| (nome del file) | `Eventi/<Evento>.md` | evento principale: una scena, un incontro, un passaggio significativo. Era il titolo `#` |
+| `##` | `## Titolo` | azione o evento minore dentro l'evento: esplorazione, interazioni, passaggi secondari |
 | `###` | `### Titolo` | prova o azione circoscritta: un singolo tentativo con il suo esito |
 
-Un file di trama non ha un titolo di documento separato: il nome del file è il titolo, e il primo `#` apre il primo evento.
+Un file evento non ha un titolo di documento separato: il nome del file è il titolo dell'evento e il testo comincia subito. I titoli `##` e `###` sono quelli del file. Il nome del file principale è il titolo della sessione.
 
 ### 2.3 Prove ed esiti
 
@@ -198,7 +225,16 @@ Gli interventi meta non sono narrazione e non definiscono l'identità di nulla.
 
 ### 2.7 Conclusione
 
-**Proposta.** Una sessione può chiudersi con una sezione in prosa che descrive dove porta la scena. Questa sezione non è una fonte di dati: le dipendenze della mappa della trama vengono solo dal campo `depends_on`, mai dal testo.
+**Proposta.** Un evento può chiudersi con una sezione in prosa che descrive dove porta la scena. Questa sezione non è una fonte di dati: le dipendenze della mappa della trama vengono solo dal campo `depends_on`, mai dal testo.
+
+### 2.8 File principale della sessione (derivato, rivisto)
+
+**Proposta.**
+
+- Lo script rigenera il file principale dai file evento della cartella `Eventi/`: grafo Mermaid con un nodo per evento e un arco per ogni `depends_on`, elenco degli eventi con link relativo al loro file, eventi senza prerequisiti (ingressi) ed eventi che nessuno richiede (uscite).
+- Il file ha il campo `generated: true` nei metadati e una riga iniziale che dice di non modificarlo.
+- **Rivisto e corretto.** Dopo la rigenerazione un sub-agente indipendente rilegge la mappa rispetto agli eventi. Le correzioni si applicano alle **fonti** (metadati o testo degli eventi), mai alla mappa, che altrimenti perderebbe la correzione alla rigenerazione successiva. Poi la mappa si rigenera di nuovo.
+- Lo script segnala eventi con `session` diversa dalla cartella, `id` duplicati, riferimenti inesistenti e cicli.
 
 ## 3. Pagina di cronaca
 
@@ -539,7 +575,7 @@ Nei documenti di `Trama/` il controllo sui blocchi con tre backtick non si appli
 | Concetto di storia | sezioni obbligatorie; nessuna sezione di tipo personaggio | coerenza con il canone e con le altre voci di `Storia/` |
 | Personaggio giocante | sezioni obbligatorie; nessun link pubblico verso `Giocatori/` | se l'integrazione propone canone che va confermato |
 | Economia | tabelle con colonne fisse; `Minimo` ≤ `Massimo`; `Luogo` esistenti; valuta usata dalle schede esiste nel documento | se il sistema di prezzi regge la campagna |
-| Sessione | `id` unico; `depends_on` esistenti e senza cicli; titoli `#` come eventi; prove con titolo nel formato dell'adattatore | l'ordine narrativo e la coerenza delle scene |
+| Sessione | `id` unico; `depends_on` esistenti e senza cicli; file principale coerente con la cartella `Eventi/`; ogni evento con `session` corretta; prove con titolo nel formato dell'adattatore | l'ordine narrativo, la coerenza delle scene e la fedeltà della mappa agli eventi |
 | Cronaca | nome del file uguale alla data nel `id` | fedeltà al registro di sessione |
 
 ## 6. Scelte chiarite
@@ -552,7 +588,9 @@ Nei documenti di `Trama/` il controllo sui blocchi con tre backtick non si appli
 
 - **Metadati minimi e categorie.** I metadati minimi (`id`, `location`, `depends_on`, `print`), il blocco riservato in fondo alla scheda e le categorie piatte con `Mondo/` a cascata sono ancora **Proposta** (vedi [Principi](Principi.md), punto 4, e [Architettura](Architettura.md), sezione 3). Vanno confermati prima di diventare decisioni.
 - **Parte pubblica delle sessioni.** Nessuna uscita legge oggi le sessioni. La sezione 6 presuppone che `Trama/` sia interamente riservata al master: va confermato, oppure va deciso se una sessione ha una parte pubblica.
-- **Titolo delle sessioni.** Il modello di trama non ha un titolo di documento, perché il primo `#` è un evento. Va confermato, e va deciso se la cronaca segue la stessa regola.
+- **Titolo delle sessioni.** Il file principale ha il nome della sessione come titolo. Va deciso se la cronaca segue la stessa regola.
+- **Conclusione della sessione.** Con gli eventi in file separati, la sezione conclusiva (2.7) sta nell'ultimo evento. Va confermato.
+- **Campagne già create.** La migrazione che spezza i titoli `#` in file evento e crea la cartella per sessione è descritta in [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md). I link verso le ancore dei vecchi `#` vanno riscritti.
 - **Diramazioni.** [Principi](Principi.md), punto 15, copre solo i prerequisiti. La mappa della trama potrebbe aver bisogno di dichiarare anche le uscite (scelte e diramazioni). Non è deciso se servono altri campi o se la mappa le ricava dal testo, che sarebbe una seconda fonte di verità.
 - **Modello del venditore.** Il venditore è un PNG con una sezione in più e un valore di `template`, non un tipo separato. Va confermato, perché un modello separato sarebbe più leggibile per i tavoli con molti negozi.
 - **Formato del registro `mixed`.** La configurazione ammette `mixed`, ma non è definito quando un testo sia misto né come lo verifica il validatore. Va definito o tolto.

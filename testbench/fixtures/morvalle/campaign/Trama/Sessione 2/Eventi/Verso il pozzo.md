@@ -1,9 +1,9 @@
 ---
-id: la-cenere-che-canta-02
-depends_on: [la-cenere-che-canta-01]
-location: [pozzo-di-narem]
+id: la-cenere-che-canta-02-e01
+session: la-cenere-che-canta-02
+depends_on: []
+location: []
 ---
-# Verso il pozzo
 
 _Il sentiero sale tra betulle grigie, e ogni passo solleva una nuvola di cenere sottile._
 

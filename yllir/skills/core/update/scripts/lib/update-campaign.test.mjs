@@ -12,6 +12,7 @@ import {
 import { generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
 import { ensureRepo, listVersions, saveVersion } from '../../../../../scripts/lib/versions.mjs';
 import { stripExitLine } from '../../../../../scripts/lib/cli-exit.mjs';
+import { plotMap } from '../../../../../skills/library/plot-map/scripts/lib/plot-map.mjs';
 
 // Identity logic is exercised only when no global or system git config exists.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
@@ -333,4 +334,29 @@ test('the CLI exits 2 on a usage error and 1 on a known failure', () => {
   assert.equal(failed.status, 1);
   assert.equal(failed.stdout.trimEnd().split('\n').pop(), 'exit: 1');
   assert.equal(JSON.parse(stripExitLine(failed.stdout)).errors[0].code, 'no-repo');
+});
+
+test('an old-layout campaign is migrated to the session folders in one saved version', () => {
+  const dir = makeCampaign();
+  write(
+    dir,
+    'Trama/Ombre/Sessione 1.md',
+    '---\nid: ombre-1\ndepends_on: []\nlocation: []\n---\n\n# Arrivo\n\nAl porto.\n\n# Fuga\n\nNella notte.\n',
+  );
+  setVersion(dir, OLD);
+
+  const result = updateCampaign(dir, { today: '2026-11-09' });
+  assert.equal(result.status, 'updated');
+  assert.deepEqual(result.migrated, ['Trama/Ombre/Sessione 1.md']);
+  assert.deepEqual(result.errors, []);
+  assert.equal(fs.existsSync(path.join(dir, 'Trama/Ombre/Sessione 1.md')), false);
+  assert.match(read(dir, 'Trama/Sessione 1/Sessione 1.md'), /^arc: "Ombre"$/m);
+  assert.match(read(dir, 'Trama/Sessione 1/Eventi/Fuga.md'), /^Nella notte\.$/m);
+  assert.equal(listVersions(dir, { limit: 1 })[0].message, `Updated Yllir to ${INSTALLED}`);
+  assert.match(git(dir, 'show', '--name-only', '--format=', 'HEAD', '--', 'Trama'), /Trama\/Sessione 1\/Sessione 1\.md/);
+
+  const map = plotMap(dir);
+  assert.deepEqual(map.errors, []);
+  assert.deepEqual(map.sessions.map((s) => s.id), ['ombre-1']);
+  assert.equal(map.sessions[0].events.length, 2);
 });

@@ -10,8 +10,10 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   asksToUpdate,
+  eventFileName,
   frameworkVersionOf,
   gradeDeclined,
+  gradeLegacy,
   gradeNewer,
   gradeScenario,
   gradeStale,
@@ -20,11 +22,20 @@ import {
   paragraphsOf,
   parseCaseData,
   setFrameworkVersion,
+  setupScenario,
   technicalFindings,
   todayDates,
+  toLegacyLayout,
+  withIsolatedGit,
 } from './run-update-case.mjs';
+import { updateCampaign } from '../../yllir/skills/core/update/scripts/lib/update-campaign.mjs';
+import { checkLinks } from '../../yllir/skills/library/linker/scripts/lib/check-links.mjs';
+import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 
 const LEXICON = path.resolve(import.meta.dirname, '..', '..', 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
+const FIXTURE = path.resolve(import.meta.dirname, '..', 'fixtures', 'morvalle', 'campaign');
+const LEGACY_SESSIONS = ['Sessione 1', 'Sessione 2', 'Sessione 3'];
+const LEGACY_REPORT = 'Ciao! La campagna è pronta a ripartire.';
 const TODAY = '2026-11-09';
 const INSTALLED = '0.1.0';
 const MARKER = 'riga-a-mano-4471';
@@ -170,6 +181,190 @@ test('parseCaseData accepts the three update cases and refuses mismatches', () =
   assert.throws(() => parseCaseData({ case: 'update-x', scenario: 'stale-campaign', prompt: 'x' }), /unknown case/);
   assert.throws(() => parseCaseData({ case: 'update-declined', scenario: 'other', prompt: 'x' }), /unknown scenario/);
   assert.throws(() => parseCaseData({ case: 'update-declined', scenario: 'declined' }), /prompt missing/);
+});
+
+test('parseCaseData accepts the legacy-sessions case', () => {
+  const ok = parseCaseData({ case: 'update-legacy-sessions', scenario: 'legacy-sessions', prompt: 'x' });
+  assert.equal(ok.scenario, 'legacy-sessions');
+  assert.throws(() => parseCaseData({ case: 'update-legacy-sessions', scenario: 'stale-campaign', prompt: 'x' }), /needs scenario legacy-sessions/);
+});
+
+test('eventFileName removes only the characters a file name cannot hold', () => {
+  assert.equal(eventFileName("L'arrivo a Borgo Cenere"), "L'arrivo a Borgo Cenere");
+  assert.equal(eventFileName('A/b\\c:d*e?f"g<h>i|j'), 'Abcdefghij');
+});
+
+// ---------------------------------------------------------------- legacy-sessions
+
+test('toLegacyLayout writes the old session files and removes the session folders', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'update-legacy-test-'));
+  try {
+    const dir = path.join(tmp, 'campaign');
+    fs.cpSync(FIXTURE, dir, { recursive: true });
+    const layout = toLegacyLayout(dir);
+    assert.deepEqual(layout.sessionIds, [
+      'la-cenere-che-canta-01',
+      'la-cenere-che-canta-02',
+      'la-cenere-che-canta-03',
+    ]);
+    assert.deepEqual(Object.keys(layout.scenes), LEGACY_SESSIONS);
+    assert.deepEqual(
+      layout.scenes['Sessione 2'].map((scene) => scene.title),
+      ['Verso il pozzo'],
+    );
+    for (const session of LEGACY_SESSIONS) {
+      assert.equal(fs.existsSync(path.join(dir, 'Trama', session)), false, `${session} folder is still there`);
+    }
+    const old = path.join(dir, layout.oldFiles[1]);
+    assert.equal(layout.oldFiles[1], 'Trama/La cenere che canta/Sessione 2.md');
+    const text = fs.readFileSync(old, 'utf8');
+    assert.deepEqual(parseFrontmatter(text).data, {
+      id: 'la-cenere-che-canta-02',
+      depends_on: ['la-cenere-che-canta-01'],
+      location: ['pozzo-di-narem'],
+    });
+    assert.match(text, /^# Verso il pozzo\n\n_Il sentiero sale tra betulle/m);
+    assert.match(text, /^Il gruppo sale verso il pozzo con la luce del mattino\./m);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/** Relative link targets (without #anchor) of a Markdown text, outside fenced code blocks. */
+function relativeTargets(text) {
+  const targets = [];
+  let fenced = false;
+  for (const line of text.split('\n')) {
+    if (/^\s*```/.test(line)) {
+      fenced = !fenced;
+      continue;
+    }
+    if (fenced) continue;
+    for (const match of line.matchAll(/\[[^\]\n]*\]\(([^)\s]+)\)/g)) {
+      const target = match[1];
+      if (/^[a-z][a-z0-9+.-]*:/i.test(target) || target.startsWith('/') || target.startsWith('#')) continue;
+      targets.push(target.split('#')[0]);
+    }
+  }
+  return targets;
+}
+
+/** Every relative link of the old files resolves to an existing file of the campaign. */
+function assertOldLinksResolve(dir, oldFiles) {
+  for (const old of oldFiles) {
+    const text = fs.readFileSync(path.join(dir, old), 'utf8');
+    for (const target of relativeTargets(text)) {
+      const abs = path.join(dir, path.posix.dirname(old), decodeURIComponent(target));
+      assert.ok(fs.existsSync(abs), `${old}: link ${target} does not resolve`);
+    }
+  }
+}
+
+test('toLegacyLayout rebases the event links to the folder of the old file', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'update-legacy-links-test-'));
+  try {
+    const dir = path.join(tmp, 'campaign');
+    fs.cpSync(FIXTURE, dir, { recursive: true });
+    const eventFile = path.join(dir, 'Trama', 'Sessione 3', 'Eventi', "L'arrivo a Borgo Cenere.md");
+    assert.match(fs.readFileSync(eventFile, 'utf8'), /\]\(\.\.\/\.\.\/\.\.\/Personaggi\/Oria%20Valdes\.md\)/);
+    const layout = toLegacyLayout(dir);
+    const oldFile = layout.oldFiles.find((file) => file.endsWith('Sessione 3.md'));
+    const old = fs.readFileSync(path.join(dir, oldFile), 'utf8');
+    assert.ok(old.includes('](../../Personaggi/Oria%20Valdes.md)'), 'link not rebased');
+    assert.equal(old.includes('../../../Personaggi'), false);
+    // the grading keeps the original (new-layout) body
+    const scene = layout.scenes['Sessione 3'].find((s) => s.title === "L'arrivo a Borgo Cenere");
+    assert.ok(scene.body.includes('](../../../Personaggi/Oria%20Valdes.md)'));
+    assertOldLinksResolve(dir, layout.oldFiles);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('toLegacyLayout puts a session without arc directly in the category folder', () => {
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'update-legacy-noarc-test-'));
+  try {
+    const dir = path.join(tmp, 'campaign');
+    fs.cpSync(FIXTURE, dir, { recursive: true });
+    const main = path.join(dir, 'Trama', 'Sessione 1', 'Sessione 1.md');
+    const before = fs.readFileSync(main, 'utf8');
+    const after = before.replace(/^arc: .*\n/m, '');
+    assert.notEqual(after, before, 'the arc line was not found');
+    fs.writeFileSync(main, after);
+    const layout = toLegacyLayout(dir);
+    assert.equal(layout.oldFiles[0], 'Trama/Sessione 1.md');
+    assert.equal(fs.existsSync(path.join(dir, 'Trama', 'Sessione 1.md')), true);
+    assert.equal(fs.existsSync(path.join(dir, 'Trama', 'none')), false, 'a folder named none was made');
+    assert.equal(fs.existsSync(path.join(dir, 'Trama', 'La cenere che canta', 'Sessione 1.md')), false);
+    assert.equal(parseFrontmatter(fs.readFileSync(path.join(dir, layout.oldFiles[0]), 'utf8')).data.id, 'la-cenere-che-canta-01');
+    assertOldLinksResolve(dir, layout.oldFiles);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+/** A campaign in the old layout, saved, then migrated by the real update. Remove prepared.tmp when done. */
+function migratedFolder() {
+  const prepared = setupScenario('legacy-sessions');
+  const result = withIsolatedGit(() => updateCampaign(prepared.dir));
+  assert.equal(result.status, 'updated', JSON.stringify(result.errors));
+  assert.equal(result.migrated.length, LEGACY_SESSIONS.length);
+  return prepared;
+}
+
+test('the migrated session and event files have no broken link and the links are back at event depth', () => {
+  const { tmp, dir, setup } = migratedFolder();
+  try {
+    const files = [];
+    for (const [session, scenes] of Object.entries(setup.scenes)) {
+      files.push(`Trama/${session}/${session}.md`);
+      for (const scene of scenes) files.push(`Trama/${session}/Eventi/${eventFileName(scene.title)}.md`);
+    }
+    const { errors } = checkLinks(dir, { files });
+    assert.deepEqual(errors, [], JSON.stringify(errors));
+    const text = fs.readFileSync(path.join(dir, 'Trama', 'Sessione 3', 'Eventi', "L'arrivo a Borgo Cenere.md"), 'utf8');
+    assert.ok(text.includes('](../../../Personaggi/Oria%20Valdes.md)'), 'link not back at event depth');
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('gradeLegacy passes a campaign migrated by the real update (L1 to L4)', () => {
+  const { tmp, dir, setup } = migratedFolder();
+  try {
+    const results = gradeLegacy({ dir, setup, report: LEGACY_REPORT });
+    assert.deepEqual(failing(results), [], JSON.stringify(results));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('gradeLegacy fails L1 when an event file is missing', () => {
+  const { tmp, dir, setup } = migratedFolder();
+  try {
+    fs.rmSync(path.join(dir, 'Trama', 'Sessione 2', 'Eventi', 'Verso il pozzo.md'));
+    const results = gradeLegacy({ dir, setup, report: LEGACY_REPORT });
+    assert.ok(failing(results).includes('L1'), JSON.stringify(results));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('gradeLegacy fails L3 when a scene text is altered', () => {
+  const { tmp, dir, setup } = migratedFolder();
+  try {
+    const file = path.join(dir, 'Trama', 'Sessione 2', 'Eventi', 'Verso il pozzo.md');
+    const text = fs.readFileSync(file, 'utf8');
+    fs.writeFileSync(file, text.replace('Il gruppo sale verso il pozzo', 'Il gruppo corre verso il pozzo'));
+    const results = gradeLegacy({ dir, setup, report: LEGACY_REPORT });
+    assert.ok(failing(results).includes('L3'), JSON.stringify(results));
+    assert.deepEqual(
+      results.find(([id]) => id === 'L3')[2],
+      ['Verso il pozzo: text changed'],
+    );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
 });
 
 // ---------------------------------------------------------------- stale-campaign

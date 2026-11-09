@@ -151,7 +151,7 @@ Collegamento diretto (sidestep): i file già completi non vengono copiati né tr
 
 ### L5. Mappa della trama
 
-- **Scopo:** mantenere la vista d'insieme della trama: grafo, tabella dei documenti, nodi aperti, rami e rientri.
+- **Scopo:** mantenere la vista d'insieme della trama: grafo, tabella dei documenti, nodi aperti, rami e rientri. **Proposta (2026-11-09):** genera anche, per ogni sessione, il file principale con la mappa concettuale dei suoi eventi (un file per evento in `Eventi/`, vedi [Formato dei contenuti](Formato%20dei%20contenuti.md), 2.8). Dopo la generazione, un sub-agente indipendente rivede la mappa e le correzioni vanno alle fonti. `plot-map` possiede quindi sia l'analisi della trama sia la generazione delle mappe concettuali delle sessioni, e i suoi script vivono nella sua cartella (`skills/library/plot-map/scripts/`), non in una cartella condivisa.
 - **Avvio:** dal core, dopo modifiche che toccano ordine, ingressi, uscite o scelte. Le modifiche interne a una scena non la richiamano.
 - **Input → output:** documenti di trama con il loro campo `depends_on` → file della mappa (grafo Mermaid, tabella, nodi aperti) e rapporto di incoerenze.
 - **Deterministico:** lettura del campo `depends_on`, generazione del grafo dalle dipendenze, controllo di link rotti, documenti assenti, dipendenze mancanti o cicliche, rigenerazione della tabella.

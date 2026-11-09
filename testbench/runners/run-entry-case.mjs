@@ -39,7 +39,7 @@ import { buildSubjectIndex, compareStrings } from '../../yllir/scripts/lib/subje
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../yllir/scripts/lib/zones.mjs';
 import { foldForm } from '../../yllir/scripts/lib/fold.mjs';
-import { plotMap } from '../../yllir/scripts/lib/plot-map.mjs';
+import { plotMap } from '../../yllir/skills/library/plot-map/scripts/lib/plot-map.mjs';
 
 const USAGE =
   'usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude|codex] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
@@ -227,7 +227,8 @@ function noWriteCheck(dir) {
 // ---------------------------------------------------------------- prepare-session cases
 
 const PREPARE_CASES = ['entry-prepare-proceed', 'entry-prepare-two-turns'];
-const PREPARE_FILE = 'Trama/La cenere che canta/Sessione 4.md';
+const PREPARE_FILE = 'Trama/Sessione 4/Sessione 4.md';
+const PREPARE_SCENES = 'Trama/Sessione 4/Eventi';
 const PREPARE_ID = 'la-cenere-che-canta-04';
 const PREPARE_DEPENDS = ['la-cenere-che-canta-03'];
 const PREPARE_LOCATION = 'lago-grigio';
@@ -264,7 +265,18 @@ function topicReasons(dir, status, topicProcess = 'prepare-session') {
   return reasons;
 }
 
-/** P1 (frontmatter) and P2 (format) of the new session file. */
+/** The scene files of the new session (Eventi/*.md), as paths relative to the campaign root. */
+function prepareSceneFiles(dir) {
+  const folder = path.join(dir, PREPARE_SCENES);
+  if (!fs.existsSync(folder)) return [];
+  return fs
+    .readdirSync(folder)
+    .filter((name) => name.endsWith('.md'))
+    .sort()
+    .map((name) => `${PREPARE_SCENES}/${name}`);
+}
+
+/** P1 (frontmatter of the main file) and P2 (format of the scene files) of the new session. */
 function sessionFileResults(dir) {
   const file = path.join(dir, PREPARE_FILE);
   if (!fs.existsSync(file)) {
@@ -286,21 +298,25 @@ function sessionFileResults(dir) {
     }
   }
 
-  const lines = (body ?? '').split('\n');
+  // Scene files carry no level-1 heading any more: the first body line is the first paragraph.
   const p2 = [];
-  const first = lines.find((line) => line.trim() !== '') ?? '';
-  if (!/^# \S/.test(first.trim())) p2.push('the first body line is not a level-1 heading');
-  if (!lines.some((line) => /^_[^_].*_$/.test(line.trim()))) p2.push('no italic narration paragraph');
-  const hasCheck = lines.some((line, i) => {
-    if (!/^###\s/.test(line)) return false;
-    const next = lines.slice(i + 1, i + 7);
-    return next.some((l) => l.includes('**Successo:**')) && next.some((l) => l.includes('**Fallimento:**'));
-  });
-  if (!hasCheck) p2.push('no ### check with Successo and Fallimento within 6 lines');
+  const scenes = prepareSceneFiles(dir);
+  if (scenes.length === 0) p2.push(`no scene file in ${PREPARE_SCENES}`);
+  for (const rel of scenes) {
+    const { body: sceneBody } = parseFrontmatter(fs.readFileSync(path.join(dir, rel), 'utf8'));
+    const lines = (sceneBody ?? '').split('\n');
+    if (!lines.some((line) => /^_[^_].*_$/.test(line.trim()))) p2.push(`${rel}: no italic narration paragraph`);
+    const hasCheck = lines.some((line, i) => {
+      if (!/^###\s/.test(line)) return false;
+      const next = lines.slice(i + 1, i + 7);
+      return next.some((l) => l.includes('**Successo:**')) && next.some((l) => l.includes('**Fallimento:**'));
+    });
+    if (!hasCheck) p2.push(`${rel}: no ### check with Successo and Fallimento within 6 lines`);
+  }
   return [result('P1', p1), result('P2', p2)];
 }
 
-/** P3 (only the session file added since version 2, no protected folder changed), P4 (links), P5 (saved, clean). */
+/** P3 (the session main file and its scene files added since version 2, no protected folder changed), P4 (links), P5 (saved, clean). */
 function repoResults(dir, v2) {
   const p3 = [];
   const diff = v2 ? tryGit(dir, ['diff', '--name-status', v2, 'HEAD']) : null;
@@ -315,7 +331,9 @@ function repoResults(dir, v2) {
       .map((line) => line.split('\t'));
     const pathOf = (row) => row[row.length - 1];
     const added = rows.filter((row) => row[0].startsWith('A')).map(pathOf);
-    if (JSON.stringify(added) !== JSON.stringify([PREPARE_FILE])) {
+    const sceneAdded = added.filter((p) => p.startsWith(`${PREPARE_SCENES}/`));
+    const otherAdded = added.filter((p) => p !== PREPARE_FILE && !p.startsWith(`${PREPARE_SCENES}/`));
+    if (!added.includes(PREPARE_FILE) || sceneAdded.length === 0 || otherAdded.length > 0) {
       p3.push(`files added since version 2: ${added.join(', ') || 'none'}`);
     }
     const protectedChanged = rows
@@ -447,9 +465,12 @@ function unnamedCapitalisedWords(dir, relPath, prompt) {
   return [...found].sort(compareStrings);
 }
 
-/** P10, informational only: capitalised words of the session body that no source names. */
+/** P10, informational only: capitalised words of the session scene files that no source names. Null when there are none. */
 function possibleInventedNames(dir, prompt) {
-  return unnamedCapitalisedWords(dir, PREPARE_FILE, prompt);
+  const scenes = prepareSceneFiles(dir);
+  if (scenes.length === 0) return null;
+  const found = scenes.flatMap((rel) => unnamedCapitalisedWords(dir, rel, prompt) ?? []);
+  return [...new Set(found)].sort(compareStrings);
 }
 
 // ---------------------------------------------------------------- after-session cases

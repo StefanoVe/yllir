@@ -1,9 +1,9 @@
 ---
-id: la-cenere-che-canta-01
+id: la-cenere-che-canta-01-e01
+session: la-cenere-che-canta-01
 depends_on: []
-location: [borgo-cenere]
+location: []
 ---
-# La strada verso la valle
 
 _La strada scende verso Borgo Cenere tra campi grigi._
 

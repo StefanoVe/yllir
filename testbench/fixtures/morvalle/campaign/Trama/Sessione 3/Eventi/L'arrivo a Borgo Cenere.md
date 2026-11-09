@@ -1,9 +1,9 @@
 ---
-id: la-cenere-che-canta-03
-depends_on: [la-cenere-che-canta-02]
-location: [borgo-cenere]
+id: la-cenere-che-canta-03-e01
+session: la-cenere-che-canta-03
+depends_on: []
+location: []
 ---
-# L'arrivo a Borgo Cenere
 
 _Il vento porta la cenere dal Pozzo di Nàrem fino alle finestre._
 
@@ -86,9 +86,9 @@ flowchart LR
 
 Il sentiero sale tra rocce nere, e il vento non si ferma mai.
 
-[Oria Valdes](../../Personaggi/Oria%20Valdes.md) li aspetta al molo.
+[Oria Valdes](../../../Personaggi/Oria%20Valdes.md) li aspetta al molo.
 
-[Sibilla Aurne](../../Personaggi/Teodo%20Marr.md) recita la preghiera della sera.
+[Sibilla Aurne](../../../Personaggi/Teodo%20Marr.md) recita la preghiera della sera.
 
 Sul molo le barche oscillano piano e nessuno parla.
 

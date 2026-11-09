@@ -117,7 +117,7 @@ framework-campagne/              Proposta: repository separato, nome da sceglier
       continuity-keeper/
   modules/
     systems/                     Adattatori di sistema di gioco
-      dnd-2024/
+      dnd-2024/                  Primo adattatore, implementato
       generico/                  Da definire
     styles/                      Profili di stile visivo
       dark-fantasy/              Esempio di profilo di stile
@@ -186,9 +186,11 @@ mia-campagna/
   Creature/                      Creature, piatte
   Oggetti/                       Oggetti, piatti; le carte stanno in img/
   Storia/                        Storia, cosmologia, concetti condivisi, Economia.md
-  Trama/                         Ciò che il master prepara, per arco
-    Il faro spento/              Un arco: una cartella
-      Sessione 1.md
+  Trama/                         Ciò che il master prepara, una cartella per sessione
+    Sessione 1/                  Una sessione: una cartella
+      Sessione 1.md              File principale: mappa degli eventi (derivato)
+      Eventi/
+        Arrivo al porto.md       Un file per evento principale
   Cronaca/                       Ciò che è successo davvero, una pagina per sessione giocata
     2026-11-14.md
   Giocatori/                     Personaggi giocanti: una scheda per personaggio, tutto riservato al master
@@ -205,7 +207,7 @@ I nomi delle cartelle dei contenuti sono nella lingua della campagna e si fissan
 
 La geografia è gerarchica per natura: un porto sta in una costa, una costa in una regione. Per questo `Mondo/` è l'unica categoria a cascata. Personaggi (`Personaggi/`), creature (`Creature/`) e oggetti (`Oggetti/`) invece non hanno un posto fisso: un personaggio viaggia, un oggetto passa di mano, una creatura vive in più regioni. Se la cartella ne indicasse il luogo, il luogo sarebbe scritto due volte (nella cartella e nella scheda) e la cartella invecchierebbe male. Per questo queste tre categorie sono piatte, e il luogo è un dato della scheda (`location`).
 
-`Trama/` è organizzata per arco: una cartella per arco, con dentro le sessioni. È un ordine di lavoro, non un luogo, e non ripete la gerarchia del mondo.
+`Trama/` è organizzata per sessione: una cartella per sessione, con il file principale (derivato) e gli eventi in `Eventi/`. **Proposta (2026-11-09):** l'arco non è più una cartella; se serve raggrupparle, lo si dichiara nei metadati e non nel percorso. È un ordine di lavoro, non un luogo, e non ripete la gerarchia del mondo.
 
 Ripetere le stesse aree in più categorie, con lo stesso nome da mantenere allineato a mano, è il modo di fallimento che questa struttura evita: rinominare un luogo tocca una sola cartella.
 

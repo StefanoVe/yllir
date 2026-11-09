@@ -212,10 +212,11 @@ test('prose register is an enumeration and session_format is text', () => {
 });
 
 test('system adapter must be installed; version and options must have the right type', () => {
-  assert.deepEqual(pairsOf(errorsOf(MINIMAL.replace('adapter: none', 'adapter: dnd-2024'))), [
+  assert.deepEqual(pairsOf(errorsOf(MINIMAL.replace('adapter: none', 'adapter: no-such-system'))), [
     'unknown-adapter system.adapter',
   ]);
-  assert.match(errorsOf(MINIMAL.replace('adapter: none', 'adapter: dnd-2024'))[0].message, /dnd-2024 is not installed/);
+  assert.match(errorsOf(MINIMAL.replace('adapter: none', 'adapter: no-such-system'))[0].message, /no-such-system is not installed/);
+  assert.deepEqual(errorsOf(MINIMAL.replace('adapter: none', 'adapter: dnd-2024')), []);
   assert.deepEqual(pairsOf(errorsOf(MINIMAL.replace('adapter: none', 'adapter: none\n  version: "1"'))), [
     'bad-type system.version',
   ]);
@@ -360,7 +361,7 @@ test('errors come out sorted by path, then code, and the result is deterministic
     'prose:',
     '  register: loud',
     'system:',
-    '  adapter: dnd-2024',
+    '  adapter: no-such-system',
     'colour: red',
     '',
   );

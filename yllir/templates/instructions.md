@@ -43,6 +43,8 @@ Categories appear when their first document is created. Create a folder only thr
 ## Game rules
 
 Game-rules adapter: {{system.adapter}}. If it is `none`, there are no game rules: write checks and statistics as plain text and never invent rules of a specific game.
+
+When the adapter is not `none`, the write sequence must check creature and item sheets through `yllir:system-adapter`. Ask that skill with `OPERATION=info` to learn what the system forbids. Never write a game rule from memory.
 {{/if}}
 
 {{#if modules.print}}

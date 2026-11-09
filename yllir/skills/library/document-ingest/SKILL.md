@@ -324,6 +324,6 @@ audit: COMPLETE
 open questions for the master:
 - src-1a2b3c4d Q001 p1:l2 The name at p1:l2 reads "Corvin" in the transcription. Is it Corvin?
 link warnings:
-- warning: no git backup for external link Trama/Cronaca.md
+- warning: no git backup for external link Appunti/Cronaca.md
 continue with: write-sequence step 7
 ```

@@ -1,20 +1,23 @@
 #!/usr/bin/env node
 // Builds the plot map of a campaign: one line per session (played, ready or
 // waiting, with its prerequisites), a summary, and one line per error. With
-// --out, also writes the whole result as JSON.
-// Usage: node plot-map.mjs <campaignRoot> [--out <file>]
+// --out, also writes the whole result as JSON. With --write-session-maps, also
+// rewrites the generated main file of each session where it differs.
+// Usage: node plot-map.mjs <campaignRoot> [--out <file>] [--write-session-maps]
 // Exit codes: 0 no errors, 1 errors found, 2 usage error.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { plotMap } from './lib/plot-map.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { writeSessionMaps } from './lib/session-map.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
-const USAGE = 'usage: node plot-map.mjs <campaignRoot> [--out <file>]';
+const USAGE = 'usage: node plot-map.mjs <campaignRoot> [--out <file>] [--write-session-maps]';
 
 function parseArgs(argv) {
   let root = null;
   let out = null;
+  let writeSessionMapsFlag = false;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--out') {
@@ -22,6 +25,8 @@ function parseArgs(argv) {
       if (value === undefined || value === '' || value.startsWith('--')) return null;
       out = value;
       i++;
+    } else if (arg === '--write-session-maps') {
+      writeSessionMapsFlag = true;
     } else if (arg.startsWith('--') || arg === '') {
       return null;
     } else if (root === null) {
@@ -30,14 +35,22 @@ function parseArgs(argv) {
       return null;
     }
   }
-  return root === null ? null : { root, out };
+  return root === null ? null : { root, out, writeSessionMaps: writeSessionMapsFlag };
 }
 
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args === null) throw new Error(USAGE);
 
-  const result = plotMap(path.resolve(args.root));
+  const root = path.resolve(args.root);
+  const result = plotMap(root);
+
+  if (args.writeSessionMaps) {
+    const written = writeSessionMaps(root, result.sessions);
+    process.stdout.write(
+      `session maps written: ${written.written.length}, unchanged: ${written.unchanged.length}\n`,
+    );
+  }
 
   for (const session of result.sessions) {
     const status = session.played ? 'played' : session.ready ? 'ready' : 'waiting';
