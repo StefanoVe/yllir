@@ -2,7 +2,7 @@
 name: yllir
 description: Entry point of Yllir. Invoke it first for every message of the master in a Yllir campaign folder or in an empty folder: it recognises what the master wants and runs the right process.
 user-invocable: true
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/runner-result.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *), Read, Agent
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/runner-result.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/canon-research/scripts/research-search.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/canon-research/scripts/research-report.mjs" *), Read, Write, Agent
 ---
 
 # Yllir entry point
@@ -72,14 +72,17 @@ This skill receives every message of the master. It checks the folder, keeps the
   - (f) Run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" .`. If the exit code is 1, say the fixed sentence of the lexicon for a problem with a link.
   - (g) Tell the master in one sentence what is now as it was, and how to undo this too («go back» again, to the version just saved).
 
-- **Question about the campaign** (for example «chi è…», «dove si trova…»): read the relevant documents, answer briefly, and name the documents you used by their titles. Never write anything.
+- **Question about the campaign** (for example «chi è…», «dove si trova…»). Never write anything.
+  - (a) Read `${CLAUDE_PLUGIN_ROOT}/skills/library/canon-research/SKILL.md` and follow it exactly, with QUESTION = the master's question verbatim, TERMS empty, CONTINUE_WITH = "step b of the question bullet of the entry skill". Run it in this skill, not in `yllir:process-runner`.
+  - (b) Read `.campaign/state/research/report.txt` with the Read tool. If it does not exist or its `status:` is `FAILED`, say the fixed sentence of the lexicon for an operation that could not be finished, as it is written there, in the campaign language, and stop this bullet here.
+  - (c) Answer the master in plain words, from the report only: the direct answer first, then what it rests on, named by the document titles (never file paths). Say clearly when something is a hypothesis, something a character says, or something the documents do not say. If the report lists homonyms, say which people have the same name and answer for each. If the report has a `not read` list other than `none`, or lists problems, say that the check may be incomplete. Never state as fact a claim the report marks as hypothesis, interpretation or source-claim. Never show the words of the report layout, file paths or status names.
 
 - **Anything else** (change or create documents other than through these processes, tidy up): say in one or two plain sentences that this part is not available in this version yet. Then list what is available now: create a campaign, prepare the next session, record the evening, bring in existing notes, photos or documents, go back to a saved version, and questions about the campaign.
 
 **Step 7 — Update notice.** If your context has a block that starts with `YLLIR UPDATE AVAILABLE`, or your previous message to the master asked whether to update, read `${CLAUDE_PLUGIN_ROOT}/skills/core/update/SKILL.md` and follow its Part B. The master decides: never update without a clear «yes».
 
 **Step 8 — Rules.** These apply to every step above.
-- Never write or change a campaign document yourself. Every write goes through `yllir:write-sequence`, run by a process.
+- Never write or change a campaign document yourself. Every write goes through `yllir:write-sequence`, run by a process. The only file this skill writes is `.campaign/state/research/answer.json`, and only while following canon-research.
 - Never run a writing process (`yllir:new-campaign`, `yllir:prepare-session`, `yllir:after-session`, `yllir:import`) in this skill: launch `yllir:process-runner` instead.
 - Never show internal words, commands, file formats or error codes to the master.
 - Write to the master in plain text: no backticks, no code formatting, no file paths, no version codes.

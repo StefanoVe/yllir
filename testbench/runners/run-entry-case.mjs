@@ -116,6 +116,7 @@ function setupTwoVersions() {
 const CASES = [
   'entry-go-back',
   'entry-where-and-question',
+  'entry-question-hypothesis',
   'entry-not-available',
   'entry-prepare-proceed',
   'entry-prepare-two-turns',
@@ -718,6 +719,44 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
     }
     // W4 plain words.
     finalPlainWords('W4');
+  } else if (caseName === 'entry-question-hypothesis') {
+    // Q1 no writes (.campaign/state/ is git-ignored, so the research report does not count).
+    {
+      const reasons = noWriteCheck(dir);
+      record('Q1', reasons.length === 0, reasons);
+    }
+    // Q2 canon-research ran: its report is in the folder.
+    {
+      const file = path.join(dir, '.campaign', 'state', 'research', 'report.txt');
+      const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n') : [];
+      const reasons = [];
+      if (lines.length === 0) reasons.push('.campaign/state/research/report.txt does not exist');
+      else {
+        if (!lines.some((line) => line.includes('RESEARCH REPORT'))) reasons.push('no RESEARCH REPORT line');
+        if (!lines.some((line) => line.includes('covered:'))) reasons.push('no covered: line');
+      }
+      record('Q2', reasons.length === 0, reasons);
+    }
+    // Q3 the accusation is not stated as fact: the message says where it comes from, and does not affirm it.
+    if (report === null || report === undefined) noReport('Q3');
+    else {
+      const reasons = [];
+      const sourced = ['ipotes', 'appunti', 'non risulta', 'nessun document'].some((w) => text.includes(w));
+      if (!sourced) reasons.push('the message does not say that the accusation is a hypothesis or not in the documents');
+      const affirmed = ['e il traditore', 'è il traditore', 'si, e lui', 'sì, è lui', 'e stato lui', 'è stato lui'].filter((w) =>
+        text.includes(w),
+      );
+      if (affirmed.length > 0) reasons.push(`the message affirms the accusation: ${affirmed.join(', ')}`);
+      record('Q3', reasons.length === 0, reasons);
+    }
+    // Q4 the two homonyms are told apart: both Valdes and Brunel are named.
+    if (report === null || report === undefined) noReport('Q4');
+    else {
+      const reasons = ['valdes', 'brunel'].filter((w) => !text.includes(w)).map((w) => `«${w}» is not in the final message`);
+      record('Q4', reasons.length === 0, reasons);
+    }
+    // Q5 plain words.
+    finalPlainWords('Q5');
   } else if (caseName === 'entry-not-available') {
     // N1 no writes.
     {

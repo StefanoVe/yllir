@@ -36,18 +36,18 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | Funzione | Strato | Motivazione | Stato |
 |---|---|---|---|
 | [Ingest di documenti](#l1-ingest-di-documenti) (`document-ingest`) | Libreria, in autorun | Portare in digitale appunti, lettere, mappe, scansioni e PDF già esistenti, e integrarli nelle schede della campagna. | Deciso |
-| [Audit di continuità](#l2-audit-di-continuità) (`continuity-audit`) | Libreria, chiamata dal core | Individuare contraddizioni e lacune prima di ogni modifica di documenti canonici. | Proposta |
-| [Collegamenti](#l3-collegamenti) (`linker`) | Libreria, chiamata dal core | Collegare ogni menzione di un soggetto alla sua scheda o fonte, senza alterare testo, fatti o regole. | Proposta |
-| [Ricerca nel canone](#l4-ricerca-nel-canone) (`canon-research`) | Libreria, sola lettura | Rispondere a domande su chi o che cosa è qualcosa, con prove e limiti. | Proposta |
-| [Mappa della trama](#l5-mappa-della-trama) (`plot-map`) | Libreria, chiamata dal core | Vista d'insieme delle dipendenze fra documenti di trama: grafo, tabella, nodi aperti, rami. | Proposta |
-| [Intrecci dei PG](#l6-intrecci-dei-pg) (`pc-weaving`) | Libreria, chiamata dal core | Trasformare la scheda di un giocatore in un piano di integrazione con la trama. | Proposta |
-| [Schede di luoghi e oggetti](#l7-schede) (`sheets`) | Libreria, chiamata dal core | Creare e aggiornare le schede di luoghi e oggetti, con un blocco riservato al master. | Proposta |
+| [Audit di continuità](#l2-audit-di-continuità) (`continuity-audit`) | Libreria, chiamata dal core | Individuare contraddizioni e lacune prima di ogni modifica di documenti canonici. | Deciso |
+| [Collegamenti](#l3-collegamenti) (`linker`) | Libreria, chiamata dal core | Collegare ogni menzione di un soggetto alla sua scheda o fonte, senza alterare testo, fatti o regole. | Deciso |
+| [Ricerca nel canone](#l4-ricerca-nel-canone) (`canon-research`) | Libreria, sola lettura | Rispondere a domande su chi o che cosa è qualcosa, con prove e limiti. | Deciso |
+| [Mappa della trama](#l5-mappa-della-trama) (`plot-map`) | Libreria, chiamata dal core | Vista d'insieme delle dipendenze fra documenti di trama: grafo, tabella, nodi aperti, rami. | Deciso |
+| [Intrecci dei PG](#l6-intrecci-dei-pg) (`pc-weaving`) | Libreria, chiamata dal core | Trasformare la scheda di un giocatore in un piano di integrazione con la trama. | Deciso |
+| [Schede di luoghi e oggetti](#l7-schede) (`sheets`) | Libreria, chiamata dal core | Creare e aggiornare le schede di luoghi e oggetti, con un blocco riservato al master. | Deciso |
 | [Gestione dei PNG](#l14-gestione-dei-png) (`npc-manager`) | Libreria, chiamata dal core | Creare e mantenere personaggi non giocanti, nemici e venditori con schede sempre standardizzate. | Deciso |
-| [Artwork](#l8-artwork) (`artwork`) | Libreria, chiamata dal core | Dipingere una creatura o un personaggio partendo da una descrizione verificata, e collegare il dipinto alla scheda. | Proposta |
-| [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Proposta |
-| [Mappe di luogo e di battaglia](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Creare mappe con livelli separati, per luoghi e scontri. | Proposta |
-| [Mappe del mondo](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Modificare una carta del mondo senza alterarne la geometria. | Proposta |
-| [Scontri](#l12-scontri) (`combat-tracker`) | Libreria, con adattatore | Tenere lo stato di uno scontro per il master: iniziativa, PF, fasi, condizioni, risorse dei nemici. | Proposta |
+| [Artwork](#l8-artwork) (`artwork`) | Libreria, chiamata dal core | Dipingere una creatura o un personaggio partendo da una descrizione verificata, e collegare il dipinto alla scheda. | Deciso |
+| [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Deciso |
+| [Mappe di luogo e di battaglia](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Creare mappe con livelli separati, per luoghi e scontri. | Deciso |
+| [Mappe del mondo](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Modificare una carta del mondo senza alterarne la geometria. | Deciso |
+| [Scontri](#l12-scontri) (`combat-tracker`) | Libreria, con adattatore | Tenere lo stato di uno scontro per il master: iniziativa, PF, fasi, condizioni, risorse dei nemici. | Deciso |
 | [Bilanciamento degli incontri](#l15-bilanciamento-degli-incontri) (`encounter-balancer`) | Libreria, su richiesta | Ribilanciare scontri e prove quando il master lo chiede, per esempio se cambia il gruppo. | Deciso |
 | [Economia](#l16-economia) (`economy-manager`) | Libreria, chiamata dal core | Mantenere il documento di economia del mondo e far sì che prezzi, salari e ricompense delle schede lo rispettino. | Deciso |
 | [Dottore della campagna](#l17-dottore-della-campagna) (`campaign-doctor`) | Libreria, su richiesta e nella manutenzione | Analizzare l'intera campagna, riportare problemi narrativi, logici e strutturali e proporre soluzioni. | Deciso |

@@ -83,6 +83,8 @@ node testbench/runners/run-entry-case.mjs testbench/cases/entry/after-too-thin [
 
 The checks are A1 to A7 (one new chronicle page with its id and the played session, the old page unchanged, nothing else changed, the plot map has no errors and the session is played, an Accaduto section of prose with no master block, every capitalised name is in the prompt or the subjects, saved as one commit, plain Italian words) and T1 to T3 (nothing written, one question asking for the evening in scenes, one open after-session topic with its question).
 
+The question-hypothesis case (`cases/entry/question-hypothesis`, run with `node testbench/runners/run-entry-case.mjs testbench/cases/entry/question-hypothesis [--runs N] [--model haiku] [--keep]`) asks about an accusation that exists only as a hypothesis in the notes file `Appunti/Idee.md`, and asks who Oria is, where two characters share that name. The checks are Q1 to Q5: no writes, the canon research report exists in `.campaign/state/research/`, the accusation is not stated as fact and the message says it is a hypothesis or not in the documents, both Valdes and Brunel are named, and plain words.
+
 ## Running the suite
 
 `runners/run-suite.mjs` runs every case under `cases/` through its runner, one child process per (case, agent, run), at most `--parallel` at a time (default 8). Each child appends its own record to `results/`. The suite prints a table of `p/n` per case and agent, a TOTAL line and the reasons of the failed jobs. It exits 0 only when every job passes.
