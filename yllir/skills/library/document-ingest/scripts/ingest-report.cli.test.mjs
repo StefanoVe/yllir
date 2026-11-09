@@ -66,3 +66,31 @@ test('omitting --ids entirely is a usage error (exit 2)', () => {
     assert.equal(fs.existsSync(out), false);
   });
 });
+
+test('--links adds the linked line and the warnings for external links', () => {
+  withCampaign((root) => {
+    const out = path.join(root, 'report.txt');
+    const links = path.join(root, 'links.json');
+    fs.writeFileSync(
+      links,
+      JSON.stringify({ links: [{ input: '/archivio/cronaca.md', path: 'Trama/cronaca.md', external: true }], refused: [] }),
+    );
+    const result = runCli([root, '--ids', '', '--duplicates', '0', '--links', links, '--continue-with', 'x', '--out', out]);
+
+    assert.equal(result.status, 0, result.stderr);
+    const text = fs.readFileSync(out, 'utf8');
+    assert.match(text, /^linked: 1 \(external 1\)$/m);
+    assert.match(text, /^link warnings:\n- warning: no git backup for external link Trama\/cronaca\.md\ncontinue with: x$/m);
+  });
+});
+
+test('--links with a missing file is a usage error (exit 2)', () => {
+  withCampaign((root) => {
+    const out = path.join(root, 'report.txt');
+    const result = runCli([root, '--ids', '', '--links', path.join(root, 'missing.json'), '--out', out]);
+
+    assert.equal(result.status, 2);
+    assert.match(result.stdout, /exit: 2\n$/);
+    assert.equal(fs.existsSync(out), false);
+  });
+});

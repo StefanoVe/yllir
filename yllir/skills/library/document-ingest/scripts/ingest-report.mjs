@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Writes the INGEST REPORT of a run: runs the check (without --final) on each id.
 // Usage: node ingest-report.mjs <campaignRoot> --ids a,b --out <report.txt> [--duplicates N]
-//        [--write-report <file>] [--audit-report <file>] [--continue-with "<text>"] [--status-reason "<text>"]
+//        [--write-report <file>] [--audit-report <file>] [--links <links.json>] [--continue-with "<text>"] [--status-reason "<text>"]
 // Exit codes: 0 report written (whatever its status), 2 usage error.
 
 import fs from 'node:fs';
@@ -10,7 +10,7 @@ import { buildReport } from './lib/ingest-report.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE =
-  'usage: node ingest-report.mjs <campaignRoot> --ids a,b --out <report.txt> [--duplicates N] [--write-report <file>] [--audit-report <file>] [--continue-with "<text>"] [--status-reason "<text>"]';
+  'usage: node ingest-report.mjs <campaignRoot> --ids a,b --out <report.txt> [--duplicates N] [--write-report <file>] [--audit-report <file>] [--links <links.json>] [--continue-with "<text>"] [--status-reason "<text>"]';
 
 const VALUE_OPTIONS = new Set([
   '--ids',
@@ -18,6 +18,7 @@ const VALUE_OPTIONS = new Set([
   '--duplicates',
   '--write-report',
   '--audit-report',
+  '--links',
   '--continue-with',
   '--status-reason',
 ]);
@@ -30,6 +31,7 @@ function parseArgs(argv) {
     duplicates: '0',
     'write-report': null,
     'audit-report': null,
+    links: null,
     'continue-with': null,
     'status-reason': null,
   };
@@ -66,6 +68,7 @@ function main() {
     duplicates: Number(args.duplicates),
     writeText: readOptional(args['write-report']),
     auditText: readOptional(args['audit-report']),
+    linksText: readOptional(args.links),
     continueWith: args['continue-with'],
     statusReason: args['status-reason'],
   });

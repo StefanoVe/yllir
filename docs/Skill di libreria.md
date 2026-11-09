@@ -92,6 +92,8 @@ Ogni scheda segue lo stesso schema. «Deterministico» indica ciò che deve dive
   - un percorso fisso nelle istruzioni lega la skill a un solo progetto: i percorsi vengono dalla configurazione;
   - un modello di acquisizione senza controllo meccanico arriva incompleto alle schede: uno script ne verifica la presenza dei campi.
 
+Collegamento diretto (sidestep): i file già completi non vengono copiati né trascritti. La skill crea un collegamento simbolico all'originale direttamente nella categoria del canone, anche quando l'originale sta fuori dal repository della campagna; in quel caso l'esito avvisa che il backup git non copre quel contenuto. Il criterio è un markdown con front matter valido (verificato da uno script) più il giudizio di un agente economico, che collega solo i documenti finiti e privi di dubbi; nel dubbio il file segue il flusso normale. L'originale collegato non viene mai modificato.
+
 ### L2. Audit di continuità
 
 - **Scopo:** individuare contraddizioni e lacune fra documenti e fonti, senza modificare nulla. Sono riportate separatamente le differenze spiegabili (tempo, prospettiva, rivelazione successiva).

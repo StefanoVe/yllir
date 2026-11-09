@@ -76,19 +76,29 @@ When it has finished, read `.campaign/state/ingest/report.txt` with the Read too
 - Output: the report, read and kept. If the file does not exist: go to Step 7 with the status FAILED.
 
 **Step 7 — Message.** Read the report (from Step 6). Its `status:` line decides. Keep these values from the report:
-- `sources:` line: the number before the bracket (the count of documents);
+- `sources:` line: the number before the bracket (the count of documents copied and saved; it can be 0);
+- `linked:` line: N, the number before the bracket, and M, the number in the brackets (`linked: N (external M)`). If there is no `linked:` line, N and M are 0;
 - `claims:` line: the number after `integrated` in the brackets (the count of claims that went into the cards);
 - `duplicates skipped:` line: the number.
 - `open questions for the master:` section: its lines, in order.
 
+Linked documents are the documents that were already complete and were linked directly, without copying them. When N is more than 0, these sentences are used in both statuses, in the place described for each status:
+- one sentence: how many documents were linked directly in the campaign, without copying them, because they were already complete (N);
+- if M is more than 0: one more sentence: M of them are outside the campaign folder, so the version history does not keep a copy of their content.
+Use the singular or the plural correctly. Never show paths.
+
 **If status is `DONE`:** write ONE message in the CAMPAIGN LANGUAGE, in plain words:
-- one sentence: how many documents were brought in (the `sources` count), and that they are saved with their originals;
-- one sentence: how many claims went into the cards (the `integrated` count);
+- if `sources` is more than 0: one sentence: how many documents were brought in (the `sources` count), and that they are saved with their originals;
+- if `sources` is 0: no document was copied, so write no sentence about documents brought in and no sentence about claims;
+- if N is more than 0: the linked sentences above;
+- if `sources` is more than 0: one sentence: how many claims went into the cards (the `integrated` count);
 - if `duplicates skipped` is not 0: one sentence saying that some of the documents were already in the campaign, so they were not added again;
+- if none of the sentences above applies: one sentence saying that there was no new document to bring in;
 - end the message there. No question.
 
 **If status is `NEEDS_ATTENTION`:** write ONE message in the CAMPAIGN LANGUAGE:
-- one sentence: what was done (the documents were saved and the rest was checked);
+- one sentence: what was done. If `sources` is more than 0: the documents were saved and the rest was checked. If `sources` is 0: no document was saved; say only that the material was checked;
+- if N is more than 0: the linked sentences above;
 - then take the FIRST line under `open questions for the master:` and put it in plain words, as ONE question ending with «?». Name the document by its original name (read it from the `original_name` field in the front matter of its card, `<SOURCES>/<id>/card.md`), never by its id. Name the place on the page in plain words, never by the locator code: `p1:l2` becomes «the second line of the first page», `p2:l5` becomes «the fifth line of the second page». Put the answer choices in the question when there are some;
 - if there are more lines under `open questions for the master:`, say in one sentence before the question that more questions will follow, one at a time;
 - the question must be the last sentence of the message, and it must end with «?».
@@ -107,6 +117,9 @@ Never show ids, paths, locators, statuses or report lines in the message. No bac
 
 Correct, DONE (the master writes «ecco le foto del mio quaderno», the report says 2 documents, 14 claims integrated, 0 duplicates skipped):
 «Ho portato nella campagna 2 documenti e li ho salvati con gli originali. Ho messo 14 affermazioni nelle schede della campagna. Dimmi pure cosa vuoi fare adesso.»
+
+Correct, DONE with linked documents (the report says 0 sources, linked 2 (external 1)):
+«Ho collegato direttamente nella campagna 2 documenti, senza copiarli, perché erano già completi. Uno di questi si trova fuori dalla cartella della campagna, quindi la cronologia delle versioni non ne salva il contenuto. Dimmi pure cosa vuoi fare adesso.»
 
 Correct, NEEDS_ATTENTION (the first open question is about the name in the second line of the first page of the document «Note di Varn.jpg»):
 «Ho portato nella campagna il documento «Note di Varn.jpg». Ci sono altre domande, e te le farò una alla volta. Alla seconda riga della prima pagina il nome si legge «Corvin»: è così?»

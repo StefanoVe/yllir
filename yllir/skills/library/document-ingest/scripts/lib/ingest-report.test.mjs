@@ -230,3 +230,78 @@ test('statusValue reads the status line, or unknown when there is none', () => {
   assert.equal(statusValue('x\nstatus: DONE\n'), 'DONE');
   assert.equal(statusValue('no status here'), 'unknown');
 });
+
+const LINKS = JSON.stringify({
+  links: [
+    { input: '/campaign/inbox/scena.md', path: 'Trama/scena.md', external: false },
+    { input: '/archivio/cronaca.md', path: 'Trama/cronaca.md', external: true },
+  ],
+  refused: [{ input: '/archivio/bozza.md', reason: 'no valid front matter' }],
+});
+
+test('without links, the report has no link lines', () => {
+  withCampaign((root) => {
+    acquisition(root);
+    const result = report(root, { linksText: null });
+    assert.doesNotMatch(result.text, /linked:/);
+    assert.doesNotMatch(result.text, /link warnings:/);
+    assert.equal(result.text, report(root).text);
+  });
+});
+
+test('links: the linked line follows duplicates, and external links get a warning before continue with', () => {
+  withCampaign((root) => {
+    acquisition(root);
+    const result = report(root, { duplicates: 1, linksText: LINKS });
+    assert.equal(result.status, 'DONE');
+    assert.equal(
+      result.text,
+      [
+        'INGEST REPORT',
+        'status: DONE',
+        `sources: 1 (${ID})`,
+        'duplicates skipped: 1',
+        'linked: 2 (external 1)',
+        'claims: 1 (integrated 0, verified 1, conflict 0, open 0, excluded 0)',
+        'unreadable parts: 0 (none)',
+        'check: 0 errors',
+        'write: not run',
+        'audit: not run',
+        'open questions for the master:',
+        '- none',
+        'link warnings:',
+        '- warning: no git backup for external link Trama/cronaca.md',
+        'continue with: the step of the invoking skill that called document-ingest',
+        '',
+      ].join('\n'),
+    );
+  });
+});
+
+test('links without external ones: linked line only, no warnings', () => {
+  withCampaign((root) => {
+    acquisition(root);
+    const links = JSON.stringify({ links: [{ input: 'x.md', path: 'Trama/x.md', external: false }], refused: [] });
+    const result = report(root, { linksText: links });
+    assert.match(result.text, /^linked: 1 \(external 0\)$/m);
+    assert.doesNotMatch(result.text, /link warnings:/);
+  });
+});
+
+test('links with no link at all: linked 0 (external 0), no warnings', () => {
+  withCampaign((root) => {
+    acquisition(root);
+    const result = report(root, { linksText: JSON.stringify({ links: [], refused: [] }) });
+    assert.match(result.text, /^linked: 0 \(external 0\)$/m);
+    assert.doesNotMatch(result.text, /link warnings:/);
+  });
+});
+
+test('links that are not valid links text are an error', () => {
+  withCampaign((root) => {
+    acquisition(root);
+    assert.throws(() => report(root, { linksText: 'not json' }), /not valid JSON/);
+    assert.throws(() => report(root, { linksText: '{"refused":[]}' }), /no links list/);
+    assert.throws(() => report(root, { linksText: '{"links":[{"external":true}]}' }), /without a path/);
+  });
+});

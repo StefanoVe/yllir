@@ -18,10 +18,34 @@ function zeroClaims() {
 }
 
 /**
+ * Reads the content of links.json (written by ingest-link.mjs). Returns null when
+ * no text is given. Throws when the text is not a valid links file.
+ */
+export function parseLinks(linksText) {
+  if (linksText === null) return null;
+  let data;
+  try {
+    data = JSON.parse(linksText);
+  } catch {
+    throw new Error('links file is not valid JSON');
+  }
+  if (data === null || typeof data !== 'object' || !Array.isArray(data.links)) {
+    throw new Error('links file has no links list');
+  }
+  for (const link of data.links) {
+    if (link === null || typeof link !== 'object' || typeof link.path !== 'string') {
+      throw new Error('links file has a link without a path');
+    }
+  }
+  return data.links;
+}
+
+/**
  * @param {{ campaignRoot: string, ids: string[], duplicates?: number,
  *   writeText?: string|null, auditText?: string|null, continueWith?: string|null,
- *   statusReason?: string|null }} args
+ *   statusReason?: string|null, linksText?: string|null }} args
  *   writeText / auditText: the content of the report files, or null when not run
+ *   linksText: the content of links.json, or null when there is no link step
  * @returns {{ status: 'DONE'|'NEEDS_ATTENTION'|'FAILED', text: string }}
  */
 export function buildReport({
@@ -32,7 +56,11 @@ export function buildReport({
   auditText = null,
   continueWith = null,
   statusReason = null,
+  linksText = null,
 }) {
+  const links = parseLinks(linksText);
+  const externalLinks = links === null ? [] : links.filter((link) => link.external === true);
+
   const sourceIds = [...new Set(ids)].sort(compareStrings);
 
   const checks = sourceIds.map((id) => {
@@ -87,6 +115,9 @@ export function buildReport({
   lines.push(
     `sources: ${sourceIds.length} (${sourceIds.length > 0 ? sourceIds.join(',') : 'none'})`,
     `duplicates skipped: ${duplicates}`,
+  );
+  if (links !== null) lines.push(`linked: ${links.length} (external ${externalLinks.length})`);
+  lines.push(
     `claims: ${totals.total} (integrated ${totals.integrated}, verified ${totals.verified}, conflict ${totals.conflict}, open ${totals.open}, excluded ${totals.excluded})`,
     `unreadable parts: ${unreadable.length} (${unreadable.length > 0 ? unreadable.join('; ') : 'none'})`,
     `check: ${checkErrors} errors`,
@@ -96,6 +127,10 @@ export function buildReport({
   );
   if (masterLines.length === 0) lines.push('- none');
   else lines.push(...masterLines);
+  if (externalLinks.length > 0) {
+    lines.push('link warnings:');
+    for (const link of externalLinks) lines.push(`- warning: no git backup for external link ${link.path}`);
+  }
   lines.push(`continue with: ${continueWith ?? DEFAULT_CONTINUE}`);
 
   return { status, text: `${lines.join('\n')}\n` };
