@@ -24,12 +24,14 @@ export function checkLinks(campaignRoot, { files = null } = {}) {
   }
 
   const isMasterOnly = masterOnlyChecker(structure);
+  const isExternal = externalChecker(structure);
 
   const listed =
     files === null
       ? listAllSheets(root, structure)
       : files.map((file) => relOf(root, path.resolve(root, file)));
-  const toCheck = [...new Set(listed)].sort(compareStrings);
+  // External documents belong to another campaign: they are link targets, never checked.
+  const toCheck = [...new Set(listed)].filter((rel) => !isExternal(rel)).sort(compareStrings);
 
   const cache = new Map(); // campaign-relative path -> analysis, or null when unreadable
   const errors = [];
@@ -175,6 +177,30 @@ function analyzeDoc(text) {
     frontmatterErrors: frontmatter.errors,
     zoneErrors: zones.errors,
     anchors,
+  };
+}
+
+/**
+ * Decides whether a campaign-relative path lies in an `external` category. The
+ * category of a path is the one with the longest folder that is a prefix of it.
+ * @returns {(rel: string) => boolean}
+ */
+function externalChecker(structure) {
+  const categories = structure
+    .filter((entry) => typeof entry.folder === 'string')
+    .map((entry) => {
+      const folder = path.posix.normalize(entry.folder).replace(/\/+$/, '');
+      const prefix = folder === '.' || folder === '' ? '' : `${folder}/`;
+      return { type: entry.type, prefix };
+    });
+  return (rel) => {
+    let best = null;
+    for (const category of categories) {
+      if (rel.startsWith(category.prefix) && (best === null || category.prefix.length > best.prefix.length)) {
+        best = category;
+      }
+    }
+    return best !== null && best.type === 'external';
   };
 }
 

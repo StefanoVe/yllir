@@ -400,6 +400,53 @@ test('an unknown key in an audit exclusion is reported as unknown-key', () => {
   assert.deepEqual(pairsOf(errorsOf(yaml)), ['unknown-key audit.exclusions[0].note']);
 });
 
+test('an external category is accepted when its folder exists', () => {
+  const yaml = `${MINIMAL}structure:\n  - id: esterno\n    folder: Esterno\n    type: external\n`;
+  assert.deepEqual(errorsOf(yaml, ['Esterno']), []);
+});
+
+test('an external category accepts a valid exclude list', () => {
+  const yaml = `${MINIMAL}structure:\n  - id: esterno\n    folder: Esterno\n    type: external\n    exclude: ["Bozze", "note/privato.md"]\n`;
+  assert.deepEqual(errorsOf(yaml, ['Esterno']), []);
+});
+
+test('exclude is only valid on an external category', () => {
+  const yaml = `${MINIMAL}structure:\n  - id: trama\n    folder: Trama\n    type: plot\n    exclude: ["Bozze"]\n`;
+  assert.deepEqual(pairsOf(errorsOf(yaml, ['Trama'])), ['exclude-not-external structure[0].exclude']);
+});
+
+test('exclude must be a list of text items', () => {
+  const notList = `${MINIMAL}structure:\n  - id: esterno\n    folder: Esterno\n    type: external\n    exclude: Bozze\n`;
+  assert.deepEqual(pairsOf(errorsOf(notList, ['Esterno'])), ['bad-type structure[0].exclude']);
+  const notText = `${MINIMAL}structure:\n  - id: esterno\n    folder: Esterno\n    type: external\n    exclude: [3]\n`;
+  assert.deepEqual(pairsOf(errorsOf(notText, ['Esterno'])), ['bad-type structure[0].exclude[0]']);
+});
+
+test('exclude items must be safe relative paths inside the folder', () => {
+  const yaml = `${MINIMAL}structure:\n  - id: esterno\n    folder: Esterno\n    type: external\n    exclude: ["../segreto", "/assoluto", "a\\\\b"]\n`;
+  assert.deepEqual(pairsOf(errorsOf(yaml, ['Esterno'])), [
+    'bad-exclude structure[0].exclude[0]',
+    'bad-exclude structure[0].exclude[1]',
+    'bad-exclude structure[0].exclude[2]',
+  ]);
+});
+
+test('a folder that is a symlink to a directory counts as an existing folder', () => {
+  const root = makeCampaign(`${MINIMAL}structure:\n  - id: esterno\n    folder: Esterno\n    type: external\n`);
+  const target = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-target-'));
+  created.push(target);
+  fs.symlinkSync(target, path.join(root, 'Esterno'), 'dir');
+  const result = validateConfig(root);
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.deepEqual(result.errors, []);
+});
+
+test('a folder that is a broken symlink is reported as missing-folder', () => {
+  const root = makeCampaign(`${MINIMAL}structure:\n  - id: esterno\n    folder: Esterno\n    type: external\n`);
+  fs.symlinkSync(path.join(root, 'nowhere'), path.join(root, 'Esterno'), 'dir');
+  assert.deepEqual(pairsOf(validateConfig(root).errors), ['missing-folder structure[0].folder']);
+});
+
 test('the morvalle fixture is valid with no errors', () => {
   const result = validateConfig(FIXTURE);
   assert.equal(result.ok, true, JSON.stringify(result.errors));

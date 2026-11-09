@@ -132,6 +132,8 @@ Collegamento diretto (sidestep): i file già completi non vengono copiati né tr
   - una skill che dichiara uno script di supporto ma non lo fornisce lascia tutta la procedura al giudizio;
   - gli alias non definiti in alcuna scheda sono un'ipotesi della causa dei collegamenti mancati, da verificare con esempi concreti.
 
+Le destinazioni dei collegamenti possono essere anche documenti di categorie `external` (fonti esterne: cartelle di un'altra campagna o di materiale condiviso, collegate in sola lettura). Il linker li usa solo come bersaglio: non cerca menzioni al loro interno, non li modifica e non li tratta come canone. Due documenti con lo stesso titolo, uno esterno e uno della campagna, sono omonimi e vanno in revisione al master, come gli altri omonimi. Identificativi e regole sono in [Configurazione](Configurazione.md), sezione «Fonti esterne».
+
 ### L4. Ricerca nel canone
 
 - **Scopo:** rispondere a «chi o cosa è», «come sono collegati», «cosa dicono le fonti», «è vero che…», con le prove e i limiti.
@@ -316,17 +318,20 @@ Collegamento diretto (sidestep): i file già completi non vengono copiati né tr
 - **Scopo:** creare, aggiornare e tenere uniformi le schede di personaggi non giocanti, nemici e venditori, così che ogni scheda abbia sempre la stessa forma e si possa usare al tavolo senza cercare.
 - **Avvio:** dal core, quando serve un nuovo personaggio o una nuova creatura (preparazione, dopo la sessione, ingest, generatori al tavolo quando il master dice «tienilo»), o su richiesta («sistema le schede dei PNG»).
 - **Input → output:** dettagli del master, ruolo (PNG, nemico, venditore, creatura), luogo → scheda nella categoria giusta, dal modello del ruolo; per le schede esistenti, un rapporto delle differenze dal modello e la correzione proposta.
-- **Deterministico:** modelli per ruolo (sezioni obbligatorie, ordine, metadati); validatore che confronta ogni scheda con il suo modello; ricerca dei duplicati e degli omonimi prima di creare; per i nemici, la forma del blocco statistiche è data dall'adattatore del sistema; per i venditori, il controllo dei prezzi contro il documento di economia.
-- **Giudizio:** personalità, voce, motivazioni, che cosa sa e che cosa nasconde; quale parte è pubblica e quale riservata.
+- **Deterministico:** modelli per ruolo (sezioni obbligatorie, ordine, metadati); validatore che confronta ogni scheda con il suo modello; ricerca dei duplicati e degli omonimi prima di creare; per i nemici, la forma del blocco statistiche è data dall'adattatore del sistema; per i venditori, il controllo dei prezzi contro il documento di economia; il controllo `plot-cast` verifica che ogni `id` in `characters` degli eventi di trama esista e sia una scheda di personaggio, senza duplicati, e segnala come informazione (mai come errore) i nomi con la maiuscola che non corrispondono a nessun soggetto noto.
+- **Giudizio:** personalità, voce, motivazioni, che cosa sa e che cosa nasconde; quale parte è pubblica e quale riservata; quali personaggi nominati nella trama richiedono una scheda; se un testo di trama contraddice la scheda, la discrepanza è una domanda per il master, non una correzione silenziosa.
 - **Modello:** vedi [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md).
 - **Dipendenze:** adattatore del sistema di gioco (statistiche dei nemici); [economia](#l16-economia) in lettura (inventari e prezzi dei venditori); artwork per i ritratti.
 - **Requisiti:**
   - un modello per ruolo, dichiarato dal campo `template` (`npc`, `enemy`, `vendor`, `creature`), e un solo ruolo per scheda: un PNG che vende e combatte usa il modello più ricco e dichiara le sezioni opzionali, invece di avere due schede;
   - una scheda vecchia non si riscrive in silenzio: la standardizzazione propone le differenze e le applica dopo conferma, conservando ogni contenuto;
-  - la vista compatta per il tavolo (voce, tic, cosa vuole, cosa sa) è derivata dalla scheda, non scritta a parte.
+  - la vista compatta per il tavolo (voce, tic, cosa vuole, cosa sa) è derivata dalla scheda, non scritta a parte;
+  - ogni personaggio definito in un documento di trama ha la sua scheda, scritta prima o insieme al primo evento che lo definisce. La scheda è la fonte di verità per l'identità (chi è), non per le azioni in trama, che stanno nei documenti di trama e nella cronaca (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md#26-identità-e-rimandi)).
 - **Rischi da evitare:**
   - modelli che si moltiplicano per eccezioni fino a non essere più uno standard;
-  - statistiche scritte a mano nella scheda e non validate dall'adattatore.
+  - statistiche scritte a mano nella scheda e non validate dall'adattatore;
+  - azioni della trama scritte nella scheda (la scheda diventerebbe una seconda trama);
+  - identità dei personaggi ridefinita negli eventi.
 
 ### L15. Bilanciamento degli incontri
 

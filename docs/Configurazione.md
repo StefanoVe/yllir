@@ -68,13 +68,15 @@ structure:                       # facoltativo alla creazione. Categorie di docu
                                  # Una categoria compare quando nasce la prima scheda.
   - id: testo                    # obbligatorio. Id stabile, usato dai processi; non cambia con il nome della cartella.
     folder: testo                # obbligatorio. Percorso relativo alla radice della campagna.
-    type: plot | chronicle | places | subjects | objects | free | notes | sources | master-only
+    type: plot | chronicle | places | subjects | objects | free | notes | sources | external | master-only
                                  # obbligatorio. Determina quali regole di creazione e di collegamento si applicano.
                                  # notes: spunti e bozze, non canone (Appunti/). Non entrano nell'indice dei soggetti
                                  # e non si collegano in automatico; l'audit li legge come ipotesi.
                                  # sources: originali acquisiti (foto, PDF, scansioni) con trascrizione e scheda di acquisizione, scritti dall'ingest. Non entrano nell'indice dei soggetti e non si collegano in automatico; l'audit li legge come ipotesi.
+                                 # external: documenti di un'altra campagna o di materiale condiviso, usati solo come destinazione dei link. Non sono canone. Vedi Fonti esterne.
     style: id                    # facoltativo. Profilo di stile per gli artwork di questa categoria.
     cards: false                 # facoltativo. Se vero, gli oggetti producono carte illustrate.
+    exclude: []                  # facoltativo, solo con type external. Percorsi (file o cartelle, relativi alla cartella, con /) che non vengono indicizzati.
 
 audit:                           # facoltativo. Decisione dell'autore (2026-11-07): il registro delle esclusioni sta qui.
   exclusions:                    # rilievi che il master ha già deciso: l'audit non li ripropone.
@@ -93,6 +95,20 @@ modules:                         # facoltativo. Solo moduli veri, ciascuno attiv
 ```
 
 Le funzioni di libreria (ingest, intrecci, mappa della trama, artwork, scontri, economia) non compaiono tra i moduli: partono quando servono. Non c'è un'opzione per i conflitti del canone: un conflitto che riguarda la modifica ferma sempre la scrittura (regola fissa, vedi [Principi](Principi.md)).
+
+### Fonti esterne
+
+**Deciso** (2026-11-09, scelta dell'autore).
+
+Una categoria con `type: external` punta a una cartella che non appartiene a questa campagna: di solito un collegamento simbolico a una cartella di un'altra campagna o di materiale condiviso, per esempio il mondo comune a più campagne. È una scelta facoltativa: una campagna senza categorie `external` si comporta come prima.
+
+I documenti di una fonte esterna servono solo come destinazione dei collegamenti: il linker può proporre un link da una menzione nei documenti della campagna verso uno di questi documenti. Non vengono mai cercate menzioni al loro interno, non vengono mai modificati e non fanno parte del canone di questa campagna: audit e ricerca nel canone li leggono come le fonti e le note, cioè non come canone.
+
+Non serve il frontmatter. L'identificativo si ricava senza riscrivere il file: `<id della categoria>:<percorso nella cartella, senza .md>`, per esempio `mondo-condiviso:Luoghi/Raatnagar`. Se il documento ha un `id` nel frontmatter, l'identificativo è `<id della categoria>:<quell'id>`. Il titolo è il primo titolo di primo livello, o il nome del file senza `.md`; gli alias sono letti dal frontmatter solo se presenti.
+
+La chiave facoltativa `exclude` elenca file o cartelle, relativi alla cartella, che non vengono indicizzati: serve a lasciare fuori i documenti che non devono essere destinazioni di collegamenti. La scansione segue i collegamenti simbolici, visita ogni cartella e ogni file reale una sola volta (così non si entra in cicli) e salta in silenzio i collegamenti rotti.
+
+Due documenti con lo stesso titolo (nella stessa cartella esterna, in due cartelle esterne, o uno esterno e uno della campagna) sono omonimi: il linker non li collega mai in automatico e li mette in revisione per il master, come ogni omonimo. I link passano attraverso il collegamento simbolico: il percorso nel link è quello dentro la cartella della campagna, non quello reale.
 
 ## Esempio completo: «Le maree di Calvane»
 
@@ -225,4 +241,5 @@ Il validatore viene eseguito all'avvio, dopo ogni modifica alla configurazione e
 - **Gerarchia dei luoghi.** La configurazione dichiara solo le categorie. Non è deciso se anche la gerarchia di `Mondo` (continente, regione, luogo) debba essere descritta nel file o ricavata dalle cartelle.
 - **Lingue secondarie.** Non è deciso se una campagna possa avere enciclopedia o schede in più lingue e come si collegano.
 - **Wrapper per Claude e Codex.** **Deciso (2026-11-07):** nella radice della campagna il generatore scrive `CLAUDE.md` e `AGENTS.md` brevi, che rimandano soltanto a `.campaign/instructions/`, l'unica fonte, e a `.campaign/customizations.md`.
+- **Fonti esterne e audit.** Non è deciso se l'audit debba mai leggere i documenti di una fonte `external` come ipotesi, come fa con le fonti, o non leggerli mai. Il fatto deciso è solo che non sono canone.
 - **Regole di processo fisse.** L'elenco delle regole che il template impone, e che la configurazione non può disattivare, va confrontato con [Processi di core](Processi%20di%20core.md) prima di essere fissato.

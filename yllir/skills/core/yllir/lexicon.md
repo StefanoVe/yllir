@@ -37,6 +37,7 @@ Use only the words in the language column of the campaign: the Italian column fo
 | Test case | Non visibile | Not visible |
 | Continuity audit | «Controllo di coerenza» | «Consistency check» |
 | Linker | «Collegamenti» | «Links» |
+| Character sheet manager | «Schede dei personaggi» | «Character sheets» |
 | Canon research | «Che cosa dice la campagna» | «What the campaign says» |
 | Combat tracker | «Scontro» | «Combat» |
 | Session log | «Registro della partita» | «Game log» |

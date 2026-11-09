@@ -336,3 +336,110 @@ test('symlinked document: no proposal for it, a normal file still gets one', () 
     }
   });
 });
+
+const EXTERNAL_CAMPAIGN = [
+  'name: Test',
+  'structure:',
+  '  - id: people',
+  '    folder: People',
+  '    type: subjects',
+  '  - id: plot',
+  '    folder: Trama',
+  '    type: plot',
+  '  - id: mondo-fuori',
+  '    folder: Mondo/Fuori',
+  '    type: external',
+  '',
+].join('\n');
+
+/** Byte content and mtime of every file under a folder. */
+function snapshotTree(dir) {
+  const out = {};
+  const walk = (current, rel) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      const relName = rel === '' ? entry.name : `${rel}/${entry.name}`;
+      if (entry.isDirectory()) {
+        walk(full, relName);
+      } else {
+        out[relName] = {
+          bytes: fs.readFileSync(full).toString('hex'),
+          mtimeMs: fs.statSync(full).mtimeMs,
+        };
+      }
+    }
+  };
+  walk(dir, '');
+  return out;
+}
+
+/**
+ * Campaign with an external category `Mondo/Fuori`, a symlink to a temporary
+ * folder outside the campaign holding `outsideFiles`. Runs fn(root, outside).
+ */
+function withExternalCampaign(files, outsideFiles, fn) {
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-outside-'));
+  try {
+    for (const [rel, content] of Object.entries(outsideFiles)) {
+      fs.writeFileSync(path.join(outside, rel), content);
+    }
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+    try {
+      const all = { 'campaign.yaml': EXTERNAL_CAMPAIGN, ...BASE, ...files };
+      for (const [rel, content] of Object.entries(all)) {
+        const full = path.join(root, rel);
+        fs.mkdirSync(path.dirname(full), { recursive: true });
+        fs.writeFileSync(full, content);
+      }
+      fs.mkdirSync(path.join(root, 'Mondo'), { recursive: true });
+      fs.symlinkSync(outside, path.join(root, 'Mondo', 'Fuori'), 'dir');
+      return fn(root, outside);
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  } finally {
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+}
+
+test('a plot mention of an external subject is proposed through the symlink, never inside it', () => {
+  withExternalCampaign(
+    { 'Trama/Nota.md': '# Nota\n\nLo sbarco a Raatnagar.\n' },
+    { 'Raatnagar.md': '# Raatnagar\n' },
+    (root, outside) => {
+      const before = snapshotTree(outside);
+      const plan = planLinks(root);
+      assert.equal(plan.proposals.length, 1);
+      const [p] = plan.proposals;
+      assert.equal(p.subject, 'mondo-fuori:Raatnagar');
+      assert.equal(p.target, '../Mondo/Fuori/Raatnagar.md');
+      assert.equal(p.file, 'Trama/Nota.md');
+      assert.equal(p.after, 'Lo sbarco a [Raatnagar](../Mondo/Fuori/Raatnagar.md).');
+      assert.ok(plan.proposals.every((q) => !q.file.startsWith('Mondo/')));
+      assert.ok(plan.scope.every((file) => !file.startsWith('Mondo/')));
+      assert.deepEqual(plan.review, []);
+      assert.deepEqual(snapshotTree(outside), before);
+    },
+  );
+});
+
+test('a homonym between an external sheet and an internal sheet gives a review entry, not a proposal', () => {
+  withExternalCampaign(
+    {
+      'People/Raatnagar.md': subject('raatnagar', 'Raatnagar'),
+      'Trama/Nota.md': '# Nota\n\nLo sbarco a Raatnagar.\n',
+    },
+    { 'Raatnagar.md': '# Raatnagar\n' },
+    (root, outside) => {
+      const before = snapshotTree(outside);
+      const plan = planLinks(root);
+      assert.deepEqual(plan.proposals, []);
+      assert.equal(plan.review.length, 1);
+      const [r] = plan.review;
+      assert.equal(r.state, 'ambiguous');
+      assert.equal(r.file, 'Trama/Nota.md');
+      assert.deepEqual(r.candidates, ['mondo-fuori:Raatnagar', 'raatnagar']);
+      assert.deepEqual(snapshotTree(outside), before);
+    },
+  );
+});

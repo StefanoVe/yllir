@@ -51,8 +51,9 @@ export function validateFacts(campaignRoot, scope, factsDir, vocab) {
     const forcedHypothesis = isNotesDocument(document, structure);
 
     // Metadata facts do not depend on the facts file.
+    // External subjects belong to another campaign: their location is not our canon.
     const subject = subjectBySheet.get(document);
-    if (subject && frontmatter && Array.isArray(frontmatter.location) && frontmatter.location.length > 0) {
+    if (subject && !subject.external && frontmatter && Array.isArray(frontmatter.location) && frontmatter.location.length > 0) {
       facts.push(metadataFact(fid, document, subject.id, frontmatter.location, keyLine(text, 'location')));
     }
 
@@ -249,7 +250,7 @@ function sectionAt(lines, lineNo) {
   return section;
 }
 
-/** True when the document lies under a category of type `notes` or `sources` (the longest folder wins). */
+/** True when the document lies under a category of type `notes`, `sources` or `external` (the longest folder wins). */
 function isNotesDocument(document, structure) {
   let best = null;
   for (const category of structure ?? []) {
@@ -260,7 +261,7 @@ function isNotesDocument(document, structure) {
       best = { folder, type: category.type };
     }
   }
-  return best !== null && (best.type === 'notes' || best.type === 'sources');
+  return best !== null && (best.type === 'notes' || best.type === 'sources' || best.type === 'external');
 }
 
 function metadataFact(fid, document, subjectId, items, line) {

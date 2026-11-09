@@ -34,6 +34,7 @@ Sono ammessi solo i campi della tabella. Ogni altro campo è un errore: un campo
 | `location` | soggetti con una posizione: personaggi, creature, oggetti, annunci | lista di `id` di luoghi; `[]` se non ha un luogo fisso | luogo attuale del soggetto; una creatura che vive in più luoghi li elenca tutti |
 | `played` | pagine di cronaca (**Deciso**, 2026-11-07) | lista di `id` delle sessioni o attività giocate quella sera; `[]` se nessuna | unica fonte per sapere che cosa è stato giocato: la preparazione verifica i prerequisiti da qui; lo scrive il processo «dopo la sessione» |
 | `depends_on` | sessioni e attività di trama | lista di `id` di sessioni o attività; `[]` se non ne ha | prerequisiti (vedi sezione 2) |
+| `characters` | facoltativo, nei file evento di trama | lista di `id` di schede di personaggio; `[]` o assente se l'evento non nomina personaggi | i personaggi che l'evento nomina e fa agire o parlare; **Proposta** |
 | `print` | oggetti con carta | `to-print`, `printed` o `reprint` | stato fisico della carta; è l'unico posto in cui sta |
 | `template` | categorie con più modelli: Personaggi (`npc`, `vendor`), Creature (`enemy`, `creature`), Oggetti (`item`, `notice`) | uno dei valori indicati | modello della scheda, da cui il validatore ricava le sezioni obbligatorie |
 | `aliases` | facoltativo, per ogni scheda | lista di nomi alternativi | forme alternative del nome; fonte unica per l'indice dei soggetti |
@@ -45,7 +46,7 @@ Sono ammessi solo i campi della tabella. Ogni altro campo è un errore: un campo
 
 - Le chiavi sono in minuscolo, con il trattino basso dove serve. Le liste sono in forma `[a, b]`.
 - Un `id` è uno slug: solo minuscole, cifre e trattini. Si assegna alla creazione e non cambia mai, neppure quando il titolo cambia.
-- I riferimenti (`location`, `depends_on`) puntano sempre a `id`, mai a nomi di file o a link. Così una rinomina non rompe nulla.
+- I riferimenti (`location`, `depends_on`, `characters`) puntano sempre a `id`, mai a nomi di file o a link. Così una rinomina non rompe nulla.
 - Il nome del soggetto, il tipo e la categoria non si ripetono nei metadati.
 - I metadati non contengono nulla di riservato: sono dati di sistema, non contenuto.
 
@@ -160,6 +161,7 @@ Trama/
 - Nel file principale, `depends_on` elenca gli `id` delle sessioni o attività che devono essere giocate prima. In un file evento elenca gli `id` degli eventi (della stessa sessione o di altre) che devono accadere prima. Non conta l'ordine dei file: solo il campo crea una dipendenza.
 - Un file evento dichiara anche `session`, l'`id` della sua sessione, perché ogni evento appartiene a una sola sessione.
 - `location` è facoltativo e indica il luogo principale della scena o dell'evento.
+- `characters` (**Proposta**, 2026-11-09) è facoltativo nei file evento di trama: elenca gli `id` dei personaggi che l'evento nomina e fa agire o parlare, ciascuno con la sua scheda (vedi 2.6). Un evento che non nomina personaggi dichiara `[]` oppure non scrive il campo. Ogni `id` deve essere una scheda di personaggio (`npc`, `vendor`, `enemy` o `creature`).
 
 ```yaml
 ---
@@ -177,6 +179,18 @@ id: il-faro-spento-02-arrivo
 session: il-faro-spento-02
 depends_on: []
 location: [porto-di-selce]
+---
+```
+
+Un evento che fa agire o parlare dei personaggi li elenca in `characters` (esempio fittizio):
+
+```yaml
+---
+id: il-faro-spento-02-consegna
+session: il-faro-spento-02
+depends_on: [il-faro-spento-02-arrivo]
+location: [porto-di-selce]
+characters: [ilde-varno, bruno-tesi]
 ---
 ```
 
@@ -222,6 +236,8 @@ Gli interventi meta non sono narrazione e non definiscono l'identità di nulla.
 ### 2.6 Identità e rimandi
 
 **Proposta.** Una sessione non definisce l'identità di un personaggio, di un luogo o di un concetto: descrive ciò che accade e rimanda alla scheda dedicata. Il rimando è un link Markdown relativo alla scheda: il testo del link è il nome del soggetto, e il percorso parte dalla cartella del file in cui si scrive.
+
+**Proposta (2026-11-09).** La scheda di un personaggio è la fonte di verità per la sua identità (chi è: nome, ruolo, aspetto, modi, voce, che cosa vuole, segreti), ma non per le sue azioni durante la trama: le azioni stanno nei documenti di trama e, una volta giocate, nella cronaca. Ogni volta che un personaggio viene definito in un documento di trama, serve la sua scheda (vedi 4.2). Identità: vince la scheda. Azioni nella trama: vince la trama. Se una scena fa agire un personaggio contro la sua scheda, non è un errore da correggere in silenzio: è una domanda per il master.
 
 ### 2.7 Conclusione
 
@@ -355,6 +371,8 @@ Parla poco, risponde con domande e chiede sempre chi ha acceso la lanterna.
 Sa dove è finito il registro del faro, ma non lo dirà a chi non ha ancora trovato la chiave.
 <!-- /master -->
 ```
+
+Un PNG nominato da un documento di trama ha la sua scheda prima del primo evento che lo definisce, o insieme ad esso: vedi 2.6.
 
 ### 4.3 Nemico (creatura)
 
@@ -596,7 +614,7 @@ Nei documenti di `Trama/` il controllo sui blocchi con tre backtick non si appli
 | Concetto di storia | sezioni obbligatorie; nessuna sezione di tipo personaggio | coerenza con il canone e con le altre voci di `Storia/` |
 | Personaggio giocante | sezioni obbligatorie; nessun link pubblico verso `Giocatori/` | se l'integrazione propone canone che va confermato |
 | Economia | tabelle con colonne fisse; `Minimo` ≤ `Massimo`; `Luogo` esistenti; valuta usata dalle schede esiste nel documento | se il sistema di prezzi regge la campagna |
-| Sessione | `id` unico; `depends_on` esistenti e senza cicli; file principale coerente con la cartella `Eventi/`; ogni evento con `session` corretta; prove con titolo nel formato dell'adattatore | l'ordine narrativo, la coerenza delle scene e la fedeltà della mappa agli eventi |
+| Sessione | `id` unico; `depends_on` esistenti e senza cicli; file principale coerente con la cartella `Eventi/`; ogni evento con `session` corretta; prove con titolo nel formato dell'adattatore; ogni `id` in `characters` esiste ed è una scheda di personaggio | l'ordine narrativo, la coerenza delle scene e la fedeltà della mappa agli eventi; ogni personaggio nominato che agisce o parla è in `characters`; il testo non definisce né cambia l'identità di un personaggio |
 | Cronaca | nome del file uguale alla data nel `id` | fedeltà al registro di sessione |
 
 ## 6. Scelte chiarite
@@ -618,3 +636,4 @@ Nei documenti di `Trama/` il controllo sui blocchi con tre backtick non si appli
 - **Economia e unità.** Non è deciso se le unità di conto vadano sempre nei metadati o solo nella tabella, né quanto possa essere largo l'intervallo di un prezzo.
 - **Sotto-luoghi.** L'elenco dei sotto-luoghi è derivato dalle cartelle. Non è deciso dove vada scritto per il master (in una vista derivata o non va scritto del tutto).
 - **Criterio di ramo (Proposta, 2026-11-09).** Il criterio per riconoscere una biforcazione o un rientro (2.9) è giudicato dall'agente e non è deterministico. Va verificato sui casi reali e, se serve, reso più esplicito nelle regole di 2.9.
+- **Campo `characters` (Proposta, 2026-11-09).** Non è deciso se dichiarare i personaggi di un evento con il campo `characters` sia il modo giusto, o se vadano ricavati dai link nel testo. Il campo e il testo sarebbero due fonti di verità da tenere allineate: il rischio va verificato su casi reali. La lista dei nomi con la maiuscola non elencati in `characters` è un'euristica informativa, non un controllo deterministico completo.

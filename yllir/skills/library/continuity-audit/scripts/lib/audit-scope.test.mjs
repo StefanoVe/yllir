@@ -182,3 +182,57 @@ test('--reset without campaign.yaml exits 2 and deletes nothing', () => {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+const CAMPAIGN_EXTERNAL = CAMPAIGN + '  - id: ext\n    folder: External\n    type: external\n';
+
+/**
+ * Like `scope`, with an external category: `External` is a symlink to a folder
+ * outside the campaign that holds one document without frontmatter.
+ */
+function externalScope(options, files = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-outside-'));
+  try {
+    fs.writeFileSync(path.join(outside, 'Pagina.md'), '# Pagina\n\nTesto esterno.\n');
+    for (const [rel, content] of Object.entries({ ...FILES, 'campaign.yaml': CAMPAIGN_EXTERNAL, ...files })) {
+      const full = path.join(root, rel);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content);
+    }
+    fs.symlinkSync(outside, path.join(root, 'External'), 'dir');
+    return computeScope(root, options);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+}
+
+test('full mode leaves external subjects and their documents out of the scope', () => {
+  const result = externalScope({ mode: 'full' });
+  assert.deepEqual(result.subjects, ['borgo', 'lanterna', 'oria-valdes']);
+  assert.ok(!documentsOf(result).some((d) => d.startsWith('External/')));
+  assert.deepEqual(result.errors, []);
+});
+
+test('pre mode rejects a given file of an external category as not in scope', () => {
+  const result = externalScope({ mode: 'pre', files: ['External/Pagina.md', 'Plot/Altro.md'] });
+  assert.deepEqual(result.errors, [{ file: 'External/Pagina.md', message: 'external file: not in scope' }]);
+  assert.deepEqual(documentsOf(result), ['Plot/Altro.md']);
+  assert.deepEqual(result.subjects, []);
+});
+
+test('pre mode: a file that mentions an external subject does not pull its sheet in', () => {
+  const result = externalScope({ mode: 'pre', files: ['Plot/Citazione.md'] }, {
+    'Plot/Citazione.md': '# Citazione\n\nCome dice Pagina nel testo esterno.\n',
+  });
+  assert.deepEqual(result.subjects, []);
+  assert.deepEqual(documentsOf(result), ['Plot/Citazione.md']);
+  assert.deepEqual(result.errors, []);
+});
+
+test('pre mode drops external ids given in subjects, keeping the others', () => {
+  const result = externalScope({ mode: 'pre', subjects: ['ext:Pagina', 'oria-valdes'] });
+  assert.deepEqual(result.subjects, ['oria-valdes']);
+  assert.ok(!documentsOf(result).some((d) => d.startsWith('External/')));
+  assert.deepEqual(result.errors, []);
+});

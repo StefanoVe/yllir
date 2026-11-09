@@ -228,7 +228,7 @@ Write the card again with the Write tool (Step 4d format, Read it first) with th
 
 **Step 7 — Integrate.** Only claims with status `verified` and class `fact` go into the subject sheets. Claims of class `hypothesis` or `draft` go to the notes document. Claims of class `secret` go into a master block. Claims that cannot be placed stay `verified` and get a question.
 
-On resume (RESUME_IDS given), this step places only the claims of the cards of the new ids, or RESUME_IDS, that have status `verified`, class `fact`, and are not yet `integrated`. Every other claim is not placed in this run, whatever its class, and keeps its status. The rules of 7a to 7g apply to those claims only. In a normal run, they apply to all claims of the new ids.
+On resume (RESUME_IDS given), this step places only the claims of the cards of the new ids, or RESUME_IDS, that have status `verified`, class `fact`, and are not yet `integrated`. Every other claim is not placed in this run, whatever its class, and keeps its status. The rules of 7a to 7g apply to those claims only. In a normal run, they apply to all claims of the new ids. Images are never required for a sheet, and ingest never adds an image to a sheet.
 
 7a. Read `campaign.yaml` and its `structure` list. Each entry has `id`, `type`, `folder`. Choose a category by type, the first entry in the list with that type:
 - `pc-sheet` kind: type `master-only`. Otherwise `free`.
@@ -242,10 +242,33 @@ On resume (RESUME_IDS given), this step places only the claims of the cards of t
 - If the index does not exist, or no entry matches: read `<category folder>/<name>.md` with the Read tool. If Read finds it, it is the existing sheet.
 - A name that matches more than one sheet: do not choose. The claims stay `verified` and get a question: `The name "<name>" matches more than one sheet. Which one?`.
 - Otherwise the subject is new.
+  - A NEW subject is a CHARACTER SUBJECT when the claims name a person, a vendor, an enemy or a creature (card kind `npc` or `creature`, or the claims say so). Mark it as such. Places and objects are never character subjects.
 
 7d. Drafts. For each target document, make the FULL text of the document:
 - Existing sheet: Read it whole. Add each new sentence to the section of the sheet where it fits, with the section headings it already has. Keep all other text exactly as it is. Never remove text. Never change the master block, except as in 7e.
-- New sheet: Read one existing sheet of the same category as a model, and copy its front matter keys and its headings. Name the file `<name>.md` in the category folder. Its title `# <name>` equals the file name without `.md`. Its front matter `id` is the title in lowercase, with spaces and punctuation replaced by `-`. Put the new sentences under the headings. If the index has that id, the subject exists: use its sheet instead.
+- New sheet of a CHARACTER SUBJECT: do NOT copy a model sheet. Invoke the skill `yllir:npc-manager` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/SKILL.md` with the Read tool and follow it exactly) with these inputs:
+  - `MODE=create`
+  - `NAME=<the name>`
+  - `LOCATION=<ids of the places that the claims name and that exist in the index, comma-separated, or empty>`
+  - `DETAILS=<the sentences of the claims of class fact about this subject that this run places, copied word for word, one per line; never claims of class secret, hypothesis or draft>`
+  - `REQUESTED_BY=` (empty)
+  - `TEMPLATE=<chosen as below>`
+  - `CONTINUE_WITH="document-ingest step 7d: read the npc-manager report, then go on"`
+
+  Then read `.campaign/state/npc-manager/report.txt` with the Read tool. Never show it. Go by its `status:` line:
+  - `DONE` with a `draft:` path (not `none`): add that path to the list of drafts, and its `new subject:` id to the list of new subjects. Record that the claims of this subject went into that draft path.
+  - `DONE` with `exists: <id>` (not `none`): the sheet exists. Treat it as an existing sheet: use the rule "Existing sheet" above, with the sheet of the entry with that `id` in `.campaign/cache/subjects.json`.
+  - `ASK`: the claims of this subject stay `verified` and each gets an open question with its locator: the `question:` line of the report, in your own words, without quotes. No draft.
+  - `NOT_AVAILABLE`, `FAILED`, or the file is missing: the claims of this subject stay `verified` and each gets the open question `The sheet of "<name>" could not be created. What should happen?`. No draft.
+
+  Choose TEMPLATE in this order. The first match wins. Use only what the claims and the card kind say:
+  1. `vendor` if the claims say the subject sells, buys or runs a shop, stall or inn with goods and prices.
+  2. `enemy` if it is a creature or person that fights or is hostile: the claims mention attacks, a threat, combat, a monster, or a beast that hunts or guards.
+  3. `creature` if it is an animal or beast that does not fight (mounts, pets, livestock, wildlife that is only described).
+  4. Otherwise `npc`, unless the card kind is `creature`: then use the card-kind rule below.
+
+  If the claims do not decide, use the card kind: kind `creature` gives `enemy` when the claims give any threat, otherwise `creature`; kind `npc` gives `npc`. Never ask the master for the template.
+- New sheet of anything else (a place, an object, free text): Read one existing sheet of the same category as a model, and copy its front matter keys and its headings. Name the file `<name>.md` in the category folder. Its title `# <name>` equals the file name without `.md`. Its front matter `id` is the title in lowercase, with spaces and punctuation replaced by `-`. Put the new sentences under the headings. If the index has that id, the subject exists: use its sheet instead.
 - Write each sentence in the campaign language (`language.main` in `campaign.yaml`). A translation keeps every name and every number exactly.
 - Write each full draft with the Write tool to `.campaign/state/write/draft/<campaign-relative path>`. For example, the draft of `Characters/Ada Rook.md` is `.campaign/state/write/draft/Characters/Ada Rook.md`.
 - Keep the list of: each draft path, each new subject's `id`, and for each claim the path of the draft where it went.
@@ -262,16 +285,18 @@ If the document already has such a block, add the sentences inside it, under a `
 
 7f. Call write-sequence. Keep ROUND = 1 for the first call.
 Invoke the skill `yllir:write-sequence` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/SKILL.md` with the Read tool and follow it exactly, as if it had been invoked) with these inputs:
-- `DOCUMENTS`: every draft path, campaign-relative, comma-separated.
+- `DOCUMENTS`: every draft path, campaign-relative, comma-separated, including the sheets made by npc-manager.
 - `INTENT`: `integrate material from <IDS>`
-- `NEW_SUBJECTS`: the `id` of each new sheet, comma-separated, or empty.
+- `NEW_SUBJECTS`: the `id` of each new sheet, including those made by npc-manager, comma-separated, or empty.
 - `VERSION_MESSAGE`: one sentence in the campaign language. For `language.main` `en`: `Material brought in from <IDS>`. For `it`: `Materiale acquisito da <IDS>`. For any other code, translate the English sentence.
 - `ROUND`: 1, then 2, then 3 on the next calls.
 - `CONTINUE_WITH`: `document-ingest step 8`
 
+The linker, run by the write sequence, links the documents that mention a new character to its sheet. Never write a link by hand.
+
 7g. When it has finished, read `.campaign/state/write/report.txt` with the Read tool. Its `status:` line decides:
 - `DONE`: every claim that was placed in a draft is now in the saved document. For each such claim, set its status to `integrated` and its target to the campaign-relative path of the document it went to (the claim line ends with ` | <path>`). Write the card again with the Write tool. A card whose claims are all `integrated` gets `status: integrated` in the front matter. Go to Step 8.
-- `FIX_NEEDED` or `VERIFY_FAILED`: read the `details:` lines of the report. Redo the drafts that the details name (Step 7d), in the same way. Then call write-sequence again with `ROUND` one higher (2, then 3). After the third call, go to the next line.
+- `FIX_NEEDED` or `VERIFY_FAILED`: read the `details:` lines of the report. Redo the drafts that the details name (Step 7d), in the same way. For a draft that came from npc-manager, fix only the problem named in the `details` line, directly in that draft with the Write tool, keeping the standard model. Do not invoke npc-manager again. Then call write-sequence again with `ROUND` one higher (2, then 3). After the third call, go to the next line.
 - `ASK`, `CONFLICT`, `FAILED`, or a missing file, or a third failed round: keep the claims `verified`. For each claim that was to be integrated, add an open question with its locator and the reason written in your own words, without quotes: `Integration stopped: <reason>. What should happen?`. Go to Step 8 with `--status-reason` only if the status is `FAILED`. Otherwise go to Step 8 with no status reason.
 
 Record whether write-sequence was called in this run (yes or no). Step 8 needs it.

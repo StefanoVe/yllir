@@ -6,6 +6,7 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validateFacts } from './audit-facts.mjs';
+import { buildSubjectIndex } from '../../../../../scripts/lib/subjects.mjs';
 import { loadVocabulary } from './audit-vocabulary.mjs';
 
 const AUDIT_VALIDATE = fileURLToPath(new URL('../audit-validate.mjs', import.meta.url));
@@ -511,5 +512,47 @@ test('audit-validate prints ignored frontmatter facts in the summary, not as dis
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(work, { recursive: true, force: true });
+  }
+});
+
+test('a document of an external category is a hypothesis and its location is not a metadata fact', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+  const source = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
+  const factsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-facts-'));
+  try {
+    const campaign = [CAMPAIGN, '  - id: mondo-condiviso', '    folder: Mondo/Mondo condiviso', '    type: external', ''].join('\n');
+    const files = { ...BASE_FILES, 'campaign.yaml': campaign };
+    for (const [rel, content] of Object.entries(files)) {
+      const full = path.join(root, rel);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content);
+    }
+    fs.mkdirSync(path.join(source, 'Luoghi'), { recursive: true });
+    fs.writeFileSync(
+      path.join(source, 'Luoghi', 'Raatnagar.md'),
+      '---\nid: raatnagar\nlocation: [Morvalle]\n---\n\n# Raatnagar\n\nOria Valdes è la guida del luogo.\n',
+    );
+    fs.mkdirSync(path.join(root, 'Mondo'), { recursive: true });
+    fs.symlinkSync(source, path.join(root, 'Mondo', 'Mondo condiviso'), 'dir');
+
+    const sheet = 'Mondo/Mondo condiviso/Luoghi/Raatnagar.md';
+    const subject = buildSubjectIndex(root).subjects.find((s) => s.sheet === sheet);
+    assert.ok(subject && subject.external === true, 'the external sheet is an external subject');
+
+    fs.writeFileSync(
+      path.join(factsDir, 'D001.json'),
+      JSON.stringify(factsFile('D001', sheet, [
+        fact({ source_type: 'editorial-summary', quote: 'Oria Valdes è la guida' }),
+      ])),
+    );
+    const result = validateFacts(root, { mode: 'pre', files: [{ fid: 'D001', document: sheet }] }, factsDir, loadVocabulary());
+    assert.equal(result.facts.length, 1, 'only the body fact, no metadata fact');
+    assert.equal(result.facts[0].from_metadata, false);
+    assert.equal(result.facts[0].source_type, 'hypothesis');
+    assert.equal(result.facts[0].forced_hypothesis, true);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(source, { recursive: true, force: true });
+    fs.rmSync(factsDir, { recursive: true, force: true });
   }
 });

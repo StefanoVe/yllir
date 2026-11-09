@@ -192,3 +192,92 @@ test('files option restricts the check', (t) => {
   assert.deepEqual(result.checked, ['Notes/b.md']);
   assert.deepEqual(result.errors.map((e) => e.file), ['Notes/b.md']);
 });
+
+const EXTERNAL_CAMPAIGN = [
+  'name: Test',
+  'structure:',
+  '  - id: places',
+  '    folder: Places',
+  '    type: places',
+  '  - id: giocatori',
+  '    folder: Giocatori',
+  '    type: master-only',
+  '  - id: notes',
+  '    folder: Notes',
+  '    type: notes',
+  '  - id: mondo-condiviso',
+  '    folder: Mondo/Mondo condiviso',
+  '    type: external',
+  '',
+].join('\n');
+
+/**
+ * Creates a campaign whose external category is a symlink to a folder outside it
+ * (the other campaign). `external` maps paths inside that folder to their content.
+ */
+function makeExternalCampaign(t, files, external) {
+  const root = makeCampaign(t, { 'campaign.yaml': EXTERNAL_CAMPAIGN, ...files });
+  const source = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
+  t.after(() => fs.rmSync(source, { recursive: true, force: true }));
+  for (const [rel, content] of Object.entries(external)) {
+    const full = path.join(source, rel);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, content);
+  }
+  fs.mkdirSync(path.join(root, 'Mondo'), { recursive: true });
+  fs.symlinkSync(source, path.join(root, 'Mondo', 'Mondo condiviso'), 'dir');
+  return root;
+}
+
+const EXTERNAL_FILES = {
+  'Luoghi/Raatnagar.md': '---\nid: raatnagar\n---\n\n# Raatnagar\n\n## Porte\n\nTesto.\n',
+};
+
+test('a link into an external folder resolves through the symlink and checks its anchor', (t) => {
+  const root = makeExternalCampaign(
+    t,
+    {
+      'Notes/a.md': [
+        '# A',
+        '',
+        '[porte](../Mondo/Mondo%20condiviso/Luoghi/Raatnagar.md#porte)',
+        '[altrove](../Mondo/Mondo%20condiviso/Luoghi/Raatnagar.md)',
+        '',
+      ].join('\n'),
+    },
+    EXTERNAL_FILES,
+  );
+  const result = checkLinks(root);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.links, 2);
+  assert.deepEqual(result.checked, ['Notes/a.md']);
+});
+
+test('a missing anchor in an external document is an error', (t) => {
+  const root = makeExternalCampaign(
+    t,
+    { 'Notes/a.md': '# A\n\n[x](../Mondo/Mondo%20condiviso/Luoghi/Raatnagar.md#cancelli)\n' },
+    EXTERNAL_FILES,
+  );
+  assert.deepEqual(codes(checkLinks(root)), ['missing-anchor']);
+});
+
+test('a link to a missing external file is a missing target', (t) => {
+  const root = makeExternalCampaign(
+    t,
+    { 'Notes/a.md': '# A\n\n[x](../Mondo/Mondo%20condiviso/Luoghi/Nessuno.md)\n' },
+    EXTERNAL_FILES,
+  );
+  assert.deepEqual(codes(checkLinks(root)), ['missing-target']);
+});
+
+test('an external document given explicitly is not checked', (t) => {
+  const root = makeExternalCampaign(
+    t,
+    { 'Notes/a.md': '# A\n\n[x](nope.md)\n' },
+    { ...EXTERNAL_FILES, 'Luoghi/Rotto.md': '# Rotto\n\n[x](nessuno.md)\n' },
+  );
+  const result = checkLinks(root, { files: ['Mondo/Mondo condiviso/Luoghi/Rotto.md', 'Notes/a.md'] });
+  assert.deepEqual(result.checked, ['Notes/a.md']);
+  assert.deepEqual(result.errors.map((e) => e.file), ['Notes/a.md']);
+});

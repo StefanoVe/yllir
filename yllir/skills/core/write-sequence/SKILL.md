@@ -2,7 +2,7 @@
 name: write-sequence
 description: Core rule. The only way Yllir writes campaign documents: manual changes saved, continuity check, independent review, write, links, derived files, deterministic verification, saved version. Invoked by core processes with drafts already prepared.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" *), Read, Write, Agent, Skill
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Read, Write, Agent, Skill
 ---
 
 # Write sequence
@@ -73,21 +73,24 @@ Save its answer exactly as received to `.campaign/state/write/review.json` with 
 
 **5. Write.** Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" . --draft-dir .campaign/state/write/draft --files "<DOCUMENTS>"`. Save its printed JSON to `.campaign/state/write/applied.json` with the Write tool. Exit ≠ 0 (nothing was written): end this skill with `status: FAILED` (the calling process continues) and list its `errors`.
 
-**6. Links.** Invoke the skill `yllir:linker` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/linker/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `FILES=DOCUMENTS`, `SUBJECTS=NEW_SUBJECTS`, `CONTINUE_WITH="write-sequence step 7 (derived files), then steps 8 and 9"`. When it has finished, read `.campaign/state/linker/report.txt` with the Read tool. That file is the LINKER REPORT.
+**6. Links.** Invoke the skill `yllir:linker` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/linker/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `FILES=DOCUMENTS`, `SUBJECTS=NEW_SUBJECTS`, `CONTINUE_WITH="write-sequence step 7 (derived files), then steps 8 and 9"`. NEW_SUBJECTS must list the id of every NEW character sheet among DOCUMENTS (template npc): if a document in DOCUMENTS is a new sheet and its id is not in NEW_SUBJECTS, add it before invoking the linker. This is what links the documents that mention the new character to its sheet. When it has finished, read `.campaign/state/linker/report.txt` with the Read tool. That file is the LINKER REPORT.
 - Its `status:` line is `FAILED`: continue, record `links: FAILED`, and mark every document "to check" in the report.
 - Otherwise record `links: applied <n>` with the number from its `applied:` line. Copy every line under `decisions for the master` into the report details.
 - The file is missing: record `links: FAILED` and continue as above.
 
 **7. Derived files.** Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" . --out .campaign/cache/subjects.json`. Exit ≠ 0: end this skill with `status: FAILED`, reason "index not built", and its printed lines (the calling process continues). The documents already written stay marked "to check".
 
-**8. Deterministic verification.** Run these three commands in this order, and keep the output of each:
+**8. Deterministic verification.** Run these five commands in this order, and keep the output of each:
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" . --files "<DOCUMENTS>"`
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" .`
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" . --check`
+- `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . plot-cast --files "<DOCUMENTS>" --out .campaign/state/write/plot-cast.json`
+- `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . check-sheets --files "<DOCUMENTS>"`
 
 Then decide:
-- `check-links` or `validate-config` exit 1: end this skill with `status: VERIFY_FAILED` (the calling process continues). Put every printed error line in the report details. Do NOT save a version. The caller fixes the draft and calls again with ROUND+1.
-- `check-links` or `validate-config` exit with any code other than 0 or 1: end this skill with `status: FAILED`, reason "verification not run" (the calling process continues).
+- `check-links`, `validate-config`, `plot-cast` or `check-sheets` exit 1: end this skill with `status: VERIFY_FAILED` (the calling process continues). Put every printed error line in the report details. Do NOT save a version. The caller fixes the draft and calls again with ROUND+1.
+  - Do not list `candidate` lines of `plot-cast` as errors. When there is at least one error line, copy every `candidate` line of `plot-cast` into the report details, each prefixed with `candidate (judge before the next round):`. When there is no error line, ignore the `candidate` lines.
+- `check-links`, `validate-config`, `plot-cast` or `check-sheets` exit with any code other than 0 or 1: end this skill with `status: FAILED`, reason "verification not run" (the calling process continues).
 - `generate-instructions --check` exit 1 (files changed): run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" .`. Exit ≠ 0: end this skill with `status: FAILED`, reason "instructions not regenerated" (the calling process continues). Exit 0: continue.
 - `generate-instructions --check` exit ≠ 0 and ≠ 1: end this skill with `status: FAILED`, reason "instructions not checked" (the calling process continues).
 - Otherwise record `verification: passed`.
@@ -162,3 +165,4 @@ Wrong example, do not do this: step 4 is skipped, and the document is written wi
 - Never change a sub-agent's answer. Save it exactly as received.
 - Run every command from the campaign root.
 - Never print the WRITE REPORT, never show it to the master, and never end your turn with it.
+- The sheet of a character and the plot events that use it are written in the same write sequence, so the check passes.

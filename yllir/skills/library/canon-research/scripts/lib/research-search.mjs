@@ -56,7 +56,8 @@ export function categoryOf(structure, file) {
 
 /**
  * Source class of a campaign-relative path: `notes` or `sources` for those
- * category types, `canon` for every other category, null when no category holds it.
+ * category types, `sources` for `external` (another campaign, not our canon),
+ * `canon` for every other category, null when no category holds it.
  * @param {object[]} structure
  * @param {string} file
  * @returns {'canon'|'notes'|'sources'|null}
@@ -64,6 +65,7 @@ export function categoryOf(structure, file) {
 export function sourceClassFor(structure, file) {
   const category = categoryOf(structure, file);
   if (category === null) return null;
+  if (category.type === 'external') return 'sources';
   return category.type === 'notes' || category.type === 'sources' ? category.type : 'canon';
 }
 
@@ -152,7 +154,8 @@ export function searchCampaign(campaignRoot, terms) {
   // Every document of every category folder. A file belongs to the category with the longest matching folder.
   const categoryByFile = new Map();
   for (const category of structure) {
-    if (typeof category.folder !== 'string') continue;
+    // External documents belong to another campaign: never searched.
+    if (typeof category.folder !== 'string' || category.type === 'external') continue;
     for (const file of listSheets(campaignRoot, category.folder)) {
       if (file.startsWith('.campaign/')) continue;
       if (!categoryByFile.has(file)) categoryByFile.set(file, categoryOf(structure, file));

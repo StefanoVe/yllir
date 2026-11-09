@@ -4,7 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildSubjectIndex, compareStrings } from '../../../../../scripts/lib/subjects.mjs';
+import { buildSubjectIndex, compareStrings, readStructure } from '../../../../../scripts/lib/subjects.mjs';
 import { scanMentions } from '../../../../../scripts/lib/mentions.mjs';
 
 /**
@@ -23,10 +23,17 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
   // silently left out of the audit otherwise.
   const errors = [...index.errors];
 
+  // External subjects are read-only link targets of other campaigns: they are
+  // never in the scope, neither as subjects nor as documents.
+  const externalIds = new Set(index.subjects.filter((s) => s.external === true).map((s) => s.id));
+  const externalSheets = new Set(index.subjects.filter((s) => s.external === true).map((s) => s.sheet));
+  const categoryTypeOf = categoryTypeChecker(readStructure(campaignRoot).structure ?? []);
+  const isExternalFile = (rel) => externalSheets.has(rel) || categoryTypeOf(rel) === 'external';
+
   let subjectIds;
   let documents;
   if (mode === 'full') {
-    subjectIds = index.subjects.map((subject) => subject.id);
+    subjectIds = index.subjects.filter((s) => !externalIds.has(s.id)).map((subject) => subject.id);
     documents = scan.files;
   } else {
     const given = new Set();
@@ -34,6 +41,8 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
       const document = normalizeDocument(raw);
       if (document === null) {
         errors.push({ file: raw, message: 'file outside campaign' });
+      } else if (isExternalFile(document)) {
+        errors.push({ file: raw, message: 'external file: not in scope' });
       } else if (!isFile(path.join(campaignRoot, document))) {
         errors.push({ file: raw, message: 'file not found' });
       } else {
@@ -41,15 +50,17 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
       }
     }
 
-    // S: the given subjects, the subjects owning a given sheet, and every
-    // subject mentioned (any state) in a given file.
-    const selected = new Set(subjects);
+    // S: the given subjects (external ones dropped), the subjects owning a
+    // given sheet, and every subject mentioned (any state) in a given file.
+    const selected = new Set(subjects.filter((id) => !externalIds.has(id)));
     for (const subject of index.subjects) {
       if (given.has(subject.sheet)) selected.add(subject.id);
     }
     for (const occurrence of scan.occurrences) {
       if (given.has(occurrence.file)) {
-        for (const id of occurrenceIds(occurrence)) selected.add(id);
+        for (const id of occurrenceIds(occurrence)) {
+          if (!externalIds.has(id)) selected.add(id);
+        }
       }
     }
 
@@ -78,6 +89,31 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
       document,
     })),
     errors,
+  };
+}
+
+/**
+ * Returns a function giving the type of the category that owns a campaign-relative
+ * path: the category with the longest folder that is a prefix of it (as in
+ * masterOnlyChecker), or null when none does.
+ */
+function categoryTypeChecker(structure) {
+  const categories = structure
+    .filter((entry) => typeof entry.folder === 'string')
+    .map((entry) => {
+      const folder = path.posix.normalize(entry.folder).replace(/\/+$/, '');
+      const prefix = folder === '.' || folder === '' ? '' : `${folder}/`;
+      return { type: entry.type, prefix };
+    });
+
+  return (rel) => {
+    let best = null;
+    for (const category of categories) {
+      if (rel.startsWith(category.prefix) && (best === null || category.prefix.length > best.prefix.length)) {
+        best = category;
+      }
+    }
+    return best === null ? null : best.type;
   };
 }
 

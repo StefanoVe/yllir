@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseTerms, searchCampaign } from './research-search.mjs';
+import { parseTerms, searchCampaign, sourceClassFor } from './research-search.mjs';
 
 const CAMPAIGN = [
   'name: Test',
@@ -223,4 +223,55 @@ test('the search result has the documented shape and is deterministic', (t) => {
     type: 'subjects',
     forms: ['Oria Brunel', 'Oria'],
   });
+});
+
+test('an external category is labelled as sources, the other categories as before', () => {
+  const structure = [
+    { id: 'luoghi', folder: 'Mondo', type: 'places' },
+    { id: 'esterno', folder: 'Esterno', type: 'external' },
+    { id: 'appunti', folder: 'Appunti', type: 'notes' },
+  ];
+  assert.equal(sourceClassFor(structure, 'Esterno/Luoghi/Raatnagar.md'), 'sources');
+  assert.equal(sourceClassFor(structure, 'Mondo/Pozzo.md'), 'canon');
+  assert.equal(sourceClassFor(structure, 'Appunti/Idee.md'), 'notes');
+  assert.equal(sourceClassFor(structure, 'Altrove/x.md'), null);
+});
+
+test('external documents reached through a symlink are not searched', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+  const source = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
+  try {
+    const root = path.join(dir, 'campaign');
+    const campaign = [
+      'name: Test',
+      'structure:',
+      '  - id: luoghi',
+      '    folder: Mondo',
+      '    type: places',
+      '  - id: esterno',
+      '    folder: Esterno',
+      '    type: external',
+      '',
+    ].join('\n');
+    const canon = { 'campaign.yaml': campaign, 'Mondo/Pozzo.md': '# Pozzo\n\nLa Porta Nera custodisce il pozzo.\n' };
+    for (const [rel, content] of Object.entries(canon)) {
+      fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+      fs.writeFileSync(path.join(root, rel), content);
+    }
+    fs.mkdirSync(path.join(source, 'Luoghi'), { recursive: true });
+    fs.writeFileSync(path.join(source, 'Luoghi', 'Raatnagar.md'), '# Raatnagar\n\nLa Porta Nera è sigillata.\n');
+    fs.symlinkSync(source, path.join(root, 'Esterno'), 'dir');
+
+    const porta = searchCampaign(root, ['Porta Nera']);
+    assert.deepEqual(porta.hits.map((h) => h.file), ['Mondo/Pozzo.md']);
+    assert.deepEqual(porta.hits.map((h) => h.source_class), ['canon']);
+    assert.equal(porta.documents.includes('Esterno/Luoghi/Raatnagar.md'), false);
+
+    const raatnagar = searchCampaign(root, ['Raatnagar']);
+    assert.deepEqual(raatnagar.hits, []);
+    assert.equal(raatnagar.documents.some((d) => d.startsWith('Esterno/')), false);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(source, { recursive: true, force: true });
+  }
 });

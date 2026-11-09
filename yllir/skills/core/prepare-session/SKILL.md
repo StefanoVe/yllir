@@ -14,7 +14,8 @@ Prepares the next session as a new session folder: a main file and one file per 
 **Scope of this version.** This process:
 - creates a NEW session (its main file and its scene files);
 - does NOT rewrite an existing session. If the master asks to change an existing session, say in one sentence that this is not available yet, and stop;
-- never creates character, creature, place or item documents. A name with no document is listed as missing, and nothing is created for it.
+- creates a sheet through `yllir:npc-manager` for each NEW NAMED CHARACTER (person, vendor, enemy or creature) that MASTER_MESSAGE names or explicitly asks for, choosing the kind itself (step 6b);
+- never creates place or item documents. A name of a place or item with no document is listed as missing, and nothing is created for it.
 
 **Questions to the master.** Ask the master in plain words, then stop. Write the question as your message; the process runner turns it into a QUESTION result.
 
@@ -53,8 +54,11 @@ Read `.campaign/cache/plot-map.json` with the Read tool. Keep `sessions`, `arcs`
 2. For each name, compare it with each form in `subjects.json` (the `forms` list of each subject, field `text`). Compare ignoring case and accents. A match is a subject id.
 3. Read the document of each matched subject. Its path is the `sheet` of the subject. Read the whole document, master notes included.
 4. Also read the previous session: its main file, and every scene file listed under `events` for it in the map.
-5. A name the master uses that matches no subject is MISSING. Do not create a document for it.
-- Output: the list of documents read (paths), the list of subject ids, and the MISSING names.
+5. A name the master uses that matches no subject is MISSING. Split the MISSING names in two lists:
+   - MISSING_CHARACTERS: the names of persons, vendors, enemies or creatures that MASTER_MESSAGE names or asks to create, and that no subject matches. Example: the master writes «Maren is the innkeeper». Maren matches no subject, so she is in MISSING_CHARACTERS. Another example: the master writes «Garron, a named beast, hunts at the ford». Garron matches no subject, so he is in MISSING_CHARACTERS.
+   - MISSING_OTHER: every other MISSING name, including places and items. Example: «the Grey Wolf», a creature named only in the text of the previous session, is in MISSING_OTHER. So is a person named only in the previous session, such as «Tomas». So is the place «the Ford».
+   Only MISSING_CHARACTERS get a sheet (step 6b). Do not create a document for a MISSING_OTHER name.
+- Output: the list of documents read (paths), the list of subject ids, and the MISSING_CHARACTERS and MISSING_OTHER names.
 
 **Step 5 — Read-only check.** Invoke the skill `yllir:continuity-audit` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with:
 - `MODE=pre`
@@ -71,6 +75,34 @@ These lists never block the preparation. If the file is missing, record "check n
 
 **Step 6 — Characters' entry points.** Read every document in the category whose `type` is `master-only` in `structure` of `campaign.yaml` (these are the players' characters). For each such document that names a subject of step 4, write one line: which character, and the hook written there. Keep these as ENTRY_POINTS. If none, ENTRY_POINTS is empty.
 - Output: the ENTRY_POINTS list (may be empty).
+
+**Step 6b — Character sheets.** Keep three lists, all empty at first: SHEET_DRAFTS (campaign paths of the sheet drafts), NEW_CHARACTERS (subject ids of the new sheets) and KNOWN_NEW (subject ids of sheets that already exist). If MISSING_CHARACTERS is empty, skip this step and go to step 7. Otherwise do the following for each name in MISSING_CHARACTERS, one name at a time:
+0. Decide TEMPLATE for the name. Never ask the master for the kind. Use ONLY MASTER_MESSAGE, the previous session text and the documents read in step 4. Never guess from the name alone. Go through this numbered list and take the FIRST rule that matches:
+   1. `vendor`: the context says the character sells or buys goods, or runs a shop, stall, forge or inn with goods and prices.
+   2. `enemy`: the context says the character is hostile or will be fought, or is a monster or beast that attacks, hunts or guards (the master wants a fight, a threat, an ambush).
+   3. `creature`: an animal or beast that is only described or used (mount, pet, livestock, wildlife) and does not fight.
+   4. `npc`: every other person.
+   A person who sells AND could fight is `vendor` (the richer model; never two sheets). If two rules fit, the lower number wins. Write the choice and a one-line reason in plain words, from the context, in your notes.
+   Pass `TEMPLATE=<the choice>` to `yllir:npc-manager` in step 1.
+1. Invoke the skill `yllir:npc-manager` with:
+   - `MODE=create`
+   - `NAME=<the name>`
+   - `TEMPLATE=<the choice of step 0>`
+   - `LOCATION=<the main place ids of step 4, comma-separated, or empty; for an enemy or creature, the places where it lives, and empty means errant>`
+   - `DETAILS=<only what MASTER_MESSAGE says about this character, copied; empty if nothing>`
+   - `REQUESTED_BY=` empty: the scene file names are decided in step 7, which runs after this step, so they are not known yet. Step 8 links the scenes to the new sheet anyway, through NEW_SUBJECTS.
+   - `CONTINUE_WITH="prepare-session step 6b: read the npc-manager report, then step 7"`
+   If your tool cannot invoke a named skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/SKILL.md` with the Read tool and follow it exactly as if it had been invoked, with the same inputs.
+2. When it has finished, read `.campaign/state/npc-manager/report.txt` with the Read tool. This is the NPC REPORT. It is for you, never for the master: do not show it or quote it. If the file is missing, treat the status as `FAILED`.
+3. Act on the `status:` line of the NPC REPORT:
+   - `DONE` with a `draft:` path (not none): add the draft path to SHEET_DRAFTS, and add the `new subject:` id to NEW_CHARACTERS.
+   - `DONE` with an `exists:` id (not none): the character already has a sheet. Add that id to KNOWN_NEW. Create nothing.
+   - `ASK`: ask the master the `question:` line in plain words, in the campaign language, then stop. If the question is about statistics («Which statistics does ... have?»), ask exactly that question, in plain words, and stop. Never answer it yourself and never invent statistics.
+   - `FAILED` with reason "no creature category": treat the name as MISSING_OTHER, and add to the final message (step 9) that this creature has no sheet yet.
+   - `NOT_AVAILABLE`, any other `FAILED`, or the file is missing: treat the name as MISSING_OTHER. It appears as plain text with a ``` note, as in step 7. Add to the final message (step 9) that this character has no sheet yet.
+
+A character with empty DETAILS still gets a sheet, with its sections marked as still to be defined. Step 9 tells the master what is still open.
+- Output: SHEET_DRAFTS, NEW_CHARACTERS and KNOWN_NEW (may be empty), and the names of the characters with no sheet.
 
 **Step 7 — Draft.** Write the session as drafts under `.campaign/state/write/draft/`, each at `.campaign/state/write/draft/` followed by its campaign path from step 2. There are two kinds of file.
 
@@ -96,6 +128,7 @@ id: <scene id, see the rules below>
 session: <new id>
 depends_on: []
 location: [<ids of the main places of the scene, or []>]
+characters: [<ids of the characters of the scene, or []>]
 ---
 
 _<one narration paragraph that opens the scene>_
@@ -123,14 +156,17 @@ Rules for the draft:
 - Use only what MASTER_MESSAGE, the documents of step 4 and the previous session say.
 - Never decide which of two contradicting documents is right. Never state a CONTESTED fact in the draft: write the scene without it (for example, do not name how two characters are related). Avoid every CONTESTED fact, including in narration and in master notes.
 - You may invent scene events and unnamed extras (for example «a fisherman»).
-- You may NOT add a named character or a named place. You may NOT define or change who a known subject is.
-- A name from MISSING appears as plain text, with a note in a ``` block saying that its document does not exist yet.
+- You may NOT add a named place. You may add a named character only if it is in NEW_CHARACTERS (new sheet) or KNOWN_NEW (existing sheet). You may NOT define or change who a known subject is.
+- Every named character who acts or speaks in a scene is listed in that scene's `characters`, and has a sheet: an existing subject, or one of NEW_CHARACTERS or KNOWN_NEW. The `characters` list may hold ids of sheets of any kind: npc, vendor, enemy or creature.
+- A scene text names the character and says what they do. It never states or changes who the character is (role, looks, personality, motives, secrets): such facts live only in the sheet.
+- A scene may make a character do things the sheet does not mention, but never against what the sheet says. If the only way to write an event is to contradict the sheet, write the scene without that action, and say so in the final message (step 9).
+- A name from MISSING_OTHER appears as plain text, with a note in a ``` block saying that its document does not exist yet.
 - Output: the main file and every scene file exist at their draft paths.
 
 **Step 8 — Write sequence.** Invoke the skill `yllir:write-sequence` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with:
-- `DOCUMENTS=<main file>, <scene file 1>, <scene file 2>, ...` (campaign paths, comma-separated, main file first)
-- `INTENT="Session preparation for <arc>: new scenes; may add scene events and unnamed extras; must not define or change the identity of existing subjects; no new named characters or places."`
-- `NEW_SUBJECTS=` (empty: sessions are not subjects)
+- `DOCUMENTS=<main file>, <scene file 1>, <scene file 2>, ..., <every path of SHEET_DRAFTS>` (campaign paths, comma-separated: the main file first, then the scene files, then every path of SHEET_DRAFTS; if SHEET_DRAFTS is empty, nothing is added)
+- `INTENT="Session preparation for <arc>: new scenes; may add scene events and unnamed extras; must not define or change the identity of existing subjects; new named characters only through their own new sheet, listed in characters; no new places; sheets define who a character is and the scenes only what they do."`
+- `NEW_SUBJECTS=<NEW_CHARACTERS, comma-separated>` (empty if NEW_CHARACTERS is empty: sessions are not subjects, and only new character sheets are)
 - `VERSION_MESSAGE=` the sentence «Preparata la sessione «<session name>»» for `it`, «Prepared the session «<session name>»» for `en`, or the translation into the campaign language
 - `ROUND=1`
 - `CONTINUE_WITH="prepare-session step 8: read the write report and act on its status"`
@@ -140,10 +176,14 @@ After invoking it, read `.campaign/state/write/report.txt` with the Read tool. T
 Loop, starting with `ROUND=1`. Read `.campaign/state/write/report.txt`. Then:
 - If status is `FIX_NEEDED` or `VERIFY_FAILED`: open the draft, fix exactly each problem listed under `details` (if a problem is a contested fact, remove that fact), save the draft, and invoke `yllir:write-sequence` again with `ROUND` plus one and the same other inputs. Do this up to `ROUND` 3. Do not stop after the first fix: each fix is followed by a new invocation.
 - If status is `ASK` or `CONFLICT`: ask the master the question from the report in plain words, and stop.
-- If status is `DONE`: go to step 8b.
+- If status is `DONE`: do the links check below, then go to step 8b.
 - If status is `FAILED`, or any other status: go to the failure sentence below, and stop.
 
 After a failed `ROUND` 3 (still `FIX_NEEDED` or `VERIFY_FAILED`), or after `FAILED`: tell the master in one plain sentence, in the campaign language, that the session could not be completed and why, in plain words. Do not mention rounds, statuses, problems or paths. Stop.
+
+**Links check.** Run after the loop reaches `DONE`, in this order:
+1. Read the `links:` line of `.campaign/state/write/report.txt`. If NEW_CHARACTERS or KNOWN_NEW is not empty and that line says `links: FAILED` or `links: applied 0`, do not tell the master that the links were made: the final message (step 9) must contain one plain sentence that the character names in the scenes are not linked yet. Never show the report.
+2. NEW_SUBJECTS must contain every id of NEW_CHARACTERS (it does, from the inputs above). That is what makes the linker link the new sheets to the scenes.
 
 Output: `status: DONE`.
 
@@ -161,18 +201,28 @@ When it has finished, read `.campaign/state/plot-map/report.txt` with the Read t
 - one sentence: the session is ready, with its name (the session name, without `.md`);
 - the scenes may be mentioned in plain words, only if useful: never their file names or ids;
 - if any prerequisite was not played: the message MUST contain one sentence that names those sessions and says they were not played yet, using the word «played» in the campaign language (for Italian: «giocata»). This holds even when the master told you to go on without asking;
-- if MISSING is not empty: one sentence «these have no document yet: <names>»;
+- if MISSING_OTHER is not empty: one sentence «these have no document yet: <names>»;
+- for each character in NEW_CHARACTERS: one plain sentence per new sheet, by name, saying what kind of sheet was made, in the master's words: «a character» («un personaggio» in Italian), «a seller» («un venditore»), «an enemy» («un nemico») or «an animal» («un animale»). The master can say to change it. For a character created with no details, add one plain sentence that the sheet exists and what is still to be defined (the `open points:` lines of the NPC REPORT, in plain words). Never write the word template;
+- for each character in KNOWN_NEW: one sentence, by name, that the character already has a sheet, using the master-facing words for character sheets in the lexicon («Schede dei personaggi» in Italian, «Character sheets» in English);
+- for each character that got no sheet under step 6b: one sentence that this character has no sheet yet;
+- for each scene written without an action that would have contradicted a sheet (step 7): one plain sentence saying what was left out;
 - each NOTE from step 5, in one plain sentence;
 - each CONTESTED fact from step 5, in one plain sentence: which two documents disagree, and that the session was written without that fact. Never choose a version;
 - for each ENTRY_POINTS line, one sentence: which character can enter the scene, and how;
 - one sentence on what the master can do next (for example «say what happens in the first scene, and I will change it»).
 
-No paths, no ids, no codes, no backticks, no formatting marks. The report of Step 8b is never shown: do not write its NOTE lines, and nothing else from it.
+No paths, no ids, no codes, no backticks, no formatting marks. The report of Step 8b is never shown: do not write its NOTE lines, and nothing else from it. The NPC REPORT of step 6b is never shown either, and the words template and sheet-template never appear.
 
 ## Examples
 
 Correct: the master writes «prepare the next session of the Old Mill arc». The arc is named, the previous session is played, and the draft uses only the master's words and the previous session. Varn is in the previous session, and it has a document, so it is read and kept as it is. The draft includes an unnamed «fisherman» and no new named character. The message for the master names the session, says that the check found nothing to note, and suggests one next step.
 
-Wrong (creating a document): the draft mentions «Brenna the innkeeper», and the process creates `Characters/Brenna.md`. This is forbidden. Brenna has no document, so she is MISSING: she appears as plain text with a ``` note, and nothing is created.
+Correct (new named character): the master writes «Brenna is the innkeeper of the Old Mill». Brenna has no document, and the master named her, so she is MISSING_CHARACTERS. Step 6b invokes `yllir:npc-manager`, which makes her sheet as a draft. The scene lists her in `characters` and says what she does, for example «Brenna pours the ale». The scene does not say what kind of person she is: that is in the sheet.
+
+Correct (kind chosen by the process): the master writes «Grigio, a wolf, guards the mill». The wolf has a name, so it needs a sheet. The context says it guards the mill, so step 6b rule 2 applies and TEMPLATE is `enemy`. The process never asks the master what kind it is. The message says «an enemy» in plain words, and the scene lists the wolf in `characters`. If the master wrote only «a wolf guards the mill», the wolf has no name: it gets no sheet and appears in the scene as an unnamed extra.
+
+Wrong (asking the master for the kind): the process asks the master «is it an npc or a creature?». The kind is decided in step 6b from the context. Never ask it.
+
+Wrong (writing the sheet by hand): the process writes `Characters/Brenna.md` with its own tools, or copies a sheet into the campaign. This is forbidden: a sheet is made only through `yllir:npc-manager`, and its draft goes through the write sequence.
 
 Wrong (inventing a named character): the draft says «the innkeeper, Oswin, pours the ale». Oswin is a new named character. Write «the innkeeper» instead, or «a fisherman» for an unnamed extra.

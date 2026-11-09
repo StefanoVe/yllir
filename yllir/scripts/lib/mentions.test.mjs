@@ -416,3 +416,121 @@ test('mentions inside a symlinked document are reported under the symlink path',
     fs.rmSync(outside, { recursive: true, force: true });
   }
 });
+
+test('an external subject is a valid target; external files produce no occurrences', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-outside-'));
+  try {
+    const yaml = `${CAMPAIGN}  - id: mondo-condiviso\n    folder: Mondo/Condiviso\n    type: external\n`;
+    const files = {
+      'campaign.yaml': yaml,
+      ...BASE_FILES,
+      'Plot/Trama.md': '# Trama\n\nLo sbarco a Raatnagar.\n',
+      'Plot/Collegato.md': '# Collegato\n\nVedi [Raatnagar](../Mondo/Condiviso/Luoghi/Raatnagar.md).\n',
+    };
+    for (const [rel, content] of Object.entries(files)) {
+      const full = path.join(root, rel);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content);
+    }
+    // The external original mentions a known subject; it must not be scanned.
+    fs.mkdirSync(path.join(outside, 'Luoghi'), { recursive: true });
+    fs.writeFileSync(
+      path.join(outside, 'Luoghi/Raatnagar.md'),
+      '# Raatnagar\n\nNel porto di Raatnagar parla Oria Valdes.\n',
+    );
+    fs.mkdirSync(path.join(root, 'Mondo'), { recursive: true });
+    fs.symlinkSync(outside, path.join(root, 'Mondo/Condiviso'), 'dir');
+
+    const index = buildSubjectIndex(root);
+    const { occurrences, files: scanned } = scanMentions(root, index);
+
+    assert.ok(scanned.every((file) => !file.startsWith('Mondo/')));
+    assert.ok(occurrences.every((o) => !o.file.startsWith('Mondo/')));
+
+    const [bare] = occurrences.filter((o) => o.file === 'Plot/Trama.md');
+    assert.equal(bare.state, 'bare');
+    assert.equal(bare.subject, 'mondo-condiviso:Luoghi/Raatnagar');
+    assert.equal(bare.text, 'Raatnagar');
+
+    const [linked] = occurrences.filter((o) => o.file === 'Plot/Collegato.md');
+    assert.equal(linked.state, 'linked');
+    assert.equal(linked.subject, 'mondo-condiviso:Luoghi/Raatnagar');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test('a link to an external subject by the real path of the original is linked too', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-outside-'));
+  try {
+    const yaml = `${CAMPAIGN}  - id: mondo-condiviso\n    folder: Mondo/Condiviso\n    type: external\n`;
+    fs.writeFileSync(path.join(root, 'campaign.yaml'), yaml);
+    fs.mkdirSync(path.join(root, 'Plot'), { recursive: true });
+    fs.mkdirSync(path.join(root, 'Mondo'), { recursive: true });
+    fs.symlinkSync(outside, path.join(root, 'Mondo/Condiviso'), 'dir');
+    fs.writeFileSync(path.join(outside, 'Raatnagar.md'), '# Raatnagar\n');
+    const realTarget = path.relative(
+      path.join(root, 'Plot'),
+      path.join(fs.realpathSync(outside), 'Raatnagar.md'),
+    ).split(path.sep).join('/');
+    fs.writeFileSync(
+      path.join(root, 'Plot/Reale.md'),
+      `# Reale\n\nVedi [Raatnagar](${realTarget}) qui.\n`,
+    );
+
+    const index = buildSubjectIndex(root);
+    const { occurrences } = scanMentions(root, index);
+    const [occ] = occurrences.filter((o) => o.file === 'Plot/Reale.md');
+    assert.equal(occ.subject, 'mondo-condiviso:Raatnagar');
+    assert.equal(occ.state, 'linked');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test('an internal subject reached through a symlink: only the exact sheet path is linked', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-outside-'));
+  try {
+    const files = {
+      'campaign.yaml': CAMPAIGN,
+      'People/Ferro.md': subject('ferro', 'Ferro'),
+      'Plot/Trama.md': '# Trama\n\nVedi [Ferro](../People/Ferro.md) qui.\n',
+    };
+    for (const [rel, content] of Object.entries(files)) {
+      const full = path.join(root, rel);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content);
+    }
+    // Replace the sheet with a symlink to an original outside the campaign.
+    fs.rmSync(path.join(root, 'People/Ferro.md'));
+    fs.writeFileSync(path.join(outside, 'Ferro.md'), subject('ferro', 'Ferro'));
+    fs.symlinkSync(path.join(outside, 'Ferro.md'), path.join(root, 'People/Ferro.md'));
+    const realTarget = path.relative(
+      path.join(root, 'Plot'),
+      path.join(fs.realpathSync(outside), 'Ferro.md'),
+    ).split(path.sep).join('/');
+    fs.writeFileSync(
+      path.join(root, 'Plot/Reale.md'),
+      `# Reale\n\nVedi [Ferro](${realTarget}) qui.\n`,
+    );
+
+    const index = buildSubjectIndex(root);
+    const { occurrences } = scanMentions(root, index);
+    const [viaSheet] = occurrences.filter((o) => o.file === 'Plot/Trama.md');
+    assert.equal(viaSheet.subject, 'ferro');
+    assert.equal(viaSheet.state, 'linked');
+    // The real path reaches the same file, but for an internal subject the comparison is exact.
+    const [viaReal] = occurrences.filter((o) => o.file === 'Plot/Reale.md');
+    assert.equal(viaReal.subject, 'ferro');
+    assert.equal(viaReal.state, 'linked-elsewhere');
+    assert.notEqual(viaReal.link_target, 'People/Ferro.md');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});

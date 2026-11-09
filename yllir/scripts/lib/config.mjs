@@ -11,7 +11,7 @@ import { listAdapters, pluginRootFromHere } from './adapter.mjs';
 const FILE = 'campaign.yaml';
 const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit'];
 const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];
-const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only'];
+const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only', 'external'];
 const MODULE_KEYS = ['print', 'encyclopedia', 'master_screen', 'music'];
 const INSTALLED_ADAPTERS = ['none', ...listAdapters(pluginRootFromHere())];
 const INSTALLED_STYLES = [];
@@ -335,7 +335,7 @@ function validateStructure(r, structure, campaignRoot) {
       r.error('bad-type', base, `${base} must be a mapping with id, folder and type`);
       return;
     }
-    checkUnknownKeys(r, entry, base, ['id', 'folder', 'type', 'style', 'cards']);
+    checkUnknownKeys(r, entry, base, ['id', 'folder', 'type', 'style', 'cards', 'exclude']);
 
     const idValid = checkText(r, entry, base, 'id', {
       required: true,
@@ -399,6 +399,27 @@ function validateStructure(r, structure, campaignRoot) {
         r.error('bad-type', `${base}.cards`, `${base}.cards must be true or false`);
       } else if (entry.cards && entry.type !== 'objects') {
         r.error('cards-not-objects', `${base}.cards`, 'cards: true is only valid on a category of type objects');
+      }
+    }
+
+    if (Object.hasOwn(entry, 'exclude')) {
+      const exclude = listField(r, entry, base, 'exclude');
+      if (exclude !== null) {
+        exclude.forEach((item, itemIndex) => {
+          const at = `${base}.exclude[${itemIndex}]`;
+          if (typeof item !== 'string' || item.trim() === '') {
+            r.error('bad-type', at, `${at} must be a non-empty path written as text`);
+          } else if (!isSafeRelativeFolder(item)) {
+            r.error(
+              'bad-exclude',
+              at,
+              `${at} must be a relative path inside the category folder, without .. and without backslashes`,
+            );
+          }
+        });
+      }
+      if (entry.type !== 'external') {
+        r.error('exclude-not-external', `${base}.exclude`, 'exclude is only valid on a category of type external');
       }
     }
   });

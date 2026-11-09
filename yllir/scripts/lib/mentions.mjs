@@ -45,6 +45,7 @@ export function scanMentions(campaignRoot, index, { includeNotes = false } = {})
   for (const category of structure ?? []) {
     if (typeof category.folder !== 'string') continue;
     if (category.type === 'sources') continue;
+    if (category.type === 'external') continue; // read-only originals: link targets, never scanned
     if (category.type === 'notes' && !includeNotes) continue;
     for (const sheet of listSheets(campaignRoot, category.folder)) scanned.add(sheet);
   }
@@ -189,12 +190,15 @@ function classifyGroup(group, line, map, file, campaignRoot, index) {
       if (!inLabel) return null; // inside the target (or the link syntax): not a mention
       const target = resolveLinkTarget(span.target, file, campaignRoot);
       if (isHomonym) {
-        const sameSheet = memberIds.some((id) => sheetOf(index, id) === target);
+        const sameSheet = memberIds.some((id) => {
+          const subject = subjectOf(index, id);
+          return subject !== null && isSameSheet(target, subject, campaignRoot);
+        });
         return sameSheet
           ? finish('linked')
           : finish('linked-elsewhere', { link_target: target });
       }
-      return member.subject.sheet === target
+      return isSameSheet(target, member.subject, campaignRoot)
         ? finish('linked')
         : finish('linked-elsewhere', { link_target: target });
     }
@@ -222,9 +226,31 @@ function classifyGroup(group, line, map, file, campaignRoot, index) {
   return finish('bare');
 }
 
-function sheetOf(index, id) {
-  const subject = index.subjects.find((s) => s.id === id);
-  return subject ? subject.sheet : null;
+function subjectOf(index, id) {
+  return index.subjects.find((s) => s.id === id) ?? null;
+}
+
+/**
+ * True when a link target is the subject's sheet. Internal subjects are compared
+ * as written. For an external subject (reached through a symlink) a target that
+ * reaches the same file by another path, such as the real path of the original,
+ * is the same sheet too.
+ */
+function isSameSheet(target, subject, campaignRoot) {
+  const sheet = subject.sheet;
+  if (target === sheet) return true;
+  if (!subject.external) return false;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return false; // external URL
+  const real = realpathOrNull(path.join(campaignRoot, target));
+  return real !== null && real === realpathOrNull(path.join(campaignRoot, sheet));
+}
+
+function realpathOrNull(p) {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    return null;
+  }
 }
 
 /** Ids of the other subjects with a form that contains `needle` as whole words. */

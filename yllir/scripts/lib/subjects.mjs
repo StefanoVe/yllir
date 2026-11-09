@@ -116,6 +116,88 @@ function isRegularFile(full, entry) {
   }
 }
 
+/**
+ * Lists the Markdown files of an `external` category: a folder that may hold
+ * symlinks to directories or files of another campaign. Those files are
+ * read-only originals; they are indexed as link destinations only.
+ * Paths go through the symlinks (never the real path), so a link written
+ * from a campaign document reaches them. Symlinks are followed. Each directory
+ * is entered once and each file is kept once (by realpath), so loops and shared
+ * files give no duplicates. Broken links, loops and unreadable entries are
+ * skipped silently. Directories named `img` are skipped. A missing folder gives [].
+ * @param {string} campaignRoot absolute path
+ * @param {string} folder campaign-relative folder of the category
+ * @param {string[]} [exclude] paths relative to the folder: a file, or a subfolder (all of it)
+ * @returns {string[]} campaign-relative paths with `/` separators, sorted
+ */
+export function listExternalSheets(campaignRoot, folder, exclude = []) {
+  const base = path.join(campaignRoot, folder);
+  const excluded = exclude
+    .filter((item) => typeof item === 'string')
+    .map(normalizeRelative);
+  const isExcluded = (rel) => excluded.some((item) => rel === item || rel.startsWith(`${item}/`));
+  const visitedDirs = new Set(); // realpaths of the directories already entered
+  const seenFiles = new Set(); // realpaths of the files already kept
+  const found = [];
+
+  const realpathOrNull = (p) => {
+    try {
+      return fs.realpathSync(p);
+    } catch {
+      return null;
+    }
+  };
+
+  const walk = (dir, relDir) => {
+    const dirReal = realpathOrNull(dir);
+    if (dirReal === null || visitedDirs.has(dirReal)) return;
+    visitedDirs.add(dirReal);
+
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    entries.sort((a, b) => compareStrings(a.name, b.name));
+
+    for (const entry of entries) {
+      const rel = relDir === '' ? entry.name : `${relDir}/${entry.name}`;
+      if (isExcluded(rel)) continue;
+      const full = path.join(dir, entry.name);
+
+      let stat;
+      try {
+        stat = fs.statSync(full); // follows symlinks; throws on broken links and loops
+      } catch {
+        continue;
+      }
+      if (stat.isDirectory()) {
+        if (entry.name !== 'img') walk(full, rel);
+      } else if (stat.isFile() && entry.name.endsWith('.md')) {
+        const real = realpathOrNull(full);
+        if (real === null || seenFiles.has(real)) continue;
+        seenFiles.add(real);
+        found.push(path.relative(campaignRoot, full).split(path.sep).join('/'));
+      }
+    }
+  };
+
+  walk(base, '');
+  return found.sort(compareStrings);
+}
+
+/** Folder without `./`, doubled separators or a trailing slash, with `/` separators. */
+function normalizeRelative(item) {
+  return path.posix.normalize(item.split(path.sep).join('/')).replace(/\/+$/, '');
+}
+
+/** Campaign-relative folder as a prefix ('' for the campaign root). */
+function folderPrefix(folder) {
+  const normalized = path.posix.normalize(folder).replace(/\/+$/, '');
+  return normalized === '.' ? '' : normalized;
+}
+
 /** Code-unit comparison, so the result does not depend on the locale. */
 export function compareStrings(a, b) {
   if (a < b) return -1;
@@ -138,7 +220,12 @@ export function buildSubjectIndex(campaignRoot) {
   const indexErrors = [];
 
   for (const category of structure) {
-    if (typeof category.folder !== 'string' || !SUBJECT_TYPES.has(category.type)) continue;
+    if (typeof category.folder !== 'string') continue;
+    if (category.type === 'external') {
+      indexExternal(campaignRoot, category, { subjects, bySubjectId, indexErrors });
+      continue;
+    }
+    if (!SUBJECT_TYPES.has(category.type)) continue;
 
     for (const sheet of listSheets(campaignRoot, category.folder)) {
       const text = fs.readFileSync(path.join(campaignRoot, sheet), 'utf8');
@@ -173,23 +260,12 @@ export function buildSubjectIndex(campaignRoot) {
       }
       bySubjectId.set(data.id, sheet);
 
-      const forms = [];
-      const seen = new Set();
-      const addForm = (text, kind) => {
-        const folded = foldForm(text);
-        if (folded === '' || seen.has(folded)) return;
-        seen.add(folded);
-        forms.push({ text, folded, kind, status: 'fact' });
-      };
-      addForm(title, 'title');
-      for (const alias of aliases) addForm(alias, 'alias');
-
       subjects.push({
         id: data.id,
         category: category.id,
         type: category.type,
         sheet,
-        forms,
+        forms: buildForms(title, aliases),
       });
     }
   }
@@ -216,6 +292,69 @@ export function buildSubjectIndex(campaignRoot) {
   );
 
   return { subjects, homonyms, errors: indexErrors };
+}
+
+/**
+ * Adds the subjects of an `external` category. Their documents are never ours:
+ * their content never causes an error (only a duplicate id does). The id comes
+ * from the frontmatter `id` when it is a non-empty string, else from the path
+ * inside the category; the title falls back to the file name.
+ */
+function indexExternal(campaignRoot, category, { subjects, bySubjectId, indexErrors }) {
+  const prefix = folderPrefix(category.folder);
+  const exclude = Array.isArray(category.exclude) ? category.exclude : [];
+
+  for (const sheet of listExternalSheets(campaignRoot, category.folder, exclude)) {
+    let text;
+    try {
+      text = fs.readFileSync(path.join(campaignRoot, sheet), 'utf8');
+    } catch {
+      continue; // unreadable original: skipped silently
+    }
+    const { data, body, bodyStartLine } = parseFrontmatter(text);
+
+    const relInFolder = prefix === '' ? sheet : sheet.slice(prefix.length + 1);
+    const ownId = typeof data?.id === 'string' && data.id !== '' ? data.id : relInFolder.slice(0, -'.md'.length);
+    const id = `${category.id}:${ownId}`;
+
+    if (bySubjectId.has(id)) {
+      indexErrors.push({
+        file: sheet,
+        message: `duplicate id ${id} (also in ${bySubjectId.get(id)})`,
+      });
+      continue;
+    }
+    bySubjectId.set(id, sheet);
+
+    const title =
+      firstTitle(analyzeMarkdown(body, bodyStartLine).lines) ??
+      path.posix.basename(sheet, '.md');
+    const aliases = Array.isArray(data?.aliases) ? data.aliases.map(String) : [];
+
+    subjects.push({
+      id,
+      category: category.id,
+      type: 'external',
+      sheet,
+      forms: buildForms(title, aliases),
+      external: true,
+    });
+  }
+}
+
+/** Forms of a subject: the title, then the aliases, without duplicates (by folded text). */
+function buildForms(title, aliases) {
+  const forms = [];
+  const seen = new Set();
+  const addForm = (text, kind) => {
+    const folded = foldForm(text);
+    if (folded === '' || seen.has(folded)) return;
+    seen.add(folded);
+    forms.push({ text, folded, kind, status: 'fact' });
+  };
+  addForm(title, 'title');
+  for (const alias of aliases) addForm(alias, 'alias');
+  return forms;
 }
 
 /** Text of the first level-1 heading, or null when there is none (or it is empty). */

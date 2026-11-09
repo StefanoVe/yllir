@@ -26,6 +26,7 @@ Use only the master-facing words listed in the lexicon of the `yllir` skill. Nev
 These rules cannot be changed by settings or by the master's rules.
 
 - Write campaign documents only through the skill `yllir:write-sequence`, never directly.
+- A named character defined in a plot document needs their own character sheet. The sheet is the source of truth for who the character is, never for what the character does in the plot. Create sheets only through the processes.
 - After any change to a campaign document, its mentions must be linked. Links are made only by the skill `yllir:linker`, which runs by itself after the write sequence and when the turn check lists unlinked mentions; never add links by hand.
 - Without git the framework writes nothing: tell the master that the campaign needs git, and write nothing.
 - The block between `<!-- master -->` and `<!-- /master -->` holds the master's private notes. Never copy it into anything meant for players, image services, web searches or publishing.

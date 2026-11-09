@@ -85,3 +85,4 @@ continue with: write-sequence step 7
 - Never quote the content of a master-only block. Refer to the file and line, for example `Characters/Ada Rook.md:22`.
 - Do not change the outcomes that the reviewer gave. If you disagree, send the case back to the reviewer through the Step 3 loop, do not overwrite it.
 - Run commands only from the campaign root.
+- Documents in `external` categories are read-only link targets: they are never in FILES, and the scripts never write into them.
