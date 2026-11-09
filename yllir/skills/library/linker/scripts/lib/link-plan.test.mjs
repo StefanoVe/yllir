@@ -141,6 +141,57 @@ test('scope by subjects picks the files that mention the subject', () => {
   );
 });
 
+test('two-way: a sheet in files pulls in the documents that mention its subject', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/Nota.md': '# Nota\n\nC\'è Teodo Marr qui.\n',
+    },
+    (root) => {
+      // No `subjects` argument: the sheet of Teodo Marr is in files, so its mentions count.
+      const plan = planLinks(root, { files: ['People/Teodo Marr.md'] });
+      assert.ok(plan.scope.includes('People/Teodo Marr.md'));
+      assert.ok(plan.scope.includes('Trama/Nota.md'));
+      assert.ok(plan.proposals.some((p) => p.file === 'Trama/Nota.md' && p.subject === 'teodo-marr'));
+    },
+  );
+});
+
+test('two-way: a file that is not a sheet gives no extra scope', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/Nota.md': '# Nota\n\nC\'è Teodo Marr qui.\n',
+      'Trama/Altra.md': '# Altra\n\nParla Teodo Marr con il monaco.\n',
+    },
+    (root) => {
+      const plan = planLinks(root, { files: ['Trama/Nota.md'] });
+      assert.deepEqual(plan.scope, ['Trama/Nota.md']);
+      assert.deepEqual(
+        plan.proposals.map((p) => p.file),
+        ['Trama/Nota.md'],
+      );
+    },
+  );
+});
+
+test('two-way: a mention already linked to its sheet is not proposed again', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/Nota.md': '# Nota\n\nVedi [Teodo Marr](../People/Teodo%20Marr.md) al porto.\n',
+    },
+    (root) => {
+      const plan = planLinks(root, { files: ['People/Teodo Marr.md'] });
+      assert.ok(plan.scope.includes('Trama/Nota.md'));
+      assert.deepEqual(
+        plan.proposals.filter((p) => p.file === 'Trama/Nota.md'),
+        [],
+      );
+    },
+  );
+});
+
 test('unknown file in scope gives a scope error', () => {
   withCampaign(
     {
@@ -256,4 +307,32 @@ test('master-only document mentioning a master-only subject gets no link', () =>
       );
     },
   );
+});
+
+test('symlinked document: no proposal for it, a normal file still gets one', () => {
+  withCampaign(BASE, (root) => {
+    // Document ingest keeps the original outside the repo and links it from the campaign.
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
+    try {
+      const original = path.join(outside, 'Originale.md');
+      fs.writeFileSync(original, '# Originale\n\nParla Teodo Marr al porto.\n');
+      fs.mkdirSync(path.join(root, 'Trama'), { recursive: true });
+      fs.symlinkSync(original, path.join(root, 'Trama', 'Originale.md'));
+      fs.writeFileSync(
+        path.join(root, 'Trama', 'Nota.md'),
+        '# Nota\n\nIncontro con Teodo Marr al porto.\n',
+      );
+
+      const plan = planLinks(root);
+      assert.ok(!plan.scope.includes('Trama/Originale.md'));
+      assert.ok(plan.scope.includes('Trama/Nota.md'));
+      assert.deepEqual(
+        plan.proposals.map((p) => p.file),
+        ['Trama/Nota.md'],
+      );
+      assert.deepEqual(plan.review.filter((r) => r.file === 'Trama/Originale.md'), []);
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true });
+    }
+  });
 });

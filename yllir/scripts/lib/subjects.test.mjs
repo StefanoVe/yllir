@@ -168,3 +168,60 @@ test('an invalid campaign.yaml is an error with empty lists', () => {
   assert.equal(result.errors.length, 1);
   assert.equal(result.errors[0].file, 'campaign.yaml');
 });
+
+/** Creates a temporary folder outside any campaign, for symlink targets. */
+function makeOutside(files) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-outside-'));
+  for (const [rel, content] of Object.entries(files)) {
+    fs.writeFileSync(path.join(dir, rel), content);
+  }
+  return dir;
+}
+
+test('a symlink to a regular Markdown file is indexed as a subject under its own path', () => {
+  const outside = makeOutside({ 'scheda.md': sheet('linked-sheet', 'Scheda Collegata') });
+  try {
+    const root = makeCampaign({});
+    fs.mkdirSync(path.join(root, 'People'), { recursive: true });
+    fs.symlinkSync(path.join(outside, 'scheda.md'), path.join(root, 'People/Collegata.md'));
+    const { subjects, errors } = buildSubjectIndex(root);
+    assert.deepEqual(errors, []);
+    assert.equal(subjects.length, 1);
+    assert.equal(subjects[0].id, 'linked-sheet');
+    assert.equal(subjects[0].sheet, 'People/Collegata.md');
+    assert.equal(subjects[0].forms[0].text, 'Scheda Collegata');
+  } finally {
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test('a broken symlink is ignored without error', () => {
+  const root = makeCampaign({ 'People/Oria.md': sheet('oria', 'Oria') });
+  fs.symlinkSync(path.join(root, 'nowhere.md'), path.join(root, 'People/Rotto.md'));
+  const { subjects, errors } = buildSubjectIndex(root);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(subjects.map((s) => s.id), ['oria']);
+});
+
+test('a symlink to a directory is ignored and its contents are not walked', () => {
+  const outside = makeOutside({});
+  try {
+    fs.mkdirSync(path.join(outside, 'Cartella'));
+    fs.writeFileSync(path.join(outside, 'Cartella/Dentro.md'), sheet('dentro', 'Dentro'));
+    const root = makeCampaign({ 'People/Oria.md': sheet('oria', 'Oria') });
+    fs.symlinkSync(path.join(outside, 'Cartella'), path.join(root, 'People/Dir'));
+    const { subjects, errors } = buildSubjectIndex(root);
+    assert.deepEqual(errors, []);
+    assert.deepEqual(subjects.map((s) => s.id), ['oria']);
+  } finally {
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test('a symlink loop is ignored without error', () => {
+  const root = makeCampaign({ 'People/Oria.md': sheet('oria', 'Oria') });
+  fs.symlinkSync(path.join(root, 'People/Loop.md'), path.join(root, 'People/Loop.md'));
+  const { subjects, errors } = buildSubjectIndex(root);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(subjects.map((s) => s.id), ['oria']);
+});

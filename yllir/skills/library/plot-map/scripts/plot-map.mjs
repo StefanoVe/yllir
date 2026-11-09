@@ -63,6 +63,9 @@ function main() {
   process.stdout.write(
     `sessions: ${result.sessions.length}, played: ${played}, ready: ${ready}, errors: ${result.errors.length}\n`,
   );
+  process.stdout.write(
+    `unlinked sessions: ${result.unlinked.length > 0 ? result.unlinked.join(', ') : 'none'}\n`,
+  );
   for (const error of result.errors) {
     process.stdout.write(`error ${error.code} ${error.file}: ${error.message}\n`);
   }

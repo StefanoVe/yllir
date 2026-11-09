@@ -94,7 +94,7 @@ Generated file. Do not edit by hand.
 ---
 id: <scene id, see the rules below>
 session: <new id>
-depends_on: [<id of the previous scene, or nothing>]
+depends_on: []
 location: [<ids of the main places of the scene, or []>]
 ---
 
@@ -113,7 +113,7 @@ _<one narration paragraph that opens the scene>_
 Rules for the draft:
 - Write 2 to 4 scenes, one scene file each. The scene file name is the scene title, without the characters `/ \ : * ? " < > |`. The text of a scene file has no `#` title line: the file name is the title, and the text starts with the narration paragraph.
 - The scene id is `<new id>-e<NN>`, where `<NN>` is the scene number with two digits, from `01`, in the order of the scenes. Example: `the-long-night-02-e01`.
-- The `depends_on` of the first scene is `[]`. The `depends_on` of a later scene lists the id of the previous scene ONLY if MASTER_MESSAGE says the scenes happen in that order; otherwise it is `[]`.
+- The `depends_on` of EVERY scene is `[]` in the draft, the first one and the later ones alike. Do not put the id of another scene there, even if MASTER_MESSAGE says the scenes happen in order. The links between the scenes are decided later, in Step 8b, by the plot-map skill, which reads the scene files. The draft does not decide them, and you do not guess them.
 - The main file has no scene text. It is generated from the scene files: write only the form above.
 - Each scene opens with ONE `_italic_` narration paragraph. Italic is only for read-aloud narration.
 - Use `##` for minor actions inside a scene.
@@ -140,12 +140,22 @@ After invoking it, read `.campaign/state/write/report.txt` with the Read tool. T
 Loop, starting with `ROUND=1`. Read `.campaign/state/write/report.txt`. Then:
 - If status is `FIX_NEEDED` or `VERIFY_FAILED`: open the draft, fix exactly each problem listed under `details` (if a problem is a contested fact, remove that fact), save the draft, and invoke `yllir:write-sequence` again with `ROUND` plus one and the same other inputs. Do this up to `ROUND` 3. Do not stop after the first fix: each fix is followed by a new invocation.
 - If status is `ASK` or `CONFLICT`: ask the master the question from the report in plain words, and stop.
-- If status is `DONE`: go to step 9.
+- If status is `DONE`: go to step 8b.
 - If status is `FAILED`, or any other status: go to the failure sentence below, and stop.
 
 After a failed `ROUND` 3 (still `FIX_NEEDED` or `VERIFY_FAILED`), or after `FAILED`: tell the master in one plain sentence, in the campaign language, that the session could not be completed and why, in plain words. Do not mention rounds, statuses, problems or paths. Stop.
 
 Output: `status: DONE`.
+
+**Step 8b — Link the scenes.** Run after `status: DONE` of Step 8, and before Step 9. Invoke the skill `yllir:plot-map` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/plot-map/SKILL.md` with the Read tool, and follow it exactly as if it had been invoked) with:
+- `MODE=link-events`
+- `SESSIONS=<the id of the new session>`
+- `CONTINUE_WITH="prepare-session step 9"`
+
+When it has finished, read `.campaign/state/plot-map/report.txt` with the Read tool. The report is for you, never for the master: do not show it or quote it. If the file is missing, treat the status as `FAILED`.
+- Whatever the `status` of the report, go to Step 9.
+- If the `status` is `FAILED`: add nothing about the linking to the message for the master.
+- Output: the scenes linked, or the linking attempted and failed. Either way, the report has been read.
 
 **Step 9 — Message for the master.** Only after `status: DONE`. Write ONE message in the campaign language, in plain words:
 - one sentence: the session is ready, with its name (the session name, without `.md`);
@@ -157,7 +167,7 @@ Output: `status: DONE`.
 - for each ENTRY_POINTS line, one sentence: which character can enter the scene, and how;
 - one sentence on what the master can do next (for example «say what happens in the first scene, and I will change it»).
 
-No paths, no ids, no codes, no backticks, no formatting marks.
+No paths, no ids, no codes, no backticks, no formatting marks. The report of Step 8b is never shown: do not write its NOTE lines, and nothing else from it.
 
 ## Examples
 

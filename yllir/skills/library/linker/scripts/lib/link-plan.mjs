@@ -26,6 +26,12 @@ export function scanCampaign(campaignRoot) {
 }
 
 /**
+ * Linking runs in two directions, with no extra argument:
+ * - outward: the mentions inside the given files are linked to their sheets;
+ * - inward: every subject passed in `subjects`, and every subject whose sheet is
+ *   one of the given files, has all its mentions linked, in any campaign file
+ *   (the other documents join the scope).
+ * When both `files` and `subjects` are null, the whole campaign is in scope.
  * @param {string} campaignRoot absolute path to the campaign folder
  * @param {{ files?: string[]|null, subjects?: string[]|null }} [options]
  * @returns {{ scope: string[], errors: object[], proposals: object[], review: object[] }}
@@ -48,17 +54,24 @@ export function planFromScan(campaignRoot, { index, scan }, { files = null, subj
   if (files === null && subjects === null) {
     for (const file of scan.files) scope.add(file);
   } else {
+    const validFiles = new Set();
     if (files !== null) {
       for (const file of new Set(files)) {
         if (scanned.has(file)) {
           scope.add(file);
+          validFiles.add(file);
         } else {
           errors.push({ file, message: 'file not in scan' });
         }
       }
     }
-    if (subjects !== null) {
-      const wanted = new Set(subjects);
+    // Outward and inward: the subjects passed by the caller, plus the subjects
+    // whose sheet is one of the valid files (so no caller argument is needed).
+    const wanted = new Set(subjects ?? []);
+    for (const subject of index.subjects) {
+      if (validFiles.has(subject.sheet)) wanted.add(subject.id);
+    }
+    if (wanted.size > 0) {
       for (const occ of scan.occurrences) {
         const direct = typeof occ.subject === 'string' && wanted.has(occ.subject);
         const candidate = (occ.candidates ?? []).some((id) => wanted.has(id));
@@ -66,6 +79,23 @@ export function planFromScan(campaignRoot, { index, scan }, { files = null, subj
       }
     }
   }
+
+  // A symlink is an original kept outside the repo (made by document ingest): the linker
+  // never writes into it, so it gets no proposal or review entry and is not in scope.
+  // It can still be a subject sheet, so the subjects above keep pointing at it.
+  const linkCache = new Map();
+  const isLink = (file) => {
+    if (!linkCache.has(file)) {
+      let link = false;
+      try {
+        link = fs.lstatSync(path.join(campaignRoot, file)).isSymbolicLink();
+      } catch {
+        link = false;
+      }
+      linkCache.set(file, link);
+    }
+    return linkCache.get(file);
+  };
 
   const sheetOf = new Map(index.subjects.map((subject) => [subject.id, subject.sheet]));
   // A master-only subject is never linked, from any document (the subject stays in the index).
@@ -85,7 +115,7 @@ export function planFromScan(campaignRoot, { index, scan }, { files = null, subj
   let reviewNo = 0;
 
   for (const occ of scan.occurrences) {
-    if (!scope.has(occ.file)) continue;
+    if (!scope.has(occ.file) || isLink(occ.file)) continue;
 
     if (occ.state === 'bare' && occ.subject !== null) {
       const sheet = sheetOf.get(occ.subject);
@@ -129,7 +159,7 @@ export function planFromScan(campaignRoot, { index, scan }, { files = null, subj
   }
 
   return {
-    scope: [...scope].sort(compareStrings),
+    scope: [...scope].filter((file) => !isLink(file)).sort(compareStrings),
     errors,
     proposals,
     review,

@@ -296,7 +296,7 @@ If the command is refused or exits with 2, run it again exactly as written, with
 
 - Never modify, rename or delete an original. Only `ingest-acquire.mjs` copies, and only into `<SOURCES>/<id>/`.
 - Write only inside `<SOURCES>/<id>/` and inside `.campaign/state/`. Campaign documents are written only by write-sequence (through its `apply-draft` step).
-- Symlinks are created only by `ingest-link.mjs` (Step 1b). This is the only exception to the rule that campaign documents are written only by write-sequence. A linked original is never modified.
+- Symlinks are created only by `ingest-link.mjs` (Step 1b). This is the only exception to the rule that campaign documents are written only by write-sequence. A linked original is never modified. The linker does not write into linked originals; links towards them are made from the other documents.
 - Step 1b links a file only when it is a finished campaign document with no doubt in it. When in doubt, the file is not linked and follows the normal flow.
 - Never edit `campaign.yaml`, the customizations, or any configuration.
 - A silent master is not a confirmation. A doubt that blocks integration waits for the master's answer: it stays an open question. Never resolve it yourself.

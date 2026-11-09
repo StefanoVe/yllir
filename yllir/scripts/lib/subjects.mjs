@@ -72,7 +72,10 @@ export function masterOnlyChecker(structure) {
 
 /**
  * Lists the Markdown files under `<campaignRoot>/<folder>`, recursively, skipping
- * directories named `img`. A missing folder gives an empty list.
+ * directories named `img`. A symlink counts as a file when it points to a regular
+ * file (document-ingest links original documents this way); its path stays the
+ * path of the symlink. Symlinks to directories, broken symlinks and loops are
+ * ignored. A missing folder gives an empty list.
  * @returns {string[]} relative paths with `/` separators, sorted
  */
 export function listSheets(campaignRoot, folder) {
@@ -90,13 +93,27 @@ export function listSheets(campaignRoot, folder) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (entry.name !== 'img') walk(full);
-      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+      } else if (entry.name.endsWith('.md') && isRegularFile(full, entry)) {
         found.push(path.relative(campaignRoot, full).split(path.sep).join('/'));
       }
     }
   };
   walk(base);
   return found.sort(compareStrings);
+}
+
+/**
+ * True for a regular file, or for a symlink whose target is a regular file.
+ * Directory symlinks are never followed; any error (broken link, loop) is false.
+ */
+function isRegularFile(full, entry) {
+  if (entry.isFile()) return true;
+  if (!entry.isSymbolicLink()) return false;
+  try {
+    return fs.statSync(full).isFile();
+  } catch {
+    return false;
+  }
 }
 
 /** Code-unit comparison, so the result does not depend on the locale. */

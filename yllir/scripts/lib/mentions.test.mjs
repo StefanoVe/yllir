@@ -325,3 +325,94 @@ test('summary has every state, with zero when absent', () => {
   assert.equal(result.summary.linked, 0);
   assert.ok(result.summary.bare >= 1);
 });
+
+/** Creates a temporary folder outside the campaign, for symlink targets. */
+function makeOutside(files) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-outside-'));
+  for (const [rel, content] of Object.entries(files)) {
+    fs.writeFileSync(path.join(dir, rel), content);
+  }
+  return dir;
+}
+
+test('a mention of a symlinked subject in a normal document is found', () => {
+  const outside = makeOutside({ 'scheda.md': subject('lino', 'Lino Collegato') });
+  try {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+    try {
+      const files = { 'campaign.yaml': CAMPAIGN, ...BASE_FILES, 'Plot/Trama.md': 'Incontro con Lino Collegato.\n' };
+      for (const [rel, content] of Object.entries(files)) {
+        const full = path.join(root, rel);
+        fs.mkdirSync(path.dirname(full), { recursive: true });
+        fs.writeFileSync(full, content);
+      }
+      fs.symlinkSync(path.join(outside, 'scheda.md'), path.join(root, 'People/Lino.md'));
+      const index = buildSubjectIndex(root);
+      assert.deepEqual(index.errors, []);
+      const scanned = scanMentions(root, index);
+      assert.ok(scanned.files.includes('People/Lino.md'));
+      const [occ] = scanned.occurrences.filter((o) => o.file === 'Plot/Trama.md');
+      assert.equal(occ.subject, 'lino');
+      assert.equal(occ.state, 'bare');
+      assert.equal(occ.text, 'Lino Collegato');
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  } finally {
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test('a link from a normal document to a symlinked subject is linked, not linked-elsewhere', () => {
+  const outside = makeOutside({ 'scheda.md': subject('lino', 'Lino Collegato') });
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+  try {
+    const files = {
+      'campaign.yaml': CAMPAIGN,
+      ...BASE_FILES,
+      'Plot/Link.md': 'Vedi [Lino Collegato](../People/Lino.md).\n',
+    };
+    for (const [rel, content] of Object.entries(files)) {
+      const full = path.join(root, rel);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content);
+    }
+    fs.symlinkSync(path.join(outside, 'scheda.md'), path.join(root, 'People/Lino.md'));
+    const index = buildSubjectIndex(root);
+    const { occurrences } = scanMentions(root, index);
+    const [occ] = occurrences.filter((o) => o.file === 'Plot/Link.md');
+    assert.equal(occ.subject, 'lino');
+    assert.equal(occ.state, 'linked');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test('mentions inside a symlinked document are reported under the symlink path', () => {
+  const outside = makeOutside({
+    'appunti.md': '# Appunti\n\nOria Valdes parla al porto.\n',
+  });
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+  try {
+    const files = { 'campaign.yaml': CAMPAIGN, ...BASE_FILES };
+    for (const [rel, content] of Object.entries(files)) {
+      const full = path.join(root, rel);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, content);
+    }
+    fs.mkdirSync(path.join(root, 'Plot'), { recursive: true });
+    fs.symlinkSync(path.join(outside, 'appunti.md'), path.join(root, 'Plot/Appunti.md'));
+    const index = buildSubjectIndex(root);
+    const { occurrences, files: scanned } = scanMentions(root, index);
+    assert.ok(scanned.includes('Plot/Appunti.md'));
+    const [occ] = occurrences.filter((o) => o.file === 'Plot/Appunti.md');
+    assert.equal(occ.subject, 'oria-valdes');
+    assert.equal(occ.state, 'bare');
+    assert.equal(occ.line, 3);
+    assert.equal(occ.col, 1);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(outside, { recursive: true, force: true });
+  }
+});

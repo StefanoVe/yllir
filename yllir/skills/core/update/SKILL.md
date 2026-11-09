@@ -2,7 +2,7 @@
 name: update
 description: Handles the framework update for the master: campaign alignment after the assistant was updated, the update notice and its yes or no, and an interrupted update. It is read by the entry skill, never called by the master.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *)
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *), Read, Skill
 ---
 
 # Update
@@ -20,14 +20,24 @@ Run every command from the campaign root (the folder the master opened). Never r
 Use this part only when the block `YLLIR SESSION CHECK` has the line `campaign alignment: needed`: the assistant was updated and the campaign's generated files are older.
 
 1. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" .`. Read the JSON result and its `exit:` line.
-2. If `status` is `updated`: say the fixed sentence of the lexicon «L'assistente è stato aggiornato. Nulla di tuo è cambiato.» (in the campaign language, as it is written there). If `restored_by_hand` is not empty, add in one sentence that a file managed by the assistant was restored, and that their own rules belong in «Your rules». Do not run `generate-instructions` as well.
+2. If `status` is `updated`: say the fixed sentence of the lexicon «L'assistente è stato aggiornato. Nulla di tuo è cambiato.» (in the campaign language, as it is written there). Then do the following, in this order:
+   - If `migrated` is not empty (it lists the old session files that were converted), link the scenes, once:
+     1. Invoke the skill `yllir:plot-map` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/plot-map/SKILL.md` with the Read tool, and follow it exactly as if it had been invoked) with:
+        - `MODE=link-events`
+        - `SESSIONS=UNLINKED`
+        - `CONTINUE_WITH="update Part A: read the plot-map report, then end"`
+     2. When it has finished, read `.campaign/state/plot-map/report.txt` with the Read tool. The report is for you, never for the master: do not show it or quote it.
+     3. If its `status` is `DONE`: add ONE sentence for the master, in the campaign language, in plain words: the sessions have been reorganised so that each scene is its own document, and each session has a map of its scenes. Use only the lexicon words «Sessione» and «Mappa della trama» (English: «Session» and «Plot map»), and the plain words «scena» (English: «scene»). Do not use the words «evento», «file», «migrazione» or «depends_on».
+     4. If its `status` is `FAILED`, or any other status: say nothing about it and do not retry. The check runs again the next time the master prepares a session.
+   - If `restored_by_hand` is not empty, add in one sentence that a file managed by the assistant was restored, and that their own rules belong in «Your rules».
+   - Do not run `generate-instructions` as well.
 3. If `status` is `up-to-date`: say nothing.
 4. If `status` is `failed` and the first item of `errors` has `code` `interrupted-update`: say the fixed sentence of the lexicon for an earlier update that was not finished. Then offer two choices in plain words: continue the update, or go back to how it was. Write no campaign content until the master chooses.
    - On «continue»: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" . --resume`. Read its JSON result and apply step 2 (`updated`) or step 5 (any other failure).
    - On «go back»: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" . --cancel`. If `status` is `cancelled`, tell the master in one sentence that everything is as it was before the update.
 5. Any other failure, or any other status: say the fixed sentence of the lexicon for an update that could not be applied, which says that nothing was changed (the script has already restored the campaign). Stop writing.
 
-Output: the campaign is aligned (updated, or already up to date), or the master has been told about the problem and nothing was written.
+Output: the campaign is aligned (updated, with the scenes linked when `migrated` was not empty, or already up to date), or the master has been told about the problem and nothing was written.
 
 ## Part B — Update notice
 

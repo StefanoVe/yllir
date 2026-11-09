@@ -24,7 +24,7 @@ export function plotMap(root) {
     for (const e of configErrors) {
       errors.push({ code: 'campaign-config', file: e.file, message: e.message });
     }
-    return { sessions: [], arcs: [], errors: sortErrors(errors) };
+    return { sessions: [], arcs: [], unlinked: [], errors: sortErrors(errors) };
   }
 
   const categoriesOf = (type) =>
@@ -298,7 +298,19 @@ export function plotMap(root) {
     };
   });
 
-  return { sessions: result, arcs, errors: sortErrors(errors) };
+  // 8. Unlinked sessions: two or more events, and no event depends on another event of the same session.
+  const unlinked = result
+    .filter((s) => s.events.length >= 2 && !hasInternalLink(s.events))
+    .map((s) => s.id)
+    .sort(compareStrings);
+
+  return { sessions: result, arcs, unlinked, errors: sortErrors(errors) };
+}
+
+/** True when some event of the session depends on another event of the same session. */
+function hasInternalLink(sessionEvents) {
+  const ids = new Set(sessionEvents.map((e) => e.id));
+  return sessionEvents.some((e) => e.depends_on.some((dep) => dep !== e.id && ids.has(dep)));
 }
 
 /** Kind of a plot file from its path relative to the category folder. */

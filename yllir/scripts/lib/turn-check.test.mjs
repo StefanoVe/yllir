@@ -30,10 +30,26 @@ function tempDir() {
   return dir;
 }
 
-/** Campaign folder: only the presence of campaign.yaml matters to the turn check. */
+/** A campaign.yaml with the structure the linker needs (a subjects folder and a plot folder). */
+const CAMPAIGN_YAML = [
+  'name: Test',
+  'structure:',
+  '  - id: people',
+  '    folder: People',
+  '    type: subjects',
+  '  - id: plot',
+  '    folder: Trama',
+  '    type: plot',
+  '',
+].join('\n');
+
+/**
+ * Campaign folder with campaign.yaml. The turn check only needs its presence for the
+ * topics; the linker needs the structure to plan the links.
+ */
 function campaign() {
   const root = tempDir();
-  fs.writeFileSync(path.join(root, 'campaign.yaml'), 'schema: 1\n');
+  fs.writeFileSync(path.join(root, 'campaign.yaml'), CAMPAIGN_YAML);
   return root;
 }
 
@@ -89,7 +105,10 @@ describe('turnCheck', () => {
 
   test('a campaign with no topics has no active topic', () => {
     const root = campaign();
-    assert.equal(turnCheck(root), [HEADER, rootLine(root), 'active topic: none', NEXT].join('\n'));
+    assert.equal(
+      turnCheck(root),
+      [HEADER, rootLine(root), 'active topic: none', 'unlinked mentions: none', NEXT].join('\n'),
+    );
   });
 
   test('an active topic shows its next step, its pending question and the other open topics', () => {
@@ -110,6 +129,7 @@ describe('turnCheck', () => {
         `active topic: ${active.id} — Il porto di Morvalle — next step: Scrivere la scena del porto.`,
         'pending questions: Il molo è di legno o di pietra?',
         `other open topics: ${first.id} — Il mercato delle ceneri`,
+        'unlinked mentions: none',
         NEXT,
       ].join('\n'),
     );
@@ -125,6 +145,7 @@ describe('turnCheck', () => {
         rootLine(root),
         expectedActive(root, 'Il porto di Morvalle', 'none'),
         'pending questions: none',
+        'unlinked mentions: none',
         NEXT,
       ].join('\n'),
     );
@@ -158,6 +179,64 @@ describe('turnCheck', () => {
     newTopic(root, { process: 'scena', goal: 'Il porto di Morvalle', now: new Date('2026-11-03T10:00:00Z') });
     fs.writeFileSync(path.join(root, '.campaign/state/topics', 'rotto.md'), 'niente frontmatter\n');
     assert.equal(turnCheck(root), [HEADER, rootLine(root), NEXT].join('\n'));
+  });
+});
+
+/** Campaign folder with a subjects folder and a plot folder, for mention tests. */
+function structuredCampaign() {
+  const root = campaign();
+  fs.mkdirSync(path.join(root, 'People'));
+  fs.mkdirSync(path.join(root, 'Trama'));
+  fs.writeFileSync(
+    path.join(root, 'People', 'Teodo Marr.md'),
+    '---\nid: teodo-marr\n---\n\n# Teodo Marr\n\nUn testo.\n',
+  );
+  return root;
+}
+
+/** The unlinked-mentions line of a check text, or undefined when there is none. */
+function unlinkedOf(text) {
+  return text.split('\n').find((line) => line.startsWith('unlinked mentions: '));
+}
+
+describe('unlinked mentions line', () => {
+  test('none when no file has an unlinked mention', () => {
+    const root = structuredCampaign();
+    fs.writeFileSync(path.join(root, 'Trama', 'A.md'), '# A\n\nVedi [Teodo Marr](../People/Teodo%20Marr.md).\n');
+    assert.equal(unlinkedOf(turnCheck(root)), 'unlinked mentions: none');
+  });
+
+  test('one file with a bare mention is listed, just before the next line', () => {
+    const root = structuredCampaign();
+    fs.writeFileSync(path.join(root, 'Trama', 'A.md'), '# A\n\nC\'è Teodo Marr qui.\n');
+    assert.equal(
+      turnCheck(root),
+      [HEADER, rootLine(root), 'active topic: none', 'unlinked mentions: 1 files: Trama/A.md', NEXT].join('\n'),
+    );
+  });
+
+  test('more than five files: five listed, then the count of the rest', () => {
+    const root = structuredCampaign();
+    for (const name of ['F1', 'F2', 'F3', 'F4', 'F5', 'F6']) {
+      fs.writeFileSync(path.join(root, 'Trama', `${name}.md`), '# X\n\nC\'è Teodo Marr qui.\n');
+    }
+    assert.equal(
+      unlinkedOf(turnCheck(root)),
+      'unlinked mentions: 6 files: Trama/F1.md, Trama/F2.md, Trama/F3.md, Trama/F4.md, Trama/F5.md, and 1 more',
+    );
+  });
+
+  test('a campaign whose structure cannot be read says unknown, and nothing throws', () => {
+    const root = tempDir();
+    fs.writeFileSync(path.join(root, 'campaign.yaml'), 'schema: 1\n');
+    assert.equal(unlinkedOf(turnCheck(root)), 'unlinked mentions: unknown');
+  });
+
+  test('a folder without campaign.yaml has no unlinked mentions line', () => {
+    const root = structuredCampaign();
+    fs.rmSync(path.join(root, 'campaign.yaml'));
+    fs.writeFileSync(path.join(root, 'Trama', 'A.md'), '# A\n\nC\'è Teodo Marr qui.\n');
+    assert.equal(unlinkedOf(turnCheck(root)), undefined);
   });
 });
 

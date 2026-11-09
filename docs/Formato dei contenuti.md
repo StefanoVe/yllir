@@ -231,10 +231,31 @@ Gli interventi meta non sono narrazione e non definiscono l'identità di nulla.
 
 **Proposta.**
 
-- Lo script rigenera il file principale dai file evento della cartella `Eventi/`: grafo Mermaid con un nodo per evento e un arco per ogni `depends_on`, elenco degli eventi con link relativo al loro file, eventi senza prerequisiti (ingressi) ed eventi che nessuno richiede (uscite).
+- Lo script rigenera il file principale dai file evento della cartella `Eventi/`: grafo Mermaid con un nodo per evento e un arco per ogni `depends_on`, elenco degli eventi con link relativo al loro file, eventi senza prerequisiti (ingressi) ed eventi che nessuno richiede (uscite). Gli archi sono le dipendenze fra eventi, collegate dall'agente secondo 2.9: lo script non le ricava dal testo.
 - Il file ha il campo `generated: true` nei metadati e una riga iniziale che dice di non modificarlo.
 - **Rivisto e corretto.** Dopo la rigenerazione un sub-agente indipendente rilegge la mappa rispetto agli eventi. Le correzioni si applicano alle **fonti** (metadati o testo degli eventi), mai alla mappa, che altrimenti perderebbe la correzione alla rigenerazione successiva. Poi la mappa si rigenera di nuovo.
 - Lo script segnala eventi con `session` diversa dalla cartella, `id` duplicati, riferimenti inesistenti e cicli.
+
+### 2.9 Collegamento degli eventi
+
+**Proposta (2026-11-09, scelta dell'autore).** Gli eventi di una sessione devono essere collegati fra loro con `depends_on`, anche quando si biforcano e si ricongiungono. Altrimenti la mappa concettuale della sessione mostra solo una fila di eventi scollegati. Il collegamento è un giudizio, non un calcolo: lo fa un agente che esamina i testi degli eventi, mentre la mappa resta un derivato (2.8).
+
+Il collegamento avviene in due momenti:
+
+- (a) dopo la migrazione delle campagne esistenti, che crea gli eventi con `depends_on: []` (vedi [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md));
+- (b) ogni volta che si creano nuovi eventi di una sessione.
+
+Lo script deterministico si limita a segnalare le sessioni i cui eventi non sono collegati: una sessione con due o più eventi e nessuna dipendenza fra di essi. Non decide nulla.
+
+Regole per l'agente:
+
+- una scelta o una biforcazione fa dipendere più eventi dalla stessa scena: sono i rami;
+- un evento raggiungibile da più rami dipende da tutti questi rami: è un rientro nel filone principale;
+- i primi eventi hanno `depends_on: []`;
+- l'adiacenza nell'elenco non è una dipendenza: se il testo non dice nulla, l'agente usa l'ordine dell'elenco e lascia una nota;
+- l'agente non crea, non rinomina, non unisce e non cancella eventi;
+- non sono ammessi cicli;
+- l'agente scrive solo il campo `depends_on` dei file evento, attraverso la sequenza di scrittura (revisione indipendente, versione salvata).
 
 ## 3. Pagina di cronaca
 
@@ -596,3 +617,4 @@ Nei documenti di `Trama/` il controllo sui blocchi con tre backtick non si appli
 - **Formato del registro `mixed`.** La configurazione ammette `mixed`, ma non è definito quando un testo sia misto né come lo verifica il validatore. Va definito o tolto.
 - **Economia e unità.** Non è deciso se le unità di conto vadano sempre nei metadati o solo nella tabella, né quanto possa essere largo l'intervallo di un prezzo.
 - **Sotto-luoghi.** L'elenco dei sotto-luoghi è derivato dalle cartelle. Non è deciso dove vada scritto per il master (in una vista derivata o non va scritto del tutto).
+- **Criterio di ramo (Proposta, 2026-11-09).** Il criterio per riconoscere una biforcazione o un rientro (2.9) è giudicato dall'agente e non è deterministico. Va verificato sui casi reali e, se serve, reso più esplicito nelle regole di 2.9.

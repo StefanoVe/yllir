@@ -6,10 +6,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { activeTopic, listTopics, readSection } from './topics.mjs';
+import { planLinks } from '../../skills/library/linker/scripts/lib/link-plan.mjs';
 
 const HEADER = 'YLLIR TURN CHECK (for the assistant, not for the master)';
 const NEXT_STEP = 'next: invoke the skill yllir:yllir before answering the master.';
 const MAX_OTHER_TOPICS = 5;
+const MAX_UNLINKED_FILES = 5;
 const DASH = '—';
 
 /** Plain-text check for the assistant, one message at a time. */
@@ -25,12 +27,20 @@ export function turnCheck(root) {
 
 function build(dir, rootLine) {
   const lines = [HEADER, rootLine];
-  const active = fs.existsSync(path.join(dir, 'campaign.yaml')) ? activeTopic(dir) : null;
-  if (!active) {
-    lines.push('active topic: none', NEXT_STEP);
-    return lines.join('\n');
+  const hasCampaign = fs.existsSync(path.join(dir, 'campaign.yaml'));
+  const active = hasCampaign ? activeTopic(dir) : null;
+  if (active) {
+    lines.push(...activeLines(dir, active));
+  } else {
+    lines.push('active topic: none');
   }
+  if (hasCampaign) lines.push(unlinkedLine(dir));
+  lines.push(NEXT_STEP);
+  return lines.join('\n');
+}
 
+function activeLines(dir, active) {
+  const lines = [];
   const nextStep = firstLine(section(dir, active.id, 'Next step'));
   const questions = firstLine(section(dir, active.id, 'Questions for the master'));
   lines.push(`active topic: ${active.id} ${DASH} ${active.goal} ${DASH} next step: ${nextStep}`);
@@ -42,8 +52,27 @@ function build(dir, rootLine) {
   if (others.length > 0) {
     lines.push(`other open topics: ${others.map((topic) => `${topic.id} ${DASH} ${topic.goal}`).join('; ')}`);
   }
-  lines.push(NEXT_STEP);
-  return lines.join('\n');
+  return lines;
+}
+
+/**
+ * One line with the campaign files that still have unlinked mentions, from a
+ * plan over the whole campaign (read-only). Never throws.
+ */
+function unlinkedLine(dir) {
+  try {
+    const plan = planLinks(dir);
+    const files = [...new Set([...plan.proposals, ...plan.review].map((entry) => entry.file))];
+    if (files.length === 0) {
+      return plan.errors.length === 0 ? 'unlinked mentions: none' : 'unlinked mentions: unknown';
+    }
+    files.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    const shown = files.slice(0, MAX_UNLINKED_FILES).join(', ');
+    const more = files.length > MAX_UNLINKED_FILES ? `, and ${files.length - MAX_UNLINKED_FILES} more` : '';
+    return `unlinked mentions: ${files.length} files: ${shown}${more}`;
+  } catch {
+    return 'unlinked mentions: unknown';
+  }
 }
 
 /** Absolute real path of the folder, or the resolved path when it does not exist. */

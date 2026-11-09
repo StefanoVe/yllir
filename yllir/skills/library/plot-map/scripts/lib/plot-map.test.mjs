@@ -385,6 +385,57 @@ test('event self dependency is an event cycle', (t) => {
   assert.deepEqual(codes(plotMap(root)), ['event-cycle']);
 });
 
+test('session with 3 events and no edges is unlinked', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/S1/S1.md': plot('s-1', []),
+    'Trama/S1/Eventi/a.md': event('a', 's-1', []),
+    'Trama/S1/Eventi/b.md': event('b', 's-1', []),
+    'Trama/S1/Eventi/c.md': event('c', 's-1', []),
+  });
+  const result = plotMap(root);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.unlinked, ['s-1']);
+});
+
+test('session with one intra-session edge is not unlinked', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/S1/S1.md': plot('s-1', []),
+    'Trama/S1/Eventi/a.md': event('a', 's-1', []),
+    'Trama/S1/Eventi/b.md': event('b', 's-1', ['a']),
+    'Trama/S1/Eventi/c.md': event('c', 's-1', []),
+  });
+  const result = plotMap(root);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.unlinked, []);
+});
+
+test('a single event session is not unlinked', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/S1/S1.md': plot('s-1', []),
+    'Trama/S1/Eventi/a.md': event('a', 's-1', []),
+  });
+  assert.deepEqual(plotMap(root).unlinked, []);
+});
+
+test('a session with no events is not unlinked', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/S1/S1.md': plot('s-1', []),
+  });
+  assert.deepEqual(plotMap(root).unlinked, []);
+});
+
+test('a dependency on an event of another session does not link the session', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/S1/S1.md': plot('s-1', []),
+    'Trama/S2/S2.md': plot('s-2', []),
+    'Trama/S1/Eventi/a.md': event('a', 's-1', []),
+    'Trama/S1/Eventi/b.md': event('b', 's-1', ['x']),
+    'Trama/S2/Eventi/x.md': event('x', 's-2', []),
+  });
+  const result = plotMap(root);
+  assert.deepEqual(result.unlinked, ['s-1']);
+});
+
 test('the same campaign gives the same result every time', (t) => {
   const root = makeCampaign(t, {
     'Trama/a/a.md': plot('a', ['b']),
@@ -426,6 +477,7 @@ test('CLI prints the session lines and the summary, exit 0 without errors', () =
       'la-cenere-che-canta-02 ready deps: la-cenere-che-canta-01',
       'la-cenere-che-canta-03 waiting deps: la-cenere-che-canta-02',
       'sessions: 3, played: 1, ready: 1, errors: 0',
+      'unlinked sessions: none',
       'exit: 0',
       '',
     ].join('\n'),

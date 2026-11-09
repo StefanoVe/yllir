@@ -18,6 +18,7 @@ Scripts find mentions, write links and build the report. The reviewer judges. Yo
 The caller gives:
 - `FILES`: campaign-relative paths of the documents to link, comma-separated. May be empty.
 - `SUBJECTS`: ids of subjects just created or given a new alias. May be empty.
+  The plan script also adds, by itself, every document that mentions a subject whose sheet is in FILES (two-way: the touched file is linked towards the sheets, and the other documents are linked towards the touched sheet), so the caller does not need to list those subjects.
 - `CONTINUE_WITH`: text given by the invoking skill naming the exact step to resume (e.g. "write-sequence step 7"). If absent, use "the step of the invoking skill that called the linker".
 
 If both FILES and SUBJECTS are empty, stop and ask the caller which documents to link. Do not guess and do not link the whole campaign.
