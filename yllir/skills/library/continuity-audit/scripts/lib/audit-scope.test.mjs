@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { computeScope } from './audit-scope.mjs';
+
+const CLI = path.resolve(import.meta.dirname, '../audit-scope.mjs');
 
 const CAMPAIGN = [
   'name: Test',
@@ -124,4 +127,58 @@ test('fids are D001, D002, ... in path order and the output is deterministic', (
 
 test('unknown mode is rejected', () => {
   assert.throws(() => scope({ mode: 'post' }), /unknown mode: post/);
+});
+
+/** Writes the campaign FILES into a new temporary folder and returns its path. */
+function campaignFolder(extra = {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-reset-'));
+  for (const [rel, content] of Object.entries({ ...FILES, ...extra })) {
+    const full = path.join(root, rel);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
+    fs.writeFileSync(full, content);
+  }
+  return root;
+}
+
+test('--reset deletes the audit state, recreates facts, and keeps the rest of .campaign', () => {
+  const root = campaignFolder({
+    '.campaign/state/audit/facts/old.json': '{}',
+    '.campaign/state/audit/scope.json': '{}',
+    '.campaign/state/other.md': 'stato',
+    '.campaign/cache/keep.txt': 'cache',
+  });
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-reset-out-'));
+  try {
+    const result = spawnSync(process.execPath, [CLI, root, '--mode', 'full', '--out', path.join(out, 'scope.json'), '--reset'], {
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(fs.existsSync(path.join(root, '.campaign/state/audit/facts/old.json')), false);
+    assert.equal(fs.existsSync(path.join(root, '.campaign/state/audit/scope.json')), false);
+    assert.ok(fs.statSync(path.join(root, '.campaign/state/audit/facts')).isDirectory());
+    assert.deepEqual(fs.readdirSync(path.join(root, '.campaign/state/audit/facts')), []);
+    assert.equal(fs.readFileSync(path.join(root, '.campaign/state/other.md'), 'utf8'), 'stato');
+    assert.equal(fs.readFileSync(path.join(root, '.campaign/cache/keep.txt'), 'utf8'), 'cache');
+    assert.ok(fs.existsSync(path.join(out, 'scope.json')));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+    fs.rmSync(out, { recursive: true, force: true });
+  }
+});
+
+test('--reset without campaign.yaml exits 2 and deletes nothing', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-reset-'));
+  try {
+    fs.mkdirSync(path.join(root, '.campaign/state/audit/facts'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.campaign/state/audit/facts/old.json'), '{}');
+    const result = spawnSync(process.execPath, [CLI, root, '--mode', 'full', '--out', path.join(root, 'x/scope.json'), '--reset'], {
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /campaign\.yaml/);
+    assert.equal(fs.readFileSync(path.join(root, '.campaign/state/audit/facts/old.json'), 'utf8'), '{}');
+    assert.equal(fs.existsSync(path.join(root, 'x')), false);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });

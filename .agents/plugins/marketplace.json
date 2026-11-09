@@ -1,0 +1,12 @@
+{
+  "name": "yllir",
+  "interface": { "displayName": "Yllir", "shortDescription": "Agent skills to create and maintain tabletop RPG campaigns." },
+  "plugins": [
+    {
+      "name": "yllir",
+      "source": { "source": "local", "path": "./yllir" },
+      "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
+      "category": "Productivity"
+    }
+  ]
+}

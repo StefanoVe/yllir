@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // Runs one continuity-audit case end to end: copies the fixture campaign into a
-// temporary git repository, runs the audit skill with `claude -p`, grades what it
-// left in .campaign/state/audit/ against the answer key, and appends one JSON
-// line per run to testbench/results/<case>.jsonl.
+// temporary git repository, runs the audit skill with `claude -p` (or `codex exec`
+// with --agent codex), grades what it left in .campaign/state/audit/ against the
+// answer key, and appends one JSON line per run to testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep]
+// Usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex]
 //        node testbench/runners/run-audit-case.mjs <caseDir> --grade-only <copyPath>
+// --agent codex runs the agent with `codex exec` instead of `claude -p`; codex gets
+// no model unless --model is given explicitly.
 // --grade-only grades an existing copy (kept with --keep) without running the agent,
 // prints the record and does not append it to the results file.
 // Exit codes: 0 every run passes; 1 some run fails; 2 the case or key cannot be used.
@@ -23,13 +25,13 @@ import {
   parseCommonArgs,
   prepareCopy,
   printSummary,
+  recordHeader,
   removeCopy,
-  runClaude,
+  runAgent,
 } from './lib/case-common.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--grade-only <copyPath>]';
-const ALLOWED_TOOLS = 'Bash(node:*) Bash(mkdir:*) Bash(rm:*) Bash(pwd) Bash(echo:*) Read Write Grep Glob Agent';
+  'usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex] [--grade-only <copyPath>]';
 const AGENT_TIMEOUT_MS = 1800000;
 const AUDIT_DIR = path.join('.campaign', 'state', 'audit');
 
@@ -278,14 +280,15 @@ function gradeCopy({ key, fixtureCampaign, copy }) {
 }
 
 /** Builds the JSONL record of one run from the grading result. */
-function makeRecord({ caseName, run, date, model, hash, agentFailure, agent, graded, copy }) {
+function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFailure, agent, graded, copy }) {
   const failures = [...(agentFailure ? [`agent error: ${agentFailure}`] : []), ...graded.failures];
   const record = {
     case: caseName,
     run,
     date,
-    model,
+    ...header,
     instructions_hash: hash,
+    permission_mode: permissionMode ?? null,
     pass: graded.pass && !agentFailure,
     checks: graded.checks,
     failures,
@@ -293,6 +296,8 @@ function makeRecord({ caseName, run, date, model, hash, agentFailure, agent, gra
     cost_usd: agent ? agent.cost_usd : null,
     duration_ms: agent ? agent.duration_ms : null,
     num_turns: agent ? agent.num_turns : null,
+    denied: agent?.denied ?? [],
+    tool_calls: agent?.tool_calls ?? null,
     metrics: graded.metrics,
     missed: graded.missed,
     false_alarms: graded.false_alarms,
@@ -320,6 +325,7 @@ function main() {
   const key = loadKey(fixtureDir);
   const hash = instructionsHash(auditInstructionFiles());
   const gradeOnly = opts.values['--grade-only'];
+  const header = recordHeader({ agent: opts.agent, modelLabel: opts.modelLabel });
 
   if (gradeOnly !== undefined) {
     const copy = path.resolve(gradeOnly);
@@ -329,16 +335,17 @@ function main() {
       caseName: caseData.case,
       run: 1,
       date: new Date().toISOString(),
-      model: opts.model,
+      header,
       hash,
       agentFailure: null,
+      permissionMode: null,
       agent: { report: readText(path.join(copy, AUDIT_DIR, 'report.txt')), cost_usd: null, duration_ms: null, num_turns: null },
       graded,
       copy,
     });
     record.grade_only = true;
     console.log(JSON.stringify(consoleView(record)));
-    process.exitCode = printSummary([record], opts.model, hash) === 1 ? 0 : 1;
+    process.exitCode = printSummary([record], opts.modelLabel, hash, opts.agent) === 1 ? 0 : 1;
     return;
   }
 
@@ -348,11 +355,12 @@ function main() {
     const date = new Date().toISOString();
     let record;
     try {
-      const agent = runClaude({
+      const agent = runAgent({
+        agent: opts.agent,
         cwd: campaign,
         prompt: caseData.prompt,
         model: opts.model,
-        allowedTools: ALLOWED_TOOLS,
+        modelGiven: opts.modelGiven,
         timeoutMs: AGENT_TIMEOUT_MS,
       });
       // The copy is graded even when the agent failed: a partial audit still shows what happened.
@@ -361,8 +369,9 @@ function main() {
         caseName: caseData.case,
         run: i,
         date,
-        model: opts.model,
+        header,
         hash,
+        permissionMode: agent.permission_mode,
         agentFailure: agent.ok ? null : agent.error,
         agent: agent.ok ? agent : null,
         graded,
@@ -380,7 +389,7 @@ function main() {
     summaries.push(record);
   }
 
-  const passed = printSummary(summaries, opts.model, hash);
+  const passed = printSummary(summaries, opts.modelLabel, hash, opts.agent);
   process.exitCode = passed === summaries.length ? 0 : 1;
 }
 

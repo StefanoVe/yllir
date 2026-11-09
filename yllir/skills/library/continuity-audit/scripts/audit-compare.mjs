@@ -7,6 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYamlLite } from '../../../../scripts/lib/yaml-lite.mjs';
 import { compareFacts, exclusionsFromConfig } from './lib/audit-compare.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+
 
 const USAGE = 'usage: node audit-compare.mjs <root> --facts <facts.json> --out <candidates.json>';
 
@@ -32,8 +34,7 @@ function parseArgs(argv) {
 }
 
 function fail(message) {
-  process.stderr.write(`${message}\n`);
-  process.exit(2);
+  throw new Error(message);
 }
 
 function readCampaignExclusions(root) {
@@ -68,36 +69,40 @@ function readFacts(file) {
   return doc;
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  fail(USAGE);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) {
+    fail(USAGE);
+  }
+
+  const campaignRoot = path.resolve(args.root);
+  const exclusions = readCampaignExclusions(campaignRoot);
+  const factsDoc = readFacts(path.resolve(args.facts));
+
+  let result;
+  try {
+    result = compareFacts(factsDoc.facts, exclusions);
+  } catch (err) {
+    fail(`${args.facts}: cannot compare facts: ${err.message}`);
+  }
+
+  const outFile = path.resolve(args.out);
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  fs.writeFileSync(outFile, `${JSON.stringify(result, null, 2)}\n`);
+
+  const { stats } = result;
+  const lines = [];
+  if (!factsDoc.complete) {
+    lines.push('WARNING: coverage incomplete');
+  }
+  lines.push(
+    `facts: ${stats.facts}, candidates: ${stats.candidates}, excluded: ${stats.excluded}, hypotheses: ${stats.hypotheses}`,
+  );
+  for (const c of result.candidates) {
+    lines.push(`${c.cid} ${c.kind} ${c.subject} ${c.attribute} ${c.values.join(' | ')}`);
+  }
+  process.stdout.write(`${lines.join('\n')}\n`);
+  exitWith(factsDoc.complete ? 0 : 1);
 }
 
-const campaignRoot = path.resolve(args.root);
-const exclusions = readCampaignExclusions(campaignRoot);
-const factsDoc = readFacts(path.resolve(args.facts));
-
-let result;
-try {
-  result = compareFacts(factsDoc.facts, exclusions);
-} catch (err) {
-  fail(`${args.facts}: cannot compare facts: ${err.message}`);
-}
-
-const outFile = path.resolve(args.out);
-fs.mkdirSync(path.dirname(outFile), { recursive: true });
-fs.writeFileSync(outFile, `${JSON.stringify(result, null, 2)}\n`);
-
-const { stats } = result;
-const lines = [];
-if (!factsDoc.complete) {
-  lines.push('WARNING: coverage incomplete');
-}
-lines.push(
-  `facts: ${stats.facts}, candidates: ${stats.candidates}, excluded: ${stats.excluded}, hypotheses: ${stats.hypotheses}`,
-);
-for (const c of result.candidates) {
-  lines.push(`${c.cid} ${c.kind} ${c.subject} ${c.attribute} ${c.values.join(' | ')}`);
-}
-process.stdout.write(`${lines.join('\n')}\n`);
-process.exitCode = factsDoc.complete ? 0 : 1;
+runCli(main);

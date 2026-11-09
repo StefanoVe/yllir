@@ -167,6 +167,8 @@ Due modalità distinte, con regole diverse:
 - **Pre-modifica.** Ambito ristretto ai soggetti toccati dalla modifica (ricavati dall’indice) e ai documenti che li citano, più le schede che li definiscono. È l’audit che la sequenza di scrittura richiede prima di ogni modifica (vedi [Processi di core](Processi%20di%20core.md#regole-comuni)).
 - **Completo.** Ambito tutto il repository, eseguito su richiesta o a intervalli. Produce un registro di copertura per ogni file.
 
+**Deciso (2026-11-08).** L'ambito pre-modifica resta largo: i soggetti toccati comprendono quelli menzionati nei documenti coinvolti, e con essi i documenti che li citano, così l'audit trova anche le contraddizioni a distanza. Per contenere i tempi, i fatti estratti si conservano in una cache derivata (`.campaign/cache/facts/`), indicizzata dall'impronta del contenuto del documento e del vocabolario degli attributi: si ri-estraggono solo i documenti nuovi o cambiati.
+
 Il registro di copertura è generato dallo script: elenca ogni file incluso, il numero di fatti estratti e lo stato (`to-read`, `read`, `extracted`, `not-relevant`). Un audit senza registro non è dichiarato completo.
 
 ### Estrazione dei fatti

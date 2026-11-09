@@ -1,0 +1,4 @@
+case: update-declined
+scenario: declined
+prompt: |
+  Riprendiamo. Se c'è un aggiornamento, ora non lo voglio: ricordamelo domani.

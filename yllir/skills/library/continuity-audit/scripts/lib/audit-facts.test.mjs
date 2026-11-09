@@ -486,7 +486,8 @@ test('audit-validate prints ignored frontmatter facts in the summary, not as dis
       lines[0],
       'documents: 1, extracted: 1, read: 0, to-read: 0, facts: 1, discarded: 0, ignored (frontmatter): 1, complete: true',
     );
-    assert.equal(lines.length, 1, 'no discard line is printed');
+    assert.equal(lines.length, 2, 'no discard line is printed');
+    assert.equal(lines[1], 'exit: 0');
     const written = JSON.parse(fs.readFileSync(out, 'utf8'));
     assert.equal(written.ignored_frontmatter.length, 1);
   } finally {

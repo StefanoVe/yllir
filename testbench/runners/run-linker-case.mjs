@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Runs one linker case end to end: copies the fixture campaign into a temporary
-// git repository, runs the agent under test with `claude -p`, grades the result
-// deterministically against the answer key, and appends one JSON line per run
-// to testbench/results/<case>.jsonl.
+// git repository, runs the agent under test with `claude -p` (or `codex exec` with
+// --agent codex), grades the result deterministically against the answer key, and
+// appends one JSON line per run to testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-linker-case.mjs <caseDir> [--runs N] [--model haiku] [--keep]
+// Usage: node testbench/runners/run-linker-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex]
 // Exit codes: 0 every run passes; 1 some run fails; 2 the case or key cannot be used.
 
 import fs from 'node:fs';
@@ -21,13 +21,13 @@ import {
   parseCommonArgs,
   prepareCopy,
   printSummary,
+  recordHeader,
   removeCopy,
-  runClaude,
+  runAgent,
 } from './lib/case-common.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-linker-case.mjs <caseDir> [--runs N] [--model haiku] [--keep]';
-const ALLOWED_TOOLS = 'Bash(node:*) Bash(mkdir:*) Bash(pwd) Read Write Grep Glob Agent';
+  'usage: node testbench/runners/run-linker-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex]';
 const AGENT_TIMEOUT_MS = 900000;
 const LINK_RE = /\[([^\]]+)\]\(([^)]*)\)/g;
 
@@ -80,8 +80,15 @@ function linesWith(lines, snippet) {
   return hits;
 }
 
-function grade({ key, scope, fixtureCampaign, copy, report }) {
+/** The LINKER REPORT the skill wrote in the copy, or null when the file is missing. */
+function readLinkerReport(copy) {
+  const file = path.join(copy, '.campaign', 'state', 'linker', 'report.txt');
+  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+}
+
+function grade({ key, scope, fixtureCampaign, copy }) {
   const failures = [];
+  const report = readLinkerReport(copy);
   const scopeSet = new Set(scope);
   const mentions = key.mentions.filter(
     (m) => m !== null && typeof m === 'object' && scopeSet.has(m.file),
@@ -175,7 +182,7 @@ function grade({ key, scope, fixtureCampaign, copy, report }) {
 
   // C5 decisions-reported
   const decisions = mentions.filter((m) => m.expected === 'ask' || m.expected === 'fix-link');
-  const reportLower = report.toLowerCase();
+  const reportLower = (report ?? '').toLowerCase();
   const undecided = [];
   for (const m of decisions) {
     const line = linesWith(origByFile.get(m.file), m.snippet)[0] + 1;
@@ -188,21 +195,23 @@ function grade({ key, scope, fixtureCampaign, copy, report }) {
     for (const o of scan.occurrences) {
       if (o.file === m.file && o.line === line && o.text) forms.add(o.text);
     }
-    const byLine = new RegExp(`:${line}(?!\\d)`).test(report);
+    const byLine = new RegExp(`:${line}(?!\\d)`).test(report ?? '');
     const byForm = [...forms].some((f) => reportLower.includes(f.toLowerCase()));
     if (!byLine && !byForm) undecided.push(`${m.id} ${m.file}:${line}`);
   }
-  const c5 = undecided.length === 0;
-  if (!c5) failures.push(`C5 not reported: ${undecided.join('; ')}`);
+  const c5 = report !== null && undecided.length === 0;
+  if (report === null) failures.push('C5 no linker report file');
+  else if (undecided.length > 0) failures.push(`C5 not reported: ${undecided.join('; ')}`);
 
   // C6 report-status
-  const c6 = report.includes('status: DONE');
-  if (!c6) failures.push('C6 report does not contain "status: DONE"');
+  const c6 = report !== null && report.includes('status: DONE');
+  if (report === null) failures.push('C6 no linker report file');
+  else if (!c6) failures.push('C6 report does not contain "status: DONE"');
 
   const checks = { C1: c1, C2: c2, C3: c3, C4: c4, C5: c5, C6: c6 };
   const [a, b] = c3.split('/').map(Number);
   const pass = c1 && c2 && c4 && c5 && c6 && a === b;
-  return { checks, pass, failures };
+  return { checks, pass, failures, report };
 }
 
 function main() {
@@ -221,11 +230,12 @@ function main() {
     const date = new Date().toISOString();
     let record;
     try {
-      const agent = runClaude({
+      const agent = runAgent({
+        agent: opts.agent,
         cwd: campaign,
         prompt: caseData.prompt,
         model: opts.model,
-        allowedTools: ALLOWED_TOOLS,
+        modelGiven: opts.modelGiven,
         timeoutMs: AGENT_TIMEOUT_MS,
       });
       if (!agent.ok) {
@@ -233,15 +243,19 @@ function main() {
           case: caseData.case,
           run: i,
           date,
-          model: opts.model,
+          ...recordHeader({ agent: opts.agent, modelLabel: opts.modelLabel }),
           instructions_hash: hash,
+          permission_mode: agent.permission_mode,
           pass: false,
           checks: {},
           failures: [`agent error: ${agent.error}`],
           report: null,
+          final_message: null,
           cost_usd: null,
           duration_ms: null,
           num_turns: null,
+          denied: agent.denied,
+          tool_calls: agent.tool_calls,
         };
       } else {
         const graded = grade({
@@ -249,21 +263,24 @@ function main() {
           scope,
           fixtureCampaign,
           copy: campaign,
-          report: agent.report,
         });
         record = {
           case: caseData.case,
           run: i,
           date,
-          model: opts.model,
+          ...recordHeader({ agent: opts.agent, modelLabel: opts.modelLabel }),
           instructions_hash: hash,
+          permission_mode: agent.permission_mode,
           pass: graded.pass,
           checks: graded.checks,
           failures: graded.failures,
-          report: agent.report,
+          report: graded.report,
+          final_message: agent.report,
           cost_usd: agent.cost_usd,
           duration_ms: agent.duration_ms,
           num_turns: agent.num_turns,
+          denied: agent.denied,
+          tool_calls: agent.tool_calls,
         };
       }
     } finally {
@@ -278,7 +295,7 @@ function main() {
     summaries.push(record);
   }
 
-  const passed = printSummary(summaries, opts.model, hash);
+  const passed = printSummary(summaries, opts.modelLabel, hash, opts.agent);
   process.exitCode = passed === summaries.length ? 0 : 1;
 }
 

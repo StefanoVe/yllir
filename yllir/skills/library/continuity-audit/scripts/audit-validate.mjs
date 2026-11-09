@@ -9,6 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { validateFacts } from './lib/audit-facts.mjs';
 import { loadVocabulary } from './lib/audit-vocabulary.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+
 
 const USAGE =
   'usage: node audit-validate.mjs <campaignRoot> --scope <scope.json> --facts-dir <dir> --out <facts.json>';
@@ -35,55 +37,57 @@ function parseArgs(argv) {
 }
 
 function usage(message) {
-  if (message) process.stderr.write(`${message}\n`);
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+  throw new Error(message ? `${message}\n${USAGE}` : USAGE);
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null || args.root === null || args.scope === null || args['facts-dir'] === null || args.out === null) {
-  usage();
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null || args.root === null || args.scope === null || args['facts-dir'] === null || args.out === null) {
+    usage();
+  }
+
+  const campaignRoot = path.resolve(args.root);
+  if (!fs.statSync(campaignRoot, { throwIfNoEntry: false })?.isDirectory()) {
+    usage(`campaign folder not found: ${args.root}`);
+  }
+
+  let scope;
+  try {
+    scope = JSON.parse(fs.readFileSync(path.resolve(args.scope), 'utf8'));
+  } catch (err) {
+    usage(`cannot read scope file: ${err.message}`);
+  }
+  const validScope =
+    scope !== null &&
+    typeof scope === 'object' &&
+    Array.isArray(scope.files) &&
+    scope.files.every((f) => f && typeof f.fid === 'string' && typeof f.document === 'string');
+  if (!validScope) usage('scope file is not a scope written by audit-scope');
+
+  let vocab;
+  try {
+    vocab = loadVocabulary();
+  } catch (err) {
+    usage(`cannot load vocabulary: ${err.message}`);
+  }
+
+  const result = validateFacts(campaignRoot, scope, path.resolve(args['facts-dir']), vocab);
+
+  const outFile = path.resolve(args.out);
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  fs.writeFileSync(outFile, `${JSON.stringify(result, null, 2)}\n`);
+
+  const count = (status) => result.coverage.filter((c) => c.status === status).length;
+  process.stdout.write(
+    `documents: ${result.coverage.length}, extracted: ${count('extracted')}, read: ${count('read')}, to-read: ${count('to-read')}, facts: ${result.facts.length}, discarded: ${result.discarded.length}, ignored (frontmatter): ${result.ignored_frontmatter.length}, complete: ${result.complete}\n`,
+  );
+  for (const entry of result.discarded) {
+    process.stdout.write(`${entry.fid}#${entry.index + 1} ${entry.reason}\n`);
+  }
+  for (const error of result.errors) {
+    process.stdout.write(`error ${error.fid} ${error.document}: ${error.message}\n`);
+  }
+  exitWith(result.complete ? 0 : 1);
 }
 
-const campaignRoot = path.resolve(args.root);
-if (!fs.statSync(campaignRoot, { throwIfNoEntry: false })?.isDirectory()) {
-  usage(`campaign folder not found: ${args.root}`);
-}
-
-let scope;
-try {
-  scope = JSON.parse(fs.readFileSync(path.resolve(args.scope), 'utf8'));
-} catch (err) {
-  usage(`cannot read scope file: ${err.message}`);
-}
-const validScope =
-  scope !== null &&
-  typeof scope === 'object' &&
-  Array.isArray(scope.files) &&
-  scope.files.every((f) => f && typeof f.fid === 'string' && typeof f.document === 'string');
-if (!validScope) usage('scope file is not a scope written by audit-scope');
-
-let vocab;
-try {
-  vocab = loadVocabulary();
-} catch (err) {
-  usage(`cannot load vocabulary: ${err.message}`);
-}
-
-const result = validateFacts(campaignRoot, scope, path.resolve(args['facts-dir']), vocab);
-
-const outFile = path.resolve(args.out);
-fs.mkdirSync(path.dirname(outFile), { recursive: true });
-fs.writeFileSync(outFile, `${JSON.stringify(result, null, 2)}\n`);
-
-const count = (status) => result.coverage.filter((c) => c.status === status).length;
-process.stdout.write(
-  `documents: ${result.coverage.length}, extracted: ${count('extracted')}, read: ${count('read')}, to-read: ${count('to-read')}, facts: ${result.facts.length}, discarded: ${result.discarded.length}, ignored (frontmatter): ${result.ignored_frontmatter.length}, complete: ${result.complete}\n`,
-);
-for (const entry of result.discarded) {
-  process.stdout.write(`${entry.fid}#${entry.index + 1} ${entry.reason}\n`);
-}
-for (const error of result.errors) {
-  process.stdout.write(`error ${error.fid} ${error.document}: ${error.message}\n`);
-}
-process.exitCode = result.complete ? 0 : 1;
+runCli(main);

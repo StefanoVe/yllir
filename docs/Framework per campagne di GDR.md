@@ -66,6 +66,7 @@ Questo file è l’indice: raccoglie le decisioni dell’autore, che sono vincol
   - **Il formato dei contenuti è adottato in via provvisoria.** Valgono i metadati minimi, il blocco `## Master` in fondo alla scheda, le categorie piatte con `Mondo/` a cascata e `subjects.json`, come descritti in [Formato dei contenuti](Formato%20dei%20contenuti.md) e [Architettura](Architettura.md). Si rivedono dopo le prime misure.
   - **Il pacchetto è un plugin per Claude Code e per Codex.** La forma esatta va verificata su entrambi gli strumenti.
   - **Nessun adattatore di sistema di gioco nell'MVP.** C'è solo il core agnostico; D&D 2024 arriva dopo.
+  - **Fetta di core (2026-11-07).** Portineria (ingresso, «dove eravamo rimasti», «torna a com'era»), `new-campaign` e cablaggio di scrittura. La gestione automatica di argomenti e riepiloghi per riprendere ([Gestione delle sessioni](Gestione%20delle%20sessioni.md)) entra nella fetta successiva, insieme a `prepare-session`.
   - Restano fuori dall'MVP il master screen, artwork, carte, stampa, mappe, musica, enciclopedia, migrazioni (resta solo `version.yaml`) e ingest.
 - **GUI dedicata e locale, in un secondo momento.** Resta un nice to have: una versione snella del master screen in cui si chatta con l’agente e si vedono le sue modifiche in tempo reale. Tutto gira in locale, sul computer dell’utente.
 

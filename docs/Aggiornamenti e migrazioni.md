@@ -25,15 +25,15 @@ Non si sa, e va verificato con l’autore, come sia registrata la versione, qual
 Proposta: ogni campagna contiene un file che dichiara quale versione del framework la governa, quali migrazioni ha già applicato e le impronte dei file generati dal framework. Il file sta nella radice della campagna, in una cartella nascosta dedicata al framework, così da non comparire fra i documenti.
 
 ```yaml
-# .campaign/version.yaml  (proposta)
-framework: "Nome da decidere"
-version: "1.3.0"             # versione installata
-installed_on: "2026-11-07"
-last_migration: "0003"       # ultima migrazione applicata con successo
-fingerprints:                # impronte dei file generati dal framework
-  - path: ".campaign/instructions/agent-rules.md"
-    hash: "sha256:..."
+# .campaign/version.yaml  (forma implementata nell'MVP)
+framework_version: "0.1.0"   # versione con cui sono stati generati i file
+schema: 1
+generated:                   # impronte dei file generati dal framework
+  - path: ".campaign/instructions/agent.md"
+    sha256: "..."
 ```
+
+Nell'MVP non esistono migrazioni, quindi mancano `last_migration` e la data di installazione; si aggiungono con il motore delle migrazioni.
 
 Ogni impronta (hash) è registrata al momento dell’installazione o dell’ultimo aggiornamento. Serve a sapere se un file generato è stato modificato dall’utente, cioè se è una personalizzazione (vedi [Confine](#confine-fra-framework-contenuti-e-personalizzazioni)). Le scelte di sistema di gioco e di stile non stanno qui, ma solo in `campaign.yaml` (vedi [Configurazione](Configurazione.md)). L’elenco dei file del pacchetto sta nel suo `manifest.yaml` (vedi [Architettura](Architettura.md), sezione 2).
 
@@ -256,8 +256,33 @@ Regole del changelog per il master: ogni voce dice se tocca i contenuti (sì/no)
 - Il ciclo di vita dei processi (per esempio la preparazione della sessione) non cambia con l’aggiornamento: le migrazioni toccano dati e file, non il flusso della sessione.
 - Il modulo di configurazione (vedi [Configurazione](Configurazione.md)) è il punto in cui il master esprime le sue scelte; le migrazioni vi aggiungono campi solo con valori di default.
 
+## Decisioni per la fetta base (2026-11-09)
+
+Decise dall’autore:
+
+- **Perimetro.** Nell’MVP si costruisce solo la base: `version.yaml`, controllo all’avvio, aggiornamento dei file generati della campagna. Migrazioni escluse.
+- **Distribuzione.** Plugin e marketplace (ipotesi A). Il numero di versione si fissa a mano in `plugin.json`; non si usa lo SHA del commit. Si sceglie un solo posto per il numero (non anche nella voce del marketplace).
+- **Avviso.** Una volta al giorno, finché il master non aggiorna. L’avviso dice chiaramente che la versione installata è obsoleta e riporta le novità per il master. **La decisione di aggiornare è sempre del master**: senza un suo sì non si aggiorna nulla.
+
+Verificato nella documentazione di Claude Code (da rileggere prima del rilascio):
+
+- l’aggiornamento automatico è spento di default per i marketplace di terzi;
+- da script si può lanciare `claude plugin update <plugin>@<marketplace>`;
+- la sessione in corso resta sulla versione vecchia: la nuova si carica al riavvio o con `/reload-plugins`;
+- una sorgente non raggiungibile o un comando lento non bloccano l’avvio.
+
+Scelte di implementazione dell’MVP, da confermare:
+
+- **Due aggiornamenti distinti.** Il plugin lo sostituisce lo strumento; il framework aggiorna solo i file generati nella campagna, confrontando `framework_version` della campagna con quella del plugin installato. Il master vede un solo aggiornamento.
+- **File generati modificati a mano.** Coerentemente con il comportamento già in uso, si ripristinano; la versione modificata resta recuperabile dalla storia git, perché prima dell’aggiornamento si salvano le modifiche pendenti. Non si creano copie accanto. Le regole del master vivono in `.campaign/customizations.md`, che non si tocca.
+- **Memoria dell’avviso** in `.campaign/state/update-notice.yaml` (ultima versione avvisata, data, eventuale rinvio), non in una cartella dati del plugin: funziona anche in Codex e non dipende da una variabile d’ambiente.
+- **Novità per il master** in `news/<versione>.md` (con variante `news/<versione>.<lingua>.md`) dentro il plugin pubblicato.
+- **Stato dell’aggiornamento** in `.campaign/state/update.yaml` (`in_progress`, `completed`, `cancelled`), con il punto di ripristino: se resta `in_progress`, alla sessione dopo si propone di riprendere o tornare com’era.
+
 ## Questioni aperte
 
+- Dove si trova, sul computer del master, la cartella del plugin pubblicato (la sorgente delle novità): per ora il controllo la legge dalla variabile `YLLIR_PUBLISHED_SOURCE`, e senza di essa tace. Va verificato come il marketplace la rende disponibile.
+- Come si aggiorna in Codex: la documentazione non è chiara.
 - Qual è la fonte dell’ultima versione pubblicata (plugin, repository con tag, archivio) e chi la pubblica.
 - Come funziona in dettaglio la versione di Baltimora: formato del file di versione, comando di controllo, skill di update. Serve un confronto diretto con l’autore.
 - Le personalizzazioni di un file del framework: scelta sempre esplicita o solo sopra una soglia di modifica.

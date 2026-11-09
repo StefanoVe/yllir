@@ -1,0 +1,5 @@
+{
+  "permissions": {
+    "allow": ["Skill(yllir:*)", "Edit(.campaign/state/**)", "Bash(node \"*/skills/core/yllir/scripts/runner-result.mjs\" *)"]
+  }
+}

@@ -1,0 +1,18 @@
+case: new-campaign-resume-after-stop
+seed:
+  name: "Le isole di vetro"
+  language: it
+  register: plain
+  world: Selvaria
+  description: "Selvaria è un arcipelago di isole di vetro dove le tempeste cantano; i giocatori sono contrabbandieri che cercano un faro perduto."
+prompt: |
+  Avevo iniziato a creare una campagna ma si è interrotto. Puoi finire di crearla? Va bene tutto com'era, procedi pure.
+expected:
+  name: "Le isole di vetro"
+  language: it
+  register: plain
+  world: Selvaria
+  world_file: "Mondo/Selvaria.md"
+  premise_words: [arcipelago, vetro, tempeste, contrabbandieri, faro]
+  allowed_proper_nouns: [Selvaria, Le, I]
+  version_message: "Creata la campagna «Le isole di vetro»"

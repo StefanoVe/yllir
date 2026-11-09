@@ -6,6 +6,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { applyLinks } from './lib/apply-links.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+
 
 const USAGE =
   'usage: node apply-links.mjs <campaignRoot> --plan <plan.json> --outcomes <outcomes.json> [--out <result.json>]';
@@ -35,46 +37,44 @@ function readJson(file) {
   try {
     return JSON.parse(fs.readFileSync(file, 'utf8'));
   } catch (err) {
-    process.stderr.write(`cannot read ${file}: ${err.message}\n`);
-    process.exit(2);
+    throw new Error(`cannot read ${file}: ${err.message}`);
   }
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) throw new Error(USAGE);
+
+  const plan = readJson(path.resolve(args.plan));
+  if (
+    plan === null ||
+    typeof plan !== 'object' ||
+    !Array.isArray(plan.proposals) ||
+    !Array.isArray(plan.scope)
+  ) {
+    throw new Error(`${path.resolve(args.plan)} is not a link plan`);
+  }
+
+  const outcomes = readJson(path.resolve(args.outcomes));
+  if (!Array.isArray(outcomes)) {
+    throw new Error(`${path.resolve(args.outcomes)} must contain a JSON array`);
+  }
+
+  const campaignRoot = path.resolve(args.root);
+  const result = applyLinks(campaignRoot, plan, outcomes);
+
+  if (args.out !== null) {
+    const outFile = path.resolve(args.out);
+    fs.mkdirSync(path.dirname(outFile), { recursive: true });
+    fs.writeFileSync(outFile, `${JSON.stringify(result, null, 2)}\n`);
+  }
+
+  process.stdout.write(
+    `applied: ${result.applied.length}, skipped: ${result.skipped.length}, rejected: ${result.rejected.length}, ` +
+      `missing: ${result.missing_outcome.length}, omit/ask/fix: ${result.omit.length}/${result.ask.length}/${result.fix.length}, ` +
+      `residual unexplained: ${result.residual_unexplained.length}, ok: ${result.ok}\n`,
+  );
+  exitWith(result.ok ? 0 : 1);
 }
 
-const plan = readJson(path.resolve(args.plan));
-if (
-  plan === null ||
-  typeof plan !== 'object' ||
-  !Array.isArray(plan.proposals) ||
-  !Array.isArray(plan.scope)
-) {
-  process.stderr.write(`${path.resolve(args.plan)} is not a link plan\n`);
-  process.exit(2);
-}
-
-const outcomes = readJson(path.resolve(args.outcomes));
-if (!Array.isArray(outcomes)) {
-  process.stderr.write(`${path.resolve(args.outcomes)} must contain a JSON array\n`);
-  process.exit(2);
-}
-
-const campaignRoot = path.resolve(args.root);
-const result = applyLinks(campaignRoot, plan, outcomes);
-
-if (args.out !== null) {
-  const outFile = path.resolve(args.out);
-  fs.mkdirSync(path.dirname(outFile), { recursive: true });
-  fs.writeFileSync(outFile, `${JSON.stringify(result, null, 2)}\n`);
-}
-
-process.stdout.write(
-  `applied: ${result.applied.length}, skipped: ${result.skipped.length}, rejected: ${result.rejected.length}, ` +
-    `missing: ${result.missing_outcome.length}, omit/ask/fix: ${result.omit.length}/${result.ask.length}/${result.fix.length}, ` +
-    `residual unexplained: ${result.residual_unexplained.length}, ok: ${result.ok}\n`,
-);
-process.exitCode = result.ok ? 0 : 1;
+runCli(main);

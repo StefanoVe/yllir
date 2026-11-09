@@ -7,8 +7,9 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildSubjectIndex } from './lib/subjects.mjs';
-import { scanMentions } from './lib/mentions.mjs';
+import { buildSubjectIndex } from '../../../../scripts/lib/subjects.mjs';
+import { scanMentions } from '../../../../scripts/lib/mentions.mjs';
+import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node scan-mentions.mjs <campaignRoot> [--out <file>]';
 const SUMMARY_ORDER = [
@@ -46,29 +47,30 @@ function parseArgs(argv) {
   return root === null ? null : { root, out };
 }
 
-const args = parseArgs(process.argv.slice(2));
-if (args === null) {
-  process.stderr.write(`${USAGE}\n`);
-  process.exit(2);
+function main() {
+  const args = parseArgs(process.argv.slice(2));
+  if (args === null) throw new Error(USAGE);
+
+  const campaignRoot = path.resolve(args.root);
+  const index = buildSubjectIndex(campaignRoot);
+  const scan = scanMentions(campaignRoot, index);
+
+  const report = {
+    index_errors: index.errors,
+    homonyms: index.homonyms,
+    ...scan,
+  };
+
+  const outFile =
+    args.out === null
+      ? path.join(campaignRoot, '.campaign', 'cache', 'mentions.json')
+      : path.resolve(args.out);
+  fs.mkdirSync(path.dirname(outFile), { recursive: true });
+  fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
+
+  const line = SUMMARY_ORDER.map((state) => `${state}: ${scan.summary[state]}`).join(', ');
+  process.stdout.write(`${line}\n`);
+  exitWith(index.errors.length === 0 ? 0 : 1);
 }
 
-const campaignRoot = path.resolve(args.root);
-const index = buildSubjectIndex(campaignRoot);
-const scan = scanMentions(campaignRoot, index);
-
-const report = {
-  index_errors: index.errors,
-  homonyms: index.homonyms,
-  ...scan,
-};
-
-const outFile =
-  args.out === null
-    ? path.join(campaignRoot, '.campaign', 'cache', 'mentions.json')
-    : path.resolve(args.out);
-fs.mkdirSync(path.dirname(outFile), { recursive: true });
-fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
-
-const line = SUMMARY_ORDER.map((state) => `${state}: ${scan.summary[state]}`).join(', ');
-process.stdout.write(`${line}\n`);
-process.exitCode = index.errors.length === 0 ? 0 : 1;
+runCli(main);

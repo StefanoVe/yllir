@@ -6,6 +6,8 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { validateJudgments, buildReport } from './audit-report.mjs';
+import { stripExitLine } from '../../../../../scripts/lib/cli-exit.mjs';
+
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'audit-report.mjs');
 
@@ -442,7 +444,7 @@ test('CLI exits 0 for COMPLETE and writes both outputs', (t) => {
   assert.match(result.stdout, /^AUDIT REPORT\nstatus: COMPLETE/);
   const json = JSON.parse(fs.readFileSync(path.join(dir, 'out', 'report.json'), 'utf8'));
   assert.equal(json.status, 'COMPLETE');
-  assert.equal(fs.readFileSync(path.join(dir, 'out', 'report.txt'), 'utf8'), result.stdout);
+  assert.equal(fs.readFileSync(path.join(dir, 'out', 'report.txt'), 'utf8'), stripExitLine(result.stdout));
 });
 
 test('CLI exits 1 for INCOMPLETE', (t) => {

@@ -44,6 +44,33 @@ export function readStructure(campaignRoot) {
 }
 
 /**
+ * Decides whether a campaign-relative path lies in a master-only category. The
+ * category of a path is the one with the longest folder that is a prefix of it.
+ * Shared by check-links and link planning, so the two never disagree.
+ * @param {object[]} structure the structure list of campaign.yaml
+ * @returns {(rel: string) => boolean}
+ */
+export function masterOnlyChecker(structure) {
+  const categories = structure
+    .filter((entry) => typeof entry.folder === 'string')
+    .map((entry) => {
+      const folder = path.posix.normalize(entry.folder).replace(/\/+$/, '');
+      const prefix = folder === '.' || folder === '' ? '' : `${folder}/`;
+      return { type: entry.type, prefix };
+    });
+
+  return (rel) => {
+    let best = null;
+    for (const category of categories) {
+      if (rel.startsWith(category.prefix) && (best === null || category.prefix.length > best.prefix.length)) {
+        best = category;
+      }
+    }
+    return best !== null && best.type === 'master-only';
+  };
+}
+
+/**
  * Lists the Markdown files under `<campaignRoot>/<folder>`, recursively, skipping
  * directories named `img`. A missing folder gives an empty list.
  * @returns {string[]} relative paths with `/` separators, sorted
