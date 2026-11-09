@@ -163,6 +163,26 @@ Le regole di scrittura delle istruzioni per modelli minori e per Codex sono in [
 - Un revisore per lotto, non per ogni voce, salvo che la skill dichiari il contrario.
 - Il framework conta le chiamate per operazione e le mostra su richiesta, così il master può vedere il costo reale di un'operazione senza leggere i log.
 
+### Livello di controllo proporzionato alla modifica
+
+**Proposta.** Ogni scrittura riceve un livello di controllo, basso, medio o alto, calcolato da uno script deterministico (`skills/core/write-sequence/scripts/classify-write.mjs`) prima del controllo di continuità. Il livello è il massimo fra le seguenti misure numeriche; lo script le stampa tutte, perché un essere umano possa vedere il motivo:
+
+- **dimensione della modifica:** righe aggiunte, rimosse e cambiate; per un documento esistente, anche la quota di testo toccata;
+- **ampiezza:** numero di documenti e di soggetti coinvolti;
+- **portata:** quanti altri documenti menzionano i soggetti toccati, trovati con una ricerca testuale volutamente sensibile su titoli e alias;
+- **peso del contenuto:** trama, cronaca e configurazione pesano più di una scheda foglia; un front matter modificato o una data cambiata alzano il livello;
+- **riservatezza:** una categoria riservata al master dà livello alto; un blocco riservato dà livello medio;
+- **omonimi:** un altro soggetto il cui titolo o alias coincide, anche in parte, dà livello alto.
+
+Regole:
+
+- Se una misura non si può calcolare, il livello è alto.
+- Al livello basso il controllo di continuità è saltato. Medio e alto eseguono tutto come oggi.
+- **La revisione indipendente è sempre presente, a ogni livello.** È una decisione dell'autore e non si indebolisce.
+- Il revisore può solo alzare il livello: segnala `escalate`, e allora il controllo di continuità viene eseguito. Nessuna fase abbassa il livello.
+- Il livello si ricalcola a ogni giro del ciclo fra bozza e revisione.
+- Le soglie sono costanti dello script, da tarare sul testbench.
+
 ## Fallback
 
 | Situazione | Comportamento |
@@ -187,3 +207,8 @@ La sessione che il master vede fa da portineria e affida ogni argomento a un sub
 - Dove vivono i brief: nella cartella del progetto, per essere riusabili, o nella cartella temporanea, per non sporcare la cartella della campagna?
 - Il framework registra i costi per operazione o solo il numero di chiamate?
 - Come si valida la tabella dei passi delegabili: un controllo automatico alla modifica della skill, o una revisione manuale?
+- **Pesi e soglie iniziali del livello di controllo.** Vanno tarati sul testbench, con i casi con trappole (omonimi, alias, contraddizioni lontane, ipotesi che non devono diventare accuse, esclusioni registrate): i casi con trappole devono risultare `high`.
+- **Linker nel livello basso.** Il linker può girare senza revisore nel livello basso? Da valutare dopo aver letto e misurato il linker.
+- **Differenza fra medio e alto.** Per ora medio e alto si comportano allo stesso modo. Serve decidere quale controllo in più dare al livello alto.
+- **Punteggio continuo.** Invece dei tre livelli si potrebbe usare un punteggio continuo con soglie. Conviene, o i tre livelli bastano?
+- **Esclusioni registrate.** Dove vivono le esclusioni registrate (ciò che non deve essere segnalato) e devono entrare fra le misure della classificazione?

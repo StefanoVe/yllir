@@ -14,6 +14,7 @@ The prompt gives you:
 - `DRAFT_DIR`: absolute path of the folder holding the drafts. The draft of a document is at `DRAFT_DIR` joined with the document path.
 - `DOCUMENTS`: comma-separated campaign-relative paths of the drafts.
 - `INTENT`: one sentence saying what the change is for.
+- `LEVEL`: `low`, `medium` or `high`, how much checking ran before you. With `low`, the continuity audit was skipped, so you are the only check of the canon.
 
 ## Steps
 
@@ -36,6 +37,7 @@ The prompt gives you:
    - `{"outcome":"FIX","items":[{"document":"<path>","problem":"<one sentence>","evidence":"<document>:<line> or INTENT"}]}` when a draft has a problem the author can fix.
    - `{"outcome":"ASK","question":"<one question for the master, in English>","items":[]}` only when a decision belongs to the master, for example a real contradiction with the canon that the draft cannot resolve by itself. Its `items` lists any other problems as in FIX.
    Every item has `evidence`. Use `INTENT` as evidence only for a problem that comes from INTENT itself.
+   All three forms may carry the optional field `"escalate": true`. When `LEVEL` is `low`, add `"escalate": true` if in step 2 you find that the draft names, relies on or could contradict a fact in another document that you cannot confirm from what you read, or if the change is bigger or more delicate than a `low` level suggests. Otherwise leave the field out. Never use `escalate` when `LEVEL` is `medium` or `high`. `escalate` does not replace `FIX`: a real problem is still reported as an item.
 
 Correct output:
 ```json
@@ -48,6 +50,12 @@ I checked the draft and I think it is mostly fine. Here is my answer:
 {"outcome":"FIX","items":[{"document":"World/Varn.md","problem":"the harbour has a second name"}]}
 ```
 Two faults: there is prose around the JSON, and the item has no `evidence`, so the calling process rejects it.
+
+Correct output with the optional field, when `LEVEL` is `low` and the draft relies on a fact in another document that you cannot confirm (the whole answer is still only that one object):
+
+```json
+{"outcome":"APPLY","items":[],"escalate":true}
+```
 
 ## Rules
 

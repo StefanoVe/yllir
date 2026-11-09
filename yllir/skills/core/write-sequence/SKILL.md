@@ -2,7 +2,7 @@
 name: write-sequence
 description: Core rule. The only way Yllir writes campaign documents: manual changes saved, continuity check, independent review, write, links, derived files, deterministic verification, saved version. Invoked by core processes with drafts already prepared.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Read, Write, Agent, Skill
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/classify-write.mjs" *), Read, Write, Agent, Skill
 ---
 
 # Write sequence
@@ -37,7 +37,16 @@ Every script below is run from the campaign root, as `node "${CLAUDE_PLUGIN_ROOT
 - The output is a JSON array. If it is empty (`[]`): this is a new campaign. Record "manual changes: none, no saved version yet" and go to step 2.
 - If it has one entry: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" status .`. If the output says `"clean": true`, go to step 2. Otherwise run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save-manual . --message "<sentence>"`, where the sentence is "Changes made by hand" in the campaign language. Read `language.main` in `campaign.yaml`: for `it` write `Modifiche fatte a mano`, for `en` write `Changes made by hand`, for any other code translate the English sentence into that language. Then go to step 2.
 
-**2. Continuity check.** EXISTING is the list of DOCUMENTS that already exist: for each document, Read `<document>`: if Read says it does not exist, the document is not in EXISTING; otherwise it is.
+**1b. Level.** Run this command from the campaign root, exactly as written, with `--subjects` present only when NEW_SUBJECTS is not empty:
+`node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/classify-write.mjs" . --files "<DOCUMENTS>" --draft-dir .campaign/state/write/draft [--subjects "<NEW_SUBJECTS>"] --out .campaign/state/write/level.json`
+
+Read the `level:` line of its output, and its `exit:` line.
+- Exit code 2, or no `level:` line, or a value other than `low`, `medium` or `high`: LEVEL is `high`. Record `level: high (not computed)`.
+- Otherwise LEVEL is the printed value. Record `level: <LEVEL>` and keep the `decided by:` line for the report details.
+
+The level only decides how much checking runs. The independent review of step 4 always runs, at every level. The level is computed again at each round, because this skill runs again at each round.
+
+**2. Continuity check.** If LEVEL is `low`, skip the whole step and record `continuity: skipped (low)`. For `medium` and `high` the step runs exactly as written below (its audit scope already limits itself to the documents that mention the subjects). EXISTING is the list of DOCUMENTS that already exist: for each document, Read `<document>`: if Read says it does not exist, the document is not in EXISTING; otherwise it is.
 - If EXISTING and NEW_SUBJECTS are both empty: skip. Record "continuity: nothing to compare yet".
 - Otherwise run a scope probe, omitting each option whose list is empty: `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" . --mode pre [--files "<EXISTING>"] [--subjects "<NEW_SUBJECTS>"] --out .campaign/state/write/scope-probe.json`.
   - If it prints `documents: 0`: skip the audit. Record "continuity: nothing to compare yet".
@@ -57,12 +66,13 @@ Every script below is run from the campaign root, as `node "${CLAUDE_PLUGIN_ROOT
 - If the ADAPTER REPORT `status:` line is `FAILED`, end this skill with `status: FAILED`, reason "system rules check not run". Do not launch the reviewer or write documents.
 - If the skill returns `status: FAILED`, the report is missing or unreadable, or its `status:` line is absent or unknown, end this skill with `status: FAILED`, reason "system rules check not run". Do not launch the reviewer or write documents.
 
-**4. Independent review.** Launch the sub-agent `yllir:canon-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. Its prompt is exactly these four lines, with real values:
+**4. Independent review.** Launch the sub-agent `yllir:canon-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. Its prompt is exactly these five lines, with real values:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 DRAFT_DIR: <CAMPAIGN_ROOT>/.campaign/state/write/draft
 DOCUMENTS: <DOCUMENTS>
 INTENT: <INTENT>
+LEVEL: <LEVEL>
 ```
 Save its answer exactly as received to `.campaign/state/write/review.json` with the Write tool. Then run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" .campaign/state/write/review.json --object`.
 - Exit ≠ 0 (not JSON): launch the reviewer once more with the same prompt and save the new answer the same way. If the second answer is also not JSON: end this skill with `status: FAILED`, reason "review not available" (the calling process continues). Nothing is written without a review.
@@ -70,6 +80,7 @@ Save its answer exactly as received to `.campaign/state/write/review.json` with 
 - Valid JSON with `"outcome": "ASK"`: end this skill with `status: ASK` (the calling process continues) and put its `question` in the report.
 - Valid JSON with `"outcome": "APPLY"`: go to step 5.
 - Any other outcome value: end this skill with `status: FAILED`, reason "review not available" (the calling process continues).
+- The answer may also carry the optional field `"escalate": true`, valid with any outcome. If LEVEL was `low` and the answer has `"escalate": true`: set LEVEL to `medium` and record `level: medium (raised by the reviewer)`. With outcome `APPLY`, run step 2 now (the continuity check), following its normal rules (a `[RELATED]` line means `status: CONFLICT`, a failed audit means `status: FAILED`), and only if it does not stop this skill go to step 5. With outcome `FIX` or `ASK`, do not run step 2: end this skill as written above (the next round computes the level again). If LEVEL is already `medium` or `high`, ignore `"escalate"`.
 
 **5. Write.** Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" . --draft-dir .campaign/state/write/draft --files "<DOCUMENTS>"`. Save its printed JSON to `.campaign/state/write/applied.json` with the Write tool. Exit ≠ 0 (nothing was written): end this skill with `status: FAILED` (the calling process continues) and list its `errors`.
 
@@ -109,15 +120,16 @@ Write the report with the Write tool to `.campaign/state/write/report.txt`. Its 
 ```
 WRITE REPORT
 status: DONE | CONFLICT | FIX_NEEDED | ASK | VERIFY_FAILED | FAILED
+level: <low | medium | high>
 documents: <paths, comma-separated>
-continuity: <COMPLETE | INCOMPLETE | nothing to compare yet | conflict>
+continuity: <COMPLETE | INCOMPLETE | nothing to compare yet | conflict | skipped (low)>
 review: <APPLY | FIX | ASK | not run>
 system rules: <passed | no adapter | n problems | not run>
 links: <applied n | FAILED | not run>
 verification: <passed | n errors | not run>
 saved version: <hash | none>
 details:
-- <one line per conflict, review item, linker decision, verification error or reason for a stop; "- none" if there are none>
+- <one line per conflict, review item, linker decision, verification error or reason for a stop, and, when LEVEL is not `high`, the `decided by:` text of step 1b; "- none" if there are none>
 continue with: <CONTINUE_WITH>
 ```
 
@@ -127,8 +139,9 @@ Correct example of the content of `report.txt` (a new campaign, documents writte
 ```
 WRITE REPORT
 status: DONE
+level: low
 documents: World/Varn.md, World/Old Mill.md
-continuity: nothing to compare yet
+continuity: skipped (low)
 review: APPLY
 system rules: passed
 links: applied 2
@@ -143,6 +156,7 @@ When the adapter reports problems, use the count in the `system rules:` field an
 ```
 WRITE REPORT
 status: FIX_NEEDED
+level: high
 documents: Creatures/Guardiano.md
 continuity: nothing to compare yet
 review: not run
@@ -166,3 +180,4 @@ Wrong example, do not do this: step 4 is skipped, and the document is written wi
 - Run every command from the campaign root.
 - Never print the WRITE REPORT, never show it to the master, and never end your turn with it.
 - The sheet of a character and the plot events that use it are written in the same write sequence, so the check passes.
+- The level never lowers the independent review. It only decides whether the continuity check runs. Only the reviewer can raise it during the sequence; nothing lowers it.
