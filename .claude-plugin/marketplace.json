@@ -1,0 +1,12 @@
+{
+  "name": "yllir",
+  "description": "Yllir: agent skills to create and maintain tabletop RPG campaigns by talking in natural language.",
+  "owner": { "name": "Stefano Vecchietti" },
+  "plugins": [
+    {
+      "name": "yllir",
+      "source": "./yllir",
+      "description": "Create and maintain tabletop RPG campaigns by talking in natural language."
+    }
+  ]
+}
