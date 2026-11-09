@@ -1,14 +1,16 @@
 // Searches a campaign for a list of terms: the subjects they name, every line of
 // every document that mentions them (or a term), and the links around the sheets
-// of those subjects. It reads every category, notes and sources included, and
-// labels each hit with its source class. Deterministic: the same files give the
-// same output.
+// of those subjects. It reads every category, notes, sources and external folders
+// included (external documents are read-only canon of the shared world, reached
+// through their symlinks), and labels each hit with its source class and its
+// `external` flag. Deterministic: the same files give the same output.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import {
   buildSubjectIndex,
   compareStrings,
+  listExternalSheets,
   listSheets,
   masterOnlyChecker,
   readStructure,
@@ -56,8 +58,8 @@ export function categoryOf(structure, file) {
 
 /**
  * Source class of a campaign-relative path: `notes` or `sources` for those
- * category types, `sources` for `external` (another campaign, not our canon),
- * `canon` for every other category, null when no category holds it.
+ * category types, `canon` for every other category (external ones included:
+ * read-only canon of the shared world), null when no category holds it.
  * @param {object[]} structure
  * @param {string} file
  * @returns {'canon'|'notes'|'sources'|null}
@@ -65,8 +67,21 @@ export function categoryOf(structure, file) {
 export function sourceClassFor(structure, file) {
   const category = categoryOf(structure, file);
   if (category === null) return null;
-  if (category.type === 'external') return 'sources';
   return category.type === 'notes' || category.type === 'sources' ? category.type : 'canon';
+}
+
+/** True when the path lies under an `external` category (read-only, from the shared world). */
+export function isExternalFor(structure, file) {
+  return categoryOf(structure, file)?.type === 'external';
+}
+
+/** Real path of a file, or null when it cannot be resolved. */
+function realPathOf(full) {
+  try {
+    return fs.realpathSync(full);
+  } catch {
+    return null;
+  }
 }
 
 /** True when `needle` occurs in `haystack` as whole words (both folded). */
@@ -153,9 +168,21 @@ export function searchCampaign(campaignRoot, terms) {
 
   // Every document of every category folder. A file belongs to the category with the longest matching folder.
   const categoryByFile = new Map();
+  const externalReal = new Set(); // real paths of the external files already kept: each file once
   for (const category of structure) {
-    // External documents belong to another campaign: never searched.
-    if (typeof category.folder !== 'string' || category.type === 'external') continue;
+    if (typeof category.folder !== 'string') continue;
+    if (category.type === 'external') {
+      // Read-only documents of another campaign or shared world, reached through their symlinks.
+      const exclude = Array.isArray(category.exclude) ? category.exclude : [];
+      for (const file of listExternalSheets(campaignRoot, category.folder, exclude)) {
+        if (categoryByFile.has(file)) continue;
+        const real = realPathOf(path.join(campaignRoot, file));
+        if (real === null || externalReal.has(real)) continue;
+        externalReal.add(real);
+        categoryByFile.set(file, categoryOf(structure, file));
+      }
+      continue;
+    }
     for (const file of listSheets(campaignRoot, category.folder)) {
       if (file.startsWith('.campaign/')) continue;
       if (!categoryByFile.has(file)) categoryByFile.set(file, categoryOf(structure, file));
@@ -176,6 +203,7 @@ export function searchCampaign(campaignRoot, terms) {
     );
     const categoryMaster = isMasterOnly(file);
     const sourceClass = sourceClassFor(structure, file);
+    const external = category.type === 'external';
 
     splitLines(text).forEach((raw, i) => {
       const lineNo = i + 1;
@@ -187,6 +215,7 @@ export function searchCampaign(campaignRoot, terms) {
         category: category.id ?? null,
         type: category.type ?? null,
         source_class: sourceClass,
+        external,
         master_only: categoryMaster || masterLines.has(lineNo),
         text: raw.trim().slice(0, HIT_TEXT_MAX),
       });
@@ -238,5 +267,6 @@ export function searchCampaign(campaignRoot, terms) {
     documents,
     files_with_hits: [...new Set(hits.map((hit) => hit.file))].sort(compareStrings),
     index_errors: index.errors,
+    external_documents: documents.filter((file) => isExternalFor(structure, file)),
   };
 }

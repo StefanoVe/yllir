@@ -117,6 +117,23 @@ function coverageSummary(facts) {
   };
 }
 
+/**
+ * External documents (read only, canon of the shared world) read in this audit, counted
+ * apart from the campaign documents so that a missing read is visible.
+ */
+function externalSummary(scope, facts) {
+  const externalNames = new Set(
+    (scope && Array.isArray(scope.files) ? scope.files : [])
+      .filter((entry) => entry.external === true)
+      .map((entry) => entry.document),
+  );
+  const coverage = (Array.isArray(facts.coverage) ? facts.coverage : []).filter((entry) =>
+    externalNames.has(entry.document),
+  );
+  const read = coverage.filter((entry) => entry.status !== 'to-read').length;
+  return { documents: externalNames.size, read, not_read: externalNames.size - read };
+}
+
 /** Lines for the "not checked" section, in text form and as JSON records. */
 function notChecked(facts) {
   const lines = [];
@@ -186,6 +203,7 @@ export function buildReport({ scope, facts, candidates, judgments, coverageRevie
   const excludedItems = Array.isArray(candidates && candidates.excluded) ? candidates.excluded : [];
   const hypotheses = Array.isArray(candidates && candidates.hypotheses) ? candidates.hypotheses : [];
   const coverage = coverageSummary(facts);
+  const external = externalSummary(scope, facts);
   const factList = Array.isArray(facts.facts) ? facts.facts : [];
   const discardedList = Array.isArray(facts.discarded) ? facts.discarded : [];
   const notCheckedLines = notChecked(facts);
@@ -209,6 +227,7 @@ export function buildReport({ scope, facts, candidates, judgments, coverageRevie
     `status: ${status}`,
     `mode: ${mode}`,
     `coverage: ${coverage.documents} documents ${DASH} extracted ${coverage.extracted}, read with no facts ${coverage.read_no_facts}, not read ${coverage.not_read}`,
+    `external documents (read only, shared world): ${external.documents} in scope, read ${external.read}, not read ${external.not_read}`,
     `facts: ${factList.length} valid, ${discardedList.length} discarded`,
     `problems (${problemLines.length}):`,
     ...listOrNone(problemLines),
@@ -237,6 +256,7 @@ export function buildReport({ scope, facts, candidates, judgments, coverageRevie
     status,
     mode,
     coverage,
+    external,
     facts: { valid: factList.length, discarded: discardedList.length },
     problems: problemItems.map(toRecord),
     perspective: perspectiveItems.map(toRecord),

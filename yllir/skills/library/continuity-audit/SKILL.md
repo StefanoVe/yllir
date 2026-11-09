@@ -23,6 +23,8 @@ The caller gives:
 
 If `MODE` is `pre` and both `FILES` and `SUBJECTS` are empty, end this skill with status `FAILED`, reason "no scope given" (the invoking skill continues and asks the master which files or subjects to audit). Do not audit the whole campaign.
 
+**External documents.** Categories of type `external` (read-only folders of another campaign or shared world) are canon for the comparison: their documents are read and their facts are checked against the campaign. They are never modified. A file of an external category given in `FILES` is rejected by the scope script (`external file: not to be modified`). Their facts carry `external: true`; the report counts them on their own line.
+
 ## Working folder
 
 **Step 0.** Run every command from the campaign root (the folder containing `campaign.yaml`).
@@ -33,7 +35,7 @@ Keep CAMPAIGN_ROOT: it is the `campaign root:` line of the session check in your
 **Step 1 — Scope and index.** Run the scope first. It resets the audit folder (`--reset`), so the index is written only after it.
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" . --reset --mode <MODE> --files "<FILES>" --subjects "<SUBJECTS>" --out .campaign/state/audit/scope.json`. Omit `--files` if FILES is empty. Omit `--subjects` if SUBJECTS is empty. Omit both in `full` mode.
 - Exit 1 from audit-scope: end this skill with status `FAILED` (the invoking skill continues), with the printed errors.
-- Exit 0: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" . --out .campaign/state/audit/subjects.json`. Exit 1: end this skill with status `FAILED` (the invoking skill continues), with the printed errors. Exit 0: go to Step 1b.
+- Exit 0: the printed line gives the number of documents and of external documents (read only) in scope. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" . --out .campaign/state/audit/subjects.json`. Exit 1: end this skill with status `FAILED` (the invoking skill continues), with the printed errors. Exit 0: go to Step 1b.
 - Any other exit code: end this skill with status `FAILED` (the invoking skill continues), reason "scope not run" or "index not run".
 
 **Step 1b — Cache.** Run:
@@ -102,6 +104,7 @@ Add `--coverage-review .campaign/state/audit/coverage-review.json` only when Ste
 ## Rules
 
 - Never modify campaign documents. Write only under `.campaign/state/audit/`.
+- Never modify external documents, and never propose changing one: when an external fact contradicts a campaign document, the campaign document is the one to change. The report line `external documents (read only, shared world): N in scope, read R, not read M` must be carried into the result the invoking skill receives; a read count below the scope count is a coverage gap, not a clean audit.
 - Never state "no problems" yourself. Only the report script decides the status. An empty problem list is valid only with status COMPLETE.
 - Facts from notes are hypotheses. Never present them as problems.
 - Do not quote master-block text in the reports, judgments or reasons you write. Fact quotes written by the extractors are the exception, because the validation script checks them.

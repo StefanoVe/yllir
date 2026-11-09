@@ -96,7 +96,7 @@ Collegamento diretto (sidestep): i file già completi non vengono copiati né tr
 
 ### L2. Audit di continuità
 
-- **Scopo:** individuare contraddizioni e lacune fra documenti e fonti, senza modificare nulla. Sono riportate separatamente le differenze spiegabili (tempo, prospettiva, rivelazione successiva).
+- **Scopo:** individuare contraddizioni e lacune fra documenti e fonti, senza modificare nulla. Sono riportate separatamente le differenze spiegabili (tempo, prospettiva, rivelazione successiva). I documenti delle fonti esterne sono letti come canone in sola lettura e riportati a parte nel conteggio, così che un audit che non ha letto il mondo condiviso si veda.
 - **Avvio:** dal core, prima di ogni modifica di documenti canonici; su richiesta esplicita.
 - **Input → output:** elenco dei file toccati e corpus → rapporto con gravità, localizzatori relativi, esclusioni applicate, ambito coperto (file letti e piste seguite) e dichiarazione esplicita di ciò che non è stato controllato.
 - **Deterministico:** inventario dei file; indice dei soggetti (nomi, alias, appellativi) con tutte le occorrenze; estrazione di valori ripetuti (date, CD, PF, quantità, nomi di luogo) in tabella; applicazione del registro delle esclusioni; elenco dei documenti letti.
@@ -132,11 +132,11 @@ Collegamento diretto (sidestep): i file già completi non vengono copiati né tr
   - una skill che dichiara uno script di supporto ma non lo fornisce lascia tutta la procedura al giudizio;
   - gli alias non definiti in alcuna scheda sono un'ipotesi della causa dei collegamenti mancati, da verificare con esempi concreti.
 
-Le destinazioni dei collegamenti possono essere anche documenti di categorie `external` (fonti esterne: cartelle di un'altra campagna o di materiale condiviso, collegate in sola lettura). Il linker li usa solo come bersaglio: non cerca menzioni al loro interno, non li modifica e non li tratta come canone. Due documenti con lo stesso titolo, uno esterno e uno della campagna, sono omonimi e vanno in revisione al master, come gli altri omonimi. Identificativi e regole sono in [Configurazione](Configurazione.md), sezione «Fonti esterne».
+Le destinazioni dei collegamenti possono essere anche documenti di categorie `external` (fonti esterne: cartelle di un'altra campagna o di materiale condiviso, collegate in sola lettura). Il linker li usa solo come bersaglio: non cerca menzioni al loro interno e non li modifica. Per l'audit di continuità e la ricerca nel canone sono invece canone in sola lettura (deciso il 2026-11-09): vengono letti e confrontati con i documenti della campagna, non vengono mai modificati, e la ricerca dichiara quando una prova viene dal mondo condiviso. Due documenti con lo stesso titolo, uno esterno e uno della campagna, sono omonimi e vanno in revisione al master, come gli altri omonimi. Identificativi e regole sono in [Configurazione](Configurazione.md), sezione «Fonti esterne».
 
 ### L4. Ricerca nel canone
 
-- **Scopo:** rispondere a «chi o cosa è», «come sono collegati», «cosa dicono le fonti», «è vero che…», con le prove e i limiti.
+- **Scopo:** rispondere a «chi o cosa è», «come sono collegati», «cosa dicono le fonti», «è vero che…», con le prove e i limiti. Cerca anche nelle fonti esterne (canone in sola lettura, deciso il 2026-11-09) e dichiara nella risposta quando una prova viene dal mondo condiviso.
 - **Avvio:** dal core, su domanda in linguaggio naturale. Mai in autorun. È in sola lettura.
 - **Input → output:** domanda → risposta diretta, prove con file e sezione, informazioni indirette segnalate come tali, ambito coperto, piste non verificate.
 - **Deterministico:** ricerca per nome, varianti e alias su tutto il corpus; grafo dei rimandi Markdown estratto dallo script di indice (condiviso con audit e collegamenti); elenco dei documenti letti.

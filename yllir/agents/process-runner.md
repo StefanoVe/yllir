@@ -26,7 +26,7 @@ MASTER_MESSAGE:
 <the master's message, verbatim; for a reply, also the earlier question>
 ```
 
-If the prompt also contains `PROBLEMS:`, your previous result was rejected: see Result.
+The prompt may also contain `MODE: revise`, right after `LANGUAGE:`. It is optional: without it the mode is new (see Step 3). If the prompt also contains `PROBLEMS:`, your previous result was rejected: see Result.
 
 Run every command from CAMPAIGN_ROOT, or pass it as the root argument. Never run a command from another folder.
 
@@ -36,7 +36,7 @@ Run every command from CAMPAIGN_ROOT, or pass it as the root argument. Never run
 
 2. **Handoff.** Only if TOPIC is not `none`: read the file HANDOFF. Every file listed in CHANGED_FILES (none, if it says `none`) has been edited since the last step: read it again before you rely on it.
 
-3. **Process.** Invoke the skill PROCESS (if your tool has no way to invoke a skill, read the process file with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs; for PROCESS `yllir:<p>` the file is `${CLAUDE_PLUGIN_ROOT}/skills/core/<p>/SKILL.md`) with MASTER_MESSAGE and, if there is one, the handoff content as its inputs. Follow it fully, including its write sequence. Processes called by you keep writing their reports to files, as they do now.
+3. **Process.** Invoke the skill PROCESS (if your tool has no way to invoke a skill, read the process file with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs; for PROCESS `yllir:<p>` the file is `${CLAUDE_PLUGIN_ROOT}/skills/core/<p>/SKILL.md`) with MASTER_MESSAGE, MODE (only when the prompt has a `MODE: revise` line; pass it as `MODE: revise`, and pass nothing otherwise) and, if there is one, the handoff content as its inputs. Follow it fully, including its write sequence. Processes called by you keep writing their reports to files, as they do now.
 
 4. **Questions.** When the process says to ask the master something, or to wait for a confirmation, do not ask anyone. Then:
    - end with status QUESTION (see Result), with the question and the next step in English; the entry skill records them in the topic.

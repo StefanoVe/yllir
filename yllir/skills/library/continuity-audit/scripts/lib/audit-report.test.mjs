@@ -73,6 +73,30 @@ function candidates(list, extra = {}) {
   return { candidates: list, excluded: [], hypotheses: [], stats: {}, ...extra };
 }
 
+test('buildReport counts external documents read apart from the campaign documents', () => {
+  const external = { fid: 'D003', document: 'Mondo/Raatnagar.md', status: 'extracted', facts_valid: 1, facts_discarded: 0 };
+  const notRead = { fid: 'D004', document: 'Mondo/Altro.md', status: 'to-read', facts_valid: 0, facts_discarded: 0 };
+  const current = facts({
+    coverage: [...facts().coverage, external, notRead],
+    complete: false,
+  });
+  const withExternal = {
+    mode: 'full',
+    subjects: ['lago-grigio'],
+    files: [
+      { fid: 'D001', document: 'Mondo/X.md', external: false },
+      { fid: 'D002', document: 'Storia/Y.md', external: false },
+      { fid: 'D003', document: 'Mondo/Raatnagar.md', external: true },
+      { fid: 'D004', document: 'Mondo/Altro.md', external: true },
+    ],
+    errors: [],
+  };
+  const report = buildReport({ scope: withExternal, facts: current, candidates: candidates([]), judgments: [] });
+  assert.ok(report.text.includes('external documents (read only, shared world): 2 in scope, read 1, not read 1\n'));
+  assert.deepEqual(report.json.external, { documents: 2, read: 1, not_read: 1 });
+  assert.equal(report.status, 'INCOMPLETE');
+});
+
 // ---------- validateJudgments ----------
 
 test('validateJudgments accepts a correct judgment', () => {
@@ -285,6 +309,7 @@ test('buildReport prints - none under every empty list', () => {
       'status: COMPLETE',
       'mode: full',
       'coverage: 2 documents — extracted 2, read with no facts 0, not read 0',
+      'external documents (read only, shared world): 0 in scope, read 0, not read 0',
       'facts: 2 valid, 0 discarded',
       'problems (0):',
       '- none',

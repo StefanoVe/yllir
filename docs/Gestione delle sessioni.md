@@ -12,6 +12,7 @@ Una conversazione con un agente ha una finestra di contesto limitata, e a un cer
 - **Deciso.** Il framework gestisce automaticamente le finestre di contesto: riconosce quando cambia argomento, salva un handoff prima di ogni riassunto automatico e lo ricarica dopo. Il master può restare in un'unica conversazione senza alcun gesto, e non deve sapere che esistono sessioni.
 - **Deciso.** Il master non scrive più «riprendiamo» e non apre conversazioni nuove.
 - **Deciso.** Il master può comunque usare più sessioni se vuole: il framework le riconosce e le riprende tramite l'indice degli argomenti.
+- **Deciso (2026-11-09).** Una sessione non ancora giocata si può rivedere scena per scena, su richiesta del master; una sessione già giocata no, e il framework glielo dice in parole semplici.
 
 ## Due strade, a seconda dell'ambiente
 

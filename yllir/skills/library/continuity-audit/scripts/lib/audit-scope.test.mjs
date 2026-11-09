@@ -207,32 +207,64 @@ function externalScope(options, files = {}) {
   }
 }
 
-test('full mode leaves external subjects and their documents out of the scope', () => {
+const externalFlags = (result) => result.files.filter((f) => f.external).map((f) => f.document);
+
+test('full mode includes external subjects and reads their sheets as read-only documents', () => {
   const result = externalScope({ mode: 'full' });
-  assert.deepEqual(result.subjects, ['borgo', 'lanterna', 'oria-valdes']);
-  assert.ok(!documentsOf(result).some((d) => d.startsWith('External/')));
+  assert.deepEqual(result.subjects, ['borgo', 'ext:Pagina', 'lanterna', 'oria-valdes']);
+  assert.deepEqual(externalFlags(result), ['External/Pagina.md']);
+  assert.ok(result.files.find((f) => f.document === 'Plot/Trama.md').external === false);
   assert.deepEqual(result.errors, []);
 });
 
-test('pre mode rejects a given file of an external category as not in scope', () => {
+test('full mode output is deterministic and external documents keep their fid order', () => {
+  const first = externalScope({ mode: 'full' });
+  const second = externalScope({ mode: 'full' });
+  assert.deepEqual(first, second);
+  assert.deepEqual(
+    first.files.map((f) => f.document),
+    [
+      'External/Pagina.md',
+      'Notes/Appunti.md',
+      'Objects/Lanterna di Morvalle.md',
+      'People/Oria Valdes.md',
+      'Places/Borgo.md',
+      'Plot/Altro.md',
+      'Plot/Trama.md',
+      'Plot/Villaggio.md',
+    ],
+  );
+});
+
+test('pre mode rejects a given file of an external category as not to be modified', () => {
   const result = externalScope({ mode: 'pre', files: ['External/Pagina.md', 'Plot/Altro.md'] });
-  assert.deepEqual(result.errors, [{ file: 'External/Pagina.md', message: 'external file: not in scope' }]);
+  assert.deepEqual(result.errors, [{ file: 'External/Pagina.md', message: 'external file: not to be modified' }]);
   assert.deepEqual(documentsOf(result), ['Plot/Altro.md']);
   assert.deepEqual(result.subjects, []);
 });
 
-test('pre mode: a file that mentions an external subject does not pull its sheet in', () => {
+test('pre mode: a file that mentions an external subject pulls its sheet in as a read-only document', () => {
   const result = externalScope({ mode: 'pre', files: ['Plot/Citazione.md'] }, {
     'Plot/Citazione.md': '# Citazione\n\nCome dice Pagina nel testo esterno.\n',
   });
-  assert.deepEqual(result.subjects, []);
-  assert.deepEqual(documentsOf(result), ['Plot/Citazione.md']);
+  assert.deepEqual(result.subjects, ['ext:Pagina']);
+  assert.deepEqual(documentsOf(result), ['External/Pagina.md', 'Plot/Citazione.md']);
+  assert.deepEqual(externalFlags(result), ['External/Pagina.md']);
   assert.deepEqual(result.errors, []);
 });
 
-test('pre mode drops external ids given in subjects, keeping the others', () => {
+test('pre mode keeps external ids given in subjects and reads their sheets', () => {
   const result = externalScope({ mode: 'pre', subjects: ['ext:Pagina', 'oria-valdes'] });
-  assert.deepEqual(result.subjects, ['oria-valdes']);
-  assert.ok(!documentsOf(result).some((d) => d.startsWith('External/')));
+  assert.deepEqual(result.subjects, ['ext:Pagina', 'oria-valdes']);
+  assert.deepEqual(documentsOf(result), ['External/Pagina.md', 'Notes/Appunti.md', 'People/Oria Valdes.md', 'Plot/Trama.md']);
+  assert.deepEqual(externalFlags(result), ['External/Pagina.md']);
+  assert.deepEqual(result.errors, []);
+});
+
+test('pre mode: an external sheet is read once even when several files mention its subject', () => {
+  const result = externalScope({ mode: 'pre', files: ['Plot/Trama.md', 'Plot/Citazione.md'] }, {
+    'Plot/Citazione.md': '# Citazione\n\nCome dice Pagina.\n',
+  });
+  assert.equal(result.files.filter((f) => f.document === 'External/Pagina.md').length, 1);
   assert.deepEqual(result.errors, []);
 });

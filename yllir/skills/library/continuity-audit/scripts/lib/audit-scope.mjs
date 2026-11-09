@@ -8,10 +8,16 @@ import { buildSubjectIndex, compareStrings, readStructure } from '../../../../..
 import { scanMentions } from '../../../../../scripts/lib/mentions.mjs';
 
 /**
+ * External categories (`type: external`) hold read-only originals of another
+ * campaign or shared world. They are canon for the comparison: their subjects
+ * are checked against and their sheets are read as reference documents, with
+ * the flag `external: true`. They are never modified, and mentions inside them
+ * are never scanned (the linker does not touch them either).
+ *
  * @param {string} campaignRoot absolute path to the campaign folder
  * @param {{ mode: 'pre'|'full', files?: string[], subjects?: string[] }} options
  *   `files` and `subjects` are used by mode `pre` only.
- * @returns {{ mode: string, subjects: string[], files: Array<{fid: string, document: string}>, errors: Array<{file: string, message: string}> }}
+ * @returns {{ mode: string, subjects: string[], files: Array<{fid: string, document: string, external: boolean}>, errors: Array<{file: string, message: string}> }}
  */
 export function computeScope(campaignRoot, { mode, files = [], subjects = [] } = {}) {
   if (mode !== 'pre' && mode !== 'full') {
@@ -23,9 +29,9 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
   // silently left out of the audit otherwise.
   const errors = [...index.errors];
 
-  // External subjects are read-only link targets of other campaigns: they are
-  // never in the scope, neither as subjects nor as documents.
-  const externalIds = new Set(index.subjects.filter((s) => s.external === true).map((s) => s.id));
+  // Sheets of the external subjects: read-only reference documents. Mentions
+  // are never scanned inside them, so they enter the scope only as the sheet
+  // of a subject of S.
   const externalSheets = new Set(index.subjects.filter((s) => s.external === true).map((s) => s.sheet));
   const categoryTypeOf = categoryTypeChecker(readStructure(campaignRoot).structure ?? []);
   const isExternalFile = (rel) => externalSheets.has(rel) || categoryTypeOf(rel) === 'external';
@@ -33,8 +39,8 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
   let subjectIds;
   let documents;
   if (mode === 'full') {
-    subjectIds = index.subjects.filter((s) => !externalIds.has(s.id)).map((subject) => subject.id);
-    documents = scan.files;
+    subjectIds = index.subjects.map((subject) => subject.id);
+    documents = [...new Set([...scan.files, ...externalSheets])];
   } else {
     const given = new Set();
     for (const raw of files) {
@@ -42,7 +48,7 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
       if (document === null) {
         errors.push({ file: raw, message: 'file outside campaign' });
       } else if (isExternalFile(document)) {
-        errors.push({ file: raw, message: 'external file: not in scope' });
+        errors.push({ file: raw, message: 'external file: not to be modified' });
       } else if (!isFile(path.join(campaignRoot, document))) {
         errors.push({ file: raw, message: 'file not found' });
       } else {
@@ -50,22 +56,20 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
       }
     }
 
-    // S: the given subjects (external ones dropped), the subjects owning a
+    // S: the given subjects (external ones included), the subjects owning a
     // given sheet, and every subject mentioned (any state) in a given file.
-    const selected = new Set(subjects.filter((id) => !externalIds.has(id)));
+    const selected = new Set(subjects);
     for (const subject of index.subjects) {
       if (given.has(subject.sheet)) selected.add(subject.id);
     }
     for (const occurrence of scan.occurrences) {
       if (given.has(occurrence.file)) {
-        for (const id of occurrenceIds(occurrence)) {
-          if (!externalIds.has(id)) selected.add(id);
-        }
+        for (const id of occurrenceIds(occurrence)) selected.add(id);
       }
     }
 
-    // Documents: the given files, the sheets of S, and every file (notes
-    // included) that mentions a subject of S.
+    // Documents: the given files, the sheets of S (external ones too, read
+    // only), and every campaign file (notes included) that mentions a subject of S.
     const docs = new Set(given);
     for (const subject of index.subjects) {
       if (selected.has(subject.id)) docs.add(subject.sheet);
@@ -87,6 +91,7 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
     files: documents.map((document, i) => ({
       fid: `D${String(i + 1).padStart(3, '0')}`,
       document,
+      external: externalSheets.has(document),
     })),
     errors,
   };

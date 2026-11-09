@@ -83,8 +83,9 @@ function main() {
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, `${JSON.stringify(scope, null, 2)}\n`);
 
+  const external = scope.files.filter((file) => file.external).length;
   process.stdout.write(
-    `mode: ${scope.mode}, subjects: ${scope.subjects.length}, documents: ${scope.files.length}, errors: ${scope.errors.length}\n`,
+    `mode: ${scope.mode}, subjects: ${scope.subjects.length}, documents: ${scope.files.length} (external, read-only: ${external}), errors: ${scope.errors.length}\n`,
   );
   for (const error of scope.errors) {
     process.stdout.write(`error: ${error.file}: ${error.message}\n`);

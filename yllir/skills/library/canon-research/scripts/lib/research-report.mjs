@@ -10,7 +10,7 @@ import { compareStrings, masterOnlyChecker, readStructure } from '../../../../..
 import { foldForm, foldText } from '../../../../../scripts/lib/fold.mjs';
 import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../../../../scripts/lib/zones.mjs';
-import { sourceClassFor } from './research-search.mjs';
+import { isExternalFor, sourceClassFor } from './research-search.mjs';
 
 const CLASSES = new Set(['fact', 'source-claim', 'interpretation', 'hypothesis', 'silence']);
 
@@ -173,6 +173,7 @@ export function writeResearchReport({ root, searchFile, answerFile, continueWith
   };
   let masterOnly = false;
   const claimLines = [];
+  const externalUsed = new Set(); // evidence files from an external folder (shared world, read only)
 
   claims.forEach((claim, index) => {
     const n = index + 1;
@@ -196,6 +197,7 @@ export function writeResearchReport({ root, searchFile, answerFile, continueWith
       locators.push(locator);
       const cls = sourceClassFor(structure, entry.file);
       if (cls !== null) sourceClasses.add(cls);
+      if (isExternalFor(structure, entry.file)) externalUsed.add(entry.file);
       if (doc.categoryMaster || doc.masterLines.has(entry.line)) masterOnly = true;
 
       const quote = foldForm(entry.quote);
@@ -256,6 +258,9 @@ export function writeResearchReport({ root, searchFile, answerFile, continueWith
     }`,
     `not read: ${search ? (notRead.length > 0 ? notRead.join(', ') : 'none') : 'unknown'}`,
     `contains master-only content: ${masterOnly ? 'yes' : 'no'}`,
+    `from the shared world (external, read only): ${
+      externalUsed.size > 0 ? [...externalUsed].sort(compareStrings).join(', ') : 'none'
+    }`,
     `homonyms: ${
       search
         ? search.homonyms.length > 0

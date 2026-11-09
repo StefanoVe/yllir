@@ -94,3 +94,11 @@ Use this sentence as it is when the assistant has been updated. It is not a fail
 | Italian | English |
 |---|---|
 | L'assistente è stato aggiornato. Nulla di tuo è cambiato. | The assistant has been brought up to date. Nothing of yours has changed. |
+
+## Fixed sentence for a session already played
+
+Use this sentence as it is when the master asks to change a session that has already been played. It is not a failure, and nothing was changed.
+
+| Italian | English |
+|---|---|
+| Questa sessione è già stata giocata, quindi non posso più cambiarla. Posso preparare la prossima, se vuoi. | This session has already been played, so I can no longer change it. I can prepare the next one, if you want. |

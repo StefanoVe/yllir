@@ -35,6 +35,18 @@ Every implementation is orchestrated through sub-agents running Haiku or Luna. T
 - **Sub-agents running in parallel** must never write the same file.
 - **If a brief fails**, rewrite it to be more explicit and rerun it. Do not take the task over yourself. A brief that only works for a stronger model is a defect, so treat it like a failing test.
 
+## Versioning and commits (automatic)
+
+Do this at the end of every task that changes files under `yllir/`, `testbench/` or `docs/`, without waiting to be asked. The user does not need to request it.
+
+- **Version.** The framework version lives in two files that must always carry the same number: `yllir/.claude-plugin/plugin.json` and `yllir/.codex-plugin/plugin.json` (field `version`). Bump both in the same commit, using semver while on `0.x`:
+  - **minor** (`0.8.0` → `0.9.0`) for a new or changed feature, skill, agent, script behavior or migration;
+  - **patch** (`0.8.0` → `0.8.1`) for a fix, a wording change in instructions or a test-only change;
+  - **no bump** when only `docs/`, `CLAUDE.md` or `testbench/` changed and `yllir/` is untouched. Never bump to `1.0.0` without the author's decision.
+- **Commit.** After the work is reviewed and the tests pass (`node --test` on the touched scripts), make one commit on the current branch with the files of that task only (never `git add -A`; leave unrelated changes alone). If the tests fail, do not commit: report the failure.
+- **Message.** Short, in English, imperative or descriptive, the same style as the history (for example `npc-manager`, `0.6.0 - linker and dependency update`). When the version was bumped, put the new number in the message (`<what changed>; version X.Y.Z`). End with the attribution line given by the session.
+- **Limits.** Commit only, never push, never amend or rewrite history, never skip hooks. Pushing and tagging stay with the author.
+
 ## Test campaigns (testbench)
 
 A test case is a campaign, a natural-language request and a verifiable `expected.yaml`/`key.yaml`. Keep the answer key **outside** the folder the agent under test can read: if the agent sees the key, the test measures copying, not finding. Fixtures must be synthetic, with no real campaign or specific game system in them, and contain seeded traps: homonyms, aliases, distant contradictions, hypotheses that must not become accusations, and recorded exclusions that must not be flagged. Each case runs several times per agent, and the result is a pass rate recorded with the model and a hash of the instructions.

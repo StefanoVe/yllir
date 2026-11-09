@@ -73,7 +73,7 @@ structure:                       # facoltativo alla creazione. Categorie di docu
                                  # notes: spunti e bozze, non canone (Appunti/). Non entrano nell'indice dei soggetti
                                  # e non si collegano in automatico; l'audit li legge come ipotesi.
                                  # sources: originali acquisiti (foto, PDF, scansioni) con trascrizione e scheda di acquisizione, scritti dall'ingest. Non entrano nell'indice dei soggetti e non si collegano in automatico; l'audit li legge come ipotesi.
-                                 # external: documenti di un'altra campagna o di materiale condiviso, usati solo come destinazione dei link. Non sono canone. Vedi Fonti esterne.
+                                 # external: documenti di un'altra campagna o di materiale condiviso, in sola lettura: canone per audit e ricerca, destinazione dei link per il linker. Non vengono mai modificati. Vedi Fonti esterne.
     style: id                    # facoltativo. Profilo di stile per gli artwork di questa categoria.
     cards: false                 # facoltativo. Se vero, gli oggetti producono carte illustrate.
     exclude: []                  # facoltativo, solo con type external. Percorsi (file o cartelle, relativi alla cartella, con /) che non vengono indicizzati.
@@ -102,7 +102,7 @@ Le funzioni di libreria (ingest, intrecci, mappa della trama, artwork, scontri, 
 
 Una categoria con `type: external` punta a una cartella che non appartiene a questa campagna: di solito un collegamento simbolico a una cartella di un'altra campagna o di materiale condiviso, per esempio il mondo comune a più campagne. È una scelta facoltativa: una campagna senza categorie `external` si comporta come prima.
 
-I documenti di una fonte esterna servono solo come destinazione dei collegamenti: il linker può proporre un link da una menzione nei documenti della campagna verso uno di questi documenti. Non vengono mai cercate menzioni al loro interno, non vengono mai modificati e non fanno parte del canone di questa campagna: audit e ricerca nel canone li leggono come le fonti e le note, cioè non come canone.
+I documenti di una fonte esterna sono canone di questa campagna in sola lettura. L'audit di continuità e la ricerca nel canone li leggono e li confrontano con i documenti della campagna: una contraddizione fra un documento della campagna e uno esterno è un errore reale. La ricerca dichiara quando una prova viene dal mondo condiviso. Non vengono mai modificati: né l'audit né la ricerca propongono di cambiarli, e quando un documento esterno non torna con uno della campagna, da correggere è il documento della campagna. Il linker li usa solo come destinazione: il linker può proporre un link da una menzione nei documenti della campagna verso uno di questi documenti, e non cerca mai menzioni al loro interno.
 
 Non serve il frontmatter. L'identificativo si ricava senza riscrivere il file: `<id della categoria>:<percorso nella cartella, senza .md>`, per esempio `mondo-condiviso:Luoghi/Raatnagar`. Se il documento ha un `id` nel frontmatter, l'identificativo è `<id della categoria>:<quell'id>`. Il titolo è il primo titolo di primo livello, o il nome del file senza `.md`; gli alias sono letti dal frontmatter solo se presenti.
 
@@ -241,5 +241,5 @@ Il validatore viene eseguito all'avvio, dopo ogni modifica alla configurazione e
 - **Gerarchia dei luoghi.** La configurazione dichiara solo le categorie. Non è deciso se anche la gerarchia di `Mondo` (continente, regione, luogo) debba essere descritta nel file o ricavata dalle cartelle.
 - **Lingue secondarie.** Non è deciso se una campagna possa avere enciclopedia o schede in più lingue e come si collegano.
 - **Wrapper per Claude e Codex.** **Deciso (2026-11-07):** nella radice della campagna il generatore scrive `CLAUDE.md` e `AGENTS.md` brevi, che rimandano soltanto a `.campaign/instructions/`, l'unica fonte, e a `.campaign/customizations.md`.
-- **Fonti esterne e audit.** Non è deciso se l'audit debba mai leggere i documenti di una fonte `external` come ipotesi, come fa con le fonti, o non leggerli mai. Il fatto deciso è solo che non sono canone.
+- **Fonti esterne e audit.** **Deciso (2026-11-09):** l'audit di continuità e la ricerca nel canone leggono i documenti delle fonti `external` come canone in sola lettura (vedi «Fonti esterne»): contano per il confronto, una contraddizione con un documento della campagna è un errore reale, non vengono mai modificati e l'audit non propone mai di cambiarli. Il linker non cambia: non cerca menzioni al loro interno.
 - **Regole di processo fisse.** L'elenco delle regole che il template impone, e che la configurazione non può disattivare, va confrontato con [Processi di core](Processi%20di%20core.md) prima di essere fissato.

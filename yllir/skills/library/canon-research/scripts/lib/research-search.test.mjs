@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { parseTerms, searchCampaign, sourceClassFor } from './research-search.mjs';
+import { isExternalFor, parseTerms, searchCampaign, sourceClassFor } from './research-search.mjs';
 
 const CAMPAIGN = [
   'name: Test',
@@ -225,53 +225,119 @@ test('the search result has the documented shape and is deterministic', (t) => {
   });
 });
 
-test('an external category is labelled as sources, the other categories as before', () => {
+test('an external category is canon (read only), the other categories as before', () => {
   const structure = [
     { id: 'luoghi', folder: 'Mondo', type: 'places' },
     { id: 'esterno', folder: 'Esterno', type: 'external' },
     { id: 'appunti', folder: 'Appunti', type: 'notes' },
   ];
-  assert.equal(sourceClassFor(structure, 'Esterno/Luoghi/Raatnagar.md'), 'sources');
+  assert.equal(sourceClassFor(structure, 'Esterno/Luoghi/Raatnagar.md'), 'canon');
   assert.equal(sourceClassFor(structure, 'Mondo/Pozzo.md'), 'canon');
   assert.equal(sourceClassFor(structure, 'Appunti/Idee.md'), 'notes');
   assert.equal(sourceClassFor(structure, 'Altrove/x.md'), null);
+  assert.equal(isExternalFor(structure, 'Esterno/Luoghi/Raatnagar.md'), true);
+  assert.equal(isExternalFor(structure, 'Mondo/Pozzo.md'), false);
 });
 
-test('external documents reached through a symlink are not searched', () => {
+/**
+ * A campaign with one external category, `Esterno`, which is a symlink to a folder
+ * outside the campaign holding Luoghi/Raatnagar.md. Returns the paths to clean up.
+ */
+function campaignWithExternal({ extraCategories = '' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
   const source = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
-  try {
-    const root = path.join(dir, 'campaign');
-    const campaign = [
-      'name: Test',
-      'structure:',
-      '  - id: luoghi',
-      '    folder: Mondo',
-      '    type: places',
-      '  - id: esterno',
-      '    folder: Esterno',
-      '    type: external',
-      '',
-    ].join('\n');
-    const canon = { 'campaign.yaml': campaign, 'Mondo/Pozzo.md': '# Pozzo\n\nLa Porta Nera custodisce il pozzo.\n' };
-    for (const [rel, content] of Object.entries(canon)) {
-      fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
-      fs.writeFileSync(path.join(root, rel), content);
-    }
-    fs.mkdirSync(path.join(source, 'Luoghi'), { recursive: true });
-    fs.writeFileSync(path.join(source, 'Luoghi', 'Raatnagar.md'), '# Raatnagar\n\nLa Porta Nera è sigillata.\n');
-    fs.symlinkSync(source, path.join(root, 'Esterno'), 'dir');
-
-    const porta = searchCampaign(root, ['Porta Nera']);
-    assert.deepEqual(porta.hits.map((h) => h.file), ['Mondo/Pozzo.md']);
-    assert.deepEqual(porta.hits.map((h) => h.source_class), ['canon']);
-    assert.equal(porta.documents.includes('Esterno/Luoghi/Raatnagar.md'), false);
-
-    const raatnagar = searchCampaign(root, ['Raatnagar']);
-    assert.deepEqual(raatnagar.hits, []);
-    assert.equal(raatnagar.documents.some((d) => d.startsWith('Esterno/')), false);
-  } finally {
+  const root = path.join(dir, 'campaign');
+  const campaign = [
+    'name: Test',
+    'structure:',
+    '  - id: luoghi',
+    '    folder: Mondo',
+    '    type: places',
+    '  - id: esterno',
+    '    folder: Esterno',
+    '    type: external',
+    extraCategories,
+    '',
+  ].join('\n');
+  const canon = {
+    'campaign.yaml': campaign,
+    'Mondo/Pozzo.md': '# Pozzo\n\nLa Porta Nera custodisce il pozzo.\n',
+  };
+  for (const [rel, content] of Object.entries(canon)) {
+    fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    fs.writeFileSync(path.join(root, rel), content);
+  }
+  fs.mkdirSync(path.join(source, 'Luoghi'), { recursive: true });
+  fs.writeFileSync(path.join(source, 'Luoghi', 'Raatnagar.md'), '# Raatnagar\n\nLa Porta Nera è sigillata.\n');
+  fs.symlinkSync(source, path.join(root, 'Esterno'), 'dir');
+  return { root, cleanup: () => {
     fs.rmSync(dir, { recursive: true, force: true });
     fs.rmSync(source, { recursive: true, force: true });
+  } };
+}
+
+test('external documents reached through a symlink are searched as canon, flagged external', () => {
+  const { root, cleanup } = campaignWithExternal();
+  try {
+    const porta = searchCampaign(root, ['Porta Nera']);
+    assert.deepEqual(porta.hits.map((h) => h.file), ['Esterno/Luoghi/Raatnagar.md', 'Mondo/Pozzo.md']);
+    assert.deepEqual(porta.hits.map((h) => h.source_class), ['canon', 'canon']);
+    assert.deepEqual(porta.hits.map((h) => h.external), [true, false]);
+    assert.ok(porta.documents.includes('Esterno/Luoghi/Raatnagar.md'));
+    assert.deepEqual(porta.external_documents, ['Esterno/Luoghi/Raatnagar.md']);
+
+    const raatnagar = searchCampaign(root, ['Raatnagar']);
+    assert.deepEqual(raatnagar.hits.map((h) => h.file), ['Esterno/Luoghi/Raatnagar.md']);
+    assert.deepEqual(raatnagar.files_with_hits, ['Esterno/Luoghi/Raatnagar.md']);
+  } finally {
+    cleanup();
   }
 });
+
+test('external documents: the same external file listed twice is searched once, broken links are skipped', () => {
+  const { root, cleanup } = campaignWithExternal({
+    extraCategories: '  - id: esterno2\n    folder: Esterno2\n    type: external',
+  });
+  try {
+    fs.symlinkSync(path.join(root, 'Esterno'), path.join(root, 'Esterno2'), 'dir');
+    fs.symlinkSync(path.join(root, 'Non esiste'), path.join(root, 'Esterno', 'Rotto.md'));
+    const search = searchCampaign(root, ['Porta Nera']);
+    const raatnagar = search.hits.filter((h) => h.file.endsWith('Raatnagar.md'));
+    assert.equal(raatnagar.length, 1, 'one hit for the external file');
+    assert.equal(search.documents.filter((d) => d.endsWith('Raatnagar.md')).length, 1);
+    assert.equal(search.documents.some((d) => d.endsWith('Rotto.md')), false);
+  } finally {
+    cleanup();
+  }
+});
+
+test('external documents honour the exclude list of their category', () => {
+  const { root, cleanup } = campaignWithExternal();
+  try {
+    fs.writeFileSync(
+      path.join(root, 'campaign.yaml'),
+      fs.readFileSync(path.join(root, 'campaign.yaml'), 'utf8').replace(
+        '    type: external\n',
+        '    type: external\n    exclude: ["Luoghi"]\n',
+      ),
+    );
+    const search = searchCampaign(root, ['Porta Nera']);
+    assert.deepEqual(search.hits.map((h) => h.file), ['Mondo/Pozzo.md']);
+    assert.deepEqual(search.external_documents, []);
+  } finally {
+    cleanup();
+  }
+});
+
+test('external documents are never modified by the search', () => {
+  const { root, cleanup } = campaignWithExternal();
+  try {
+    const source = fs.realpathSync(path.join(root, 'Esterno'));
+    const before = fs.readFileSync(path.join(source, 'Luoghi', 'Raatnagar.md'), 'utf8');
+    searchCampaign(root, ['Porta Nera']);
+    assert.equal(fs.readFileSync(path.join(source, 'Luoghi', 'Raatnagar.md'), 'utf8'), before);
+  } finally {
+    cleanup();
+  }
+});
+

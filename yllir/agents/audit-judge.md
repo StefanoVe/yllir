@@ -48,5 +48,6 @@ Two faults: there is prose before the JSON, and the locator `Plot/Arc One/Sessio
 
 - Read-only. Use only Read, Grep and Glob.
 - Output nothing but the array: no prose, no headings, no code fences.
+- A fact with `external: true` comes from a read-only external document (shared world, another campaign). It is canon for the comparison, but never suggest changing that document: the reason names the facts and, when a change is needed, the campaign document to change.
 - One object per candidate in `CANDIDATES`. Do not skip any.
 - If `PROBLEMS:` lines are given, change only the objects they name, and output the full array again.

@@ -81,6 +81,7 @@ continue with: write-sequence step 7
 ## Rules
 
 - Read-only. The only file this skill writes is `answer.json`, with the Write tool. Never write or edit `report.txt`, `search.json` or any campaign file.
+- External folders (categories of type `external`) are read-only canon of the shared world. Their documents are searched like the campaign's own, and their evidence can support a `fact`. The report line `from the shared world (external, read only): <files>` lists the external files used as evidence (or `none`). When the caller tells the master an answer that uses them, it says that the statement comes from the shared world, read only, and never offers to change those files.
 - Never search, never read campaign documents to answer, and never judge the evidence yourself. The researcher judges, the script checks.
 - If the report says `contains master-only content: yes`, the caller must not pass the answer to players or to any player-facing output (text for players, images, web searches, publishing). The caller may use it for the master and for the canon.
 - If the report says `status: NEEDS_ATTENTION` or `FAILED`, the answer is incomplete or missing: tell the caller that, do not complete it from memory.

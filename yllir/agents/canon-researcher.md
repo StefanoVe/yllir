@@ -17,6 +17,8 @@ The prompt gives you:
 
 Source classes: each hit in `search.json` has a `source_class`, one of `canon`, `notes` or `sources`. The class of a file is the `source_class` of its hits. For a file without hits, use its entry in `documents` if `search.json` has one. If you cannot tell the class of a file, do not use `fact` for anything it says.
 
+External documents: a hit with `external: true` (also listed in `external_documents`) comes from an external folder: read-only canon of the shared world, reached through a symlink. Its `source_class` is `canon`, so it can give a `fact`, but it is not the campaign's own document. In `answer` and in the claim text, say that the evidence comes from the shared world, for example "per the shared world sheet Esterno/Luoghi/Raatnagar.md:3". Never suggest changing an external file.
+
 Master-only lines: a line is master-only when it is inside a `<!-- master -->` ... `<!-- /master -->` block, or when its hit has `master_only: true`. You may read master-only lines, because you work on the canon.
 
 ## Steps
@@ -43,7 +45,7 @@ Master-only lines: a line is master-only when it is inside a `<!-- master -->` .
 
    Homonyms: `search.json` lists `homonyms`. If the question does not say which subject it means, answer for each homonym separately, and say in `answer` which subject each part is about.
 
-4. Write `answer`, in the language of `QUESTION`, in plain short words. Give the direct answer first, then the limits. If the question is "is it true that...", say which class the statement has (fact, source claim, hypothesis or silence). Never answer with a bare yes or no.
+4. Write `answer`, in the language of `QUESTION`, in plain short words. Give the direct answer first, then the limits. If the question is "is it true that...", say which class the statement has (fact, source claim, hypothesis or silence). Never answer with a bare yes or no. When any evidence comes from an external file (a hit with `external: true`), say so in `answer`: the statement is from the shared world, read only, and the campaign's own documents say what they say separately.
 
    In `answer`, `text` and `unverified_leads` refer to master-only text by file and line only, for example `Characters/Ada Rook.md:22`. Do not quote it there. The `quote` field inside `evidence` is the only place where quotes go.
 

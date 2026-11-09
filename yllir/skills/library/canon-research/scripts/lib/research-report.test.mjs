@@ -187,6 +187,59 @@ test('evidence in the master block sets contains master-only content to yes', (t
   assert.match(text, /^contains master-only content: yes$/m);
 });
 
+test('evidence from an external folder is named as read-only shared world in the report', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
+  const source = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
+  t.after(() => {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(source, { recursive: true, force: true });
+  });
+  const root = path.join(dir, 'campaign');
+  const work = path.join(dir, 'work');
+  fs.mkdirSync(work, { recursive: true });
+  const campaign = `${CAMPAIGN}  - id: mondo-condiviso\n    folder: Esterno\n    type: external\n`;
+  for (const [rel, content] of Object.entries({
+    'campaign.yaml': campaign,
+    'Mondo/Pozzo di Nar.md': ['---', 'id: pozzo-di-nar', '---', '', '# Pozzo di Nar', '', 'Il pozzo risponde.', ''].join('\n'),
+  })) {
+    fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    fs.writeFileSync(path.join(root, rel), content);
+  }
+  fs.mkdirSync(path.join(source, 'Luoghi'), { recursive: true });
+  fs.writeFileSync(path.join(source, 'Luoghi', 'Raatnagar.md'), '# Raatnagar\n\nTeodo lavora alla forgia di Raatnagar.\n');
+  fs.symlinkSync(source, path.join(root, 'Esterno'), 'dir');
+
+  const search = searchCampaign(root, parseTerms('forgia'));
+  assert.deepEqual(search.external_documents, ['Esterno/Luoghi/Raatnagar.md']);
+  const searchFile = path.join(work, 'search.json');
+  fs.writeFileSync(searchFile, JSON.stringify(search));
+  const answerFile = path.join(work, 'answer.json');
+  fs.writeFileSync(answerFile, JSON.stringify({
+    answer: 'La forgia è di Teodo.',
+    read: ['Esterno/Luoghi/Raatnagar.md'],
+    unverified_leads: [],
+    claims: [
+      {
+        class: 'fact',
+        text: 'Teodo lavora alla forgia di Raatnagar.',
+        evidence: [{ file: 'Esterno/Luoghi/Raatnagar.md', line: 3, quote: 'lavora alla forgia' }],
+      },
+    ],
+  }));
+  const outFile = path.join(work, 'report.txt');
+  const { status, problems } = writeResearchReport({ root, searchFile, answerFile, continueWith: 'ask the master', outFile });
+  const text = fs.readFileSync(outFile, 'utf8');
+  assert.equal(status, 'DONE');
+  assert.deepEqual(problems, []);
+  assert.match(text, /^from the shared world \(external, read only\): Esterno\/Luoghi\/Raatnagar\.md$/m);
+  assert.match(text, /^- \[fact\] Teodo lavora alla forgia di Raatnagar\. \(Esterno\/Luoghi\/Raatnagar\.md:3\)$/m);
+});
+
+test('a report with no external evidence says none for the shared world', (t) => {
+  const { text } = runReport(t, { answer: FACT_ON_LINE_8 });
+  assert.match(text, /^from the shared world \(external, read only\): none$/m);
+});
+
 test('a zero-hit search with a silence claim is DONE, and covered proves the coverage', (t) => {
   const answer = {
     answer: 'Nessun riscontro.',

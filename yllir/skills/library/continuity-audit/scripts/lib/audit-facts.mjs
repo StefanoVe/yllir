@@ -37,6 +37,8 @@ export function validateFacts(campaignRoot, scope, factsDir, vocab) {
   const ignoredFrontmatter = [];
   const errors = [];
 
+  const externalDocuments = new Set(scope.files.filter((entry) => entry.external === true).map((entry) => entry.document));
+
   for (const { fid, document } of scope.files) {
     const text = readText(path.join(campaignRoot, document));
     if (text === null) {
@@ -48,12 +50,12 @@ export function validateFacts(campaignRoot, scope, factsDir, vocab) {
     const { data: frontmatter, body, bodyStartLine } = parseFrontmatter(text);
     const { lines } = analyzeMarkdown(body, bodyStartLine);
     const frontmatterOnly = frontmatterLines(text);
-    const forcedHypothesis = isNotesDocument(document, structure);
+    const forcedHypothesis = isHypothesisDocument(document, structure);
 
-    // Metadata facts do not depend on the facts file.
-    // External subjects belong to another campaign: their location is not our canon.
+    // Metadata facts do not depend on the facts file. External sheets are
+    // canon for the comparison (read only), so their location counts too.
     const subject = subjectBySheet.get(document);
-    if (subject && !subject.external && frontmatter && Array.isArray(frontmatter.location) && frontmatter.location.length > 0) {
+    if (subject && frontmatter && Array.isArray(frontmatter.location) && frontmatter.location.length > 0) {
       facts.push(metadataFact(fid, document, subject.id, frontmatter.location, keyLine(text, 'location')));
     }
 
@@ -119,6 +121,11 @@ export function validateFacts(campaignRoot, scope, factsDir, vocab) {
     (a, b) =>
       compareStrings(a.document, b.document) || a.line - b.line || compareStrings(a.id, b.id),
   );
+  // Facts of read-only external documents carry the flag, so the judge never
+  // proposes to change them. The field is absent for campaign documents.
+  for (const fact of facts) {
+    if (externalDocuments.has(fact.document)) fact.external = true;
+  }
 
   return {
     mode: scope.mode,
@@ -250,8 +257,11 @@ function sectionAt(lines, lineNo) {
   return section;
 }
 
-/** True when the document lies under a category of type `notes`, `sources` or `external` (the longest folder wins). */
-function isNotesDocument(document, structure) {
+/**
+ * True when the document lies under a category of type `notes` or `sources` (the longest
+ * folder wins): its facts are hypotheses. External documents are canon (read only).
+ */
+function isHypothesisDocument(document, structure) {
   let best = null;
   for (const category of structure ?? []) {
     if (typeof category.folder !== 'string') continue;
@@ -261,7 +271,7 @@ function isNotesDocument(document, structure) {
       best = { folder, type: category.type };
     }
   }
-  return best !== null && (best.type === 'notes' || best.type === 'sources' || best.type === 'external');
+  return best !== null && (best.type === 'notes' || best.type === 'sources');
 }
 
 function metadataFact(fid, document, subjectId, items, line) {

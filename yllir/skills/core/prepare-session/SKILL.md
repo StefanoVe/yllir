@@ -11,15 +11,15 @@ Prepares the next session as a new session folder: a main file and one file per 
 
 **Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: FAILED`, reason "permission refused".
 
-**Scope of this version.** This process:
+**Scope of this version.** This process has two modes (see Inputs). In MODE `new` (the default) it:
 - creates a NEW session (its main file and its scene files);
-- does NOT rewrite an existing session. If the master asks to change an existing session, say in one sentence that this is not available yet, and stop;
+- does NOT rewrite an existing session. In MODE `new`, if the master asks to change an existing session, say in one sentence that this is not available yet, and stop. Changing an existing session is MODE `revise`, described in «Mode: revise»;
 - creates a sheet through `yllir:npc-manager` for each NEW NAMED CHARACTER (person, vendor, enemy or creature) that MASTER_MESSAGE names or explicitly asks for, choosing the kind itself (step 6b);
 - never creates place or item documents. A name of a place or item with no document is listed as missing, and nothing is created for it.
 
 **Questions to the master.** Ask the master in plain words, then stop. Write the question as your message; the process runner turns it into a QUESTION result.
 
-**Inputs.** MASTER_MESSAGE is the master's request, as given by the process runner.
+**Inputs.** MASTER_MESSAGE is the master's request, as given by the process runner. MODE is `revise` when the process runner's prompt has a line `MODE: revise`. In every other case (no MODE line, or `MODE: new`) MODE is `new`. In MODE `new`, follow the Steps below. In MODE `revise`, follow «Mode: revise» below and do not run the Steps except where «Mode: revise» refers to them.
 
 ## Steps
 
@@ -212,6 +212,66 @@ When it has finished, read `.campaign/state/plot-map/report.txt` with the Read t
 - one sentence on what the master can do next (for example «say what happens in the first scene, and I will change it»).
 
 No paths, no ids, no codes, no backticks, no formatting marks. The report of Step 8b is never shown: do not write its NOTE lines, and nothing else from it. The NPC REPORT of step 6b is never shown either, and the words template and sheet-template never appear.
+
+## Mode: revise
+
+**When this mode runs.** The process runner's prompt has `MODE: revise`. The master asked to change some scenes of a session that is already prepared and NOT yet played (for example «change the debt of the workers, the delivery of the documents: update these scenes»). In this mode the process rewrites only the named scenes, and the session main file only if its own text depends on them. It never creates a session, a folder or a sheet that is not needed for a new character, and it never touches a file of another session.
+
+Do the steps R1 to R9 in order. Each one says which of the Steps of MODE `new` it reuses: follow those Steps exactly as they are written, with the inputs named there. The commands rule and the questions rule of the top of this file apply here too.
+
+**R1 — Map.** Run Step 1 (Map) as written: the map is written and read, and its exit code rules apply as there. Keep `sessions`, `arcs` and `errors`.
+
+**R2 — Target and scenes.**
+- The target session is the session that MASTER_MESSAGE names (by its name, for example «Session 2»). If it names no session, the target is the session whose scene titles MASTER_MESSAGE names. Only the sessions in `sessions` can be the target.
+- If the target is still not clear, or two sessions are plausible: ask the master ONE question, in plain words, naming the candidate sessions by their names, and stop.
+- Read the `played` value of the target in `sessions`. If it is `true`: write nothing. Your message for the master is exactly the fixed sentence of the lexicon for a session already played, in the campaign language, and stop.
+- The scenes of the target are the items of its `events` list in `sessions`. Each item has a `file`. The title of a scene is its file name without the ending `.md`. Match each scene name in MASTER_MESSAGE with these titles, ignoring case and accents.
+- If a scene name matches no scene of the target, or MASTER_MESSAGE does not say which scene to change: ask the master ONE question in plain words, naming the scenes of that session by their titles, and stop.
+- If MASTER_MESSAGE asks to add a scene, remove a scene, or move a scene to another session: say in one sentence that this version changes the text of existing scenes only, and stop. Write nothing.
+- Output: TARGET (id and name), CHANGED_SCENES (titles and campaign paths), and the master's new decisions for each scene, in plain words.
+
+**R3 — Dependent sessions (read only).** The sessions whose `depends_on` list contains the id of TARGET are DEPENDENT. Keep their names and their main file paths. They are read in R4 and NEVER written in this mode. Output: DEPENDENT (may be empty).
+
+**R4 — Documents involved.** Read, with the Read tool, the whole text (master-only notes included) of:
+- the main file of TARGET;
+- every scene file of TARGET, the changed ones and the unchanged ones (the unchanged ones give the context);
+- the main file of each DEPENDENT session;
+- the documents involved: run Step 4 (Documents involved) as written, with MASTER_MESSAGE as the source of names. A name MISSING from the subjects is treated as in Step 4: only a new named character gets a sheet, in R6.
+Output: the paths read, the subject ids, MISSING_CHARACTERS and MISSING_OTHER.
+
+**R5 — Read-only check.** Run Step 5 (Read-only check) as written, with these differences:
+- FILES = the paths read in R4 (the main file of TARGET, all its scene files, the main files of DEPENDENT sessions, and the documents involved), comma-separated;
+- SUBJECTS = the subject ids of R4;
+- CHANGE = "<one sentence: the revision of the scenes <titles> of the session <name>, with the master's new decisions in plain words>";
+- CONTINUE_WITH = "prepare-session revise R5: read the audit report, then R6".
+The new decisions of the master are what this check is about: it must find whether they contradict a document. The lists CONTESTED and NOTES are kept as Step 5 says. Output: CONTESTED and NOTES (may be empty).
+
+**R6 — Character sheets.** If MISSING_CHARACTERS is empty, skip this step. Otherwise run Step 6b (Character sheets) as written, for these names only. Output: SHEET_DRAFTS, NEW_CHARACTERS, KNOWN_NEW, and the names with no sheet (may be empty).
+
+**R7 — Draft.** Only the changed scenes (and the main file, if it changes) are drafted. For each one, write the draft at `.campaign/state/write/draft/` followed by its campaign path, as in Step 7.
+- Start from the text you read in R4. Copy the whole current text exactly, then change only the parts that the master's new decisions require. For example, a scene that now has a new named character lists her id in `characters`.
+- Keep byte for byte: the file name, the `id`, `session` and `depends_on` lines of a scene, and every paragraph the change does not touch. Do not reformat the rest, do not reword it, and do not add or remove a scene.
+- The `depends_on` line of a scene is NOT set to `[]` in this mode: keep its current value. Step 8b (run in R9) decides the links again when the events changed.
+- The text you write follows the rules of Step 7 (one `_italic_` narration paragraph opens a scene; `##` for minor actions; difficulties as «difficoltà da definire»; master notes in a ``` block; no named place; no CONTESTED fact; a named character only as in Step 7). The rule of Step 7 that asks for `###` checks in the whole session does not apply here.
+- The main file is changed only if its own text (outside the generated line «Generated file. Do not edit by hand.») depends on the change. It normally does not. Never change its `id`, `depends_on` or `arc`.
+- Output: one draft per changed file, at its draft path.
+
+**R8 — Write sequence.** Run Step 8 (Write sequence) as written, with these differences:
+- DOCUMENTS = the draft paths of the changed scene files, then the main file of TARGET only if it changed, then every path of SHEET_DRAFTS (campaign paths, comma-separated; nothing else is added);
+- INTENT = "Session revision for <session name>: only the text of the named scenes changes; ids and file names stay; no other session changes; new named characters only through their own new sheet, listed in characters; sheets define who a character is and the scenes only what they do."
+- VERSION_MESSAGE = the sentence «Rivista la sessione «<session name>»» for `it`, «Revised the session «<session name>»» for `en`, or the translation into the campaign language;
+- NEW_SUBJECTS, ROUND and CONTINUE_WITH as in Step 8, with CONTINUE_WITH = "prepare-session revise R8: read the write report and act on its status".
+The loop and the links check of Step 8 apply unchanged. Output: `status: DONE`, or the failure of Step 8.
+
+**R9 — Links and message.** Only after `status: DONE` of R8.
+1. Run Step 8b (Link the scenes) as written, with SESSIONS = the id of TARGET and CONTINUE_WITH = "prepare-session revise R9". Its report is read as Step 8b says. If its report is `FAILED` only with the note «no depends_on changed», the links were already right: treat it as done and say nothing about the linking.
+2. Write ONE message for the master, in the campaign language, in plain words, following the rules of Step 9 (no paths, ids, codes or backticks; the reports are never shown). It contains:
+   - one sentence: the scenes that changed, by their titles, and in one short sentence each what changed, from the master's own words;
+   - one sentence: what stayed as it was (the other scenes of the session, and the other sessions);
+   - for each DEPENDENT session: one sentence that it was not changed and may need a look, by its name;
+   - the sentences of Step 9 for NEW_CHARACTERS, KNOWN_NEW, the characters with no sheet, the scenes written without an action that would have contradicted a sheet, NOTE and CONTESTED. The prerequisite sentence of Step 9 does not apply;
+   - one sentence on what the master can do next.
+   In this mode the message never says that a session was prepared or created.
 
 ## Examples
 

@@ -515,7 +515,7 @@ test('audit-validate prints ignored frontmatter facts in the summary, not as dis
   }
 });
 
-test('a document of an external category is a hypothesis and its location is not a metadata fact', () => {
+test('a document of an external category is canon, read only: its facts and location count, flagged external', () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-'));
   const source = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
   const factsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-facts-'));
@@ -545,11 +545,16 @@ test('a document of an external category is a hypothesis and its location is not
         fact({ source_type: 'editorial-summary', quote: 'Oria Valdes è la guida' }),
       ])),
     );
-    const result = validateFacts(root, { mode: 'pre', files: [{ fid: 'D001', document: sheet }] }, factsDir, loadVocabulary());
-    assert.equal(result.facts.length, 1, 'only the body fact, no metadata fact');
-    assert.equal(result.facts[0].from_metadata, false);
-    assert.equal(result.facts[0].source_type, 'hypothesis');
-    assert.equal(result.facts[0].forced_hypothesis, true);
+    const scope = { mode: 'pre', files: [{ fid: 'D001', document: sheet, external: true }] };
+    const result = validateFacts(root, scope, factsDir, loadVocabulary());
+    assert.equal(result.facts.length, 2, 'the body fact and the location metadata fact');
+    const body = result.facts.find((f) => !f.from_metadata);
+    assert.equal(body.source_type, 'editorial-summary', 'an external document is not forced to hypothesis');
+    assert.equal(body.forced_hypothesis, false);
+    assert.equal(body.external, true);
+    const metadata = result.facts.find((f) => f.from_metadata);
+    assert.equal(metadata.external, true);
+    assert.deepEqual(result.coverage.map((c) => c.status), ['extracted']);
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
     fs.rmSync(source, { recursive: true, force: true });
