@@ -19,7 +19,9 @@ Brings existing material into the campaign. Run every command from the campaign 
 
 **Questions to the master.** Ask the master in plain words, then stop. Write the question as your message; the process runner turns it into a QUESTION result. Every question ends with a question mark: a statement is not a question. Ask ONE question per message.
 
-**Inputs.** MASTER_MESSAGE is the master's message, as given by the process runner. HANDOFF is the topic handoff content, when the runner gives one (it may be absent).
+**Inputs.** MASTER_MESSAGE is the master's message, as given by the process runner. HANDOFF is the topic handoff content, when the runner gives one (it may be absent). IMAGINATION is `yes` or `no`, given by the process runner; absent or any other value means `no`.
+
+**IMAGINATION.** It never changes the transcription or the claims: they are always faithful to the source, with no invention, whatever IMAGINATION says. It only governs the character sheets made for characters that are created during the import (see Step 6). With `no`, nothing changes.
 
 **Convention for the handoff.** When this process waits for an answer, the runner records the `## Next step` of the topic as exactly:
 `answer pending for ingest <id1>,<id2>: <question>`
@@ -70,7 +72,11 @@ Here the ids are the ids of the cards that hold the open question (normally one)
 - `PROVENANCE=<PROVENANCE>`;
 - `DATE=<DATE>`;
 - `RESUME_IDS=<the ids>` (only on a resume; leave the input out otherwise);
+- `IMAGINATION=<yes or no>`: the value of IMAGINATION. The ingest skill passes it on to every `yllir:npc-manager` and `yllir:complete-sheet` call that it makes for a character created during the import. When it is `yes`, each of those calls also gets `PROPOSE=yes`, and the INTENT of its write sequence ends with the sentence below. When it is `no`, the calls get `IMAGINATION=no` and nothing else changes;
+- when IMAGINATION is `yes`, the INTENT that the ingest skill gives to its write sequence ends with this exact sentence, after a space: `The master allowed invented details: new names, places, history, relations and rules that no source gives are allowed; contradictions with the canon are not.`
 - `CONTINUE_WITH="import step 7"`.
+
+With IMAGINATION `yes`, the invention allowed by this sentence fills only what the sources leave out of a character sheet (its looks, manner, history). It never fills a line of a source that cannot be read, and it never changes a claim taken from a source.
 
 When it has finished, read `.campaign/state/ingest/report.txt` with the Read tool. The report is for you, never for the master: do not show it, quote it or name its status to the master.
 - Output: the report, read and kept. If the file does not exist: go to Step 7 with the status FAILED.
@@ -127,3 +133,5 @@ Correct, NEEDS_ATTENTION (the first open question is about the name in the secon
 Wrong, listing ids and paths: «Ho salvato src-1a2b3c4d in Fonti/src-1a2b3c4d/card.md. La domanda Q001 su p1:l2 è ancora aperta.» It shows an id, a path, a question id and a locator. The master must only see the plain words of the message.
 
 Wrong, asking for the provenance: «Da dove arrivano queste foto?» The provenance is never asked: it is taken from the master's words, or it is `unknown`.
+
+Wrong (IMAGINATION `yes`, an unreadable part filled with invented text): the photo of the notes has a smudged line where the name of a place should be, and the transcription, or a claim, is written with a plausible invented name, because IMAGINATION is `yes`. This is wrong. The unreadable line stays unreadable in the transcription and goes to the master as an open question, one at a time, as Step 6 and the ingest skill say. IMAGINATION never changes what a source says.

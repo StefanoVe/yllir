@@ -92,9 +92,17 @@ modules:                         # facoltativo. Solo moduli veri, ciascuno attiv
   encyclopedia: false            # facoltativo. Enciclopedia pubblica della campagna.
   master_screen: false           # facoltativo. Strumento grafico locale del master.
   music: false                   # facoltativo. Ricerca di sottofondi e colonne sonore.
+
+allow_model_imagination: null    # facoltativo. Fantasia del modello: null (predefinito, chiede prima di ogni aggiunta) | true (può inventare) | false (non inventa senza una richiesta esplicita). Qualunque altro valore è un errore di configurazione. Vedi sotto.
 ```
 
 Le funzioni di libreria (ingest, intrecci, mappa della trama, artwork, scontri, economia) non compaiono tra i moduli: partono quando servono. Non c'è un'opzione per i conflitti del canone: un conflitto che riguarda la modifica ferma sempre la scrittura (regola fissa, vedi [Principi](Principi.md)).
+
+### Fantasia del modello
+
+**Deciso** (2026-11-10, scelta dell'autore).
+
+La chiave `allow_model_imagination` dice se l'agente può inventare i dettagli che le fonti non danno (nomi, storia, relazioni, segreti, statistiche, prezzi, bottino) durante la preparazione della sessione, il completamento di una scheda e l'import. Il valore predefinito `null` (anche quando la chiave manca) non decide: il framework chiede al master prima di ogni aggiunta, e la risposta «Sempre sì» o «Sempre no» scrive qui `true` o `false`. Con `true` o `false` il framework decide senza domande; una richiesta esplicita del master di inventare vale per quella sola richiesta. Il validatore accetta solo `null`, `true` e `false`. La regola completa e i suoi limiti stanno nel documento [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md), nella sezione delle decisioni dell'autore.
 
 ### Fonti esterne
 

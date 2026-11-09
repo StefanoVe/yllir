@@ -329,3 +329,14 @@ test('add-category CLI prints JSON and uses exit codes 0, 1 and 2', () => {
   assert.equal(usage.status, 2);
   assert.match(usage.stderr, /usage: node add-category\.mjs/);
 });
+
+test('a top-level allow_model_imagination is written and reads back as null, true or false', () => {
+  for (const value of [null, true, false]) {
+    const config = parse(MINIMAL);
+    config.allow_model_imagination = value;
+    const text = stringifyConfig(config);
+    assert.match(text, new RegExp(`^allow_model_imagination: ${value === null ? 'null' : String(value)}$`, 'm'));
+    assert.deepEqual(parse(text), config);
+    assert.deepEqual(validateConfig(campaignWith(text)).errors, []);
+  }
+});

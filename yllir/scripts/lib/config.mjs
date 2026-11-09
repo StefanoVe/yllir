@@ -9,7 +9,7 @@ import { parseYamlLite } from './yaml-lite.mjs';
 import { listAdapters, pluginRootFromHere } from './adapter.mjs';
 
 const FILE = 'campaign.yaml';
-const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit'];
+const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit', 'allow_model_imagination'];
 const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];
 const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only', 'external'];
 const MODULE_KEYS = ['print', 'encyclopedia', 'master_screen', 'music'];
@@ -272,6 +272,21 @@ function validateTopLevel(r, config, campaignRoot) {
 
   const audit = mappingField(r, config, '', 'audit');
   if (audit !== null) validateAudit(r, audit);
+
+  if (Object.hasOwn(config, 'allow_model_imagination')) {
+    validateModelImagination(r, config.allow_model_imagination);
+  }
+}
+
+/** allow_model_imagination is true, false or null (null is the default). */
+function validateModelImagination(r, value) {
+  const at = 'allow_model_imagination';
+  if (value === null || typeof value === 'boolean') return;
+  if (Array.isArray(value) || isMapping(value)) {
+    r.error('bad-type', at, `${at} must be true, false or null, not a list or a mapping`);
+  } else {
+    r.error('bad-value', at, `${at} must be true, false or null`);
+  }
 }
 
 function validateCampaign(r, campaign) {

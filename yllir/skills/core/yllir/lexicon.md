@@ -103,3 +103,16 @@ Use this sentence as it is when the master asks to change a session that has alr
 | Italian | English |
 |---|---|
 | Questa sessione è già stata giocata, quindi non posso più cambiarla. Posso preparare la prossima, se vuoi. | This session has already been played, so I can no longer change it. I can prepare the next one, if you want. |
+
+## Fixed question about invention
+
+Use this question and these four options as they are, in this order, when the master has not yet said whether the assistant may invent details. Do not add, rename or reorder them.
+
+| Item | Italian | English |
+|---|---|---|
+| Question header | «Fantasia» | «Imagination» |
+| Question | Posso inventare dettagli che le fonti non danno (nomi, storia, aspetto, regole)? | May I invent details the sources do not give (names, history, looks, rules)? |
+| Option 1 | Sì | Yes |
+| Option 2 | No | No |
+| Option 3 | Sempre sì | Always yes |
+| Option 4 | Sempre no | Always no |

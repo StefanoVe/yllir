@@ -21,6 +21,8 @@ Prepares the next session as a new session folder: a main file and one file per 
 
 **Inputs.** MASTER_MESSAGE is the master's request, as given by the process runner. MODE is `revise` when the process runner's prompt has a line `MODE: revise`. In every other case (no MODE line, or `MODE: new`) MODE is `new`. In MODE `new`, follow the Steps below. In MODE `revise`, follow «Mode: revise» below and do not run the Steps except where «Mode: revise» refers to them.
 
+**IMAGINATION** is `yes` or `no`, given by the process runner. `yes` lets the assistant invent details that no source states, as described in step 7 and step 6b. Absent or any other value means `no`. With `no`, every rule of this file applies exactly as written, with no invention beyond the existing rules.
+
 ## Steps
 
 **Step 1 — Map.** Run these two commands in this order:
@@ -63,6 +65,7 @@ Read `.campaign/cache/plot-map.json` with the Read tool. Keep `sessions`, `arcs`
      Not required: background people, bystanders, a person the master did not ask for, and anything the master did not ask for. Example: «a fight against the bandit chief» gives one REQUIRED_CHARACTERS entry, for the chief. «a scene in a crowded market» gives none.
      If a subject of the documents read already fits the role clearly (for example, the existing sheet of the bandit chief), skip the entry and use that subject instead: add its id to KNOWN_NEW (step 6b keeps this list), and create no sheet for it.
    Only MISSING_CHARACTERS and REQUIRED_CHARACTERS get a sheet (step 6b). Do not create a document for a MISSING_OTHER name.
+6. With IMAGINATION `yes` only: each named character that you decide to invent for the scenes (step 7) is added to REQUIRED_CHARACTERS now, by its role, so that step 6b gives it a sheet before the draft is written. Its name is chosen in step 6b, as for the other REQUIRED_CHARACTERS entries.
 - Output: the list of documents read (paths), the list of subject ids, the MISSING_CHARACTERS and MISSING_OTHER names, the REQUIRED_CHARACTERS entries (described by role, not by name), and the KNOWN_NEW ids of any skipped entry.
 
 **Step 5 — Read-only check.** Invoke the skill `yllir:continuity-audit` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with:
@@ -98,7 +101,8 @@ For a REQUIRED_CHARACTERS entry, first choose its NAME: 1 to 3 words, fitting th
    - `TEMPLATE=<the choice of step 0>`
    - `LOCATION=<the main place ids of step 4, comma-separated, or empty; for an enemy or creature, the places where it lives, and empty means errant>`
    - `DETAILS=<only what MASTER_MESSAGE says about this character, copied; empty if nothing>`. For a REQUIRED_CHARACTERS entry, DETAILS is only what MASTER_MESSAGE says about the role (for example «leads the bandits the characters fight at the ford»), copied. Never invent a fact.
-   - `PROPOSE=<yes or no>`: `yes` for every REQUIRED_CHARACTERS entry, and for every MISSING_CHARACTERS name whose DETAILS is empty or almost empty (the master gave a name and nothing else). `no` only when MASTER_MESSAGE describes this character in detail itself.
+   - `PROPOSE=<yes or no>`: `yes` for every REQUIRED_CHARACTERS entry, and for every MISSING_CHARACTERS name whose DETAILS is empty or almost empty (the master gave a name and nothing else). `no` only when MASTER_MESSAGE describes this character in detail itself. When IMAGINATION is `yes`, `PROPOSE=yes` for every sheet created, whatever its DETAILS.
+   - `IMAGINATION=<yes or no>`: the value of IMAGINATION. Pass `IMAGINATION=yes` when it is `yes`, and `IMAGINATION=no` when it is `no`.
    - `REQUESTED_BY=` empty: the scene file names are decided in step 7, which runs after this step, so they are not known yet. Step 8 links the scenes to the new sheet anyway, through NEW_SUBJECTS.
    - `CONTINUE_WITH="prepare-session step 6b: read the npc-manager report, then step 7"`
    If your tool cannot invoke a named skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/SKILL.md` with the Read tool and follow it exactly as if it had been invoked, with the same inputs.
@@ -160,12 +164,24 @@ Rules for the draft:
 - Each scene opens with ONE `_italic_` narration paragraph. Italic is only for read-aloud narration.
 - Use `##` for minor actions inside a scene.
 - Use at least one `###` check in the whole session (over all the scene files). Each check has a `- **Successo:**` line and a `- **Fallimento:**` line.
-- The campaign has no game rules. Write the difficulty of a check as «difficoltà da definire» in Italian, «difficulty to be set» in English, or the translation. Do not invent numbers.
+- The campaign has no game rules. Write the difficulty of a check as «difficoltà da definire» in Italian, «difficulty to be set» in English, or the translation. Do not invent numbers. This is the rule with IMAGINATION `no`. With IMAGINATION `yes`, the difficulty rule is:
+  1. Read `system.adapter` in `campaign.yaml`.
+  2. If `system.adapter` is set to a system, write the difficulty as that system's rules give it, through the adapter as the rules of the system allow. If the rules give no value, write a plain-text difficulty (step 3).
+  3. If `system.adapter` is `none` or absent, write a plain-text difficulty in the campaign language, for example «difficile» or «facile» in Italian, «hard» or «easy» in English. Never a number.
 - Put master notes in a ``` block (three backticks, the note, three backticks). Do not use `>` for master notes. Use `>` only for a message addressed to the players.
 - Use only what MASTER_MESSAGE, the documents of step 4 and the previous session say.
 - Never decide which of two contradicting documents is right. Never state a CONTESTED fact in the draft: write the scene without it (for example, do not name how two characters are related). Avoid every CONTESTED fact, including in narration and in master notes.
 - You may invent scene events and unnamed extras (for example «a fisherman»).
 - You may NOT add a named place. You may use a named character only if it is in NEW_CHARACTERS (new sheet) or KNOWN_NEW (existing sheet); this includes the characters created for REQUIRED_CHARACTERS. You may NOT add a named character that is neither required by the master's request nor named by the master. You may NOT define or change who a known subject is.
+- With IMAGINATION `yes`, the limits above are widened as follows, and only as follows:
+  1. You may invent named characters: each one is planned in step 4 (item 6) and gets a sheet in step 6b. You may use it in the scene only after that, and it is listed in `characters` as any other character.
+  2. You may invent named places. No document is created for a place (the scope rule above still holds): the place appears as a plain name in the text and is listed in the final message as having no document yet, as for MISSING_OTHER.
+  3. You may invent game-rule details: the difficulty, as the rule above says for `yes`.
+  4. You may invent background: history, relations between characters, past events. Use it only in the scene text, never as a fact about a known subject. A known subject's identity is still fixed by its sheet and the canon, and a CONTESTED fact stays out.
+  5. Invented content is never written as a quote of a source and never gets a source reference.
+  6. Never contradict the canon, the documents read in step 4, or the previous session. An invented detail that contradicts one of them is not written.
+  7. A secret, and anything the master must not see, goes ONLY in a ``` master-only note in the scene file. Never in public text, and never in a `>` line.
+  8. Whatever the master or a document states still wins and is copied as is. Invention only fills what is missing.
 - Every named character who acts or speaks in a scene is listed in that scene's `characters`, and has a sheet: an existing subject, or one of NEW_CHARACTERS or KNOWN_NEW. The `characters` list may hold ids of sheets of any kind: npc, vendor, enemy or creature.
 - A scene text names the character and says what they do. It never states or changes who the character is (role, looks, personality, motives, secrets): such facts live only in the sheet.
 - A scene may make a character do things the sheet does not mention, but never against what the sheet says. If the only way to write an event is to contradict the sheet, write the scene without that action, and say so in the final message (step 9).
@@ -179,6 +195,7 @@ Rules for the draft:
 - `VERSION_MESSAGE=` the sentence «Preparata la sessione «<session name>»» for `it`, «Prepared the session «<session name>»» for `en`, or the translation into the campaign language
 - `ROUND=1`
 - `CONTINUE_WITH="prepare-session step 8: read the write report and act on its status"`
+- when IMAGINATION is `yes`, the INTENT ends with this exact sentence, after a space: `The master allowed invented details: new names, places, history, relations and rules that no source gives are allowed; contradictions with the canon are not.` When IMAGINATION is `no`, the INTENT has no such sentence.
 
 After invoking it, read `.campaign/state/write/report.txt` with the Read tool. The report is for you, never for the master: do not show it or quote it.
 
@@ -216,6 +233,7 @@ When it has finished, read `.campaign/state/plot-map/report.txt` with the Read t
 - for each character in KNOWN_NEW: one sentence, by name, that the character already has a sheet, using the master-facing words for character sheets in the lexicon («Schede dei personaggi» in Italian, «Character sheets» in English);
 - for each character that got no sheet under step 6b: one sentence that this character has no sheet yet;
 - for each scene written without an action that would have contradicted a sheet (step 7): one plain sentence saying what was left out;
+- with IMAGINATION `yes`, and only if something was invented beyond the sheets: one plain sentence that names what was invented by character and scene name, and any invented place, in the form «I invented X and Y, and the scenes Z and W: tell me if you want them different». If nothing was invented, no sentence. An invented character is named here too, even if its sheet sentence is already given above;
 - each NOTE from step 5, in one plain sentence;
 - each CONTESTED fact from step 5, in one plain sentence: which two documents disagree, and that the session was written without that fact. Never choose a version;
 - for each ENTRY_POINTS line, one sentence: which character can enter the scene, and how;
@@ -270,6 +288,7 @@ The new decisions of the master are what this check is about: it must find wheth
 - DOCUMENTS = the draft paths of the changed scene files, then the main file of TARGET only if it changed, then every path of SHEET_DRAFTS (campaign paths, comma-separated; nothing else is added);
 - INTENT = "Session revision for <session name>: only the text of the named scenes changes; ids and file names stay; no other session changes; new named characters only through their own new sheet, listed in characters; sheets define who a character is and the scenes only what they do."
 - VERSION_MESSAGE = the sentence «Rivista la sessione «<session name>»» for `it`, «Revised the session «<session name>»» for `en`, or the translation into the campaign language;
+- when IMAGINATION is `yes`, the INTENT ends with the same sentence as in Step 8, after a space; when `no`, it does not;
 - NEW_SUBJECTS, ROUND and CONTINUE_WITH as in Step 8, with CONTINUE_WITH = "prepare-session revise R8: read the write report and act on its status".
 The loop and the links check of Step 8 apply unchanged. Output: `status: DONE`, or the failure of Step 8.
 
@@ -294,6 +313,10 @@ Correct (kind chosen by the process): the master writes «Grigio, a wolf, guards
 Wrong (asking the master for the kind): the process asks the master «is it an npc or a creature?». The kind is decided in step 6b from the context. Never ask it.
 
 Wrong (writing the sheet by hand): the process writes `Characters/Brenna.md` with its own tools, or copies a sheet into the campaign. This is forbidden: a sheet is made only through `yllir:npc-manager`, and its draft goes through the write sequence.
+
+Correct (IMAGINATION `yes`): the master writes «prepare a session at the mill, you can invent the people and the scenes» and the message has no named character. The process plans a named miller in step 4 (item 6), so step 6b makes his sheet, with `IMAGINATION=yes` and `PROPOSE=yes`. The scene «The Wheel» lists him in `characters` and says what he does, and the difficulty of the check is written in plain text. The final message says in one sentence that the miller and the scene «The Wheel» were invented, and that the master can change them.
+
+Wrong (IMAGINATION `yes`, an invented fact that contradicts the canon): the previous session says the ford is held by the bandits, and the draft, with the freedom of IMAGINATION `yes`, says that the ford is now a free village market. That contradicts the documents read in step 4, so it is not written. The scene must follow the canon: the bandits hold the ford. Invention is allowed only where the canon is silent.
 
 Wrong (inventing a named character the request does not need): the master asks for a scene in a field, with no inn requested, and the draft says «the innkeeper, Oswin, pours the ale». Oswin is named by no one and the request does not need him, so he may not be added. Write «the innkeeper» instead, or «a fisherman» for an unnamed extra.
 

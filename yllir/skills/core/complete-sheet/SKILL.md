@@ -21,7 +21,7 @@ Completes or corrects ONE existing sheet: a character, a vendor, an enemy, a cre
 
 **Questions to the master.** Ask the master in plain words, then stop. Write the question as your message; the process runner turns it into a QUESTION result. Every question ends with a question mark: a statement is not a question. Ask at most ONE question per message.
 
-**Inputs.** MASTER_MESSAGE is the master's message, as given by the process runner. HANDOFF, when the runner gives one, is not used by this process: ignore it.
+**Inputs.** MASTER_MESSAGE is the master's message, as given by the process runner. IMAGINATION is `yes` or `no`, as given by the process runner: `yes` means the master allowed invented details that no source gives (names, places, history, relations, rules), while contradictions with the canon are never allowed. If IMAGINATION is absent or has any other value, it is `no`. HANDOFF, when the runner gives one, is not used by this process: ignore it.
 
 **Words for the master.** Use only the words of the lexicon (`yllir/skills/core/yllir/lexicon.md`): the sheet is «la scheda», the process is never named, the write sequence is never named, the reviewers are «un revisore» or «un assistente».
 
@@ -82,6 +82,7 @@ Section keys used in this file, with their headings in the heading table of Step
 
 **Step 5 — Rules facts (statistics and stock).** Run this step only when TEMPLATE is `enemy` and the `statistics` section is a gap, or when TEMPLATE is `vendor` and the `stock` section is a gap. Otherwise output "no rules gap" and go to Step 6. Rules are never written from memory and never invented, except as follows.
 0. If MASTER_MESSAGE explicitly authorizes you to invent or choose the statistics or stock yourself (for example «inventale tu», «scegli tu le statistiche», «puoi inventarle», «make them up»), this is a master-given authorization, and it overrides the rule above: do not search the sources and do not ask any question. Draft a complete, plausible RULES_BLOCK yourself, using the stat format of the system adapter if ADAPTER is `set` (ask nothing); otherwise use plain labelled lines. Write it in the sheet, and mention in the message to the master that the statistics (or the stock and prices) are invented and can be changed. This RULES_BLOCK is treated as any other RULES_BLOCK in Step 7 and Step 9. Then go to the Output of this step.
+0b. If IMAGINATION is `yes` (and the message of point 0 does not apply): sources and the master's own block come first. Follow points 1 to 4 below. Wherever they would leave the section `Da definire.` or set QUESTION_RULES (no block in the message, ADAPTER `none`, research not DONE, or no block in the sources), do not leave it and do not ask: draft the RULES_BLOCK yourself as point 0 says, and mention in the message to the master that it is invented. A block that a source or the message gives always wins over an invented one.
 1. If MASTER_MESSAGE contains a block of statistics (enemy) or of stock items with prices (vendor): copy that block exactly, character by character, into RULES_BLOCK. Then go to the Output of this step. Do not search the sources.
 2. Otherwise, if ADAPTER is `none`: the section stays `Da definire.` (English `To be defined.`). Add the section to TO_DEFINE. No question is asked. Go to the Output of this step.
 3. Otherwise (ADAPTER is `set`): invoke the skill `yllir:canon-research` with:
@@ -103,6 +104,12 @@ Section keys used in this file, with their headings in the heading table of Step
 - `appearance` is ONE italic paragraph, written as `_..._`.
 - `description` of a place is an italic opening paragraph of 1 or 2 sentences; plain sentences may follow, at most 2.
 - STILL FORBIDDEN, always: secrets; a past event; a relative or any relation to another named character; what the character does in a session or event; any master-only content; any invented statistic, price, stock item or loot entry; a new named character or a new named place.
+- With IMAGINATION `yes`, the STILL FORBIDDEN line above does not apply. These limits still apply instead:
+  - no contradiction with the ESTABLISHED facts of Step 4, nor with the rest of the campaign;
+  - a secret goes ONLY into the master-only block (`<!-- master -->` ... `<!-- /master -->`), never into a public section;
+  - anything invented is never written as a quote of a source, and never gets a source reference.
+  With IMAGINATION `yes` the proposals may also name new characters or places, past events and relations between characters. A proposal may be longer than 3 sentences when the template section needs it, but at most 5 short sentences per section.
+- With IMAGINATION `yes`, every NARRATIVE gap that is still empty after Step 4 gets a proposal. A section keeps `Da definire.` only when it cannot be filled at all.
 - PROPOSED is the list of the sections filled by a proposal (`role`, `appearance`, `table`, `nature`, `description`).
 - Ask the master a question ONLY when a gap cannot be filled without a creative decision that changes who the subject is. Example: two ESTABLISHED facts contradict each other, and the master asked to fix the sheet. Then QUESTION_CREATIVE is the question «Quale delle due è giusta: <FACT 1> o <FACT 2>?», written in the CAMPAIGN LANGUAGE, with the two facts in plain words. Never choose between them. Then go to Step 9 and send only that question.
 - Never ask about something that a source or a proposal can fill.
@@ -166,6 +173,7 @@ If QUESTION_CREATIVE is set: do not write any draft. Go to Step 9 and send only 
 **Step 8 — Write sequence.** Invoke the skill `yllir:write-sequence` with:
 - `DOCUMENTS=<SHEET_PATH>`
 - `INTENT="Completes or corrects the sheet of <TITLE>: adds only facts the campaign establishes, the master's own words, or short creative proposals; changes no existing identity fact except where the master corrects it; no secrets; no statistics, prices or stock that no source gives."`
+- When IMAGINATION is `yes`: add to the end of INTENT, after one space, exactly this sentence: `The master allowed invented details: new names, places, history, relations and rules that no source gives are allowed; contradictions with the canon are not.`
 - `NEW_SUBJECTS=` (empty)
 - `VERSION_MESSAGE=` «Scheda di <TITLE> completata» for `it`, «Sheet of <TITLE> completed» for `en`, or the translation for another language. Use «Scheda di <TITLE> corretta» (`it`), «Sheet of <TITLE> corrected» (`en`), or the translation, only when no gap section was filled and the only change is a MASTER_FACT correction.
 - `ROUND=1`
@@ -192,7 +200,7 @@ If QUESTION_CREATIVE is set: the message is only that question. Stop.
 
 Otherwise the message is, in this order:
 - (a) one sentence saying what is now in the sheet, naming the sections in plain words, for example «Ho completato la scheda di <TITLE>: ora ha <sections>.» (or «Ho corretto la scheda di <TITLE>: ...» when the change is a correction only);
-- (b) one sentence naming what comes from the campaign and what is a creative proposal the master can change. Only when PROPOSED is not empty. When PROPOSED is empty, omit this sentence;
+- (b) one sentence naming what comes from the campaign and what is a creative proposal the master can change. Only when PROPOSED is not empty. When PROPOSED is empty, omit this sentence. With IMAGINATION `yes`, when a proposal invents a name (a character, a place, a relation or a past event), this same sentence also says in plain words, by name, what was invented, so the master can change it; when nothing was invented, it is written as before;
 - (b2) only when the statistics (or the stock and prices) were invented under the master's authorization of Step 5, point 0: one sentence saying that they were invented at the master's request and can be changed. When that does not apply, omit this sentence;
 - (c) only when STILL_OPEN has a gap that is a rules or other section: one sentence saying clearly that the sheet is still «da completare» (`en`: «still to be completed») and naming what is missing in plain words. Then:
   - if QUESTION_RULES is set: that question is the LAST sentence of the message, exactly as set in Step 5;
@@ -211,6 +219,8 @@ Correct: an enemy with `system.adapter` set (ADAPTER is `set`), and no statistic
 
 Correct: a master message «Ilde è una donna, sistema la sua scheda». The MASTER_FACT is «è una donna», kept in the master's words. The sentence in the sheet that says otherwise is changed to the master's statement. Nothing else in the sheet changes.
 
+Correct: IMAGINATION is `yes`, and the master writes «completa la scheda della guardia comune». No source gives the role, the appearance or the manner, and no ESTABLISHED fact fills them. The process writes short proposals in the register of the campaign. The role proposal names a new character, the sergeant Orso Dalla, who gives the guard orders, and no secret appears in any public section. The message says, in one plain sentence, that the sergeant's name is invented and can be changed, next to the sentence about the proposals.
+
 Wrong: answering with a list of the assistant's features.
 
 Wrong: answering that the operation is not available, when the sheet is a character, a creature or a place.
@@ -221,7 +231,9 @@ Wrong: writing statistics from memory for a known game, or a price for a vendor 
 
 Wrong: turning a character's hypothesis into a fact. A line that says «X dice che il capitano è suo padre» is a claim of a character, not an ESTABLISHED fact.
 
-Wrong: adding a secret as a proposal, for example «in realtà lavora per il barone». Secrets are never proposed.
+Wrong: adding a secret as a proposal, for example «in realtà lavora per il barone». Secrets are never proposed when IMAGINATION is `no`.
+
+Wrong: IMAGINATION is `yes`, and the proposal for `## Aspetto e modi` writes the invented secret «in realtà lavora per il barone» in that public section. An invented secret goes ONLY into the master-only block, never into a public section, even with IMAGINATION `yes`.
 
 Wrong: mentioning older versions, ambiguous links or consistency checks in the message to the master.
 

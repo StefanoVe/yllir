@@ -452,3 +452,23 @@ test('the morvalle fixture is valid with no errors', () => {
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   assert.deepEqual(result.errors, []);
 });
+
+test('allow_model_imagination accepts null, true, false and an absent key', () => {
+  assert.deepEqual(errorsOf(MINIMAL), []);
+  assert.deepEqual(errorsOf(`${MINIMAL}allow_model_imagination: null\n`), []);
+  assert.deepEqual(errorsOf(`${MINIMAL}allow_model_imagination: true\n`), []);
+  assert.deepEqual(errorsOf(`${MINIMAL}allow_model_imagination: false\n`), []);
+  assert.equal(validateConfig(makeCampaign(`${MINIMAL}allow_model_imagination: true\n`)).config.allow_model_imagination, true);
+});
+
+test('allow_model_imagination rejects text, numbers, lists and mappings with its own path', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}allow_model_imagination: "yes"\n`)), ['bad-value allow_model_imagination']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}allow_model_imagination: yes\n`)), ['bad-value allow_model_imagination']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}allow_model_imagination: 1\n`)), ['bad-value allow_model_imagination']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}allow_model_imagination: [true]\n`)), ['bad-type allow_model_imagination']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}allow_model_imagination: {}\n`)), ['bad-type allow_model_imagination']);
+  assert.equal(
+    errorsOf(`${MINIMAL}allow_model_imagination: "yes"\n`)[0].message,
+    'allow_model_imagination must be true, false or null',
+  );
+});

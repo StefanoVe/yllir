@@ -9,7 +9,7 @@ import { validateConfig } from '../../../../../scripts/lib/config.mjs';
 import { generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
 
 const FILE = 'campaign.yaml';
-const TOP_ORDER = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit'];
+const TOP_ORDER = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit', 'allow_model_imagination'];
 const KEY_RE = /^[a-z][a-z0-9_]*$/;
 const BARE_RE = /^[a-z0-9][a-z0-9_-]*$/;
 const DIGITS_RE = /^\d+$/;

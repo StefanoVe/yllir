@@ -69,6 +69,13 @@ Questo file è l’indice: raccoglie le decisioni dell’autore, che sono vincol
   - **Fetta di core (2026-11-07).** Portineria (ingresso, «dove eravamo rimasti», «torna a com'era»), `new-campaign` e cablaggio di scrittura. La gestione automatica di argomenti e riepiloghi per riprendere ([Gestione delle sessioni](Gestione%20delle%20sessioni.md)) entra nella fetta successiva, insieme a `prepare-session`.
   - Restano fuori dall'MVP il master screen, artwork, carte, stampa, mappe, musica, enciclopedia, migrazioni (resta solo `version.yaml`) e ingest.
 - **GUI dedicata e locale, in un secondo momento.** Resta un nice to have: una versione snella del master screen in cui si chatta con l’agente e si vedono le sue modifiche in tempo reale. Tutto gira in locale, sul computer dell’utente.
+- **Fantasia del modello, bloccata per default (Deciso, 2026-11-10).** L'agente non inventa nulla che le fonti non danno. La sua capacità creativa si sblocca solo per conto del master, con tre condizioni in quest'ordine:
+  - (a) il master chiede esplicitamente di inventare, o di scegliere lui (per esempio «inventa tu»): vale per quella richiesta sola, e la configurazione non cambia;
+  - (b) la configurazione ha `allow_model_imagination: true`, che decide senza domande; con `false` non si inventa, salvo la richiesta esplicita del punto (a), che vale per quella sola richiesta;
+  - (c) con `allow_model_imagination: null` (il valore predefinito, anche se la chiave manca), prima di ogni aggiunta o modifica il framework chiede con una domanda a quattro risposte: Sì / No / Sempre sì / Sempre no. «Sì» e «No» valgono per quella richiesta sola; «Sempre sì» e «Sempre no» si salvano nella configurazione come `true` e `false`.
+  - Il campo vale per la preparazione della sessione, il completamento di una scheda e l'import (per le schede dei personaggi creati lì). Non vale mai per la cronaca dopo la sessione né per la trascrizione fedele dell'ingest.
+  - Quando la fantasia è sbloccata, cadono i limiti sul non inventare (nomi, storia, relazioni, segreti, statistiche, prezzi, bottino). Restano: il canone non si contraddice (l'audit di continuità e il revisore fermano le contraddizioni); segreti e contenuti riservati stanno solo nel blocco master; un'invenzione non si presenta mai come citazione di una fonte; il master è avvisato in una frase di che cosa è stato inventato.
+  - Con il valore `no` il comportamento resta quello di prima della decisione.
 
 ## Architettura
 
@@ -100,6 +107,7 @@ Modello di riferimento: Baltimora, il framework di skill usato al lavoro dall’
 ## Domande aperte
 
 - Quali altre funzioni confluiscono nel master screen oltre a consultazione, sessione live, musica e stampa (enciclopedia pubblica, atlante, vedute illustrate dei luoghi, carte nautiche)? Ancora da vedere.
+- **Fantasia del modello senza lo strumento di domanda.** La decisione del 2026-11-10 dice che, se l'agente non ha lo strumento di domanda interattivo (per esempio in Codex, se non lo espone), il valore resta `no` e nulla viene chiesto in testo. Resta da decidere se il master debba essere avvisato in una frase che la fantasia è bloccata, o se il silenzio va bene.
 
 ## Criteri di completamento
 

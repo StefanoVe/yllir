@@ -161,6 +161,8 @@ Le cartelle delle categorie, il documento di economia (`Storia/Economia.md`), i 
 
 **Modalità revisione.** **Deciso (2026-11-09).** Il master può cambiare alcune scene di una sessione già preparata e non ancora giocata («cambia il debito dei minatori», «la consegna dei documenti avviene in un'altra scena»: aggiorna quattro scene già scritte). Non è un processo nuovo: è la modalità revisione del processo di preparazione. Il processo riscrive solo le scene nominate, e il documento principale della sessione solo se il suo testo ne dipende. Passi: identifica la sessione e le scene (una sola domanda se non sono chiare); rifiuta, in parole semplici, una sessione già giocata (lo stato «giocata» della mappa della trama), senza scrivere nulla; legge le scene e i documenti coinvolti, e le sessioni che dipendono da quella (sola lettura); esegue il controllo di coerenza in sola lettura sul contenuto nuovo, incluse le decisioni del master; riscrive solo le scene cambiate, lasciando identico il resto; passa per la scrittura (salvataggio delle modifiche a mano, controllo di coerenza, revisione indipendente, scrittura, collegamenti, verifica, versione salvata); se una scena cambia ordine, entrate, uscite o scelte, ricontrolla i collegamenti della trama per quella sessione. Gli identificativi e i nomi dei file delle scene restano; le sessioni diverse da quella indicata non si scrivono mai, e quelle che dipendono dalla modificata si segnalano al master. Aggiungere o togliere una scena non è previsto in questa versione: il processo lo dice e si ferma. Il messaggio finale dice quali scene sono cambiate e che cosa è rimasto com'era.
 
+**Fantasia del modello (2026-11-10).** Il processo inventa i dettagli mancanti solo quando la fantasia è sbloccata per questa richiesta (richiesta esplicita del master, configurazione `true`, o risposta «Sì» o «Sempre sì» alla domanda; vedi il principio 17 di [Principi](Principi.md)). Ciò che il master o una fonte dicono resta com'è: si inventa solo ciò che manca. Il messaggio finale dice in una frase che cosa è stato inventato, per scena o personaggio. Il canone non si contraddice mai e i segreti restano nel blocco riservato.
+
 ## 3. Sessione live
 
 **Frasi che lo attivano:** «iniziamo», «avvia la sessione», «continuiamo da dove eravamo», «registra quello che succede».
@@ -215,6 +217,8 @@ Le cartelle delle categorie, il documento di economia (`Storia/Economia.md`), i 
 **Conferme richieste:** prima della scrittura, il master vede l'elenco delle modifiche canoniche. Non serve conferma per i fatti del registro già confermati dal master durante la sessione e senza conflitti. Ogni conflitto con il canone attende la decisione del master. Proposta: le conseguenze che riscrivono una sessione futura richiedono una conferma esplicita.
 
 **Errori:** se l'audit di continuità trova un conflitto, la scrittura interessata si ferma e il conflitto viene presentato con le due versioni. Se la creazione di una carta non è disponibile, la scheda resta, senza collegamento a un'immagine inesistente, e la carta risulta come compito aperto.
+
+**Fantasia del modello (2026-11-10).** Questo processo non inventa mai, qualunque sia il valore di `allow_model_imagination`: la cronaca racconta solo ciò che il registro contiene, e le schede si aggiornano solo con ciò che il master ha detto o confermato.
 
 ## 5. Manutenzione («fai ordine»)
 
@@ -273,6 +277,8 @@ Le cartelle delle categorie, il documento di economia (`Storia/Economia.md`), i 
 **Conferme richieste:** quando un dubbio blocca l'integrazione, il master risponde prima che il passo venga applicato. Un conflitto con il canone attende la decisione del master. Il silenzio del master non vale come conferma.
 
 **Errori:** una pagina illeggibile non viene completata con l'invenzione: resta marcata. Un OCR fallito non blocca la lettura visiva dell'immagine. Un'importazione interrotta lascia le fonti già acquisite e segnala quali parti mancano; non si dichiara l'import completo.
+
+**Fantasia del modello (2026-11-10).** Il processo inventa i dettagli mancanti nelle schede e nei documenti integrati solo quando la fantasia è sbloccata per questa richiesta (vedi il principio 17 di [Principi](Principi.md)). La trascrizione fedele dei documenti non inventa mai: la fantasia riguarda solo ciò che il processo integra quando manca. Il messaggio finale dice in una frase che cosa è stato inventato, per personaggio.
 
 ## 7. Riordino del canone
 
@@ -354,6 +360,8 @@ Le cartelle delle categorie, il documento di economia (`Storia/Economia.md`), i 
 **Conferme richieste:** nessuna per ciò che viene dalla campagna. Le proposte creative si segnalano come tali nel messaggio, e il master può cambiarle. Una sola domanda se due fatti stabiliti si contraddicono o se mancano statistiche nelle fonti consentite.
 
 **Errori:** se le statistiche non si trovano nelle fonti consentite restano «Da definire» e la scheda risulta «da completare»; mai statistiche a memoria. Se la scheda è già usabile, il processo lo dice e non scrive nulla. Se due fatti stabiliti si contraddicono, la parte interessata non viene scritta finché il master non risponde. Una correzione d'identità detta dal master (per esempio il sesso di un personaggio) si applica alla scheda solo dopo aver verificato che la campagna non dica altro; se lo dice, è una domanda sola. Se il revisore indipendente non risponde, nulla si applica (vedi «Errori comuni»).
+
+**Fantasia del modello (2026-11-10).** Il processo inventa i dettagli mancanti (nomi, aspetto, modi, storia, relazioni, statistiche, scorte, prezzi) solo quando la fantasia è sbloccata per questa richiesta (vedi il principio 17 di [Principi](Principi.md)). Le regole di gioco restano nelle fonti consentite e nell'adattatore: un valore inventato va dichiarato nel messaggio finale, mai presentato come una fonte. Il canone non si contraddice e i segreti restano nel blocco riservato.
 
 ## Tabella riassuntiva: processo → funzioni di libreria
 

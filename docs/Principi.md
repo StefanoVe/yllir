@@ -213,6 +213,19 @@ Il pubblico di riferimento è il master che non ha mai usato un'intelligenza art
 - Fra due soluzioni che risolvono lo stesso problema si sceglie quella con meno parti.
 - YAGNI non giustifica scorciatoie sulla robustezza: verifiche, casi di prova e separazione pubblico/riservato servono già oggi.
 
+## 17. Il framework non inventa: la fantasia è un permesso del master
+
+**Deciso** (2026-11-10, scelta dell'autore; vedi l'indice, «Fantasia del modello, bloccata per default»).
+
+**Motivazione.** Un framework che riempie le lacune con dettagli plausibili rovina il canone in silenzio. Il master non deve scoprire dopo che un nome, un segreto o un prezzo l'ha deciso un modello.
+
+**Conseguenze pratiche.**
+
+- Per default l'agente non crea nulla che le fonti non danno. La creatività è un permesso che il master concede, mai una presunzione del framework.
+- Il permesso si dà in una richiesta («inventa tu»), oppure con la configurazione (`allow_model_imagination`), oppure rispondendo alla domanda che il framework pone quando il valore non è ancora deciso.
+- Anche con il permesso il canone resta intoccabile: un'invenzione che contraddice il canone è un errore come un altro. Segreti e contenuti riservati restano nel blocco del master, e il master sa sempre che cosa è stato inventato.
+- Il permesso non vale mai per la cronaca dopo la sessione né per la trascrizione fedele di un documento: lì si registra solo ciò che è stato detto o scritto.
+
 ## Glossario
 
 I termini della colonna «Termine interno» sono usati nei documenti di progetto e negli script, e nelle prose della specifica compaiono con il nome indicato in quella colonna. Il master non li vede mai: nei messaggi e nelle schermate compare solo la colonna «Cosa vede il master». Le voci «Cosa vede il master» sono le uniche parole mostrate all'utente.

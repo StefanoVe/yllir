@@ -99,6 +99,7 @@ Rules for the draft:
 - Past tense only.
 - Cover every event the master told, in the order told. Write at least one full sentence for each event (who did what, where). Do not leave an event out because it seems small. A page that covers only one event is wrong.
 - Write facts only: do not add anything the master did not say. Covering every event and adding nothing are both required.
+- This process receives no IMAGINATION and never invents, even when the campaign flag `allow_model_imagination` in `campaign.yaml` is `true`. A chronicle holds only what the master said: no invented name, place, date, event, result or detail, and no background.
 - Write only facts from MASTER_MESSAGE. You may read the documents of step 5 only to get names and spellings right.
 - No new named character and no new named place. A name that is not in the subjects appears as plain words (for example «a fisherman»), and it goes to MISSING.
 - Never define or change who a known subject is. Do not write a new fact about a known subject in the page as if it were established; if the master said it, it is in the list of things not written (step 8), not in the page.
@@ -153,6 +154,6 @@ Wrong: the master describes finding a clue and defeating an obstacle, but does n
 
 Wrong (date as title): the page is titled «# 2026-11-05». A date is not a title: the title names what happened, for example «Il ponte che cede».
 
-Wrong (inventing an event): the master writes «abbiamo giocato bene, il gruppo ha vinto lo scontro». The master did not say what happened in the fight, so the page must not write how the fight ended or who won. The right move is to ask the master ONE question: to tell the evening in one sentence per scene.
+Wrong (inventing an event): the master writes «abbiamo giocato bene, il gruppo ha vinto lo scontro». The master did not say what happened in the fight, so the page must not write how the fight ended or who won. The right move is to ask the master ONE question: to tell the evening in one sentence per scene. This holds even if the campaign flag `allow_model_imagination` is `true`: a chronicle never invents.
 
 Wrong (editing a character card): the master writes «Oswin ha confessato di essere il fratello di Brenna». The process must not open the card of Oswin to add this fact. The fact goes to the page only as what the master said, and the message says it is not written into the cards yet.

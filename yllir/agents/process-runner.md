@@ -22,11 +22,12 @@ TOPIC: <topic id or none>
 HANDOFF: <absolute path or none>
 CHANGED_FILES: <comma-separated campaign-relative paths, or none>
 LANGUAGE: <ISO code of the language the master reads>
+IMAGINATION: <yes | no | keep>
 MASTER_MESSAGE:
 <the master's message, verbatim; for a reply, also the earlier question>
 ```
 
-The prompt may also contain `MODE: revise` or `MODE: complete`, right after `LANGUAGE:`. It is optional: without it the mode is new (see Step 3). `MODE: complete` means the master gives more setup information for a campaign that already exists. If the prompt also contains `PROBLEMS:`, your previous result was rejected: see Result.
+The prompt may also contain `MODE: revise` or `MODE: complete`, right after `LANGUAGE:`. It is optional: without it the mode is new (see Step 3). `MODE: complete` means the master gives more setup information for a campaign that already exists. The line `IMAGINATION:` is optional too: it comes after the `MODE:` line when there is one, and it is absent for after-session and new-campaign. Its value says whether the process may invent details: `yes` or `no` is decided by the entry skill; `keep` means the master answered a question of an earlier run, so the value is the one recorded in the handoff (see Step 2). Pass it to the process as described in Step 3. If the prompt also contains `PROBLEMS:`, your previous result was rejected: see Result.
 
 Run every command from CAMPAIGN_ROOT, or pass it as the root argument. Never run a command from another folder.
 
@@ -35,8 +36,9 @@ Run every command from CAMPAIGN_ROOT, or pass it as the root argument. Never run
 1. **Start.** Read the lexicon with the Read tool: `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/lexicon.md`. Every sentence for the master uses only its words, in LANGUAGE.
 
 2. **Handoff.** Only if TOPIC is not `none`: read the file HANDOFF. Every file listed in CHANGED_FILES (none, if it says `none`) has been edited since the last step: read it again before you rely on it.
+   - If IMAGINATION is `keep`: look for the line `Imagination: yes` or `Imagination: no` in `## Decisions`. Its value is the IMAGINATION value for this run. If there is no such line, or TOPIC is `none`, the value is `no`.
 
-3. **Process.** Invoke the skill PROCESS (if your tool has no way to invoke a skill, read the process file with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs; for PROCESS `yllir:<p>` the file is `${CLAUDE_PLUGIN_ROOT}/skills/core/<p>/SKILL.md`) with MASTER_MESSAGE, MODE (only when the prompt has a `MODE: revise` or a `MODE: complete` line; pass it as that same line, `MODE: revise` or `MODE: complete`, and pass nothing otherwise; `MODE: complete` is passed to the process exactly like `MODE: revise`) and, if there is one, the handoff content as its inputs. Follow it fully, including its write sequence. Processes called by you keep writing their reports to files, as they do now. When the process tells you to launch a sub-agent, and you are running in Codex, set the model of that sub-agent to GPT-6 Luna in the launch call.
+3. **Process.** Invoke the skill PROCESS (if your tool has no way to invoke a skill, read the process file with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs; for PROCESS `yllir:<p>` the file is `${CLAUDE_PLUGIN_ROOT}/skills/core/<p>/SKILL.md`) with MASTER_MESSAGE, MODE (only when the prompt has a `MODE: revise` or a `MODE: complete` line; pass it as that same line, `MODE: revise` or `MODE: complete`, and pass nothing otherwise; `MODE: complete` is passed to the process exactly like `MODE: revise`), IMAGINATION (only when the prompt has an `IMAGINATION:` line, as an input called IMAGINATION: pass the value unchanged, except `keep`, which you replace with the value found in step 2, `yes` or `no`; pass nothing otherwise) and, if there is one, the handoff content as its inputs. Follow it fully, including its write sequence. Processes called by you keep writing their reports to files, as they do now. When the process tells you to launch a sub-agent, and you are running in Codex, set the model of that sub-agent to GPT-6 Luna in the launch call.
 
 4. **Questions.** When the process says to ask the master something, or to wait for a confirmation, do not ask anyone. Then:
    - end with status QUESTION (see Result), with the question and the next step in English; the entry skill records them in the topic.
@@ -44,6 +46,11 @@ Run every command from CAMPAIGN_ROOT, or pass it as the root argument. Never run
    When resumed with the answer, continue from the next step recorded in the handoff. In an empty folder (TOPIC `none`) there is no handoff: the question is only in your result, and the entry skill resends it with the answer.
 
 5. **Handoff upkeep.** Only if TOPIC is not `none`. After every important step (a decision of the master, a document written, a saved version), update `## Decisions`, `## Done`, `## Remaining` and `## Next step` in English. Keep them short and explicit, and refer to files instead of copying them. You run no topic command: the entry skill records the topic from your RUNNER RESULT.
+   - When TOPIC is not `none` and IMAGINATION arrived as `yes` or `no` (not `keep`), write the line `Imagination: <yes or no>` in `## Decisions`. If an older line `Imagination: ...` is there, replace it: never keep two. Write nothing for `keep`, and nothing when there is no IMAGINATION line.
+
+   Correct example: the topic is open, the prompt says `IMAGINATION: yes`, and `## Decisions` gets the line `Imagination: yes`, replacing `Imagination: no` if it was there. Later, a prompt with `IMAGINATION: keep` reads that line in step 2 and passes `IMAGINATION: yes` to the process.
+
+   Wrong example: the prompt says `IMAGINATION: keep`, and the runner passes `IMAGINATION: keep` to the process, or writes `Imagination: keep` in `## Decisions`, or adds a second `Imagination:` line below the old one.
 
 6. **Result.** Write this block with the Write tool to `.campaign/state/runner/result.txt` (relative to CAMPAIGN_ROOT). Your final answer is only the line `result written`. The block:
 
