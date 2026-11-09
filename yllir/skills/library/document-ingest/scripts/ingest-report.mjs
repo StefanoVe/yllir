@@ -58,7 +58,6 @@ function main() {
   if (args === null) throw new Error(USAGE);
 
   const ids = args.ids.split(',').map((item) => item.trim()).filter((item) => item !== '');
-  if (ids.length === 0) throw new Error(USAGE);
 
   const readOptional = (file) => (file === null ? null : fs.readFileSync(path.resolve(file), 'utf8'));
   const { status, text } = buildReport({
