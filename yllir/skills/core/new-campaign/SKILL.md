@@ -86,7 +86,7 @@ Build the two text lines (the italic line and the plain paragraph) from the mast
 - Wrong: `_Varn rises over a dark sea, its bridges full of merchants._` (sea and merchants are new).
 - Output: the draft file exists at the path above.
 
-**Step 7 — Write sequence.** Invoke the skill `yllir:write-sequence` with these inputs:
+**Step 7 — Write sequence.** Invoke the skill `yllir:write-sequence` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with these inputs:
 - `DOCUMENTS=<Folder>/<World name>.md`
 - `INTENT="First document of a new campaign: the world description, using only the master's premise."`
 - `NEW_SUBJECTS=<world id>`

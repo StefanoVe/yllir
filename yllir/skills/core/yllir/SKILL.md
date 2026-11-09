@@ -43,7 +43,7 @@ This skill receives every message of the master. It checks the folder, keeps the
 - **Writing process** (create a campaign in an empty folder; prepare a session; record the evening that was played). This entry skill never runs these processes itself. Telling what happened at the table («abbiamo finito», «ieri i giocatori…») is recording the evening; asking for the next session is preparing one. If both are plausible, ask one question. It delegates them:
   - (a) Choose the topic (campaign folder only). Read the block `YLLIR TURN CHECK` in your context.
     - Same topic as the active one, including an answer to its pending question: reuse it.
-    - A different writing request: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" new . --process <p> --goal "<English one-sentence goal>"`. Keep the `id` and `path` of its JSON result.
+    - A different writing request: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" new . --process <p> --goal "<English one-sentence goal>"`. `<p>` is the process name WITHOUT the `yllir:` prefix: `new-campaign`, `prepare-session` or `after-session` (never `yllir:prepare-session`). Keep the `id` and `path` of its JSON result.
     - A return to an earlier open topic: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" activate . --id <id>`. If the return is ambiguous, ask the master one question that shows at most three open topics by their goal, in plain words.
     - Quick questions do not change the topic.
     - In an empty folder there are no topics yet: use `TOPIC: none` and `HANDOFF: none`.

@@ -81,7 +81,7 @@ played: [<PLAYED_IDS, or []>]
 
 ## Accaduto
 
-<prose in the past tense, only what the master said; 1 to 4 paragraphs>
+<prose in the past tense: every event the master said, nothing more; 1 to 4 paragraphs, at least one sentence per event>
 
 ## Fili aperti
 
@@ -93,6 +93,8 @@ Rules for the draft:
 - `played:` lists PLAYED_IDS between the brackets, separated by commas. If PLAYED_IDS is empty, write `played: []`.
 - The title is 2 to 6 words naming what happened, taken from the events (for example «Il ponte che cede» or «Il calore del pozzo»). Never a date, never the word Cronaca alone, never a number.
 - Past tense only.
+- Cover every event the master told, in the order told. Write at least one full sentence for each event (who did what, where). Do not leave an event out because it seems small. A page that covers only one event is wrong.
+- Write facts only: do not add anything the master did not say. Covering every event and adding nothing are both required.
 - Write only facts from MASTER_MESSAGE. You may read the documents of step 5 only to get names and spellings right.
 - No new named character and no new named place. A name that is not in the subjects appears as plain words (for example «a fisherman»), and it goes to MISSING.
 - Never define or change who a known subject is. Do not write a new fact about a known subject in the page as if it were established; if the master said it, it is in the list of things not written (step 8), not in the page.
@@ -104,7 +106,7 @@ Rules for the draft:
 - Also keep the list NOT_WRITTEN: each thing the master said that you did not write into the page, in one short plain sentence. Include new facts about known subjects, new named characters and new named places. This list may be empty.
 - Output: the draft file exists at its path; NOT_WRITTEN is kept.
 
-**Step 8 — Write sequence.** Invoke the skill `yllir:write-sequence` with:
+**Step 8 — Write sequence.** Invoke the skill `yllir:write-sequence` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with:
 - `DOCUMENTS=<CHRONICLE FOLDER>/<file name>`
 - `INTENT="Chronicle of the evening <date>: records only what the master said happened; must not define or change the identity of existing subjects; no new named characters or places."`
 - `NEW_SUBJECTS=` (empty: chronicle pages are not subjects)

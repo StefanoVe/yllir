@@ -54,7 +54,7 @@ Read `.campaign/cache/plot-map.json` with the Read tool. Keep `sessions`, `arcs`
 5. A name the master uses that matches no subject is MISSING. Do not create a document for it.
 - Output: the list of documents read (paths), the list of subject ids, and the MISSING names.
 
-**Step 5 — Read-only check.** Invoke the skill `yllir:continuity-audit` with:
+**Step 5 — Read-only check.** Invoke the skill `yllir:continuity-audit` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with:
 - `MODE=pre`
 - `FILES=<the documents read in step 4, plus the previous session, comma-separated>`
 - `SUBJECTS=<the subject ids of step 4, comma-separated>`
@@ -109,7 +109,7 @@ Rules for the draft:
 
 - Output: the draft file exists at its path.
 
-**Step 8 — Write sequence.** Invoke the skill `yllir:write-sequence` with:
+**Step 8 — Write sequence.** Invoke the skill `yllir:write-sequence` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with:
 - `DOCUMENTS=<new file>`
 - `INTENT="Session preparation for <arc>: new scenes; may add scene events and unnamed extras; must not define or change the identity of existing subjects; no new named characters or places."`
 - `NEW_SUBJECTS=` (empty: sessions are not subjects)

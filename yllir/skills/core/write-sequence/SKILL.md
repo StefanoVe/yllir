@@ -42,7 +42,7 @@ Every script below is run from the campaign root, as `node "${CLAUDE_PLUGIN_ROOT
 - Otherwise run a scope probe, omitting each option whose list is empty: `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" . --mode pre [--files "<EXISTING>"] [--subjects "<NEW_SUBJECTS>"] --out .campaign/state/write/scope-probe.json`.
   - If it prints `documents: 0`: skip the audit. Record "continuity: nothing to compare yet".
   - If its exit code is 2: end this skill with `status: FAILED`, reason "continuity check not run" (the calling process continues).
-  - Otherwise invoke the skill `yllir:continuity-audit` with `MODE=pre`, `FILES=EXISTING` (comma-separated), `SUBJECTS=NEW_SUBJECTS`, `CHANGE=INTENT`, `CONTINUE_WITH="write-sequence step 2: read the AUDIT REPORT, then step 3"`. When it has finished, read `.campaign/state/audit/report.txt` with the Read tool. That file is the AUDIT REPORT.
+  - Otherwise invoke the skill `yllir:continuity-audit` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `MODE=pre`, `FILES=EXISTING` (comma-separated), `SUBJECTS=NEW_SUBJECTS`, `CHANGE=INTENT`, `CONTINUE_WITH="write-sequence step 2: read the AUDIT REPORT, then step 3"`. When it has finished, read `.campaign/state/audit/report.txt` with the Read tool. That file is the AUDIT REPORT.
     - If any line starts with `- [RELATED]`: end this skill with `status: CONFLICT` (the calling process continues), and list those lines in the report.
     - If its `status:` line is `INCOMPLETE`: continue and record `continuity: INCOMPLETE`.
     - If its `status:` line is `COMPLETE`: continue and record `continuity: COMPLETE`.
@@ -66,7 +66,7 @@ Save its answer exactly as received to `.campaign/state/write/review.json` with 
 
 **5. Write.** Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" . --draft-dir .campaign/state/write/draft --files "<DOCUMENTS>"`. Save its printed JSON to `.campaign/state/write/applied.json` with the Write tool. Exit ≠ 0 (nothing was written): end this skill with `status: FAILED` (the calling process continues) and list its `errors`.
 
-**6. Links.** Invoke the skill `yllir:linker` with `FILES=DOCUMENTS`, `SUBJECTS=NEW_SUBJECTS`, `CONTINUE_WITH="write-sequence step 7 (derived files), then steps 8 and 9"`. When it has finished, read `.campaign/state/linker/report.txt` with the Read tool. That file is the LINKER REPORT.
+**6. Links.** Invoke the skill `yllir:linker` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/linker/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `FILES=DOCUMENTS`, `SUBJECTS=NEW_SUBJECTS`, `CONTINUE_WITH="write-sequence step 7 (derived files), then steps 8 and 9"`. When it has finished, read `.campaign/state/linker/report.txt` with the Read tool. That file is the LINKER REPORT.
 - Its `status:` line is `FAILED`: continue, record `links: FAILED`, and mark every document "to check" in the report.
 - Otherwise record `links: applied <n>` with the number from its `applied:` line. Copy every line under `decisions for the master` into the report details.
 - The file is missing: record `links: FAILED` and continue as above.
