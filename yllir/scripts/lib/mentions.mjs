@@ -44,6 +44,7 @@ export function scanMentions(campaignRoot, index, { includeNotes = false } = {})
   const scanned = new Set();
   for (const category of structure ?? []) {
     if (typeof category.folder !== 'string') continue;
+    if (category.type === 'sources') continue;
     if (category.type === 'notes' && !includeNotes) continue;
     for (const sheet of listSheets(campaignRoot, category.folder)) scanned.add(sheet);
   }

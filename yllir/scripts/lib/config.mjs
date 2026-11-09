@@ -10,7 +10,7 @@ import { parseYamlLite } from './yaml-lite.mjs';
 const FILE = 'campaign.yaml';
 const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit'];
 const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];
-const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'master-only'];
+const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only'];
 const MODULE_KEYS = ['print', 'encyclopedia', 'master_screen', 'music'];
 const INSTALLED_ADAPTERS = ['none'];
 const INSTALLED_STYLES = [];

@@ -724,17 +724,17 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
       const reasons = noWriteCheck(dir);
       record('N1', reasons.length === 0, reasons);
     }
-    // N2 honest: says it is not there yet.
+    // N2 the import starts: the master is asked which files to bring in.
     if (report === null || report === undefined) noReport('N2');
     else {
-      const ok = text.includes('non') && ['ancora', 'disponibil', 'versione'].some((w) => text.includes(w));
-      record('N2', ok, ok ? [] : ['the final message does not say that this is not available yet']);
+      const ok = text.includes('?') && ['file', 'cartella', 'trascin', 'pdf'].some((w) => text.includes(w));
+      record('N2', ok, ok ? [] : ['the final message does not ask which files or folder to bring in']);
     }
-    // N3 offers what exists: going back or answering questions.
+    // N3 it does not claim that importing is unavailable.
     if (report === null || report === undefined) noReport('N3');
     else {
-      const ok = ['torna', "com'era", 'versione salvata', 'versioni', 'domand'].some((w) => text.includes(w));
-      record('N3', ok, ok ? [] : ['the final message does not offer going back or questions']);
+      const ok = !text.includes('non disponibil') && !text.includes('non e ancora') && !text.includes('non è ancora');
+      record('N3', ok, ok ? [] : ['the final message says that importing is not available']);
     }
     // N4 plain words.
     finalPlainWords('N4');

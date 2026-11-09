@@ -24,6 +24,9 @@ const CAMPAIGN = [
   '  - id: notes',
   '    folder: Notes',
   '    type: notes',
+  '  - id: fonti',
+  '    folder: Fonti',
+  '    type: sources',
   '',
 ].join('\n');
 
@@ -286,6 +289,14 @@ test('includeNotes option scans the notes folder', () => {
   const [occ] = inFile(result, 'Notes/Appunti.md');
   assert.equal(occ.subject, 'oria-valdes');
   assert.equal(occ.state, 'bare');
+});
+
+test('sources folder is never scanned, with or without includeNotes', () => {
+  for (const options of [{ includeNotes: false }, { includeNotes: true }]) {
+    const { result } = scan({ 'Fonti/Foto.md': 'Oria Valdes\n' }, options);
+    assert.equal(result.files.includes('Fonti/Foto.md'), false);
+    assert.equal(inFile(result, 'Fonti/Foto.md').length, 0);
+  }
 });
 
 test('files lists subject folders and plot folders, sorted', () => {

@@ -60,6 +60,8 @@ Use only the words in the language column of the campaign: the Italian column fo
 | PSD | «File di lavoro del disegno» | «Working drawing file» |
 | PNG | «Immagine» | «Image» |
 | JSON, YAML | «Dati» | «Data» |
+| Sources folder / acquisition card | «Fonti» | «Sources» |
+| Ingest | «Portare nella campagna» | «Bring into the campaign» |
 
 ## Never say
 

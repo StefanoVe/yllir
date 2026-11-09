@@ -19,6 +19,7 @@ Three layers. Dependencies point downward only.
   - `new-campaign`: creates a campaign in an empty folder with a short interview.
   - `prepare-session`: drafts the next session as a plot document.
   - `after-session`: records a session that was played as a chronicle page.
+  - `import`: brings existing notes, photos or documents into the campaign.
   - `write-sequence`: the only way campaign documents are written (continuity check, independent review, write, links, verification, saved version).
 - **Library skills**, called by core and never by the user:
   - `linker`: links every mention of a subject.

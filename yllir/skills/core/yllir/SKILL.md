@@ -25,7 +25,7 @@ This skill receives every message of the master. It checks the folder, keeps the
 - `git: missing`: say in one sentence that the campaign needs a free program called Git to keep its saved versions, and that you will guide the installation if the master wants. Write nothing. Stop.
 - `folder: empty`: run the writing process `yllir:new-campaign` as described in Step 6 (TOPIC `none`, HANDOFF `none`). Stop.
 - `folder: unfinished` (a campaign was started before and not finished): run `yllir:new-campaign` the same way as for `folder: empty`, and add the line `RESUME: yes` to the runner prompt, after `LANGUAGE:`. Tell the master nothing technical about the earlier attempt: the process gives the master its message. Stop.
-- `folder: other`: ask one question: are these notes to bring into a campaign (say that this is not available yet in this version), or should a new campaign be created in an empty folder instead? Write nothing. Stop.
+- `folder: other`: say in plain words that to bring notes into the campaign, the campaign must exist first. Then ask the one question: should a new campaign be created in an empty folder, so that the material can be brought in right after? Write nothing. Stop.
 - `folder: campaign`: continue to Step 4.
 - Output: one of the four branches above, with its message.
 
@@ -40,17 +40,17 @@ This skill receives every message of the master. It checks the folder, keeps the
 
 **Step 6 — Recognise the request** by its meaning, not by keywords. First check Step 7: if the master's message answers the update question, follow Step 7 and skip this step. Otherwise do exactly one of the following.
 
-- **Writing process** (create a campaign in an empty folder; prepare a session; record the evening that was played). This entry skill never runs these processes itself. Telling what happened at the table («abbiamo finito», «ieri i giocatori…») is recording the evening; asking for the next session is preparing one. If both are plausible, ask one question. It delegates them:
+- **Writing process** (create a campaign in an empty folder; prepare a session; record the evening that was played; bring in existing material). Bringing in material is recognised by meaning: the master shares photos, scans, PDFs or documents, or says they have existing notes, pages or sheets to bring in or digitise. When files are shared, this is the AUTORUN: start `import` without asking. This entry skill never runs these processes itself. Telling what happened at the table («abbiamo finito», «ieri i giocatori…») is recording the evening; asking for the next session is preparing one. If both are plausible, ask one question. It delegates them:
   - (a) Choose the topic (campaign folder only). Read the block `YLLIR TURN CHECK` in your context.
-    - Same topic as the active one, including an answer to its pending question: reuse it.
-    - A different writing request: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" new . --process <p> --goal "<English one-sentence goal>"`. `<p>` is the process name WITHOUT the `yllir:` prefix: `new-campaign`, `prepare-session` or `after-session` (never `yllir:prepare-session`). Keep the `id` and `path` of its JSON result.
+    - Same topic as the active one, including an answer to its pending question: reuse it. For `import`, an answer to the question of an open import topic reuses that topic.
+    - A different writing request: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" new . --process <p> --goal "<English one-sentence goal>"`. `<p>` is the process name WITHOUT the `yllir:` prefix: `new-campaign`, `prepare-session`, `after-session` or `import` (never `yllir:prepare-session`). Keep the `id` and `path` of its JSON result.
     - A return to an earlier open topic: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" activate . --id <id>`. If the return is ambiguous, ask the master one question that shows at most three open topics by their goal, in plain words.
     - Quick questions do not change the topic.
     - In an empty folder there are no topics yet: use `TOPIC: none` and `HANDOFF: none`.
   - (b) Before launching the runner, if TOPIC is not `none`, run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" check . --id <id>` and use its `changed` list as CHANGED_FILES (`none` when the list is empty). Then launch the sub-agent `yllir:process-runner` in the foreground and wait for its result in the same turn (never with run_in_background). Never tell the master that you will write later or that work continues in the background: your message is the runner's message for the master, after it has finished. Use exactly these keys, filled in:
     ```text
     CAMPAIGN_ROOT: <absolute path of the campaign root>
-    PROCESS: <one of yllir:new-campaign, yllir:prepare-session or yllir:after-session>
+    PROCESS: <one of yllir:new-campaign, yllir:prepare-session, yllir:after-session or yllir:import>
     TOPIC: <topic id, or none>
     HANDOFF: <absolute path of the handoff file, or none>
     CHANGED_FILES: <comma-separated campaign-relative paths from the topic check, or none>
@@ -74,13 +74,13 @@ This skill receives every message of the master. It checks the folder, keeps the
 
 - **Question about the campaign** (for example «chi è…», «dove si trova…»): read the relevant documents, answer briefly, and name the documents you used by their titles. Never write anything.
 
-- **Anything else** (change or create documents other than through these processes, import notes, tidy up): say in one or two plain sentences that this part is not available in this version yet. Then list what is available now: create a campaign, prepare the next session, record the evening, go back to a saved version, and questions about the campaign.
+- **Anything else** (change or create documents other than through these processes, tidy up): say in one or two plain sentences that this part is not available in this version yet. Then list what is available now: create a campaign, prepare the next session, record the evening, bring in existing notes, photos or documents, go back to a saved version, and questions about the campaign.
 
 **Step 7 — Update notice.** If your context has a block that starts with `YLLIR UPDATE AVAILABLE`, or your previous message to the master asked whether to update, read `${CLAUDE_PLUGIN_ROOT}/skills/core/update/SKILL.md` and follow its Part B. The master decides: never update without a clear «yes».
 
 **Step 8 — Rules.** These apply to every step above.
 - Never write or change a campaign document yourself. Every write goes through `yllir:write-sequence`, run by a process.
-- Never run a writing process (`yllir:new-campaign`, `yllir:prepare-session`, `yllir:after-session`) in this skill: launch `yllir:process-runner` instead.
+- Never run a writing process (`yllir:new-campaign`, `yllir:prepare-session`, `yllir:after-session`, `yllir:import`) in this skill: launch `yllir:process-runner` instead.
 - Never show internal words, commands, file formats or error codes to the master.
 - Write to the master in plain text: no backticks, no code formatting, no file paths, no version codes.
 - Ask at most one question at a time.
@@ -97,6 +97,6 @@ Correct, go back (the first message of an Italian campaign is «annulla l'ultima
 
 Wrong, go back: «Ho eseguito git revert sul commit a1b2c3». It uses technical words, and it gives no confirmation question before acting.
 
-Correct, `folder: other` (the master writes «ho qui delle note di una partita»): one question that says importing notes is not available yet in this version, and asks whether the master wants a new campaign in an empty folder instead. Nothing is written.
+Correct, `folder: other` (the master writes «ho qui delle note di una partita»): one message that says the notes must go into a campaign that exists first, and asks whether the master wants a new campaign created in an empty folder, so the notes can be brought in right after. Nothing is written.
 
 Wrong, `folder: other`: creating a folder called `Notes/` to hold the master's files before asking.

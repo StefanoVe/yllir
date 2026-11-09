@@ -25,6 +25,9 @@ const CAMPAIGN = [
   '  - id: notes',
   '    folder: Notes',
   '    type: notes',
+  '  - id: fonti',
+  '    folder: Fonti',
+  '    type: sources',
   '',
 ].join('\n');
 
@@ -343,6 +346,21 @@ test('a numeric value is converted to text and the id keeps the position', () =>
   assert.equal(result.facts[0].id, 'F-D001-002');
   assert.equal(result.facts[0].value, '30');
   assert.equal(result.facts[0].line, 6);
+});
+
+test('a sources document forces the source type to hypothesis', () => {
+  const result = run({
+    files: { 'Fonti/Foto.md': '# Foto\n\nForse Oria Valdes è la madre di Lino.\n' },
+    docs: [{ fid: 'D001', document: 'Fonti/Foto.md' }],
+    facts: {
+      D001: factsFile('D001', 'Fonti/Foto.md', [
+        fact({ source_type: 'editorial-summary', quote: 'Forse Oria Valdes è la madre' }),
+      ]),
+    },
+  });
+  assert.equal(result.facts.length, 1);
+  assert.equal(result.facts[0].source_type, 'hypothesis');
+  assert.equal(result.facts[0].forced_hypothesis, true);
 });
 
 test('a note document forces the source type to hypothesis', () => {

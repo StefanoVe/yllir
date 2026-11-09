@@ -292,6 +292,11 @@ test('a category needs a valid type', () => {
   assert.deepEqual(pairsOf(errorsOf(notText, ['Trama'])), ['bad-type structure[0].type']);
 });
 
+test('a sources category is a valid type', () => {
+  const yaml = `${MINIMAL}structure:\n  - id: fonti\n    folder: Fonti\n    type: sources\n`;
+  assert.deepEqual(errorsOf(yaml, ['Fonti']), []);
+});
+
 test('a style is not installed, and cards only makes sense on objects', () => {
   const styled = `${MINIMAL}structure:\n  - id: creature\n    folder: Creature\n    type: subjects\n    style: dark-fantasy\n`;
   assert.deepEqual(pairsOf(errorsOf(styled, ['Creature'])), ['unknown-style structure[0].style']);

@@ -249,7 +249,7 @@ function sectionAt(lines, lineNo) {
   return section;
 }
 
-/** True when the document lies under a category of type `notes` (the longest folder wins). */
+/** True when the document lies under a category of type `notes` or `sources` (the longest folder wins). */
 function isNotesDocument(document, structure) {
   let best = null;
   for (const category of structure ?? []) {
@@ -260,7 +260,7 @@ function isNotesDocument(document, structure) {
       best = { folder, type: category.type };
     }
   }
-  return best !== null && best.type === 'notes';
+  return best !== null && (best.type === 'notes' || best.type === 'sources');
 }
 
 function metadataFact(fid, document, subjectId, items, line) {

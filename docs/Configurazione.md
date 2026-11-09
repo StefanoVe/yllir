@@ -68,10 +68,11 @@ structure:                       # facoltativo alla creazione. Categorie di docu
                                  # Una categoria compare quando nasce la prima scheda.
   - id: testo                    # obbligatorio. Id stabile, usato dai processi; non cambia con il nome della cartella.
     folder: testo                # obbligatorio. Percorso relativo alla radice della campagna.
-    type: plot | chronicle | places | subjects | objects | free | notes | master-only
+    type: plot | chronicle | places | subjects | objects | free | notes | sources | master-only
                                  # obbligatorio. Determina quali regole di creazione e di collegamento si applicano.
                                  # notes: spunti e bozze, non canone (Appunti/). Non entrano nell'indice dei soggetti
                                  # e non si collegano in automatico; l'audit li legge come ipotesi.
+                                 # sources: originali acquisiti (foto, PDF, scansioni) con trascrizione e scheda di acquisizione, scritti dall'ingest. Non entrano nell'indice dei soggetti e non si collegano in automatico; l'audit li legge come ipotesi.
     style: id                    # facoltativo. Profilo di stile per gli artwork di questa categoria.
     cards: false                 # facoltativo. Se vero, gli oggetti producono carte illustrate.
 
