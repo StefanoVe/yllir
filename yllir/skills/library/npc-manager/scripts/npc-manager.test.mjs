@@ -174,3 +174,32 @@ test('empty --files, blank --name and extra positionals are usage errors', () =>
     assert.equal(cli(root, ['find', '--out', 'x']).status, 2);
   });
 });
+
+test('gaps prints the gap lines and the sheet status, and exits 0 for a sheet to complete', () => {
+  withCampaign({}, (root) => {
+    const result = cli(root, ['gaps', '--files', 'Personaggi/Ilde Varno.md,Luoghi/Porto.md']);
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stdout, /^gap Personaggi\/Ilde Varno\.md: thin-sheet sheet public text has \d+ characters, at least 120 are needed$/m);
+    assert.match(result.stdout, /^sheet Personaggi\/Ilde Varno\.md: to-complete$/m);
+    assert.match(result.stdout, /^gap Luoghi\/Porto\.md: missing-section description section "Descrizione" is missing$/m);
+    assert.match(result.stdout, /^sheet Luoghi\/Porto\.md: to-complete$/m);
+    assert.match(result.stdout, /exit: 0\n$/);
+  });
+});
+
+test('gaps usage errors: missing --files, unknown option, empty --base, a file that does not exist', () => {
+  withCampaign({}, (root) => {
+    const missing = cli(root, ['gaps']);
+    assert.equal(missing.status, 2);
+    assert.match(missing.stdout, /exit: 2\n$/);
+    assert.match(missing.stderr, /^usage: /);
+
+    assert.equal(cli(root, ['gaps', '--files', 'Personaggi/Ilde Varno.md', '--out', 'x']).status, 2);
+    assert.equal(cli(root, ['gaps', '--files', 'Personaggi/Ilde Varno.md', '--base', '']).status, 2);
+
+    const absent = cli(root, ['gaps', '--files', 'Personaggi/Nessuno.md']);
+    assert.equal(absent.status, 2);
+    assert.match(absent.stderr, /does not exist/);
+    assert.match(absent.stdout, /exit: 2\n$/);
+  });
+});

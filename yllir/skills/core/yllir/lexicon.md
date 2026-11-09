@@ -65,6 +65,7 @@ Use only the words in the language column of the campaign: the Italian column fo
 | JSON, YAML | «Dati» | «Data» |
 | Sources folder / acquisition card | «Fonti» | «Sources» |
 | Ingest | «Portare nella campagna» | «Bring into the campaign» |
+| Sheet completion (complete-sheet process) | «Completa o correggi una scheda» | «Complete or fix a card» |
 
 ## Never say
 

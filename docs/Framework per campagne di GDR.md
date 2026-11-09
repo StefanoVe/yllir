@@ -19,7 +19,7 @@ Questo file è l’indice: raccoglie le decisioni dell’autore, che sono vincol
 | [Architettura](Architettura.md) | Strati core, libreria e moduli; struttura del pacchetto e di un progetto-campagna; flusso di una richiesta |
 | [Formato dei contenuti](Formato%20dei%20contenuti.md) | Regole comuni dei documenti, convenzioni dei testi di trama, modelli per tipo di scheda, controlli |
 | [Configurazione](Configurazione.md) | File di configurazione della campagna, istruzioni generate da template, personalizzazioni dell’utente |
-| [Processi di core](Processi%20di%20core.md) | Nuova campagna, preparazione, sessione live, dopo la sessione, manutenzione, import di materiale |
+| [Processi di core](Processi%20di%20core.md) | Nuova campagna, preparazione, sessione live, dopo la sessione, manutenzione, import di materiale, completamento di una scheda (**Proposta**) |
 | [Skill di libreria](Skill%20di%20libreria.md) | Catalogo e schede delle skill specialistiche |
 | [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md) | Adattatori dei sistemi di gioco e profili di stile visivo |
 | [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md) | Agente principale, esecutori economici, revisori, Claude e Codex |
@@ -74,7 +74,7 @@ Questo file è l’indice: raccoglie le decisioni dell’autore, che sono vincol
 
 Modello di riferimento: Baltimora, il framework di skill usato al lavoro dall’autore per i progetti Angular. Gli strati core / libreria / moduli e il meccanismo di aggiornamento sono decisioni dell’autore; la forma del file di configurazione e delle istruzioni generate è una proposta.
 
-- **Skill di core.** Definiscono i processi che il master vive, con nomi comprensibili: nuova campagna (intervista breve che crea solo i file core), preparazione della sessione, sessione live, dopo la sessione (riepilogo, canone, conseguenze), manutenzione. L’utente parla in linguaggio naturale e non chiama mai una skill per nome.
+- **Skill di core.** Definiscono i processi che il master vive, con nomi comprensibili: nuova campagna (intervista breve che crea solo i file core), preparazione della sessione, sessione live, dopo la sessione (riepilogo, canone, conseguenze), manutenzione, completamento di una scheda (**Proposta**). L’utente parla in linguaggio naturale e non chiama mai una skill per nome.
 - **Skill di libreria.** Fanno una cosa specifica e vengono richiamate dal core: ingest di documenti, audit di continuità, collegamenti, ricerca nel canone, mappa della trama, intrecci dei PG, schede di luoghi e oggetti, gestione dei PNG, artwork, carte, stampa, mappe, tracker degli scontri, registro di sessione, e le skill aggiuntive sopra. Le regole di lavoro (audit prima di modificare, collegamenti dopo, mappa della trama aggiornata) sono il cablaggio interno del core, non istruzioni che l’agente deve ricordarsi.
 - **Moduli opzionali, attivati dalla configurazione della campagna:**
   - adattatori del sistema di gioco (scontri, risorse, difficoltà, progressione);

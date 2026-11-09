@@ -5,7 +5,7 @@
 
 ## Scopo del documento
 
-Descrive i processi che il master vive durante una campagna: la creazione iniziale, la preparazione della sessione, la sessione giocata, il lavoro dopo la sessione, il riordino del canone, il ribilanciamento degli incontri, la manutenzione dell'archivio e l'import di materiale già esistente. Ogni processo è una skill di core: si attiva da una frase in linguaggio naturale, segue passi fissi e richiama, nell'ordine, le skill di libreria descritte in [Skill di libreria](Skill%20di%20libreria.md). Il master non sceglie mai una skill per nome e non vede i passi interni.
+Descrive i processi che il master vive durante una campagna: la creazione iniziale, la preparazione della sessione, la sessione giocata, il lavoro dopo la sessione, il riordino del canone, il ribilanciamento degli incontri, la manutenzione dell'archivio, l'import di materiale già esistente e il completamento di una scheda. Ogni processo è una skill di core: si attiva da una frase in linguaggio naturale, segue passi fissi e richiama, nell'ordine, le skill di libreria descritte in [Skill di libreria](Skill%20di%20libreria.md). Il master non sceglie mai una skill per nome e non vede i passi interni.
 
 Le regole di lavoro che le istruzioni generate dell'agente devono rispettare (controllo prima di modificare, collegamenti dopo, mappa aggiornata, verifica finale) sono il cablaggio interno di ogni processo che scrive. Il modello di riferimento è Baltimora: skill di core che definiscono i processi e richiamano skill specialistiche.
 
@@ -17,6 +17,7 @@ Gli identificativi tra parentesi (per esempio `continuity-audit`) sono quelli us
 
 - L'agente principale riconosce il processo dal significato della frase, non da parole chiave.
 - Se due processi sono plausibili e la scelta cambia ciò che verrebbe scritto, pone una sola domanda con due opzioni in linguaggio comune, per esempio: «Vuoi preparare la prossima serata o registrare quella appena giocata?».
+- La segnalazione di un problema su una scheda (per esempio «La guardia comune ha una scheda praticamente vuota») è una richiesta operativa: parte il processo di completamento della sezione 9, senza prima chiedere al master che cosa vuole fare.
 - Nessun processo di scrittura parte da solo. Fanno eccezione l'import e la ricerca musicale, come indicato nella tabella «Avvio automatico».
 
 ### Avvio automatico
@@ -323,6 +324,37 @@ Le cartelle delle categorie, il documento di economia (`Storia/Economia.md`), i 
 
 **Errori:** se il sistema di gioco non ha un adattatore con le soglie, il processo lo dice e non propone numeri.
 
+## 9. Completa o correggi una scheda
+
+**Proposta.** Il processo nasce da una segnalazione di un tester: il framework crea una scheda, ma non interviene quando il master dice che la scheda non basta. Non è ancora approvato dall'autore.
+
+**Frasi che lo attivano:** «La guardia comune ha una scheda praticamente vuota», «la scheda di Ilde è troppo scarna», «manca l'aspetto del vecchio minatore», «nella scheda Ilde è un uomo ma è una donna». Una segnalazione di un problema su una scheda è una richiesta operativa: il processo parte subito, senza chiedere al master che cosa vuole fare.
+
+**Prerequisiti:** la scheda esiste nella campagna ed è identificabile senza dubbi (per nome, alias o identificativo). Se più schede rispondono, il processo chiede una sola volta quale. Se la scheda non esiste, il processo lo dice e propone la creazione con la gestione dei PNG (`npc-manager`) o con le schede di luoghi e oggetti (`sheets`).
+
+**Passi:**
+
+1. Trova la scheda e ne riconosce il tipo: personaggio, creatura, venditore o luogo.
+2. Elenca le lacune con il controllo deterministico `gaps` di `npc-manager`: sezioni vuote o segnaposto, venditore senza righe nell'assortimento, luogo senza apertura in corsivo, scheda quasi vuota.
+3. Recupera i fatti narrativi dalla campagna con la ricerca nel canone (`canon-research`): ruolo, aspetto, modi, luoghi, legami e tutto ciò che la campagna già stabilisce. Un fatto trovato nella campagna non si chiede al master.
+4. Verifica le regole (statistiche, scorte, prezzi, bottino) solo nelle fonti consentite: cartelle esterne collegate e fonti della campagna, con l'adattatore del sistema (`system-adapter`) quando la campagna ne ha uno. Mai dalla memoria del modello, mai dal web. Ciò che non si trova resta «Da definire».
+5. Chiede al master solo le scelte creative necessarie, una alla volta, con poche opzioni e una raccomandazione (per esempio il tono dell'aspetto). Le lacune narrative che non hanno un fatto nella campagna ricevono proposte brevi, con le stesse regole della creazione di una scheda (vedi la gestione dei PNG in [Skill di libreria](Skill%20di%20libreria.md#l14-gestione-dei-png)).
+6. Prepara una bozza che cambia solo le parti lacunose: il blocco riservato e il resto della scheda restano intatti.
+7. Esegue il cablaggio di scrittura completo (`write-sequence`): versione delle modifiche a mano, controllo di coerenza, revisione indipendente, scrittura, collegamenti, verifica deterministica, versione salvata.
+8. Dà un messaggio sul problema concreto: che cosa mancava, che cosa è stato completato, che cosa resta da fare. Se restano lacune, la scheda risulta «da completare».
+
+**Funzioni di libreria, in ordine:** ricerca nel canone (`canon-research`, lettura) → adattatore del sistema (`system-adapter`, solo se la campagna ne ha uno) → gestione dei PNG (`npc-manager`, controllo `gaps`) → cablaggio di scrittura (`write-sequence`), con il controllo di coerenza come controllo preventivo e i collegamenti (`linker`) dopo la scrittura.
+
+**Delegato a modelli economici:** lettura della scheda e delle fonti, elenco delle lacune, bozza delle parti mancanti. **Decide l'agente principale:** quali fatti sono davvero stabiliti dalla campagna, quali scelte creative chiedere, quando una lacuna resta «Da definire», quando una contraddizione va portata al master.
+
+**Cosa vede l'utente:** il problema detto in parole semplici («la scheda non ha aspetto né modi; le statistiche non si trovano nelle fonti»), le domande creative una alla volta, il messaggio finale su che cosa è cambiato.
+
+**Output:** scheda con le sole parti lacunose completate; blocco riservato intatto; esito del controllo (usabile o da completare) detto al master.
+
+**Conferme richieste:** nessuna per ciò che viene dalla campagna. Le proposte creative si segnalano come tali nel messaggio, e il master può cambiarle. Una sola domanda se due fatti stabiliti si contraddicono o se mancano statistiche nelle fonti consentite.
+
+**Errori:** se le statistiche non si trovano nelle fonti consentite restano «Da definire» e la scheda risulta «da completare»; mai statistiche a memoria. Se la scheda è già usabile, il processo lo dice e non scrive nulla. Se due fatti stabiliti si contraddicono, la parte interessata non viene scritta finché il master non risponde. Una correzione d'identità detta dal master (per esempio il sesso di un personaggio) si applica alla scheda solo dopo aver verificato che la campagna non dica altro; se lo dice, è una domanda sola. Se il revisore indipendente non risponde, nulla si applica (vedi «Errori comuni»).
+
 ## Tabella riassuntiva: processo → funzioni di libreria
 
 | Processo | Funzioni di libreria, in ordine | Quando l'audit di continuità gira |
@@ -335,12 +367,16 @@ Le cartelle delle categorie, il documento di economia (`Storia/Economia.md`), i 
 | Riordino del canone (su richiesta) | manutenzione della continuità (`continuity-keeper`, piano) → conferma del master → applicazione → collegamenti → mappa della trama (se cambia la trama) → audit di continuità di chiusura | Prima dell'applicazione e in chiusura |
 | Ribilanciamento (su richiesta) | bilanciamento degli incontri (`encounter-balancer`, piano) → conferma del master → audit di continuità → gestione dei PNG (`npc-manager`, applicazione) → collegamenti | Prima dell'applicazione |
 | Import (ingresso) | ingest di documenti (`document-ingest`) → audit di continuità → intreccio dei PG (`pc-weaving`) e schede (`sheets`, `npc-manager`) secondo il tipo → collegamenti → mappa della trama (se cambia la trama) → audit di continuità di chiusura | Prima dell'integrazione e in chiusura |
+| Completamento di una scheda (su segnalazione, **Proposta**) | ricerca nel canone (`canon-research`) → adattatore del sistema (`system-adapter`, solo se c'è) → gestione dei PNG (`npc-manager`, controllo `gaps`) → cablaggio di scrittura (`write-sequence`), con collegamenti (`linker`) | Prima della scrittura, nel cablaggio |
 
 ## Questioni aperte
 
-- **Nomi dei processi.** Le etichette degli otto processi sono comprensibili per il master? Va verificato con un utente che non ha mai usato un'IA, in [Esperienza utente](Esperienza%20utente.md).
+- **Nomi dei processi.** Le etichette dei nove processi sono comprensibili per il master? Va verificato con un utente che non ha mai usato un'IA, in [Esperienza utente](Esperienza%20utente.md).
 - **Preparazione e dopo la sessione.** La preparazione scrive documenti di sessione: vanno considerati parte del processo dopo la sessione (chiusura) o restano un documento separato?
 - **Confini del processo «dopo la sessione».** La creazione di carte degli oggetti appartiene a questo processo o solo alla manutenzione? Proposta: la carta si genera al momento dell'oggetto, non a fine sessione, per evitare di aspettare.
 - **Conferme sulle conseguenze.** Quali conseguenze sulle sessioni future richiedono conferma esplicita? La proposta di questo documento è: quelle che riscrivono una sessione già preparata. Aggiunta (2026-11-09): riscrivere una sessione non ancora giocata è esplicito per natura, perché è il master a chiederlo.
 - **Revisione dell'import.** L'import di materiale condiviso senza richiesta (autorun) deve sempre chiedere il permesso prima di scrivere, o solo quando il materiale tocca il canone? Un import che parte da solo va limitato: l'autore decide il limite.
 - **Ordine dei passi «Canone» e «Conseguenze».** Possono essere invertiti senza danno? Sono separati per chiarezza: resta da verificare se la separazione regge alla prova dell'uso.
+- **Fonti consentite per le regole.** Statistiche, scorte e prezzi si verificano solo nelle cartelle esterne collegate e nelle fonti della campagna. Il web è ammesso? Proposta: no, come da sezione 9.
+- **Oggetti e annunci.** Il completamento di una scheda vale anche per oggetti e annunci, o solo per personaggi, creature, venditori e luoghi?
+- **Conferma delle proposte creative.** Le proposte creative vanno confermate dal master prima di scrivere, o si scrivono e si segnalano come proposte da cambiare dopo?

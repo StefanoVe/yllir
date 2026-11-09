@@ -96,6 +96,17 @@ Il framework distingue tre tipi di messaggio e li presenta in modo diverso.
 
 I dettagli dell'errore finiscono in un registro che il master può consultare da solo, se vuole, ma che non viene proposto spontaneamente.
 
+### Rispondere sul problema concreto
+
+**Proposta.** Quando il master segnala un problema preciso, il framework risponde a quel problema.
+
+- Una domanda su un limite («non puoi farlo?», «perché non ci riesci?») ha una risposta di una frase: che cosa non si può fare e qual è il passo successivo utile. Non si elencano le funzioni del framework.
+- Un problema concreto (una scheda vuota, una scena da sistemare) viene trattato subito. La manutenzione (versioni vecchie, collegamenti ambigui) resta in sottofondo: non viene proposta a parte, a meno che il master la chieda o che sia necessaria per rispondere.
+
+> **Master:** Non puoi completare una scheda che esiste già?
+>
+> **Assistente:** Sì, per personaggi, creature, venditori e luoghi: dimmi quale scheda, e completo le parti vuote con ciò che la campagna già dice.
+
 ## Separazione automatica fra pubblico e master
 
 **Proposta.** Il master scrive normalmente. Il framework separa ciò che i giocatori possono vedere da ciò che resta riservato, senza chiedere al master di fare la separazione.

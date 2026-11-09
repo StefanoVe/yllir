@@ -39,10 +39,10 @@ The sheet is the source of truth for WHO the character is: name, role, appearanc
 
 ## Inputs
 
-- `MODE`: `create` or `check`. Any other value: write the report with `status: FAILED` and `reason: unknown MODE <value>`.
+- `MODE`: `create`, `check` or `gaps`. Any other value: write the report with `status: FAILED` and `reason: unknown MODE <value>`.
 - `CONTINUE_WITH`: text naming the caller's next step. If absent, use "the step of the invoking skill that called npc-manager".
 
-Mode `create` also takes `NAME` (the name as written by the master or the plot; a double quote in it means `status: FAILED`, reason "name not usable"), `LOCATION` (comma-separated place ids, may be empty; for an enemy or creature, every place where it lives, and empty means errant), `DETAILS` (facts about the character as plain text, may be empty), `REQUESTED_BY` (comma-separated campaign-relative paths of the documents that asked for this character: the scene files, a sheet, an ingested page; may be empty) and `TEMPLATE` (`npc`, `vendor`, `enemy` or `creature`; default `npc`). The caller gives TEMPLATE: never guess it. `PROPOSE`: `yes` or `no`, default `no`. Any other value means `no`. With `yes`, the skill fills the gaps with creative proposals consistent with the campaign (see Step 5). The caller passes `yes` only when the master asked for something that needs this character (for example a fight, or a shop) and gave no details. With `no`, the sheet holds only what DETAILS says. Mode `check` also takes `FILES` (comma-separated campaign-relative paths; empty means the whole campaign).
+Mode `create` also takes `NAME` (the name as written by the master or the plot; a double quote in it means `status: FAILED`, reason "name not usable"), `LOCATION` (comma-separated place ids, may be empty; for an enemy or creature, every place where it lives, and empty means errant), `DETAILS` (facts about the character as plain text, may be empty), `REQUESTED_BY` (comma-separated campaign-relative paths of the documents that asked for this character: the scene files, a sheet, an ingested page; may be empty) and `TEMPLATE` (`npc`, `vendor`, `enemy` or `creature`; default `npc`). The caller gives TEMPLATE: never guess it. `PROPOSE`: `yes` or `no`, default `no`. Any other value means `no`. With `yes`, the skill fills the gaps with creative proposals consistent with the campaign (see Step 5). The caller passes `yes` only when the master asked for something that needs this character (for example a fight, or a shop) and gave no details. With `no`, the sheet holds only what DETAILS says. Mode `check` also takes `FILES` (comma-separated campaign-relative paths; empty means the whole campaign). Mode `gaps` takes `FILES` (comma-separated campaign-relative paths, required) and optional `BASE` (a campaign-relative folder that holds the files instead of the campaign root).
 
 ## Mode `create`
 
@@ -156,7 +156,9 @@ With PROPOSE `yes`, the sections filled by a proposal count as having text. A pr
 
 If a point fails, fix the draft with Write and read it back, at most 2 times. If it still fails, write the report with `status: FAILED`, `reason: draft check failed`, and go to the Continue step.
 
-**Step 7 — Report.** Write the report with `status: DONE`, `draft: <draft path relative to the campaign root>`, `new subject: <ID>`, `proposed: <list>`, `requested by:` copied from REQUESTED_BY, and `open points:` listing each section written as "to be defined". Also list "statistics" or "stock" when `## Statistiche` or `## Assortimento` is written as "to be defined". `propose:` is the value of PROPOSE (`yes` or `no`). `proposed:` lists the sections written as a proposal, using these names: `role`, `aspect and manner`, `at the table`, `nature`. An empty list means `none`, and `proposed:` is `none` in every report that writes no draft or whose PROPOSE is not `yes`. Go to the Continue step.
+When the draft reads back correctly, run the gaps command on it: `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . gaps --files "<SHEET_PATH>" --base ".campaign/state/write/draft"`. Exit code 2: write the report with `status: FAILED`, `reason: usage error from gaps: <message>`, and go to the Continue step. Otherwise add one open point for each `gap` line of its output, using the section key of that line (the word after the code), for example `- table`, or `- sheet` for `thin-sheet`. The gaps never change the status of the report.
+
+**Step 7 — Report.** Write the report with `status: DONE`, `draft: <draft path relative to the campaign root>`, `new subject: <ID>`, `proposed: <list>`, `requested by:` copied from REQUESTED_BY, and `open points:` listing each section written as "to be defined". Also list "statistics" or "stock" when `## Statistiche` or `## Assortimento` is written as "to be defined". `propose:` is the value of PROPOSE (`yes` or `no`). `proposed:` lists the sections written as a proposal, using these names: `role`, `aspect and manner`, `at the table`, `nature`. An empty list means `none`, and `proposed:` is `none` in every report that writes no draft or whose PROPOSE is not `yes`. `usable:` is `none` when `draft:` is `none`, and in modes check and gaps. Otherwise `usable:` is `no` when `open points:` is not `none` or the draft gives `thin-sheet`, and `yes` in every other case. When `usable:` is `no`, the caller must tell the master in one plain sentence that the sheet is still to be completed and which parts are missing. Go to the Continue step.
 
 ## Mode `check`
 
@@ -180,6 +182,19 @@ If a point fails, fix the draft with Write and read it back, at most 2 times. If
 
 Go to the Continue step.
 
+## Mode `gaps`
+
+**Step 1 — Gaps.** Run this exact command, with FILES replaced by the value of FILES, as one single command:
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . gaps --files "<FILES>"`
+When BASE is given, run this command instead, with FILES and BASE replaced by their values:
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . gaps --files "<FILES>" --base "<BASE>"`
+- Exit code 2: write the report with `status: FAILED`, `reason: usage error from gaps: <message>`. Go to the Continue step.
+- Otherwise read the output. Each `gap <file>: <code> <section-key> <message>` line becomes one problem line `- <code> <file>: <section-key> <message>`. A line `sheet <file>: not-applicable` is not a problem.
+- `status: DONE` when every `sheet` line is `usable` or `not-applicable`. `status: INCOMPLETE` when at least one `sheet` line is `to-complete`.
+- In this mode `mode: gaps`, and every other field of the report is `none`.
+
+Write the report, then go to the Continue step.
+
 ## Error table
 
 | Situation | Action |
@@ -193,9 +208,10 @@ The report is written with the Write tool to `.campaign/state/npc-manager/report
 
 ```
 NPC MANAGER REPORT
-status: DONE | ASK | ERRORS | NOT_AVAILABLE | FAILED
-mode: create | check
+status: DONE | INCOMPLETE | ASK | ERRORS | NOT_AVAILABLE | FAILED
+mode: create | check | gaps
 propose: yes | no
+usable: yes | no | none
 draft: <path or none>
 exists: <subject id or none>
 new subject: <id or none>
@@ -216,6 +232,7 @@ NPC MANAGER REPORT
 status: DONE
 mode: create
 propose: yes
+usable: yes
 draft: .campaign/state/write/draft/Personaggi/Ilde Varno.md
 exists: none
 new subject: ilde-varno
@@ -236,6 +253,7 @@ NPC MANAGER REPORT
 status: ASK
 mode: create
 propose: no
+usable: none
 draft: none
 exists: none
 new subject: none
@@ -256,6 +274,7 @@ NPC MANAGER REPORT
 status: ASK
 mode: create
 propose: no
+usable: none
 draft: none
 exists: none
 new subject: none
@@ -276,6 +295,7 @@ NPC MANAGER REPORT
 status: ERRORS
 mode: check
 propose: no
+usable: none
 draft: none
 exists: none
 new subject: none
@@ -302,7 +322,7 @@ The sheet is not linked here. The caller links it, through `yllir:write-sequence
 ## Rules
 
 - Never write a link into a document, and never link a sheet here: the linker does it, through the caller's write sequence.
-- Never edit a sheet that exists. This skill writes only drafts under `.campaign/state/write/draft/` (mode `create`) and the report.
+- Never edit a sheet that exists. This skill never edits an existing sheet; completing or correcting an existing sheet is done by the process `complete-sheet`, which uses the mode `gaps` of this skill. This skill writes only drafts under `.campaign/state/write/draft/` (mode `create`) and the report.
 - Never write to the plot folder (`Trama/` in an Italian campaign, `Plot/` in an English one, or the category of type `plot` in `campaign.yaml`).
 - Never print the report, never show it to the master, and never invent facts: the draft uses only DETAILS, plus the proposals that Step 5 allows when PROPOSE is `yes`.
 - Master-block text never goes into a plot text, a draft outside its block, a report or a message.

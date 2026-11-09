@@ -2,29 +2,34 @@
 // Command line tools of the NPC manager. plot-cast checks the characters that
 // plot events declare and lists name candidates without a sheet; check-sheets
 // checks NPC and vendor sheets against the sheet model; find lists the subjects
-// that match a name. Deterministic: it reports, the agent judges.
+// that match a name; gaps says whether each sheet is usable at the table.
+// Deterministic: it reports, the agent judges.
 // Usage: node npc-manager.mjs <campaignRoot> <command> [options]
 //   plot-cast    [--files a.md,b.md] --out <json>
 //   check-sheets [--files a.md,b.md]
 //   find         --name "<text>"
+//   gaps         --files "a.md,b.md" [--base <folder>]
 // Exit codes: 0 no errors, 1 errors found (plot-cast, check-sheets), 2 usage error.
-// Candidates of plot-cast never change the exit code.
+// Candidates of plot-cast never change the exit code. gaps exits 0 whenever the
+// files were read: a sheet to complete is reported, not an error.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { plotCast } from './lib/plot-cast.mjs';
 import { checkSheets } from './lib/sheet-check.mjs';
 import { findSubject } from './lib/find-subject.mjs';
+import { sheetGaps } from './lib/sheet-gaps.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE =
-  'usage: node npc-manager.mjs <campaignRoot> <plot-cast [--files a.md,b.md] --out <json> | check-sheets [--files a.md,b.md] | find --name "<text>">';
+  'usage: node npc-manager.mjs <campaignRoot> <plot-cast [--files a.md,b.md] --out <json> | check-sheets [--files a.md,b.md] | find --name "<text>" | gaps --files "a.md,b.md" [--base <folder>]>';
 
 // Options each command accepts (all of them take one value).
 const OPTIONS = {
   'plot-cast': new Set(['--files', '--out']),
   'check-sheets': new Set(['--files']),
   find: new Set(['--name']),
+  gaps: new Set(['--files', '--base']),
 };
 
 function parseArgs(argv) {
@@ -112,6 +117,26 @@ function findCommand(root, opts) {
   exitWith(0);
 }
 
+function gapsCommand(root, opts) {
+  if (opts['--files'] === undefined) throw new Error(USAGE);
+  const files = parseList(opts['--files']);
+  if (files === null) throw new Error(USAGE);
+  let base = null;
+  if (opts['--base'] !== undefined) {
+    base = opts['--base'].trim();
+    if (base === '') throw new Error(USAGE);
+  }
+
+  const { sheets } = sheetGaps(root, { files, base });
+  for (const sheet of sheets) {
+    for (const gap of sheet.gaps) {
+      process.stdout.write(`gap ${sheet.file}: ${gap.code} ${gap.section} ${gap.message}\n`);
+    }
+    process.stdout.write(`sheet ${sheet.file}: ${sheet.status}\n`);
+  }
+  exitWith(0);
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args === null) throw new Error(USAGE);
@@ -119,6 +144,7 @@ function main() {
   const root = path.resolve(args.root);
   if (args.command === 'plot-cast') plotCastCommand(root, args.opts);
   else if (args.command === 'check-sheets') checkSheetsCommand(root, args.opts);
+  else if (args.command === 'gaps') gapsCommand(root, args.opts);
   else findCommand(root, args.opts);
 }
 
