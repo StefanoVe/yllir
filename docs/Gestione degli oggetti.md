@@ -40,7 +40,7 @@ Le prime tre sono la parte pubblica. Le note del master stanno nel blocco riserv
   - validazione: sezioni presenti e in ordine, blocco riservato ultimo e unico, nessun segnaposto rimasto, percorsi delle immagini esistenti, `location` che risolve su luoghi esistenti;
   - controllo `plot-items`, analogo a `plot-cast`: ogni oggetto citato dai documenti di trama ha una scheda (vedi la questione aperta sul modo di dichiarare gli oggetti negli eventi).
 - **Giudizio (agente):**
-  - scrittura delle due descrizioni, nel registro di prosa della campagna (`prose.register`);
+  - scrittura delle due descrizioni nel tono della campagna (vedi «Tono delle descrizioni»);
   - la separazione fra ciò che i personaggi possono sapere (pubblico) e ciò che sa solo il master (riservato);
   - se un testo di trama contraddice la scheda: è una domanda per il master (`status: ASK`), mai una correzione silenziosa.
 - **Dipendenze:**
@@ -107,6 +107,11 @@ La sigla è quella della nave scomparsa. Chi la riconosce sa dove è stata fabbr
 - **Identità e trama.** Un testo di trama che ha bisogno di un fatto sull'identità dell'oggetto lo scrive prima nella scheda. Se la trama contraddice la scheda, la skill chiede al master.
 - **Posizione.** `location` è il luogo attuale, aggiornato dopo la sessione da `after-session` su dichiarazione del master.
 - **Riservato.** Le note del master non compaiono mai nelle descrizioni, nelle carte, nelle ricerche web, nei prompt per le immagini né nei revisori di testi destinati ai giocatori. Il passaggio da riservato a pubblico avviene solo per azione esplicita del master. Un rimando a una nota riservata usa l'ancora `#master`.
+- **Tono delle descrizioni.** **Deciso (dall'autore, 2026-11-09).** Sia la descrizione breve sia quella completa seguono il tono della campagna. Fonti, in ordine di precedenza (proposta):
+  1. le regole date dal master a parole in `.campaign/customizations.md` (per esempio «nei dialoghi del porto il tono è ruvido»);
+  2. il registro `prose.register` di `campaign.yaml` (`elevated`, `plain`, `colloquial`, `mixed`);
+  3. per ciò che le prime due non dicono, il tono delle schede e delle sessioni già scritte nella campagna, che la skill legge prima di scrivere.
+  La skill non ha un tono suo e non ne inventa uno. Il tono vale anche per la descrizione breve, che non è una scheda tecnica. Il tono non riguarda `## Effetti`, che segue l'adattatore. Il revisore indipendente controlla il tono insieme al resto; un tono dubbio è una domanda per il master, non una riscrittura silenziosa.
 - **Effetti.** Mai scritti a mano fuori dal formato dell'adattatore; la validazione dell'adattatore è obbligatoria prima della revisione. Senza adattatore (`system.adapter: none`) la sezione `## Effetti` resta in testo libero e il controllo dell'adattatore è saltato, dichiarandolo nel rapporto.
 - **Collegamenti.** Ogni menzione dell'oggetto in altri documenti diventa un link alla scheda dopo la scrittura, come per ogni soggetto; la scheda è inclusa nell'indice dei soggetti con i suoi alias.
 - **Duplicati.** Prima di creare, ricerca per nome e alias. Una corrispondenza esatta non crea nulla e restituisce l'`id` esistente; una parziale genera una domanda per il master («`<nome>` è lo stesso oggetto di `<titolo>`?»).
@@ -128,11 +133,12 @@ La sigla è quella della nave scomparsa. Chi la riconosce sa dove è stata fabbr
 - note del master finite nella parte pubblica, per esempio dentro la descrizione breve che le uscite riusano;
 - la descrizione breve e quella completa che divergono nei fatti: la breve è un riassunto della completa, mai una fonte autonoma;
 - oggetti duplicati con nomi diversi perché la ricerca non ha guardato gli alias;
+- un tono scritto nella skill invece che letto dalla campagna: una descrizione aulica in una campagna sobria (o il contrario) è un errore che l'audit non vede;
 - modelli che si moltiplicano per eccezioni fino a non essere più uno standard.
 
 ## Testbench
 
-**Proposta.** Un caso di prova per la modalità `create` e uno per `check`, con campagna sintetica e chiave delle risposte fuori dalla cartella leggibile dall'agente. Trappole da seminare: omonimi (due oggetti con lo stesso nome in luoghi diversi), alias che coincide con il nome di un luogo o di un personaggio, un oggetto citato in trama senza scheda, una scheda con la nota del master fuori dal blocco riservato, una descrizione breve che contraddice la completa, un oggetto che la trama fa usare contro ciò che dice la scheda (deve diventare una domanda, non una correzione), un oggetto già escluso nel registro delle esclusioni che non va segnalato. Ogni caso gira più volte per agente e il risultato è un tasso di successo registrato con modello e hash delle istruzioni (vedi [Robustezza e test](Robustezza%20e%20test.md)).
+**Proposta.** Un caso di prova per la modalità `create` e uno per `check`, con campagna sintetica e chiave delle risposte fuori dalla cartella leggibile dall'agente. Trappole da seminare: omonimi (due oggetti con lo stesso nome in luoghi diversi), alias che coincide con il nome di un luogo o di un personaggio, un oggetto citato in trama senza scheda, una scheda con la nota del master fuori dal blocco riservato, una descrizione breve che contraddice la completa, una campagna con registro `plain` e una regola di tono in `customizations.md` che la bozza deve rispettare, un oggetto che la trama fa usare contro ciò che dice la scheda (deve diventare una domanda, non una correzione), un oggetto già escluso nel registro delle esclusioni che non va segnalato. Ogni caso gira più volte per agente e il risultato è un tasso di successo registrato con modello e hash delle istruzioni (vedi [Robustezza e test](Robustezza%20e%20test.md)).
 
 ## Questioni aperte
 
@@ -143,5 +149,6 @@ La sigla è quella della nave scomparsa. Chi la riconosce sa dove è stata fabbr
 - **Oggetti senza effetti.** Un oggetto di sola scena (una lettera, una lanterna) ha davvero bisogno di una scheda, o la soglia è «ha un effetto, un valore o un segreto»? Senza soglia, ogni oggetto citato diventerebbe una scheda.
 - **Oggetti con stato.** Un oggetto che cambia nel tempo (si rompe, si identifica, passa di mano) aggiorna la scheda o resta nella cronaca? La proposta è: l'identità nella scheda, le vicende nella cronaca, con `location` come unico dato di stato.
 - **Oggetti magici e identificazione.** Il testo pubblico di un oggetto non identificato mostra gli effetti reali o quelli apparenti? Dipende dal sistema di gioco: la decisione spetta all'adattatore o al master?
+- **Tono: precedenza e verifica.** L'ordine delle fonti del tono (personalizzazioni, registro, schede esistenti) è una proposta. Resta da decidere se il tono di una scheda si può verificare in modo deterministico o solo con il giudizio del revisore.
 - **Prezzi.** La skill legge il documento di economia solo per validare, o propone anche un valore? La proposta è la sola validazione.
 - **Nome del campo e della categoria** per sistemi in cui la voce `objects` ha un altro nome nella lingua della campagna: già coperto dal campo `type` in `structure`, da confermare.
