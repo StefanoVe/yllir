@@ -40,7 +40,7 @@ External subjects are included automatically as link targets. The script reads t
 - If the output contains `proposals: 0` and `review: 0`: go to Step 5 with no status reason.
 - Otherwise: go to Step 2.
 
-**Step 2 — Review.** Launch the sub-agent `yllir:linker-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/linker-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. Its prompt is exactly these two lines, with the real absolute paths:
+**Step 2 — Review.** Launch the sub-agent `yllir:linker-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/linker-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly; in Codex, always start the sub-agent with the model Luna, because Codex gives a sub-agent the model of the main agent unless you name one) with the Agent tool. Its prompt is exactly these two lines, with the real absolute paths:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 PLAN: <CAMPAIGN_ROOT>/.campaign/state/linker/plan.json

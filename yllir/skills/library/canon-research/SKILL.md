@@ -39,7 +39,7 @@ External sources are included automatically. The script searches the external fo
 - If the exit code is 1 or 2: go to Step 4 with reason "search failed: <the error lines, joined by ; >".
 - If the exit code is 0: go to Step 2. Zero hits is a valid result: the researcher then reports silence.
 
-**Step 2 — Research.** Launch the sub-agent `yllir:canon-researcher` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-researcher.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. Its prompt is exactly these three lines, with the real absolute paths and the real question:
+**Step 2 — Research.** Launch the sub-agent `yllir:canon-researcher` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-researcher.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly; in Codex, always start the sub-agent with the model Luna, because Codex gives a sub-agent the model of the main agent unless you name one) with the Agent tool. Its prompt is exactly these three lines, with the real absolute paths and the real question:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 QUESTION: <QUESTION>
