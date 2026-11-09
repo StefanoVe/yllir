@@ -174,12 +174,19 @@ Le regole di scrittura delle istruzioni per modelli minori e per Codex sono in [
 - **riservatezza:** una categoria riservata al master dà livello alto; un blocco riservato dà livello medio;
 - **omonimi:** un altro soggetto il cui titolo o alias coincide, anche in parte, dà livello alto.
 
+Comportamento per livello:
+
+| Livello | Controllo di continuità | Revisori del canone | Linker |
+| --- | --- | --- | --- |
+| basso | saltato | un solo revisore per l'intero lotto | percorso leggero: uno script deterministico accetta da solo i link ovvi (nome proprio completo di almeno due parole, tutte con l'iniziale maiuscola, fuori dal blocco riservato, un solo soggetto, scheda esistente); il revisore del linker giudica solo gli altri |
+| medio | eseguito | un solo revisore per l'intero lotto | normale, con il revisore su ogni proposta |
+| alto | eseguito | un revisore per ogni documento, se i documenti sono più d'uno (in parallelo); l'esito unico è `ASK` se uno è `ASK`, altrimenti `FIX` se uno è `FIX`, altrimenti `APPLY` | normale |
+
 Regole:
 
 - Se una misura non si può calcolare, il livello è alto.
-- Al livello basso il controllo di continuità è saltato. Medio e alto eseguono tutto come oggi.
 - **La revisione indipendente è sempre presente, a ogni livello.** È una decisione dell'autore e non si indebolisce.
-- Il revisore può solo alzare il livello: segnala `escalate`, e allora il controllo di continuità viene eseguito. Nessuna fase abbassa il livello.
+- Il revisore può solo alzare il livello, e solo da basso a medio: segnala `escalate`, e allora il controllo di continuità parte prima della scrittura. Nessuna fase abbassa il livello.
 - Il livello si ricalcola a ogni giro del ciclo fra bozza e revisione.
 - Le soglie sono costanti dello script, da tarare sul testbench.
 
@@ -208,7 +215,7 @@ La sessione che il master vede fa da portineria e affida ogni argomento a un sub
 - Il framework registra i costi per operazione o solo il numero di chiamate?
 - Come si valida la tabella dei passi delegabili: un controllo automatico alla modifica della skill, o una revisione manuale?
 - **Pesi e soglie iniziali del livello di controllo.** Vanno tarati sul testbench, con i casi con trappole (omonimi, alias, contraddizioni lontane, ipotesi che non devono diventare accuse, esclusioni registrate): i casi con trappole devono risultare `high`.
-- **Linker nel livello basso.** Il linker può girare senza revisore nel livello basso? Da valutare dopo aver letto e misurato il linker.
-- **Differenza fra medio e alto.** Per ora medio e alto si comportano allo stesso modo. Serve decidere quale controllo in più dare al livello alto.
 - **Punteggio continuo.** Invece dei tre livelli si potrebbe usare un punteggio continuo con soglie. Conviene, o i tre livelli bastano?
 - **Esclusioni registrate.** Dove vivono le esclusioni registrate (ciò che non deve essere segnalato) e devono entrare fra le misure della classificazione?
+- **Regola dei link «ovvi».** La regola del livello basso (nome proprio di almeno due parole maiuscole) è prudente e può essere allargata solo dopo averla misurata sul testbench.
+- **Costo del revisore per documento.** Al livello alto il revisore per documento raddoppia le chiamate: va misurato il costo reale, con il conteggio delle chiamate per operazione che il framework già tiene.

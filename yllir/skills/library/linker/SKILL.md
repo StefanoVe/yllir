@@ -2,7 +2,7 @@
 name: linker
 description: Library skill. Adds Markdown links to every mention of a campaign subject in the given documents, using deterministic scripts and an independent reviewer. Invoked by Yllir core processes after a document is written, or when asked to link mentions in specific campaign files. Never invoked for anything outside a Yllir campaign.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" *), Read, Write, Agent
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/auto-outcomes.mjs" *), Read, Write, Agent
 ---
 
 # Linker
@@ -20,6 +20,7 @@ The caller gives:
 - `SUBJECTS`: ids of subjects just created or given a new alias. May be empty.
   The plan script also adds, by itself, every document that mentions a subject whose sheet is in FILES (two-way: the touched file is linked towards the sheets, and the other documents are linked towards the touched sheet), so the caller does not need to list those subjects.
 - `CONTINUE_WITH`: text given by the invoking skill naming the exact step to resume (e.g. "write-sequence step 7"). If absent, use "the step of the invoking skill that called the linker".
+- `LEVEL`: `low`, `medium` or `high`, given by the write sequence. Absent or any other value means `high`. Only `low` changes anything here (see Step 1b).
 
 If both FILES and SUBJECTS are empty, stop and ask the caller which documents to link. Do not guess and do not link the whole campaign.
 
@@ -38,7 +39,12 @@ External subjects are included automatically as link targets. The script reads t
 
 - If the exit code is 1 or 2: go to Step 5 with `--status-reason "<the error lines, joined by ; >"`.
 - If the output contains `proposals: 0` and `review: 0`: go to Step 5 with no status reason.
-- Otherwise: go to Step 2.
+- Otherwise: go to Step 1b.
+
+**Step 1b — Light path (only when LEVEL is `low`).** When LEVEL is not `low`, skip this step and go to Step 2 as written. When LEVEL is `low`, run:
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/auto-outcomes.mjs" . --plan .campaign/state/linker/plan.json --out .campaign/state/linker/outcomes.json`
+- If the exit code is 2, or the command fails in any other way: ignore its output, delete nothing, and go to Step 2 as written (full review).
+- If the exit code is 0: read the `uncertain:` line. If it is `uncertain: 0`, skip Step 2 and go to Step 3. Otherwise go to Step 2, with the changes of the light path written in Step 2.
 
 **Step 2 — Review.** Launch the sub-agent `yllir:linker-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/linker-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. Its prompt is exactly these two lines, with the real absolute paths:
 ```
@@ -49,6 +55,8 @@ Do not add your own opinion or review the proposals yourself.
 - The reviewer answers with a JSON array. Save its answer exactly as received to `.campaign/state/linker/outcomes.json` with the Write tool.
 - If the answer is not a JSON array: launch the reviewer again once with the same prompt. In Codex, set the model to GPT-6 Luna, as in the first launch. If the second answer is also not a JSON array: go to Step 5 with `--status-reason "review not available"`. Nothing is applied without a review.
 - Otherwise: go to Step 3.
+
+**Light path (only when you come from Step 1b with uncertain proposals).** The reviewer judges only the uncertain proposals. Its prompt is the two PLAN lines above plus a third line `PIDS: <the uncertain pids from the output of Step 1b, comma-separated>`. In Codex, set the model to GPT-6 Luna as in the first launch. Instead of the first bullet above: check that its answer is a JSON array (if it is not, launch the reviewer again once with the same prompt; if the second answer is not an array either, go to Step 5 with `--status-reason "review not available"`). Then read `.campaign/state/linker/outcomes.json` with the Read tool, keep the entries the script wrote, add the reviewer's entries exactly as received (never edited), and save the merged array with the Write tool. Then go to Step 3.
 
 **Step 3 — Apply.** Run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" . --plan .campaign/state/linker/plan.json --outcomes .campaign/state/linker/outcomes.json --out .campaign/state/linker/result.json`
@@ -83,6 +91,7 @@ continue with: write-sequence step 7
 ## Rules
 
 - Only `apply-links.mjs` writes links. Never edit campaign files in this skill.
+- Auto outcomes only ever come from `auto-outcomes.mjs`. Never write an APPLY entry yourself.
 - Never apply a mention listed in `plan.review`. The report script lists it under "decisions for the master".
 - Never write or edit `report.txt` yourself. Only `linker-report.mjs` writes it.
 - Never quote the content of a master-only block. Refer to the file and line, for example `Characters/Ada Rook.md:22`.
