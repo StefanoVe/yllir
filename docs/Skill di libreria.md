@@ -317,7 +317,7 @@ Le destinazioni dei collegamenti possono essere anche documenti di categorie `ex
 
 - **Scopo:** creare, aggiornare e tenere uniformi le schede di personaggi non giocanti, nemici e venditori, così che ogni scheda abbia sempre la stessa forma e si possa usare al tavolo senza cercare.
 - **Avvio:** dal core, quando serve un nuovo personaggio o una nuova creatura (preparazione, dopo la sessione, ingest, generatori al tavolo quando il master dice «tienilo»), o su richiesta («sistema le schede dei PNG»).
-- **Input → output:** dettagli del master, ruolo (PNG, nemico, venditore, creatura), luogo → scheda nella categoria giusta, dal modello del ruolo; per le schede esistenti, un rapporto delle differenze dal modello e la correzione proposta.
+- **Input → output:** dettagli del master, ruolo (PNG, nemico, venditore, creatura), luogo → scheda nella categoria giusta, dal modello del ruolo; input facoltativo `PROPOSE` (sì/no, predefinito no), vedi Requisiti; per le schede esistenti, un rapporto delle differenze dal modello e la correzione proposta.
 - **Deterministico:** modelli per ruolo (sezioni obbligatorie, ordine, metadati); validatore che confronta ogni scheda con il suo modello; ricerca dei duplicati e degli omonimi prima di creare; per i nemici, la forma del blocco statistiche è data dall'adattatore del sistema; per i venditori, il controllo dei prezzi contro il documento di economia; il controllo `plot-cast` verifica che ogni `id` in `characters` degli eventi di trama esista e sia una scheda di personaggio, senza duplicati, e segnala come informazione (mai come errore) i nomi con la maiuscola che non corrispondono a nessun soggetto noto.
 - **Giudizio:** personalità, voce, motivazioni, che cosa sa e che cosa nasconde; quale parte è pubblica e quale riservata; quali personaggi nominati nella trama richiedono una scheda; se un testo di trama contraddice la scheda, la discrepanza è una domanda per il master, non una correzione silenziosa.
 - **Modello:** vedi [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md).
@@ -327,6 +327,9 @@ Le destinazioni dei collegamenti possono essere anche documenti di categorie `ex
   - una scheda vecchia non si riscrive in silenzio: la standardizzazione propone le differenze e le applica dopo conferma, conservando ogni contenuto;
   - la vista compatta per il tavolo (voce, tic, cosa vuole, cosa sa) è derivata dalla scheda, non scritta a parte;
   - ogni personaggio definito in un documento di trama ha la sua scheda, scritta prima o insieme al primo evento che lo definisce. La scheda è la fonte di verità per l'identità (chi è), non per le azioni in trama, che stanno nei documenti di trama e nella cronaca (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md#26-identità-e-rimandi)).
+  - con `PROPOSE` sì, la skill riempie le lacune della scheda (aspetto, modi, che cosa vuole; per i nemici e le creature, natura pubblica) con proposte brevi, coerenti con il registro, il mondo e la descrizione della campagna. Mai segreti, eventi passati, relazioni con altri personaggi, che cosa il personaggio fa in una sessione, né regole di gioco: statistiche, prezzi, scorte e bottino non si inventano mai;
+  - con `PROPOSE` sì, un nemico senza statistiche, in una campagna con adattatore di gioco impostato, non ferma il processo con una domanda: la scheda si scrive con le statistiche «da definire» e il master ne è informato. Con `PROPOSE` no il comportamento resta quello stretto; dopo la sessione, dall'importazione e dall'ingest di documenti resta sempre stretto;
+  - le proposte valgono come canone finché il master non le corregge, e la scheda non le marca. Il messaggio finale dice che cosa è stato scelto, e il master può chiederne la modifica; la revisione indipendente della sequenza di scrittura si applica come sempre.
 - **Rischi da evitare:**
   - modelli che si moltiplicano per eccezioni fino a non essere più uno standard;
   - statistiche scritte a mano nella scheda e non validate dall'adattatore;
@@ -441,3 +444,4 @@ Le destinazioni dei collegamenti possono essere anche documenti di categorie `ex
 - **Autorun:** oltre all'ingest e alla ricerca musicale (entrambe decise), deve partire da sola anche la ricerca nel canone su certe domande? Proposta: no.
 - **Esclusioni dell'audit:** **Deciso (2026-11-07):** il registro sta in `campaign.yaml`, nella sezione `audit.exclusions` (vedi [Configurazione](Configurazione.md)).
 - **Funzioni da valutare:** vedute e carte nautiche entrano nel catalogo come funzioni o restano fuori? Da decidere insieme alla questione aperta dell'indice sugli strumenti da confluire.
+- **Gestione dei PNG, proposte:** le proposte non sono marcate nella scheda: da rivedere se il master vuole distinguerle dal canone confermato.

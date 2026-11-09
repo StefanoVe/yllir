@@ -42,7 +42,7 @@ The sheet is the source of truth for WHO the character is: name, role, appearanc
 - `MODE`: `create` or `check`. Any other value: write the report with `status: FAILED` and `reason: unknown MODE <value>`.
 - `CONTINUE_WITH`: text naming the caller's next step. If absent, use "the step of the invoking skill that called npc-manager".
 
-Mode `create` also takes `NAME` (the name as written by the master or the plot; a double quote in it means `status: FAILED`, reason "name not usable"), `LOCATION` (comma-separated place ids, may be empty; for an enemy or creature, every place where it lives, and empty means errant), `DETAILS` (facts about the character as plain text, may be empty), `REQUESTED_BY` (comma-separated campaign-relative paths of the documents that asked for this character: the scene files, a sheet, an ingested page; may be empty) and `TEMPLATE` (`npc`, `vendor`, `enemy` or `creature`; default `npc`). The caller gives TEMPLATE: never guess it. Mode `check` also takes `FILES` (comma-separated campaign-relative paths; empty means the whole campaign).
+Mode `create` also takes `NAME` (the name as written by the master or the plot; a double quote in it means `status: FAILED`, reason "name not usable"), `LOCATION` (comma-separated place ids, may be empty; for an enemy or creature, every place where it lives, and empty means errant), `DETAILS` (facts about the character as plain text, may be empty), `REQUESTED_BY` (comma-separated campaign-relative paths of the documents that asked for this character: the scene files, a sheet, an ingested page; may be empty) and `TEMPLATE` (`npc`, `vendor`, `enemy` or `creature`; default `npc`). The caller gives TEMPLATE: never guess it. `PROPOSE`: `yes` or `no`, default `no`. Any other value means `no`. With `yes`, the skill fills the gaps with creative proposals consistent with the campaign (see Step 5). The caller passes `yes` only when the master asked for something that needs this character (for example a fight, or a shop) and gave no details. With `no`, the sheet holds only what DETAILS says. Mode `check` also takes `FILES` (comma-separated campaign-relative paths; empty means the whole campaign).
 
 ## Mode `create`
 
@@ -65,7 +65,7 @@ Mode `create` also takes `NAME` (the name as written by the master or the plot; 
 - SHEET_PATH: `<FOLDER>/<file name>.md`, where the file name is NAME without the characters `/ \ : * ? " < > |`. The `# title` keeps the full NAME.
 
 **Step 5 — Draft.**
-- Statistics check, only when TEMPLATE is `enemy` and `system.adapter` is set (not `none`, not absent). Statistics are game rules: never write them from memory or invent them. If DETAILS contains no statistics block: do NOT write a draft. Write the report with `status: ASK`, `draft: none`, and `question:` "Which statistics does <NAME> have?". Go to the Continue step. Otherwise write the draft with the Write tool at `.campaign/state/write/draft/<SHEET_PATH>`, in the model of TEMPLATE below. Headings: the `it` column for `it`, the `en` column for `en`, translated for any other language.
+- Statistics check, only when TEMPLATE is `enemy` and `system.adapter` is set (not `none`, not absent). Statistics are game rules: never write them from memory or invent them. If DETAILS contains no statistics block and PROPOSE is `no` (or any value other than `yes`): do NOT write a draft. Write the report with `status: ASK`, `draft: none`, and `question:` "Which statistics does <NAME> have?". Go to the Continue step. If DETAILS contains no statistics block and PROPOSE is `yes`: do NOT ask and do NOT write any statistic. Write the draft as described below, with `## Statistiche` containing only `Da definire.` (`en`: `To be defined.`), add "statistics" to the To define list, and add "statistics" to `open points:` of the report. Otherwise (DETAILS contains a statistics block) write the draft with the Write tool at `.campaign/state/write/draft/<SHEET_PATH>`, in the model of TEMPLATE below. Headings: the `it` column for `it`, the `en` column for `en`, translated for any other language.
 
 | Key | it | en | Used by |
 |---|---|---|---|
@@ -134,19 +134,29 @@ location: [<LOCATION ids, separated by commas, or nothing>]
 
 Content rules, for every template:
 - The image line under the title is optional for every template, as stated in Step 5: never invent it, never require it.
-- Use ONLY what DETAILS says. Never invent a trait, a looks detail, a motive, a relative, a secret or a past event. Never write what the character does in a session or event: if DETAILS describes an action in the plot, leave it out. Every heading and sentence is in `language.main`.
+- When PROPOSE is `no` (the default, and any value other than `yes`): use ONLY what DETAILS says. Never invent a trait, a looks detail, a motive, a relative, a secret or a past event. Never write what the character does in a session or event: if DETAILS describes an action in the plot, leave it out. Every heading and sentence is in `language.main`.
 - `## Ruolo` (npc, vendor): what the character is for the story or the place, from DETAILS. If DETAILS gives nothing, one sentence that says only where the character appears, in the caller's own words. Appearance (npc, vendor): one italic paragraph (`_..._`) in `## Aspetto e modi`, only when DETAILS describes it. Manner of speaking and what the character wants go in `## Al tavolo`.
 - A required section with nothing known contains exactly one sentence: `Da definire.` (Italian), `To be defined.` (English), or the translation. Then add `## Da definire` (or `## To define`) as the LAST section before any master block, with one list item per missing section, for example `- aspect and manner`.
 - Anything marked as secret or "for the master only", and any conduct, tactics, flight or secret of a creature, goes ONLY in the master block at the end: `<!-- master -->`, `## Master`, `### Indicazioni per il master` (`en`: `### Notes for the master`), the text, `<!-- /master -->`. If there is no such content, omit the block. No public section ever holds that text.
+- **When PROPOSE is `yes`.** This block applies only when PROPOSE is `yes`. For the sections it names, it replaces the PROPOSE `no` rules above (the one-sentence `## Ruolo` rule and the appearance rule).
+  - What DETAILS says is copied as written and always wins. Never change it.
+  - Read `campaign.yaml` with the Read tool and keep `prose.register`, `world` and `description` (any of them may be absent). Write the proposals in that register, coherent with the world and the description, and with the documents the caller already read when DETAILS names them.
+  - Fill with a proposal ONLY these sections: `## Ruolo` (only if DETAILS gives nothing), `## Aspetto e modi` and `## Al tavolo` (manner of speaking and what the character wants) for npc and vendor; `## Natura` (public lore) for enemy and creature. Each proposal is 1 to 3 short sentences. Appearance stays one italic paragraph (`_..._`).
+  - STILL FORBIDDEN even with PROPOSE `yes`: secrets, a past event, a relative or any relation to another named character, what the character does in a session or event, and any master-only content. Do not write a master block unless DETAILS gives master-only content.
+  - STILL FORBIDDEN even with PROPOSE `yes`: invented statistics, prices, stock items and loot. Those sections keep the rules above: `Da definire.` (`en`: `To be defined.`), listed under To define. The image line is still never invented.
+  - A section filled by a proposal is NOT listed in `## Da definire`. A section still empty (statistics, stock, loot) is.
+  - Never name a proposal as a proposal inside the sheet text: no words such as "proposal", "suggested" or "proposta".
 
 **Step 6 — Check the draft by reading it back.** Do NOT run `check-sheets` on a draft: that script checks campaign files only. Read the draft with the Read tool and check the points for its TEMPLATE. An image line under the title, if present, is not a section: it is never counted as one, and its absence is never a failure.
 - npc: front matter has `id`, `template: npc`, `location`; one `#` title equal to NAME; `## Ruolo`, `## Aspetto e modi`, `## Al tavolo` present in this order, each with text; the only other `##` section is `## Da definire`, last; the master block, if any, is last.
 - vendor: as npc with `template: vendor`; `## Assortimento` after `## Al tavolo`, with the header `| Oggetto | Prezzo | Nota |` (`en`: `| Item | Price | Note |`) and a separator row; `## Trattare` and `## Deroghe` optional, in that order, before `## Da definire`.
 - enemy: front matter has `id`, `template: enemy`, `location` (a list, `[]` allowed); one `#` title equal to NAME; `## Natura` and `## Statistiche` present in order, each with text; `## Bottino` optional, after `## Statistiche`; no conduct text in a public section; the master block, if any, is last. creature: as enemy with `template: creature`, and `## Statistiche` contains exactly the creature sentence.
 
+With PROPOSE `yes`, the sections filled by a proposal count as having text. A proposal that contains a secret, a past event or a relation to another named character fails the check, and is fixed as described above.
+
 If a point fails, fix the draft with Write and read it back, at most 2 times. If it still fails, write the report with `status: FAILED`, `reason: draft check failed`, and go to the Continue step.
 
-**Step 7 — Report.** Write the report with `status: DONE`, `draft: <draft path relative to the campaign root>`, `new subject: <ID>`, `requested by:` copied from REQUESTED_BY, and `open points:` listing each section written as "to be defined". Also list "statistics" or "stock" when `## Statistiche` or `## Assortimento` is written as "to be defined". Go to the Continue step.
+**Step 7 — Report.** Write the report with `status: DONE`, `draft: <draft path relative to the campaign root>`, `new subject: <ID>`, `proposed: <list>`, `requested by:` copied from REQUESTED_BY, and `open points:` listing each section written as "to be defined". Also list "statistics" or "stock" when `## Statistiche` or `## Assortimento` is written as "to be defined". `propose:` is the value of PROPOSE (`yes` or `no`). `proposed:` lists the sections written as a proposal, using these names: `role`, `aspect and manner`, `at the table`, `nature`. An empty list means `none`, and `proposed:` is `none` in every report that writes no draft or whose PROPOSE is not `yes`. Go to the Continue step.
 
 ## Mode `check`
 
@@ -185,9 +195,11 @@ The report is written with the Write tool to `.campaign/state/npc-manager/report
 NPC MANAGER REPORT
 status: DONE | ASK | ERRORS | NOT_AVAILABLE | FAILED
 mode: create | check
+propose: yes | no
 draft: <path or none>
 exists: <subject id or none>
 new subject: <id or none>
+proposed: <comma-separated sections written as a proposal, or none>
 requested by: <REQUESTED_BY, comma-separated, or none>
 question: <one sentence or none>
 reason: <text or none>
@@ -203,17 +215,19 @@ Complete example, create, DONE:
 NPC MANAGER REPORT
 status: DONE
 mode: create
+propose: yes
 draft: .campaign/state/write/draft/Personaggi/Ilde Varno.md
 exists: none
 new subject: ilde-varno
+proposed: aspect and manner, at the table
 requested by: Trama/Sessione 2/Eventi/Il ponte.md
 question: none
 reason: none
 problems:
 - none
 open points:
-- ## Aspetto e modi: to be defined (no appearance in the details)
-continue with: after-session step 6: send the draft through write-sequence with the session documents
+- none
+continue with: prepare-session step 6b: read the npc-manager report, then step 7
 ```
 
 Complete example, create, ASK (partial match):
@@ -221,9 +235,11 @@ Complete example, create, ASK (partial match):
 NPC MANAGER REPORT
 status: ASK
 mode: create
+propose: no
 draft: none
 exists: none
 new subject: none
+proposed: none
 requested by: none
 question: Is Ilde the same character as Ilde Varno?
 reason: none
@@ -239,9 +255,11 @@ Complete example, create, ASK (enemy, adapter set, no statistics in DETAILS):
 NPC MANAGER REPORT
 status: ASK
 mode: create
+propose: no
 draft: none
 exists: none
 new subject: none
+proposed: none
 requested by: Trama/Sessione 3/Eventi/Le saline.md
 question: Which statistics does Guardiano di sale have?
 reason: none
@@ -257,9 +275,11 @@ Complete example, check, ERRORS:
 NPC MANAGER REPORT
 status: ERRORS
 mode: check
+propose: no
 draft: none
 exists: none
 new subject: none
+proposed: none
 requested by: none
 question: none
 reason: none
@@ -284,7 +304,7 @@ The sheet is not linked here. The caller links it, through `yllir:write-sequence
 - Never write a link into a document, and never link a sheet here: the linker does it, through the caller's write sequence.
 - Never edit a sheet that exists. This skill writes only drafts under `.campaign/state/write/draft/` (mode `create`) and the report.
 - Never write to the plot folder (`Trama/` in an Italian campaign, `Plot/` in an English one, or the category of type `plot` in `campaign.yaml`).
-- Never print the report, never show it to the master, and never invent facts: the draft uses only DETAILS.
+- Never print the report, never show it to the master, and never invent facts: the draft uses only DETAILS, plus the proposals that Step 5 allows when PROPOSE is `yes`.
 - Master-block text never goes into a plot text, a draft outside its block, a report or a message.
 - Run commands only from the campaign root, one per Bash call, exactly as written here.
 - Your last action is the Write of the report; then, in the same turn, do what `continue with:` says.
@@ -298,3 +318,7 @@ Correct: `create` with TEMPLATE `enemy` for «Guardiano di sale», with `system.
 Wrong: the same enemy, with `system.adapter` set and no statistics in DETAILS, gets a `## Statistiche` block written "from memory" for a known game. Forbidden: statistics are never invented.
 
 Wrong: a plot event says Ilde Varno "betrays the group at the harbour", and the sheet is edited to add "a traitor". Forbidden: the report says `status: ASK` and nothing is edited.
+
+Correct: `create` with PROPOSE `yes`, TEMPLATE `enemy`, `system.adapter` `none`, NAME «Capo dei banditi», and DETAILS only «guards the ford». The draft's `## Natura` gets a short proposal (1 to 3 sentences) in the register of `campaign.yaml`, coherent with the world, with no secret and no relation to a named character. `## Statistiche` says `Da definire.`, and "statistics" is listed under To define. The report says `status: DONE`, `propose: yes`, `proposed: nature`.
+
+Wrong: the same request with PROPOSE `yes`, and the draft writes in `## Natura`: «he secretly serves the baron». Forbidden: secrets are never proposed, even with PROPOSE `yes`. Step 6 fails this draft, and the sentence is removed.

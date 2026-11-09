@@ -184,7 +184,8 @@ Il pubblico di riferimento è il master che non ha mai usato un'intelligenza art
 **Conseguenze pratiche.**
 
 - Una lacuna va scritta nella sezione `## Da definire` della scheda interessata, come prevede [Formato dei contenuti](Formato%20dei%20contenuti.md).
-- L'agente non inventa tratti, date, effetti o motivazioni per completare una scheda.
+- L'agente non inventa fatti su elementi che il master non ha chiesto, né segreti, eventi passati, relazioni con altri personaggi, date, effetti o regole di gioco (statistiche, prezzi, scorte, bottino).
+- Quando la richiesta stessa ha bisogno di un personaggio (l'avversario di uno scontro richiesto, chi gestisce un luogo o un servizio richiesto), l'agente lo crea con proposte brevi coerenti con la campagna, lo dichiara al master e cambia le proposte su richiesta.
 - Le domande al master sono limitate alle lacune che non si possono risolvere dalle fonti. Una domanda è una decisione canonica, non una preferenza redazionale.
 
 ## 15. Le dipendenze fra eventi sono dichiarate
