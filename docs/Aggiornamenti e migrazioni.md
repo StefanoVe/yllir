@@ -282,7 +282,7 @@ Scelte di implementazione dell’MVP, da confermare:
 ## Questioni aperte
 
 - Dove si trova, sul computer del master, la cartella del plugin pubblicato (la sorgente delle novità): per ora il controllo la legge dalla variabile `YLLIR_PUBLISHED_SOURCE`, e senza di essa tace. Va verificato come il marketplace la rende disponibile.
-- Come si aggiorna in Codex: la documentazione non è chiara.
+- Come si aggiorna in Codex: si usa `codex plugin marketplace upgrade yllir --json` (verificato 2026-11-09: aggiorna il plugin installato da 0.1.0 a 0.2.0). Il comando funziona solo se il marketplace è stato aggiunto da Git e non da cartella locale.
 - Qual è la fonte dell’ultima versione pubblicata (plugin, repository con tag, archivio) e chi la pubblica.
 - Come funziona in dettaglio la versione di Baltimora: formato del file di versione, comando di controllo, skill di update. Serve un confronto diretto con l’autore.
 - Le personalizzazioni di un file del framework: scelta sempre esplicita o solo sopra una soglia di modifica.

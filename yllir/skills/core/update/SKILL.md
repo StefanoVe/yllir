@@ -2,7 +2,7 @@
 name: update
 description: Handles the framework update for the master: campaign alignment after the assistant was updated, the update notice and its yes or no, and an interrupted update. It is read by the entry skill, never called by the master.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *)
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *)
 ---
 
 # Update
@@ -43,9 +43,11 @@ Use this part when your context has a block that starts with `YLLIR UPDATE AVAIL
   Output: the paragraph in the final message, then the postpone command has run once.
 
 **(b) Answer to the question.** Look at your previous message in the conversation. If the master's message answers the update question of (a), do only this part (not Step 6 of the entry skill).
-  Plugin update command: `claude plugin update yllir@yllir --json` (this is the only place where this command is written; change it here if the marketplace name changes).
-  - «yes» (any clear consent, for example «sì», «aggiorna», «ok, aggiorna pure»): run the Plugin update command above, as one single command, exactly as written there.
-    If its exit code is 0: tell the master in plain words that the update is ready, that they must close and reopen the assistant once for it to start working, and that nothing of theirs changes. Say that the campaign itself is aligned the next time it is opened (the entry skill's Step 4). If the exit code is not 0: say the fixed sentence of the lexicon for an update that could not be applied, which says that nothing was changed.
+  Plugin update command, in Claude Code: `claude plugin update yllir@yllir --json`
+  Plugin update command, in Codex: `codex plugin marketplace upgrade yllir --json`
+  Run the one for the tool you are running in (you know whether you are Claude Code or Codex). Never run both. These are the only places where the commands are written; change them here if the marketplace name changes.
+  - «yes» (any clear consent, for example «sì», «aggiorna», «ok, aggiorna pure»): run the Plugin update command of your tool above, as one single command, exactly as written there.
+    If its exit code is 0 (and, in Codex, the JSON `errors` list is empty; if it is not empty, treat it like a non-zero exit code): tell the master in plain words that the update is ready, that they must close and reopen the assistant once for it to start working, and that nothing of theirs changes. Say that the campaign itself is aligned the next time it is opened (the entry skill's Step 4). If the exit code is not 0: say the fixed sentence of the lexicon for an update that could not be applied, which says that nothing was changed.
   - «no» or «later» (or any clear refusal): say that it is fine and that you will mention it again tomorrow. Run nothing.
   - Anything else (a new request): handle it normally with Step 6 of the entry skill. Do not repeat the question.
   Output: the update is ready, or nothing was changed, or nothing was run.
