@@ -75,7 +75,7 @@ Questo file è l’indice: raccoglie le decisioni dell’autore, che sono vincol
   - (c) con `allow_model_imagination: null` (il valore predefinito, anche se la chiave manca), prima di ogni aggiunta o modifica il framework chiede con una domanda a quattro risposte: Sì / No / Sempre sì / Sempre no. «Sì» e «No» valgono per quella richiesta sola; «Sempre sì» e «Sempre no» si salvano nella configurazione come `true` e `false`.
   - Il campo vale per la preparazione della sessione, il completamento di una scheda e l'import (per le schede dei personaggi creati lì). Non vale mai per la cronaca dopo la sessione né per la trascrizione fedele dell'ingest.
   - Quando la fantasia è sbloccata, cadono i limiti sul non inventare (nomi, storia, relazioni, segreti, statistiche, prezzi, bottino). Restano: il canone non si contraddice (l'audit di continuità e il revisore fermano le contraddizioni); segreti e contenuti riservati stanno solo nel blocco master; un'invenzione non si presenta mai come citazione di una fonte; il master è avvisato in una frase di che cosa è stato inventato.
-  - Con il valore `no` il comportamento resta quello di prima della decisione.
+  - Senza permesso (valore `no`, o risposta «No») il framework non inventa nulla, nemmeno le proposte brevi. Una lacuna di una scheda resta «Da definire» e il messaggio dice che il master può chiedere di inventarla. Un personaggio che la scena richiede ma che il master non ha nominato resta senza nome e senza scheda: la scena lo chiama per ruolo.
 
 ## Architettura
 

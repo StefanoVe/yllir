@@ -99,7 +99,9 @@ Section keys used in this file, with their headings in the heading table of Step
      - vendor, English: «<TITLE> has no stock and prices in the sources: do you give them to me, or do we leave them to be defined?»
 - Output: RULES_BLOCK (or none), QUESTION_RULES (or none), TO_DEFINE additions (may be empty).
 
-**Step 6 — Creative choices.** For each NARRATIVE gap still EMPTY after Step 4 (no established fact fills it), write a PROPOSAL. The master asked for the sheet to be completed, so a short proposal is allowed.
+**Step 6 — Creative choices.**
+1. If IMAGINATION is `no`: do not write any proposal. For each NARRATIVE gap still EMPTY after Step 4 (no established fact fills it), the section keeps `Da definire.` (English `To be defined.`) and its section key is added to TO_DEFINE. PROPOSALS is empty and PROPOSED is empty. The question rule at the end of this step still applies.
+2. If IMAGINATION is `yes`: for each NARRATIVE gap still EMPTY after Step 4 (no established fact fills it), write a PROPOSAL. The master asked for the sheet to be completed, so a short proposal is allowed. The rules below apply to these proposals.
 - Each proposal is 1 to 3 short sentences, in the register of PROSE, coherent with WORLD, DESCRIPTION and the ESTABLISHED facts of Step 4. If PROSE is `none`, write plain and neutral sentences.
 - `appearance` is ONE italic paragraph, written as `_..._`.
 - `description` of a place is an italic opening paragraph of 1 or 2 sentences; plain sentences may follow, at most 2.
@@ -125,15 +127,16 @@ If QUESTION_CREATIVE is set: do not write any draft. Go to Step 9 and send only 
    - Every section that already has real text is kept exactly as it is. The only exception: a MASTER_FACT changes ONLY the statement it corrects, and it is written in the master's own words.
    - A GAP section (empty, or with only `Da definire.` or `To be defined.`, or missing) gets, in this order of preference:
      1. the ESTABLISHED facts of Step 4 that describe it;
-     2. the PROPOSAL of Step 6, only if the section still has no text;
-     3. for `statistics` and `stock`: the RULES_BLOCK of Step 5 copied exactly, or the sentence `Da definire.` (English `To be defined.`) when there is no RULES_BLOCK.
+     2. the PROPOSAL of Step 6, only if one exists (with IMAGINATION `no` none exists) and the section still has no text;
+     3. for `statistics` and `stock`: the RULES_BLOCK of Step 5 copied exactly, or the sentence `Da definire.` (English `To be defined.`) when there is no RULES_BLOCK;
+     4. any other gap section that still has no text: the sentence `Da definire.` (English `To be defined.`), and its section key is added to TO_DEFINE.
    - A missing section is added in the order of the heading table below.
    - The master block (`<!-- master -->` ... `<!-- /master -->`) is kept byte for byte, stays the LAST part of the sheet, and is never added to and never moved.
    - `## Da definire` (`## To define` in English): remove the list items of every section that is now filled; add the items of TO_DEFINE; remove the whole section if nothing remains; if something remains, keep it as the LAST section before the master block, with one list item per missing section, for example `- statistics`.
    - A PROPOSAL is never listed under `## Da definire`.
    - The words proposal, suggested and proposta (and their translations) never appear in the sheet.
    - A place keeps its `## Descrizione` section with an italic opening paragraph.
-   - For an enemy, creature or vendor the rules block must be a PLAYABLE block, not only the required fields: at least armor class, hit points, speed, ability scores, at least one attack or action with its attack bonus and damage, and the equipment the character carries (if the system has such a notion). Check the arithmetic (modifiers, bonuses) before writing.
+   - With IMAGINATION `yes`, for an enemy, creature or vendor the rules block must be a PLAYABLE block, not only the required fields: at least armor class, hit points, speed, ability scores, at least one attack or action with its attack bonus and damage, and the equipment the character carries (if the system has such a notion). Check the arithmetic (modifiers, bonuses) before writing. With IMAGINATION `no`, the rules block is copied exactly as the source or the master gives it: add no statistic, item or price to it, and check only the arithmetic of what it states.
    - Statistics are written as a Markdown table, or as lines each ending with two spaces or as a list, never as consecutive plain lines that Markdown collapses into one paragraph. After writing the draft, read it back and check that every statistic is on its own row.
 
    Heading table, with the sections of each template (the `it` heading for an Italian campaign, the `en` heading for an English one, and the translation for any other language):
@@ -161,7 +164,7 @@ If QUESTION_CREATIVE is set: do not write any draft. Go to Step 9 and send only 
    - the master block is identical to the sheet's master block and is the last part of the file;
    - the words proposal, suggested and proposta do not appear;
    - a place's `## Descrizione` opens with an italic paragraph;
-   - every statistic is on its own row, and a statistic block of an enemy, creature or vendor is playable and its arithmetic is right (point 2).
+   - every statistic is on its own row, and a statistic block of an enemy, creature or vendor has right arithmetic (point 2) and, with IMAGINATION `yes` only, is playable.
    If a point fails: fix the draft with the Write tool (Read it first), and read it back again.
 4. Run this command, with `<SHEET_PATH>` replaced by the value from Step 2:
    `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . gaps --files "<SHEET_PATH>" --base .campaign/state/write/draft`
@@ -172,7 +175,7 @@ If QUESTION_CREATIVE is set: do not write any draft. Go to Step 9 and send only 
 
 **Step 8 — Write sequence.** Invoke the skill `yllir:write-sequence` with:
 - `DOCUMENTS=<SHEET_PATH>`
-- `INTENT="Completes or corrects the sheet of <TITLE>: adds only facts the campaign establishes, the master's own words, or short creative proposals; changes no existing identity fact except where the master corrects it; no secrets; no statistics, prices or stock that no source gives."`
+- `INTENT="Completes or corrects the sheet of <TITLE>: adds only facts the campaign establishes, the master's own words, or short creative proposals (with IMAGINATION `no`, leave out the words «or short creative proposals»); changes no existing identity fact except where the master corrects it; no secrets; no statistics, prices or stock that no source gives."`
 - When IMAGINATION is `yes`: add to the end of INTENT, after one space, exactly this sentence: `The master allowed invented details: new names, places, history, relations and rules that no source gives are allowed; contradictions with the canon are not.`
 - `NEW_SUBJECTS=` (empty)
 - `VERSION_MESSAGE=` «Scheda di <TITLE> completata» for `it`, «Sheet of <TITLE> completed» for `en`, or the translation for another language. Use «Scheda di <TITLE> corretta» (`it`), «Sheet of <TITLE> corrected» (`en`), or the translation, only when no gap section was filled and the only change is a MASTER_FACT correction.
@@ -202,9 +205,9 @@ Otherwise the message is, in this order:
 - (a) one sentence saying what is now in the sheet, naming the sections in plain words, for example «Ho completato la scheda di <TITLE>: ora ha <sections>.» (or «Ho corretto la scheda di <TITLE>: ...» when the change is a correction only);
 - (b) one sentence naming what comes from the campaign and what is a creative proposal the master can change. Only when PROPOSED is not empty. When PROPOSED is empty, omit this sentence. With IMAGINATION `yes`, when a proposal invents a name (a character, a place, a relation or a past event), this same sentence also says in plain words, by name, what was invented, so the master can change it; when nothing was invented, it is written as before;
 - (b2) only when the statistics (or the stock and prices) were invented under the master's authorization of Step 5, point 0: one sentence saying that they were invented at the master's request and can be changed. When that does not apply, omit this sentence;
-- (c) only when STILL_OPEN has a gap that is a rules or other section: one sentence saying clearly that the sheet is still «da completare» (`en`: «still to be completed») and naming what is missing in plain words. Then:
+- (c) only when STILL_OPEN has a gap that is a rules or other section: one sentence saying clearly that the sheet is still «da completare» (`en`: «still to be completed») and naming what is missing in plain words. If the gap is a narrative section left as `Da definire.` (always the case with IMAGINATION `no`), the sentence also says that the master can ask the assistant to invent it, and no question is added. Then:
   - if QUESTION_RULES is set: that question is the LAST sentence of the message, exactly as set in Step 5;
-  - otherwise: one sentence with the one next step the master can take, for example «Dammi le statistiche, se le hai.»;
+  - otherwise: one sentence with the one next step the master can take, for example «Dammi le statistiche, se le hai.». For a narrative section left as `Da definire.` with IMAGINATION `no`, the next step is «Se vuoi, chiedimi di inventarne il contenuto.»;
 - (d) nothing else.
 
 Never mention older saved versions, ambiguous links, consistency checks that found nothing, other documents, maintenance, research that was incomplete, or a list of what the assistant can do. Never quote master notes. No paths, no ids, no section keys, no backticks, no formatting marks.
@@ -213,13 +216,15 @@ If the whole process took a long time (the master waited many minutes), the clos
 
 ## Examples
 
-Correct: the master writes «La guardia comune ha una scheda praticamente vuota». The process finds the sheet of «La guardia comune» (the longest match), finds gaps in role, appearance and table, and `yllir:canon-research` gives one fact: the guard stands at the gate of the harbour. The sheet is completed with that fact, plus two short proposals for appearance and manner. The message says what was added, that appearance and manner are proposals the master can change, and nothing more. The message is: «Ho completato la scheda della guardia comune: ora ha il ruolo, con il suo posto al cancello del porto, e l'aspetto e il modo di parlare. Il ruolo viene dalla campagna; aspetto e modo di parlare sono proposte che puoi cambiare.»
+Correct (IMAGINATION `yes`): the master writes «La guardia comune ha una scheda praticamente vuota». The process finds the sheet of «La guardia comune» (the longest match), finds gaps in role, appearance and table, and `yllir:canon-research` gives one fact: the guard stands at the gate of the harbour. The sheet is completed with that fact, plus two short proposals for appearance and manner. The message says what was added, that appearance and manner are proposals the master can change, and nothing more. The message is: «Ho completato la scheda della guardia comune: ora ha il ruolo, con il suo posto al cancello del porto, e l'aspetto e il modo di parlare. Il ruolo viene dalla campagna; aspetto e modo di parlare sono proposte che puoi cambiare.»
 
 Correct: an enemy with `system.adapter` set (ADAPTER is `set`), and no statistics found in the sources. The narrative part (nature) is completed from the campaign and one proposal. The `statistics` section stays `Da definire.`, is listed under To define, and QUESTION_RULES is set. The message is: «Ho completato la parte di racconto della scheda del Guardiano di sale. La scheda è ancora da completare: mancano le statistiche. Me le dai tu, o le lasciamo da definire?»
 
 Correct: a master message «Ilde è una donna, sistema la sua scheda». The MASTER_FACT is «è una donna», kept in the master's words. The sentence in the sheet that says otherwise is changed to the master's statement. Nothing else in the sheet changes.
 
-Correct: IMAGINATION is `yes`, and the master writes «completa la scheda della guardia comune». No source gives the role, the appearance or the manner, and no ESTABLISHED fact fills them. The process writes short proposals in the register of the campaign. The role proposal names a new character, the sergeant Orso Dalla, who gives the guard orders, and no secret appears in any public section. The message says, in one plain sentence, that the sergeant's name is invented and can be changed, next to the sentence about the proposals.
+Correct (IMAGINATION `no`): the master writes «completa la scheda della guardia comune». The campaign gives the role (the guard stands at the gate of the harbour), so the role is written from that fact. No source gives the appearance or the manner, and no proposal is written: those sections keep «Da definire.» and are listed under To define. The message says what was added, names in plain words what is still missing, and says that the master can ask the assistant to invent it. The message is: «Ho completato la scheda della guardia comune: ora ha il ruolo, con il suo posto al cancello del porto. Mancano l'aspetto e il modo di parlare: se vuoi, chiedimi di inventarli.»
+
+Correct (IMAGINATION `yes`): the master writes «completa la scheda della guardia comune». No source gives the role, the appearance or the manner, and no ESTABLISHED fact fills them. The process writes short proposals in the register of the campaign. The role proposal names a new character, the sergeant Orso Dalla, who gives the guard orders, and no secret appears in any public section. The message says, in one plain sentence, that the sergeant's name is invented and can be changed, next to the sentence about the proposals.
 
 Wrong: answering with a list of the assistant's features.
 
@@ -232,6 +237,8 @@ Wrong: writing statistics from memory for a known game, or a price for a vendor 
 Wrong: turning a character's hypothesis into a fact. A line that says «X dice che il capitano è suo padre» is a claim of a character, not an ESTABLISHED fact.
 
 Wrong: adding a secret as a proposal, for example «in realtà lavora per il barone». Secrets are never proposed when IMAGINATION is `no`.
+
+Wrong (IMAGINATION `no`): the process writes a short proposal for appearance or manner, or names a sergeant to fill the role. Forbidden: with IMAGINATION `no` there are no proposals at all, and every empty narrative section keeps «Da definire.».
 
 Wrong: IMAGINATION is `yes`, and the proposal for `## Aspetto e modi` writes the invented secret «in realtà lavora per il barone» in that public section. An invented secret goes ONLY into the master-only block, never into a public section, even with IMAGINATION `yes`.
 

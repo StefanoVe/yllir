@@ -185,7 +185,7 @@ Il pubblico di riferimento è il master che non ha mai usato un'intelligenza art
 
 - Una lacuna va scritta nella sezione `## Da definire` della scheda interessata, come prevede [Formato dei contenuti](Formato%20dei%20contenuti.md).
 - L'agente non inventa fatti su elementi che il master non ha chiesto, né segreti, eventi passati, relazioni con altri personaggi, date, effetti o regole di gioco (statistiche, prezzi, scorte, bottino).
-- Quando la richiesta stessa ha bisogno di un personaggio (l'avversario di uno scontro richiesto, chi gestisce un luogo o un servizio richiesto), l'agente lo crea con proposte brevi coerenti con la campagna, lo dichiara al master e cambia le proposte su richiesta.
+- Quando la richiesta stessa ha bisogno di un personaggio (l'avversario di uno scontro richiesto, chi gestisce un luogo o un servizio richiesto), con la fantasia sbloccata (principio 17) l'agente lo crea con proposte brevi coerenti con la campagna, lo dichiara al master e cambia le proposte su richiesta; senza permesso il personaggio resta senza nome e senza scheda, e la scena lo chiama per ruolo.
 - Le domande al master sono limitate alle lacune che non si possono risolvere dalle fonti. Una domanda è una decisione canonica, non una preferenza redazionale.
 
 ## 15. Le dipendenze fra eventi sono dichiarate
@@ -225,6 +225,7 @@ Il pubblico di riferimento è il master che non ha mai usato un'intelligenza art
 - Il permesso si dà in una richiesta («inventa tu»), oppure con la configurazione (`allow_model_imagination`), oppure rispondendo alla domanda che il framework pone quando il valore non è ancora deciso.
 - Anche con il permesso il canone resta intoccabile: un'invenzione che contraddice il canone è un errore come un altro. Segreti e contenuti riservati restano nel blocco del master, e il master sa sempre che cosa è stato inventato.
 - Il permesso non vale mai per la cronaca dopo la sessione né per la trascrizione fedele di un documento: lì si registra solo ciò che è stato detto o scritto.
+- Senza permesso non si scrivono nemmeno le proposte. Una lacuna di una scheda resta «Da definire», e un personaggio richiesto dalla scena ma senza nome resta senza nome e senza scheda, chiamato per ruolo. Il messaggio dice che il master può chiedere di inventarli.
 
 ## Glossario
 
