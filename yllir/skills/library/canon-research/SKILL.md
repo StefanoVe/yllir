@@ -33,6 +33,9 @@ Step 0. From the campaign root (the folder containing `campaign.yaml`), keep CAM
 
 Then run this command, with `<TERMS>` replaced by the terms:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/canon-research/scripts/research-search.mjs" . --terms "<TERMS>" --out .campaign/state/research/search.json`
+
+External sources are included automatically. The script searches the external folders of the campaign (categories of type `external`) together with the campaign's own documents, even though they are reached through symlinks. Run the command as written whether or not the master mentioned external sources or the shared world. Never skip it, never narrow it, and never search the external folders by hand: grep and glob tools may not follow symlinks and would miss them.
+
 - If the exit code is 1 or 2: go to Step 4 with reason "search failed: <the error lines, joined by ; >".
 - If the exit code is 0: go to Step 2. Zero hits is a valid result: the researcher then reports silence.
 
@@ -43,6 +46,7 @@ QUESTION: <QUESTION>
 SEARCH: <CAMPAIGN_ROOT>/.campaign/state/research/search.json
 ```
 Do not add your own answer, do not add words to the question, and do not read the documents yourself.
+The researcher must read every file listed in `search.json`, external ones included (`external_documents`); a file that cannot be opened is reported as not read, never silently left out.
 - The researcher answers with one JSON object. Save its answer exactly as received, with no character changed, to `.campaign/state/research/answer.json` with the Write tool. If the Write tool refuses because the file already exists, read it with the Read tool and write it again.
 - If the answer is not a single JSON object (it has text before or after the braces, or it is not JSON): launch the researcher again once with the same prompt, and save its answer the same way if it is a single JSON object.
 - If the second answer is also not a JSON object: do not write `answer.json`. Go to Step 3 anyway; the report will say FAILED.

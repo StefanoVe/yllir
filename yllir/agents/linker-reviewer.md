@@ -28,6 +28,7 @@ The prompt gives you:
       - Do not use `FIX`.
    d. When you are unsure between APPLY and ASK, choose ASK.
    e. If a file cannot be read, choose `ASK` with reason "file not readable".
+   f. A proposal whose target is an external sheet (read only, shared world) is judged exactly like any other (same subject? same meaning?), is never rejected only because it is external, and the target file is opened with Read by its exact path in the plan.
 4. Evidence is mandatory. `evidence` is the campaign-relative path of the sheet, a colon, and the line number of the line that supports your decision: the line number of the `#` title line (it comes after the frontmatter block; find it by grepping for a line that starts with `#` followed by a space). Example: `Characters/Ada Rook.md:6`. An entry without evidence is rejected by the script.
 5. Output: ONLY a JSON array. One object per reviewed proposal, with these fields:
    - `id`: the proposal `pid`.

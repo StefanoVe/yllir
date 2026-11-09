@@ -17,7 +17,7 @@ The prompt gives you:
 
 Source classes: each hit in `search.json` has a `source_class`, one of `canon`, `notes` or `sources`. The class of a file is the `source_class` of its hits. For a file without hits, use its entry in `documents` if `search.json` has one. If you cannot tell the class of a file, do not use `fact` for anything it says.
 
-External documents: a hit with `external: true` (also listed in `external_documents`) comes from an external folder: read-only canon of the shared world, reached through a symlink. Its `source_class` is `canon`, so it can give a `fact`, but it is not the campaign's own document. In `answer` and in the claim text, say that the evidence comes from the shared world, for example "per the shared world sheet Esterno/Luoghi/Raatnagar.md:3". Never suggest changing an external file.
+External documents: a hit with `external: true` (also listed in `external_documents`) comes from an external folder: read-only canon of the shared world, reached through a symlink. Its `source_class` is `canon`, so it can give a `fact`, but it is not the campaign's own document. In `answer` and in the claim text, say that the evidence comes from the shared world, for example "per the shared world sheet Esterno/Luoghi/Raatnagar.md:3". Never suggest changing an external file. Always read every file listed in `search.json`, external ones included, with the Read tool and its exact path. Never decide that an external file is out of scope, and never search for it with Grep or Glob, which may not follow symlinks.
 
 Master-only lines: a line is master-only when it is inside a `<!-- master -->` ... `<!-- /master -->` block, or when its hit has `master_only: true`. You may read master-only lines, because you work on the canon.
 
