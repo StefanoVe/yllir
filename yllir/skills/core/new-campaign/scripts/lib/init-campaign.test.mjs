@@ -77,6 +77,23 @@ test('creates a campaign in an empty folder with a git repository and no commit 
   );
 });
 
+test('--adapter dnd-2024 is written to system.adapter and the campaign validates', () => {
+  const dir = tmp();
+  const result = initCampaign(dir, { ...GOOD, adapter: 'dnd-2024' });
+  assert.deepEqual(result.errors, []);
+  const config = parseYamlLite(fs.readFileSync(path.join(dir, 'campaign.yaml'), 'utf8')).data;
+  assert.equal(config.system.adapter, 'dnd-2024');
+  assert.deepEqual(validateConfig(dir).errors, []);
+});
+
+test('an adapter that is not installed is refused before anything is written', () => {
+  const dir = tmp();
+  const result = initCampaign(dir, { ...GOOD, adapter: 'non-installato' });
+  assert.equal(result.errors[0].code, 'unknown-adapter');
+  assert.deepEqual(result.created, []);
+  assert.deepEqual(fs.readdirSync(dir), []);
+});
+
 test('optional world and description are left out when not given', () => {
   const dir = tmp();
   const result = initCampaign(dir, { name: 'Cenere', language: 'it', register: 'mixed', today: '2026-11-07' });
@@ -176,4 +193,19 @@ test('init-campaign CLI prints JSON and uses exit codes 0, 1 and 2', () => {
   const usage = spawnSync(process.execPath, [CLI, tmp(), '--name', 'X', '--language', 'it'], { encoding: 'utf8' });
   assert.equal(usage.status, 2);
   assert.match(usage.stderr, /usage: node init-campaign\.mjs/);
+  assert.match(usage.stderr, /--adapter <id>/);
+});
+
+test('init-campaign CLI accepts --adapter and refuses an unknown adapter with exit 1', () => {
+  const dir = tmp();
+  const base = [CLI, dir, '--name', 'Cenere', '--language', 'it', '--register', 'plain'];
+  const unknown = spawnSync(process.execPath, [...base, '--adapter', 'non-installato'], { encoding: 'utf8' });
+  assert.equal(unknown.status, 1);
+  assert.equal(JSON.parse(stripExitLine(unknown.stdout)).errors[0].code, 'unknown-adapter');
+  assert.deepEqual(fs.readdirSync(dir), []);
+
+  const ok = spawnSync(process.execPath, [...base, '--adapter', 'dnd-2024'], { encoding: 'utf8' });
+  assert.equal(ok.status, 0, ok.stderr);
+  const config = parseYamlLite(fs.readFileSync(path.join(dir, 'campaign.yaml'), 'utf8')).data;
+  assert.equal(config.system.adapter, 'dnd-2024');
 });

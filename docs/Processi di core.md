@@ -82,7 +82,7 @@ Le parole mostrate al master sono definite solo nel glossario di [Principi](Prin
 **Passi:**
 
 1. Accoglie il master e spiega in due frasi che cosa succederà: poche domande, poi la campagna è pronta per cominciare.
-2. Pone le domande dell'intervista (elenco sotto), accettando risposte parziali. Se una risposta manca, usa il valore predefinito e lo dice.
+2. Pone le domande dell'intervista (elenco sotto), accettando risposte parziali. Se manca una risposta a scelta (lingua, gioco, tono), usa il valore predefinito e lo dice; il nome della campagna e la premessa non hanno un valore predefinito sensato, quindi si chiedono a testo libero.
 3. Mostra in linguaggio comune che cosa sta per creare: i file core, niente di più.
 4. Dopo la conferma, crea i file core (sotto), inizializza il repository git locale della campagna ed esegue il cablaggio di scrittura sui file che contengono testo. Il passo 9 del cablaggio crea la prima versione salvata.
 5. Chiude dicendo da dove si può partire, con due o tre esempi di frasi («descrivimi il primo luogo», «prepariamo la prima sessione», «ho degli appunti da importare»), e propone, senza imporla, una sessione di prova (vedi [Esperienza utente](Esperienza%20utente.md)).
@@ -90,9 +90,18 @@ Le parole mostrate al master sono definite solo nel glossario di [Principi](Prin
 **Domande dell'intervista** (solo ciò che serve ai file core; il perché si mostra solo se il master lo chiede):
 
 - **1.** Come si chiama la campagna, e in che lingua scriviamo?
-- **2.** Quale gioco di ruolo usate (ed edizione), oppure un sistema vostro? Serve a scegliere l'adattatore.
+- **2.** Quale gioco di ruolo usate (ed edizione), oppure un sistema vostro? Serve a scegliere l'adattatore, che si applica già alla creazione.
 - **3.** Che tono vuoi per le descrizioni: evocativo, asciutto, o altro?
 - **4.** In due o tre frasi: di che mondo e di che storia si tratta?
+- **5.** Hai materiale di un mondo condiviso con altre campagne? (se sì, in quale cartella) *Facoltativa.*
+
+**Deciso (2026-11-09):** l'intervista funziona così.
+
+- **Domande vere, non testo.** Le domande si pongono al master con lo strumento di domanda interattivo dell'agente principale: scelte fra poche opzioni, con la possibilità di rispondere a parole proprie. Il processo gira in un sotto-agente senza accesso al master: restituisce le domande a scelta in forma strutturata, e la skill di ingresso le pone. Le risposte libere (nome della campagna, premessa del mondo, percorso di una cartella) restano domande in testo semplice.
+- **Due giri.** Il primo giro è a scelta: lingua, gioco di ruolo, tono e, se c'è, il materiale di un mondo condiviso (sì o no). Il secondo giro è a testo libero e chiede solo ciò che manca: il nome, la premessa e, se il master ha risposto sì, il percorso della cartella condivisa. Se il primo messaggio del master contiene già le risposte, non si chiede nulla.
+- **Il gioco si applica subito.** Se il gioco scelto corrisponde a un adattatore installato (oggi `dnd-2024`), `system.adapter` della configurazione lo contiene fin dalla creazione, e il master sente che le regole di quel gioco sono applicate. Se non c'è un adattatore per quel gioco, la campagna funziona lo stesso, senza regole di gioco, e il master lo sente in una frase.
+- **Il materiale condiviso si collega subito.** Se il master ha materiale di un mondo condiviso, il processo lo collega alla campagna come categoria `external` (collegamento simbolico alla sua cartella, in sola lettura) fin dalla creazione. Se il collegamento fallisce, la campagna viene creata lo stesso e il master lo sente in una frase.
+- **Nulla si perde.** Le informazioni date oltre le risposte alle domande, o dopo la creazione (gioco, cartella condivisa, altri dettagli sul mondo), si applicano così. Durante la creazione, dopo la creazione dei file core: le impostazioni nella configurazione, e i dettagli sul mondo nella scheda radice, con le sole parole del master. Dopo la creazione, il processo ha una modalità «completamento» che le applica a una campagna esistente. La scheda radice e la configurazione si completano, non si ricreano.
 
 **File core creati:**
 
@@ -108,9 +117,9 @@ Le cartelle delle categorie, il documento di economia (`Storia/Economia.md`), i 
 **Chi fa che cosa:**
 
 - Modelli economici: scrittura dei file core a partire dalle risposte.
-- Agente principale: valori predefiniti, prima stesura della scheda radice del mondo.
+- Agente principale (la skill di ingresso): pone al master le domande dell'intervista con lo strumento di domanda interattivo, sia quelle a scelta sia quelle a testo libero; valori predefiniti, prima stesura della scheda radice del mondo.
 
-**Cosa vede l'utente:** quattro domande, l'elenco breve di ciò che verrà creato, le frasi d'esempio per proseguire.
+**Cosa vede l'utente:** le domande dell'intervista, prima quelle a scelta e poi, solo se mancano, quelle a testo libero; l'elenco breve di ciò che verrà creato, le frasi d'esempio per proseguire.
 
 **Output:** i file core elencati sopra.
 

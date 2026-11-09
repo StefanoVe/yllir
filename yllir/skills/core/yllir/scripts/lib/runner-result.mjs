@@ -18,9 +18,72 @@ const VERSION_CODE = /(?<![\p{L}\p{N}])[0-9a-f]{7,40}(?![\p{L}\p{N}])/gu;
 const PATH_EXTENSION = /\.(md|json|yaml|mjs|txt)$/;
 const DESCRIPTIVE = ['for example', 'names of', 'codes of', 'text in'];
 const SIMPLE_TERM = /^[\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*(?: [\p{L}\p{N}]+(?:-[\p{L}\p{N}]+)*)?$/u;
+const ASK = 'ask:';
+const MAX_ASKS = 4;
+const HEADER_MAX = 12;
+const OPTIONS_MIN = 2;
+const OPTIONS_MAX = 4;
+const OPTION_MAX = 40;
 
 function escapeRegExp(s) {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** The text of one ask line, in the exact form the runner writes it. */
+export function formatAskLine(ask) {
+  return `${ASK} ${ask.header} | ${ask.question} | ${ask.options.join(' ; ')}`;
+}
+
+/**
+ * Parses and checks the `ask:` lines of a QUESTION result. Each line is
+ * `ask: <header> | <question> | <option 1> ; <option 2>`. The ask text gets the
+ * same forbidden-word and format checks as the message.
+ */
+function parseAsks(lines, neverSay) {
+  const problems = [];
+  const asks = [];
+  if (lines.length > MAX_ASKS) {
+    problems.push(`there are ${lines.length} ask lines, at most ${MAX_ASKS} are allowed`);
+  }
+  lines.forEach((line, index) => {
+    const n = index + 1;
+    const body = line.slice(ASK.length).trim();
+    const parts = body.split(' | ');
+    if (parts.length !== 3) {
+      problems.push(`ask line ${n} must have three parts separated by " | "`);
+      return;
+    }
+    const [header, question, optionText] = parts.map((p) => p.trim());
+
+    if (header === '') {
+      problems.push(`ask line ${n}: the header is empty`);
+    } else if ([...header].length > HEADER_MAX) {
+      problems.push(`ask line ${n}: the header is longer than ${HEADER_MAX} characters: ${header}`);
+    }
+    if (question === '') {
+      problems.push(`ask line ${n}: the question is empty`);
+    } else if (!question.endsWith('?')) {
+      problems.push(`ask line ${n}: the question does not end with a question mark`);
+    }
+
+    const options = optionText.split(' ; ').map((o) => o.trim());
+    if (options.length < OPTIONS_MIN || options.length > OPTIONS_MAX) {
+      problems.push(
+        `ask line ${n}: there must be ${OPTIONS_MIN} to ${OPTIONS_MAX} options, not ${options.length}`,
+      );
+    }
+    options.forEach((option, k) => {
+      if (option === '') {
+        problems.push(`ask line ${n}: option ${k + 1} is empty`);
+      } else if ([...option].length > OPTION_MAX) {
+        problems.push(`ask line ${n}: option ${k + 1} is longer than ${OPTION_MAX} characters`);
+      }
+    });
+
+    problems.push(...checkMessage(body, neverSay).problems);
+    asks.push({ header, question, options });
+  });
+  return { asks, problems };
 }
 
 /** Problems found in the message for the master. Each is one short English sentence. */
@@ -114,6 +177,7 @@ function parseResult(text, neverSay) {
   }
 
   const fields = {};
+  const askLines = [];
   let markerIndex = -1;
   let markerText = '';
   for (let i = 1; i < lines.length; i++) {
@@ -122,6 +186,10 @@ function parseResult(text, neverSay) {
       markerIndex = i;
       markerText = marker.trim();
       break;
+    }
+    if (lines[i].startsWith(ASK)) {
+      askLines.push(lines[i]);
+      continue;
     }
     const field = /^([a-z][a-z ]*?):(.*)$/.exec(lines[i]);
     if (field && !Object.hasOwn(fields, field[1])) {
@@ -151,6 +219,12 @@ function parseResult(text, neverSay) {
     problems.push(...checkMessage(message, neverSay).problems);
   }
 
+  const parsedAsks = parseAsks(askLines, neverSay);
+  problems.push(...parsedAsks.problems);
+  if (askLines.length > 0 && status !== 'QUESTION') {
+    problems.push('ask lines are allowed only with status QUESTION');
+  }
+
   const files = (fields['files written'] ?? '')
     .split(',')
     .map((s) => s.trim())
@@ -163,6 +237,7 @@ function parseResult(text, neverSay) {
     done: fields.done ?? '',
     files,
     message,
+    asks: parsedAsks.asks,
     problems,
   };
 }
@@ -208,5 +283,5 @@ export function applyRunnerResult(
     }
   }
 
-  return { ok: true, status, message, problems: [] };
+  return { ok: true, status, message, asks: parsed.asks, problems: [] };
 }

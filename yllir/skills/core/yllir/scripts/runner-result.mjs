@@ -6,7 +6,7 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyRunnerResult } from './lib/runner-result.mjs';
+import { applyRunnerResult, formatAskLine } from './lib/runner-result.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node runner-result.mjs <root> --file <path> [--topic <id|none>]';
@@ -44,7 +44,13 @@ function main() {
 
   if (result.ok) {
     process.stdout.write(
-      [`status: ${result.status}`, 'message for the master:', result.message, ''].join('\n'),
+      [
+        `status: ${result.status}`,
+        'message for the master:',
+        result.message,
+        ...result.asks.map(formatAskLine),
+        '',
+      ].join('\n'),
     );
     exitWith(0);
   } else {

@@ -44,7 +44,7 @@ export function stringifyConfig(config) {
  * previous bytes are restored and the folders this call created are removed.
  * @returns {{ added: boolean, errors: Array<{code: string, path: string, message: string}> }}
  */
-export function addCategory(root, { id, folder, type } = {}) {
+export function addCategory(root, { id, folder, type, source } = {}) {
   const dir = path.resolve(root);
   const file = path.join(dir, FILE);
 
@@ -80,6 +80,15 @@ export function addCategory(root, { id, folder, type } = {}) {
   if (typeof type !== 'string') {
     return refuse('bad-input', 'type', 'type must be text');
   }
+  const fromSource = source !== undefined;
+  if (fromSource) {
+    if (type !== 'external') {
+      return refuse('bad-input', 'source', 'source is only valid on a category of type external');
+    }
+    if (typeof source !== 'string' || !path.isAbsolute(source) || !isDirectory(source)) {
+      return refuse('bad-input', 'source', 'source must be an absolute path to an existing folder');
+    }
+  }
 
   const structure = Object.hasOwn(config, 'structure') ? config.structure : [];
   if (!Array.isArray(structure)) {
@@ -108,15 +117,26 @@ export function addCategory(root, { id, folder, type } = {}) {
   }
 
   const target = path.join(dir, folder);
-  const createdDirs = missingAncestors(target);
+  if (fromSource && existsNoFollow(target)) {
+    return refuse('category-conflict', 'folder', `the folder ${folder} already exists`);
+  }
+
+  // With a source, the folder is a symbolic link to it: only the parents are created here.
+  const createdDirs = missingAncestors(fromSource ? path.dirname(target) : target);
   try {
-    fs.mkdirSync(target, { recursive: true });
+    if (fromSource) {
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.symlinkSync(source, target, 'dir');
+    } else {
+      fs.mkdirSync(target, { recursive: true });
+    }
   } catch (err) {
     removeEmptyDirs(createdDirs);
     return refuse('bad-folder', 'folder', `the folder ${folder} cannot be created (${err.code ?? 'error'})`);
   }
 
   const rollback = () => {
+    if (fromSource) removeLink(target);
     fs.writeFileSync(file, previous);
     removeEmptyDirs(createdDirs);
   };
@@ -237,6 +257,35 @@ function isSafeFolder(folder) {
   if (typeof folder !== 'string' || folder.trim() === '') return false;
   if (folder.startsWith('/') || folder.includes('\\')) return false;
   return folder.split('/').every((part) => part !== '' && !part.startsWith('.'));
+}
+
+function isDirectory(target) {
+  try {
+    return fs.statSync(target).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/** True when something (a folder, a file or a link, even a dangling one) is at `target`. */
+function existsNoFollow(target) {
+  try {
+    fs.lstatSync(target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Removes the symbolic link at `link` only. The folder it points to is never touched. */
+function removeLink(link) {
+  try {
+    if (fs.lstatSync(link).isSymbolicLink()) {
+      fs.rmSync(link);
+    }
+  } catch {
+    // Already gone: nothing to undo.
+  }
 }
 
 /** The folders that `mkdir -p` would create for `target`, outermost first. */

@@ -26,7 +26,7 @@ MASTER_MESSAGE:
 <the master's message, verbatim; for a reply, also the earlier question>
 ```
 
-The prompt may also contain `MODE: revise`, right after `LANGUAGE:`. It is optional: without it the mode is new (see Step 3). If the prompt also contains `PROBLEMS:`, your previous result was rejected: see Result.
+The prompt may also contain `MODE: revise` or `MODE: complete`, right after `LANGUAGE:`. It is optional: without it the mode is new (see Step 3). `MODE: complete` means the master gives more setup information for a campaign that already exists. If the prompt also contains `PROBLEMS:`, your previous result was rejected: see Result.
 
 Run every command from CAMPAIGN_ROOT, or pass it as the root argument. Never run a command from another folder.
 
@@ -36,10 +36,11 @@ Run every command from CAMPAIGN_ROOT, or pass it as the root argument. Never run
 
 2. **Handoff.** Only if TOPIC is not `none`: read the file HANDOFF. Every file listed in CHANGED_FILES (none, if it says `none`) has been edited since the last step: read it again before you rely on it.
 
-3. **Process.** Invoke the skill PROCESS (if your tool has no way to invoke a skill, read the process file with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs; for PROCESS `yllir:<p>` the file is `${CLAUDE_PLUGIN_ROOT}/skills/core/<p>/SKILL.md`) with MASTER_MESSAGE, MODE (only when the prompt has a `MODE: revise` line; pass it as `MODE: revise`, and pass nothing otherwise) and, if there is one, the handoff content as its inputs. Follow it fully, including its write sequence. Processes called by you keep writing their reports to files, as they do now.
+3. **Process.** Invoke the skill PROCESS (if your tool has no way to invoke a skill, read the process file with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs; for PROCESS `yllir:<p>` the file is `${CLAUDE_PLUGIN_ROOT}/skills/core/<p>/SKILL.md`) with MASTER_MESSAGE, MODE (only when the prompt has a `MODE: revise` or a `MODE: complete` line; pass it as that same line, `MODE: revise` or `MODE: complete`, and pass nothing otherwise; `MODE: complete` is passed to the process exactly like `MODE: revise`) and, if there is one, the handoff content as its inputs. Follow it fully, including its write sequence. Processes called by you keep writing their reports to files, as they do now.
 
 4. **Questions.** When the process says to ask the master something, or to wait for a confirmation, do not ask anyone. Then:
    - end with status QUESTION (see Result), with the question and the next step in English; the entry skill records them in the topic.
+   - when the answer is a choice among a few options (2 to 4 short answers), also write the question as `ask:` lines in the result (see Result), always in addition to the message. A free-text answer (a name, a path, a description) has no `ask:` line: only the message.
    When resumed with the answer, continue from the next step recorded in the handoff. In an empty folder (TOPIC `none`) there is no handoff: the question is only in your result, and the entry skill resends it with the answer.
 
 5. **Handoff upkeep.** Only if TOPIC is not `none`. After every important step (a decision of the master, a document written, a saved version), update `## Decisions`, `## Done`, `## Remaining` and `## Next step` in English. Keep them short and explicit, and refer to files instead of copying them. You run no topic command: the entry skill records the topic from your RUNNER RESULT.
@@ -51,6 +52,7 @@ RUNNER RESULT
 status: DONE | QUESTION | FAILED
 question: <QUESTION only: the question, in English, one line>
 next step: <QUESTION only: what to do after the answer, in English, one line>
+ask: <QUESTION only, optional, 1 to 4 lines: header | question | option 1 ; option 2>
 done: <DONE only: one line, in English>
 files written: <DONE only: campaign-relative paths, comma-separated, or none>
 message for the master:
@@ -69,6 +71,17 @@ message for the master:
 
    Wrong example: the same block with an English technical report as the message, for instance «Created the campaign at commit a1b2c3; the topic is closed.»
 
-   The entry skill checks the file with its runner-result command and sends the master exactly the text under `message for the master:`. Anything else you write in your answer is lost.
+   Rules for `ask:` lines (only with status QUESTION, at most 4):
+
+   - the form is exactly `ask: <header> | <question> | <option 1> ; <option 2>`, with 2 to 4 options separated by ` ; ` and the three parts separated by ` | `;
+   - the header is at most 12 characters; the question ends with a question mark; each option is not empty and is at most 40 characters;
+   - the text is in LANGUAGE, in plain words: no backticks, no file paths, no internal words, as for the message;
+   - each `ask:` line asks the same question as the message. The message stays mandatory: it is what the master reads when the question tool is not available.
+
+   Correct example (Italian campaign, QUESTION with one choice): the block with the `ask:` line `ask: Luogo | Dove si svolge la scena? | In cantina ; Sul tetto` placed after `next step:`, and the message «Dove vuoi che si svolga la scena: in cantina o sul tetto?».
+
+   Wrong example: the `ask:` line `ask: Luogo | Dove si svolge la scena | Cantina` (the question has no question mark and there is a single option), or the same line with backticks around an option. An `ask:` line on a DONE result is also wrong.
+
+   The entry skill checks the file with its runner-result command. It asks the master the questions of the `ask:` lines with its question tool, or sends exactly the text under `message for the master:` when that tool is not available. Anything else you write in your answer is lost.
 
    Problems: if the prompt contains `PROBLEMS:` with lines `- <problem>`, the file was rejected. Rewrite the whole file with the Write tool, fixing exactly those problems (usually: rewrite the message for the master in plain words, without codes, paths, backticks or internal words). Keep the same status. Then your final answer is only `result written`.

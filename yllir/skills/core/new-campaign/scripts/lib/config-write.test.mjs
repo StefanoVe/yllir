@@ -238,6 +238,77 @@ test('addCategory refuses folders outside the campaign and bad ids before writin
   assert.deepEqual(fs.readFileSync(path.join(dir, 'campaign.yaml')), before);
 });
 
+// ---------------------------------------------------------------- addCategory with a source
+
+test('an external category with a source becomes a symbolic link to that folder', () => {
+  const dir = campaignWith();
+  const source = tmp();
+  fs.writeFileSync(path.join(source, 'lago.md'), 'testo\n');
+  const result = addCategory(dir, { id: 'fonti', folder: 'Fonti', type: 'external', source });
+  assert.deepEqual(result, { added: true, errors: [] });
+  assert.ok(fs.lstatSync(path.join(dir, 'Fonti')).isSymbolicLink());
+  assert.equal(fs.readlinkSync(path.join(dir, 'Fonti')), source);
+  assert.equal(fs.readFileSync(path.join(dir, 'Fonti', 'lago.md'), 'utf8'), 'testo\n');
+  assert.deepEqual(validateConfig(dir).errors, []);
+  const config = parse(fs.readFileSync(path.join(dir, 'campaign.yaml'), 'utf8'));
+  assert.deepEqual(config.structure, [{ id: 'fonti', folder: 'Fonti', type: 'external' }]);
+});
+
+test('an external category without a source keeps a real folder', () => {
+  const dir = campaignWith();
+  assert.deepEqual(addCategory(dir, { id: 'fonti', folder: 'Fonti', type: 'external' }), { added: true, errors: [] });
+  assert.ok(fs.lstatSync(path.join(dir, 'Fonti')).isDirectory());
+  assert.equal(fs.lstatSync(path.join(dir, 'Fonti')).isSymbolicLink(), false);
+});
+
+test('a source that is missing or not absolute is refused and nothing is written', () => {
+  const dir = campaignWith();
+  const before = fs.readFileSync(path.join(dir, 'campaign.yaml'));
+  const missing = path.join(tmp(), 'assente');
+  const missingResult = addCategory(dir, { id: 'fonti', folder: 'Fonti', type: 'external', source: missing });
+  assert.equal(missingResult.added, false);
+  assert.equal(missingResult.errors[0].code, 'bad-input');
+  assert.equal(fs.existsSync(path.join(dir, 'Fonti')), false);
+
+  const relative = addCategory(dir, { id: 'fonti', folder: 'Fonti', type: 'external', source: 'relativa' });
+  assert.equal(relative.errors[0].code, 'bad-input');
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'campaign.yaml')), before);
+});
+
+test('a source on a category that is not of type external is refused', () => {
+  const dir = campaignWith();
+  const before = fs.readFileSync(path.join(dir, 'campaign.yaml'));
+  const result = addCategory(dir, { id: 'note', folder: 'Note', type: 'notes', source: tmp() });
+  assert.equal(result.added, false);
+  assert.equal(result.errors[0].code, 'bad-input');
+  assert.equal(fs.existsSync(path.join(dir, 'Note')), false);
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'campaign.yaml')), before);
+});
+
+test('a source is refused when the category folder already exists', () => {
+  const dir = campaignWith();
+  fs.mkdirSync(path.join(dir, 'Fonti'));
+  const result = addCategory(dir, { id: 'fonti', folder: 'Fonti', type: 'external', source: tmp() });
+  assert.equal(result.errors[0].code, 'category-conflict');
+  assert.ok(fs.lstatSync(path.join(dir, 'Fonti')).isDirectory());
+});
+
+test('rollback removes the symbolic link and never deletes the files of the source', () => {
+  // A category that already in the file does not validate, so the new one is rolled back.
+  const dir = campaignWith(MINIMAL + 'structure:\n  - id: trama\n    folder: Trama\n    type: bogus\n');
+  fs.mkdirSync(path.join(dir, 'Trama'));
+  const before = fs.readFileSync(path.join(dir, 'campaign.yaml'));
+  const source = tmp();
+  fs.writeFileSync(path.join(source, 'lago.md'), 'testo\n');
+
+  const result = addCategory(dir, { id: 'fonti', folder: 'Fonti', type: 'external', source });
+  assert.equal(result.added, false);
+  assert.ok(result.errors.length > 0);
+  assert.throws(() => fs.lstatSync(path.join(dir, 'Fonti')), { code: 'ENOENT' });
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'campaign.yaml')), before);
+  assert.equal(fs.readFileSync(path.join(source, 'lago.md'), 'utf8'), 'testo\n');
+});
+
 // ---------------------------------------------------------------- CLI
 
 test('add-category CLI prints JSON and uses exit codes 0, 1 and 2', () => {

@@ -8,6 +8,7 @@ import { stringifyConfig } from './config-write.mjs';
 import { ensureRepo } from '../../../../../scripts/lib/versions.mjs';
 import { generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
 import { validateConfig } from '../../../../../scripts/lib/config.mjs';
+import { listAdapters, pluginRootFromHere } from '../../../../../scripts/lib/adapter.mjs';
 import { slugify } from '../../../../../scripts/lib/normalize.mjs';
 
 const FILE = 'campaign.yaml';
@@ -18,7 +19,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 /**
  * @returns {{ created: string[], slug: string|null, errors: Array<{code: string, path: string|null, message: string}> }}
  */
-export function initCampaign(root, { name, language, register, world, description, today = localToday() } = {}) {
+export function initCampaign(root, { name, language, register, world, description, adapter = 'none', today = localToday() } = {}) {
   const dir = path.resolve(root);
   const refuse = (code, message) => ({ created: [], slug: null, errors: [{ code, path: null, message }] });
 
@@ -57,6 +58,13 @@ export function initCampaign(root, { name, language, register, world, descriptio
   if (typeof today !== 'string' || !DATE_RE.test(today) || !isRealDate(today)) {
     return refuse('bad-input', 'today must be a real date written as YYYY-MM-DD');
   }
+  // Checked before anything is written, so a refused adapter leaves the folder clean.
+  if (typeof adapter !== 'string') {
+    return refuse('bad-input', 'adapter must be text');
+  }
+  if (adapter !== 'none' && !listAdapters(pluginRootFromHere()).includes(adapter)) {
+    return refuse('unknown-adapter', `the game-rules adapter ${adapter} is not installed`);
+  }
 
   // 3. campaign.yaml.
   const campaign = { name: trimmedName, slug };
@@ -68,7 +76,7 @@ export function initCampaign(root, { name, language, register, world, descriptio
     campaign,
     language: { main: language, other: [] },
     prose: { register },
-    system: { adapter: 'none' },
+    system: { adapter },
   };
   const file = path.join(dir, FILE);
   const rollback = () => {

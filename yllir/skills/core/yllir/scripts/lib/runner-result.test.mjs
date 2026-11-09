@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { applyRunnerResult, checkMessage, loadNeverSay } from './runner-result.mjs';
+import { applyRunnerResult, checkMessage, formatAskLine, loadNeverSay } from './runner-result.mjs';
 import { activeTopic, listTopics, newTopic, readSection } from '../../../../../scripts/lib/topics.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -164,6 +164,7 @@ describe('applyRunnerResult parsing', () => {
       ok: true,
       status: 'QUESTION',
       message: 'Vuoi che la scena resti in cantina?',
+      asks: [],
       problems: [],
     });
     assert.equal(activeTopic(root).id, id);
@@ -384,5 +385,153 @@ describe('runner-result CLI', () => {
     const run = runCli([]);
     assert.equal(run.status, 2);
     assert.equal(lastLine(run.stdout), 'exit: 2');
+  });
+});
+
+const ASK_LOCATION = 'ask: Luogo | Dove si svolge la scena? | In cantina ; Sul tetto';
+const ASK_TONE = 'ask: Tono | Quale tono vuoi? | Serio ; Leggero ; Misterioso';
+
+function questionWithAsks(...asks) {
+  const lines = questionLines();
+  lines.splice(4, 0, ...asks);
+  return lines;
+}
+
+describe('ask lines', () => {
+  test('a valid QUESTION with two ask lines parses them and asks the topic', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), questionWithAsks(ASK_LOCATION, ASK_TONE));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, true, r.problems.join(' | '));
+    assert.deepEqual(r.asks, [
+      {
+        header: 'Luogo',
+        question: 'Dove si svolge la scena?',
+        options: ['In cantina', 'Sul tetto'],
+      },
+      {
+        header: 'Tono',
+        question: 'Quale tono vuoi?',
+        options: ['Serio', 'Leggero', 'Misterioso'],
+      },
+    ]);
+    assert.equal(activeTopic(root).id, id);
+  });
+
+  test('a header longer than 12 characters is a problem', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), questionWithAsks('ask: abcdefghijklm | Quale? | Uno ; Due'));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.some((p) => /header is longer than 12 characters/.test(p)), r.problems.join(' | '));
+  });
+
+  test('a header of exactly 12 characters is accepted', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), questionWithAsks('ask: abcdefghijkl | Quale? | Uno ; Due'));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, true, r.problems.join(' | '));
+  });
+
+  test('one option only is a problem', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), questionWithAsks('ask: Luogo | Dove si svolge la scena? | In cantina'));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.includes('ask line 1: there must be 2 to 4 options, not 1'), r.problems.join(' | '));
+  });
+
+  test('five ask lines are a problem', () => {
+    const { root, id } = campaign();
+    const asks = Array.from({ length: 5 }, (_, i) => `ask: Scelta ${i + 1} | Quale? | Uno ; Due`);
+    const file = writeResult(tmp(), questionWithAsks(...asks));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.includes('there are 5 ask lines, at most 4 are allowed'), r.problems.join(' | '));
+  });
+
+  test('four ask lines are accepted', () => {
+    const { root, id } = campaign();
+    const asks = Array.from({ length: 4 }, (_, i) => `ask: Scelta ${i + 1} | Quale? | Uno ; Due`);
+    const file = writeResult(tmp(), questionWithAsks(...asks));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, true, r.problems.join(' | '));
+    assert.equal(r.asks.length, 4);
+  });
+
+  test('ask lines on a DONE result are a problem', () => {
+    const { root, id } = campaign();
+    const lines = doneLines();
+    lines.splice(4, 0, ASK_LOCATION);
+    const file = writeResult(tmp(), lines);
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.includes('ask lines are allowed only with status QUESTION'), r.problems.join(' | '));
+  });
+
+  test('ask lines on a FAILED result are a problem', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), ['RUNNER RESULT', 'status: FAILED', ASK_LOCATION, 'message for the master:', 'Ciao.']);
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.includes('ask lines are allowed only with status QUESTION'));
+  });
+
+  test('a question without a question mark is a problem', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), questionWithAsks('ask: Luogo | Dove si svolge la scena | In cantina ; Sul tetto'));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.includes('ask line 1: the question does not end with a question mark'));
+  });
+
+  test('an empty option and an option longer than 40 characters are problems', () => {
+    const { root, id } = campaign();
+    const long = 'x'.repeat(41);
+    const file = writeResult(tmp(), questionWithAsks(`ask: Luogo | Quale? | Uno ;  ; ${long}`));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.includes('ask line 1: option 2 is empty'), r.problems.join(' | '));
+    assert.ok(r.problems.includes('ask line 1: option 3 is longer than 40 characters'), r.problems.join(' | '));
+  });
+
+  test('a line without the three parts is a problem', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), questionWithAsks('ask: Luogo | Dove si svolge la scena?'));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.includes('ask line 1 must have three parts separated by " | "'), r.problems.join(' | '));
+  });
+
+  test('a forbidden word in an ask line is a problem, like in the message', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), questionWithAsks('ask: Script | Quale script? | Uno ; Due'));
+    const r = applyRunnerResult(root, { file, topic: id, lexiconPath: LEXICON });
+    assert.equal(r.ok, false);
+    assert.ok(r.problems.some((p) => /"script"/.test(p)), r.problems.join(' | '));
+  });
+
+  test('formatAskLine writes the exact form that the parser reads', () => {
+    const ask = { header: 'Tono', question: 'Quale tono vuoi?', options: ['Serio', 'Leggero'] };
+    assert.equal(formatAskLine(ask), 'ask: Tono | Quale tono vuoi? | Serio ; Leggero');
+  });
+
+  test('the CLI prints one line per ask after the message, on success', () => {
+    const { root, id } = campaign();
+    const file = writeResult(tmp(), questionWithAsks(ASK_LOCATION, ASK_TONE));
+    const run = spawnSync(process.execPath, [CLI, root, '--file', file, '--topic', id], { encoding: 'utf8' });
+    assert.equal(run.status, 0);
+    assert.equal(
+      run.stdout,
+      [
+        'status: QUESTION',
+        'message for the master:',
+        'Vuoi che la scena resti in cantina?',
+        ASK_LOCATION,
+        ASK_TONE,
+        'exit: 0',
+        '',
+      ].join('\n'),
+    );
   });
 });
