@@ -80,7 +80,8 @@ Section keys used in this file, with their headings in the heading table of Step
 6. Assign each remaining ESTABLISHED fact to the one NARRATIVE gap section it describes. A fact that fits no gap section is not written.
 - Output: ESTABLISHED facts per section (may be empty for each), RESEARCH_INCOMPLETE (yes or no).
 
-**Step 5 — Rules facts (statistics and stock).** Run this step only when TEMPLATE is `enemy` and the `statistics` section is a gap, or when TEMPLATE is `vendor` and the `stock` section is a gap. Otherwise output "no rules gap" and go to Step 6. Rules are never written from memory and never invented.
+**Step 5 — Rules facts (statistics and stock).** Run this step only when TEMPLATE is `enemy` and the `statistics` section is a gap, or when TEMPLATE is `vendor` and the `stock` section is a gap. Otherwise output "no rules gap" and go to Step 6. Rules are never written from memory and never invented, except as follows.
+0. If MASTER_MESSAGE explicitly authorizes you to invent or choose the statistics or stock yourself (for example «inventale tu», «scegli tu le statistiche», «puoi inventarle», «make them up»), this is a master-given authorization, and it overrides the rule above: do not search the sources and do not ask any question. Draft a complete, plausible RULES_BLOCK yourself, using the stat format of the system adapter if ADAPTER is `set` (ask nothing); otherwise use plain labelled lines. Write it in the sheet, and mention in the message to the master that the statistics (or the stock and prices) are invented and can be changed. This RULES_BLOCK is treated as any other RULES_BLOCK in Step 7 and Step 9. Then go to the Output of this step.
 1. If MASTER_MESSAGE contains a block of statistics (enemy) or of stock items with prices (vendor): copy that block exactly, character by character, into RULES_BLOCK. Then go to the Output of this step. Do not search the sources.
 2. Otherwise, if ADAPTER is `none`: the section stays `Da definire.` (English `To be defined.`). Add the section to TO_DEFINE. No question is asked. Go to the Output of this step.
 3. Otherwise (ADAPTER is `set`): invoke the skill `yllir:canon-research` with:
@@ -125,6 +126,8 @@ If QUESTION_CREATIVE is set: do not write any draft. Go to Step 9 and send only 
    - A PROPOSAL is never listed under `## Da definire`.
    - The words proposal, suggested and proposta (and their translations) never appear in the sheet.
    - A place keeps its `## Descrizione` section with an italic opening paragraph.
+   - For an enemy, creature or vendor the rules block must be a PLAYABLE block, not only the required fields: at least armor class, hit points, speed, ability scores, at least one attack or action with its attack bonus and damage, and the equipment the character carries (if the system has such a notion). Check the arithmetic (modifiers, bonuses) before writing.
+   - Statistics are written as a Markdown table, or as lines each ending with two spaces or as a list, never as consecutive plain lines that Markdown collapses into one paragraph. After writing the draft, read it back and check that every statistic is on its own row.
 
    Heading table, with the sections of each template (the `it` heading for an Italian campaign, the `en` heading for an English one, and the translation for any other language):
 
@@ -150,7 +153,8 @@ If QUESTION_CREATIVE is set: do not write any draft. Go to Step 9 and send only 
    - the sections are in the order of the list above, with no section left empty unless it holds `Da definire.` (or `To be defined.`) and is listed under `## Da definire`;
    - the master block is identical to the sheet's master block and is the last part of the file;
    - the words proposal, suggested and proposta do not appear;
-   - a place's `## Descrizione` opens with an italic paragraph.
+   - a place's `## Descrizione` opens with an italic paragraph;
+   - every statistic is on its own row, and a statistic block of an enemy, creature or vendor is playable and its arithmetic is right (point 2).
    If a point fails: fix the draft with the Write tool (Read it first), and read it back again.
 4. Run this command, with `<SHEET_PATH>` replaced by the value from Step 2:
    `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . gaps --files "<SHEET_PATH>" --base .campaign/state/write/draft`
@@ -178,6 +182,8 @@ Then decide, with the `status:` line of the report:
 - `DONE`: go to Step 9.
 - `FAILED`, or any other status: say the fixed sentence of the lexicon for an operation that could not be completed, and stop.
 
+A small change to one sheet is one write-sequence round. Do not invoke write-sequence again to add something you forgot: complete the draft fully at Step 7 first.
+
 Do not mention rounds, statuses, problems, paths or reports to the master.
 
 **Step 9 — Message for the master.** Write ONE message in the CAMPAIGN LANGUAGE, in plain words. Use the section names of the lexicon, in plain words: `role` is «il ruolo» (`en` «the role»), `appearance` is «aspetto e modi» (`en` «appearance and manner»), `table` is «il modo di parlare e cosa vuole» (`en` «how they speak and what they want»), `nature` is «la natura» (`en` «the nature»), `description` is «la descrizione» (`en` «the description»), `statistics` is «le statistiche» (`en` «the statistics»), `stock` is «l'assortimento e i prezzi» (`en` «the stock and prices»), `loot` is «il bottino» (`en` «the loot»).
@@ -187,12 +193,15 @@ If QUESTION_CREATIVE is set: the message is only that question. Stop.
 Otherwise the message is, in this order:
 - (a) one sentence saying what is now in the sheet, naming the sections in plain words, for example «Ho completato la scheda di <TITLE>: ora ha <sections>.» (or «Ho corretto la scheda di <TITLE>: ...» when the change is a correction only);
 - (b) one sentence naming what comes from the campaign and what is a creative proposal the master can change. Only when PROPOSED is not empty. When PROPOSED is empty, omit this sentence;
+- (b2) only when the statistics (or the stock and prices) were invented under the master's authorization of Step 5, point 0: one sentence saying that they were invented at the master's request and can be changed. When that does not apply, omit this sentence;
 - (c) only when STILL_OPEN has a gap that is a rules or other section: one sentence saying clearly that the sheet is still «da completare» (`en`: «still to be completed») and naming what is missing in plain words. Then:
   - if QUESTION_RULES is set: that question is the LAST sentence of the message, exactly as set in Step 5;
   - otherwise: one sentence with the one next step the master can take, for example «Dammi le statistiche, se le hai.»;
 - (d) nothing else.
 
 Never mention older saved versions, ambiguous links, consistency checks that found nothing, other documents, maintenance, research that was incomplete, or a list of what the assistant can do. Never quote master notes. No paths, no ids, no section keys, no backticks, no formatting marks.
+
+If the whole process took a long time (the master waited many minutes), the closing message includes no apology, but never claims it was quick.
 
 ## Examples
 

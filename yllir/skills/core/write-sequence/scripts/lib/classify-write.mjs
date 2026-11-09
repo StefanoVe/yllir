@@ -24,6 +24,8 @@ export const THRESHOLDS = Object.freeze({
     newMedium: 120,
     existingLowChanged: 6, // changed lines (added + removed) of an existing document
     existingLowRatio: 0.2, // changed / non-blank lines of the old text
+    existingLowChangedHard: 20, // changed lines low also when the old text is thin (see existingThinMax)
+    existingThinMax: 25, // non-blank lines of the old text up to which the ratio is ignored
     existingMediumChanged: 30,
     existingMediumRatio: 0.5,
   },
@@ -261,7 +263,8 @@ function sizeMeasure(ctx) {
       const changed = added.length + removed;
       const ratio = changed / Math.max(1, oldNonBlank);
       record.changed = changed;
-      if (changed <= t.existingLowChanged && ratio <= t.existingLowRatio) record.sizeLevel = 'low';
+      const thinLow = changed <= t.existingLowChangedHard && oldNonBlank <= t.existingThinMax;
+      if ((changed <= t.existingLowChanged && ratio <= t.existingLowRatio) || thinLow) record.sizeLevel = 'low';
       else if (changed <= t.existingMediumChanged && ratio <= t.existingMediumRatio) record.sizeLevel = 'medium';
       else record.sizeLevel = 'high';
     }

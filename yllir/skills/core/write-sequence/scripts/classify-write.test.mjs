@@ -172,3 +172,45 @@ test('a repeated option or a missing value is a usage error: exit 2', () => {
     assert.equal(stdoutLines(missingValue).at(-1), 'exit: 2');
   });
 });
+
+/** A sheet with the frontmatter, a title and `body` non-blank body lines. */
+function sheetWithBody(body) {
+  const lines = ['---', 'id: lira-quen', 'template: npc', 'location: []', '---', '', '# Lira Quen'];
+  for (let i = 1; i <= body; i++) lines.push(`Riga ${i} della scheda.`);
+  return lines.join('\n') + '\n';
+}
+
+test('a small addition to a thin existing sheet is size low', () => {
+  withWorkspace(({ campaign, drafts, out }) => {
+    // 12 non-blank lines in the old sheet, 15 added lines: the thin rule applies.
+    const old = sheetWithBody(6);
+    writeTree(campaign, { 'Personaggi/Lira Quen.md': old });
+    writeTree(drafts, { 'Personaggi/Lira Quen.md': old + Array.from({ length: 15 }, (_, i) => `Attacco ${i + 1}: spada corta.`).join('\n') + '\n' });
+    const result = runCli([campaign, '--files', 'Personaggi/Lira Quen.md', '--draft-dir', drafts, '--out', out]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(stdoutLines(result).includes('measure size 15 low'));
+  });
+});
+
+test('a large addition to a thin existing sheet is not size low', () => {
+  withWorkspace(({ campaign, drafts, out }) => {
+    const old = sheetWithBody(6);
+    writeTree(campaign, { 'Personaggi/Lira Quen.md': old });
+    writeTree(drafts, { 'Personaggi/Lira Quen.md': old + Array.from({ length: 40 }, (_, i) => `Attacco ${i + 1}: spada corta.`).join('\n') + '\n' });
+    const result = runCli([campaign, '--files', 'Personaggi/Lira Quen.md', '--draft-dir', drafts, '--out', out]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(stdoutLines(result).includes('measure size 40 high'));
+  });
+});
+
+test('a small addition to a long existing document keeps the ratio rule', () => {
+  withWorkspace(({ campaign, drafts, out }) => {
+    // 60 non-blank lines in the old text: the thin rule does not apply, 10 changed lines are above existingLowChanged.
+    const old = sheetWithBody(53);
+    writeTree(campaign, { 'Personaggi/Lira Quen.md': old });
+    writeTree(drafts, { 'Personaggi/Lira Quen.md': old + Array.from({ length: 10 }, (_, i) => `Nota ${i + 1}.`).join('\n') + '\n' });
+    const result = runCli([campaign, '--files', 'Personaggi/Lira Quen.md', '--draft-dir', drafts, '--out', out]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(stdoutLines(result).includes('measure size 10 medium'));
+  });
+});

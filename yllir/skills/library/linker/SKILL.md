@@ -31,9 +31,11 @@ Step 0. From the campaign root (the folder containing `campaign.yaml`), keep CAM
 
 ## Steps
 
+**Repeat check (before Step 1).** If the previous linker pass in this same write (same documents, same draft) applied 0 links and the documents' text has not changed since, do not run the full pass again: record `applied: 0` and finish (go to Step 5; do not run Steps 1 to 4 again).
+
 **Step 1 — Plan.** Run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" . --files "<FILES>" --subjects "<SUBJECTS>" --out .campaign/state/linker/plan.json`
-Omit `--files` if FILES is empty. Omit `--subjects` if SUBJECTS is empty.
+Omit `--files` if FILES is empty. Omit `--subjects` when SUBJECTS is empty.
 
 External subjects are included automatically as link targets. The script reads the external folders (categories of type `external`) by itself: a mention in FILES of a subject that exists only in an external folder is planned and linked to that external sheet. Do not add external files to FILES, and do not drop or ignore proposals whose target is external. Run the command as written whether or not the master mentioned external sources.
 

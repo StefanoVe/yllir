@@ -12,7 +12,7 @@ import { analyzeMarkdown } from '../../../../../scripts/lib/zones.mjs';
 import { foldText, foldForm } from '../../../../../scripts/lib/fold.mjs';
 import { checkAttribute, checkValue } from './audit-vocabulary.mjs';
 
-const MIN_QUOTE_LENGTH = 8;
+const MIN_QUOTE_LENGTH = 4;
 const REQUIRED_FIELDS = ['subject', 'attribute', 'value', 'source_type', 'quote'];
 
 /**

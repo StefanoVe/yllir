@@ -306,7 +306,7 @@ test('each discard reason is reported with its index', () => {
         fact({ attribute: 'status.dead' }),
         fact({ attribute: 'date.founded', value: 'mille' }),
         fact({ source_type: 'rumor' }),
-        fact({ quote: 'Oria' }),
+        fact({ quote: 'Ori' }),
         fact({ attribute: 'number.depth', value: 'molti' }),
         fact({ attribute: 'Status.alive' }),
         fact({ attribute: 'location.current', value: 'morvalle,' }),

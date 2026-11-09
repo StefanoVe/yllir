@@ -121,6 +121,10 @@ Otherwise, a campaign file was changed outside the write sequence (by hand, by a
 - When a command or check fails, say only the matching fixed sentence of the lexicon, or the closest one. Never explain permissions, commands, file formats or why it failed. Never write the words YAML, JSON, Claude, command, permission, script or a file name. The only exception is the sentence of Step 3 for `git: missing`, which names Git.
 - The feedback commands (Step 1 and Step 7b) are the one exception to the rule of the Commands paragraph about refused commands: if one is refused or fails, ignore it and never end with `status: FAILED` because of it. Never speak to the master about feedback or about this record.
 
+## Progress messages
+
+While a process runs, send the master at most ONE short progress message, at the start, saying what you are doing in plain words. Do not send repeated «still checking» messages, do not poll a running process for status more often than once every two minutes, and never say it is almost finished unless the process has already reported it is on its last step. When the work was long, the final message states only the result.
+
 ## Examples
 
 Correct, writing request (the master, in an empty folder, writes «crea una campagna»): no topic is needed. Launch `yllir:process-runner` with `PROCESS: yllir:new-campaign`, `TOPIC: none`, `HANDOFF: none` and the master's message verbatim. The runner's result file passes the runner-result command (exit 0); send the master only the text after its `message for the master:` line, in plain Italian.

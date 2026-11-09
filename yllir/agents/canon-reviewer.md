@@ -16,6 +16,8 @@ The prompt gives you:
 - `INTENT`: one sentence saying what the change is for.
 - `LEVEL`: `low`, `medium` or `high`, how much checking ran before you. With `low`, the continuity audit was skipped, so you are the only check of the canon.
 
+- `ONLY_CHANGED`: `yes` or `no`. `PREVIOUS_ITEMS`: `none`, or the problems you or another reviewer reported in the previous round. When `ONLY_CHANGED` is `yes`: read the whole draft, check that each previous item is fixed and that the fix added no new problem, and in step 2 read other documents only as far as needed for those items. When it is `no` (or the lines are missing), do the full review.
+
 ## Steps
 
 1. Read `CAMPAIGN_ROOT/campaign.yaml` with the Read tool. Keep `language.main` and `prose.register`. For each document in `DOCUMENTS`, read its draft with the Read tool. If the document already exists at `CAMPAIGN_ROOT` joined with its path, read that current version too.

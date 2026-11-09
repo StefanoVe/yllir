@@ -39,7 +39,7 @@ The prompt gives you:
    - `hypothesis`: a guess ("maybe", "perhaps", "idea:", a question).
    - `author-clarification`: a statement inside the master block that says what is really true.
    - `editorial-summary`: any other plain statement of the text.
-6. Set `quote`: copy at least 8 characters, exactly as written, from the single line that contains the statement. Copy it character by character. A quote that spans two lines, or that paraphrases, is discarded by the script. Add `"line": <n>` with the line number.
+6. Set `quote`: copy at least 4 characters, exactly as written, from the single line that contains the statement. Copy it character by character. A quote that spans two lines, or that paraphrases, is discarded by the script. Add `"line": <n>` with the line number.
 7. Write `OUT_DIR/<fid>.json` with the Write tool, one file per document, even when it has no facts. Format:
 ```json
 { "fid": "D002", "document": "Characters/Ada Rook.md", "read": true, "facts": [

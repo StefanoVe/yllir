@@ -16,6 +16,11 @@ function parseArgs(argv) {
   const opts = { root: null, files: null, subjects: null, out: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
+    // An empty --subjects is the same as omitting it: no subjects.
+    if (arg === '--subjects' && argv[i + 1] === '') {
+      i++;
+      continue;
+    }
     if (arg === '--files' || arg === '--subjects' || arg === '--out') {
       const value = argv[i + 1];
       if (value === undefined || value === '' || value.startsWith('--')) return null;
