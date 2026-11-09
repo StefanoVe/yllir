@@ -362,6 +362,20 @@ Un test per la pubblicazione di un’enciclopedia con blocchi riservati al maste
 
 Queste lezioni portano a verificare invarianti, a usare controlli di fuga con una regola esplicita e a testare il codice effettivo. Va evitato il conteggio fisso dentro il codice di verifica.
 
+## Feedback d’uso
+
+Raccolta locale di dati d’uso, decisa dall’autore (**decisioni dell’autore**, 2026-11-09). Serve a capire perché il framework risulta lento o inutilizzabile anche per richieste semplici, con Claude e con Codex, e a migliorare le istruzioni con dati e non con impressioni.
+
+- **Scopo.** Raccogliere in automatico, a ogni richiesta del master, dati che mostrano dove si perde tempo. Il registro misura soltanto: non risolve la lentezza. Con i dati raccolti si decide dove tagliare i passi (la sequenza di scrittura, il controllo a ogni messaggio, il linker nell’agente principale).
+- **Registro.** `.campaign/state/feedback/events.jsonl` in ogni campagna, in sola aggiunta (append-only), una riga per evento. Sta sotto `state/`, quindi non è versionato e non richiede migrazione.
+- **Tre tipi di evento**, una riga JSON ciascuno:
+  - `turn`: inizio della richiesta. Contiene sessione, agente (`claude` o `codex`), versione del framework e topic attivo.
+  - `end`: fine della richiesta. Contiene durata in secondi, esito del runner come `status`, modello, numero di file scritti e processo scelto, quando noto.
+  - `note`: auto-valutazione dell’agente a fine richiesta. Contiene esito (`ok`, `partial`, `blocked`), attrito (`none`, `slow`, `unclear-instruction`, `script-error`, `too-many-steps`, `wrong-process`, `other`) e una frase di dettaglio di massimo 200 caratteri.
+- **Privacy.** Il registro non contiene mai il testo del master né contenuti della campagna, nemmeno il blocco riservato. La frase di dettaglio non nomina personaggi, luoghi o testi della campagna. Valgono anche le regole di redazione della sezione 3.3 di [Sicurezza e privacy](Sicurezza%20e%20privacy.md). Il registro resta sul computer: in questa versione non c’è invio esterno, quindi non c’è consenso da chiedere.
+- **Raccolta.** Su Claude Code `turn` ed `end` sono scritti dagli hook `UserPromptSubmit` (inizio) e `Stop` (fine). Dove gli hook non ci sono (Codex, supporto non verificato), la skill d’ingresso registra `turn` ed `end` da sola, come primo e ultimo passo. La `note` la scrive sempre la skill d’ingresso, con un solo comando, a fine richiesta, non il runner.
+- **Lettura.** Due comandi per lo sviluppatore: un riepilogo (richieste, durata mediana e massima, esiti, attriti più frequenti, note recenti) e un’esportazione in un file.
+
 ## Questioni aperte
 
 - I valori di partenza delle soglie vanno confermati dopo la prima misura: quali accettare, e per quali skill.
@@ -371,3 +385,4 @@ Queste lezioni portano a verificare invarianti, a usare controlli di fuga con un
   Come dichiarare nella scheda le figure tramite e lo stato delle forme (`fact` o `hypothesis`): a mano dal master, o proposte dallo script e confermate. Gli `aliases` sono la fonte dell’indice; la forma della dichiarazione per queste due informazioni non è ancora definita.
 - ~~Come trattare i diagrammi Mermaid e le tabelle.~~ **Deciso (2026-11-07):** nelle tabelle si collega come nel testo; nei diagrammi Mermaid mai (stato `excluded-diagram`).
 - Se il registro di copertura dell’audit debba essere conservato nella campagna o restare un file temporaneo.
+- Se e come inviare il registro d’uso all’autore: un pacchetto di diagnosi con consenso e redazione (vedi [Sicurezza e privacy](Sicurezza%20e%20privacy.md), sezione 8); oggi il registro resta solo locale. **Non deciso.**

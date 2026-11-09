@@ -247,13 +247,23 @@ describe('user-prompt CLI', () => {
     assert.equal(output, `${[HEADER, rootLine(root), 'active topic: none', NEXT].join('\n')}\n`);
   });
 
-  test('prints the active topic of a campaign and writes nothing', () => {
+  test('prints the active topic of a campaign and writes only the feedback log', () => {
     const root = campaign();
     newTopic(root, { process: 'scena', goal: 'Il porto di Morvalle', now: new Date('2026-11-03T10:00:00Z') });
     const before = listFiles(root);
     const output = execFileSync(process.execPath, [CLI, root], { encoding: 'utf8' });
     assert.match(output, /^active topic: \S+ — Il porto di Morvalle — next step: none$/m);
-    assert.deepEqual(listFiles(root), before);
+    const after = listFiles(root);
+    // listFiles entries are "<relative path>:<content>", so the path is the part before the first colon.
+    const added = after.filter((entry) => !before.includes(entry)).map((entry) => entry.slice(0, entry.indexOf(':')));
+    assert.deepEqual(added, ['.campaign/state/feedback/events.jsonl']);
+    assert.ok(before.every((entry) => after.includes(entry)));
+  });
+
+  test('does not create a feedback log outside a campaign', () => {
+    const root = tempDir();
+    execFileSync(process.execPath, [CLI, root], { encoding: 'utf8' });
+    assert.deepEqual(listFiles(root), []);
   });
 });
 

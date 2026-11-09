@@ -2,7 +2,7 @@
 name: yllir
 description: Entry point of Yllir. Invoke it first for every message of the master in a Yllir campaign folder or in an empty folder: it recognises what the master wants and runs the right process.
 user-invocable: true
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/runner-result.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/canon-research/scripts/research-search.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/canon-research/scripts/research-report.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" *), Read, Write, Agent, AskUserQuestion
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/feedback.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/runner-result.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/canon-research/scripts/research-search.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/canon-research/scripts/research-report.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" *), Read, Write, Agent, AskUserQuestion
 ---
 
 # Yllir entry point
@@ -15,6 +15,7 @@ This skill receives every message of the master. It checks the folder, keeps the
 
 **Step 1 — Check.** Find the block that starts with `YLLIR SESSION CHECK` in your context. Keep its values: `folder`, `git`, `campaign root`, `saved versions`, `changes not yet saved`, `settings`, `instructions`, `framework version` (with its «campaign made with» part, when there is one), `campaign alignment` (when that line is in the block), `update notice` (the block `YLLIR UPDATE AVAILABLE`, when it is in your context).
 - If the block is not in your context: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and keep its output the same way.
+- Turn record: if the block `YLLIR TURN CHECK` is not in your context (no hook runs in this tool), run `node "${CLAUDE_PLUGIN_ROOT}/scripts/feedback.mjs" record turn .` once per master message. Ignore its result, whatever it is.
 - Output: the values of the block, kept for the next steps.
 
 **Step 2 — Lexicon.** Read `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/lexicon.md` and read the table.
@@ -100,14 +101,24 @@ Otherwise, a campaign file was changed outside the write sequence (by hand, by a
 
 **Step 7 — Update notice.** If your context has a block that starts with `YLLIR UPDATE AVAILABLE`, or your previous message to the master asked whether to update, read `${CLAUDE_PLUGIN_ROOT}/skills/core/update/SKILL.md` and follow its Part B. The master decides: never update without a clear «yes».
 
+**Step 7b — Feedback note (every message, last action).** This is the last thing you do in this message, right before your final answer to the master (also when the answer is a question, when something failed, or when you stopped early). It is never mentioned to the master and never changes the master's message. Skip this step when git is missing (Step 3).
+- (a) If the block `YLLIR TURN CHECK` was not in your context at Step 1 (no hook), first run `node "${CLAUDE_PLUGIN_ROOT}/scripts/feedback.mjs" record end .`, adding `--process <name>` when this message ran a writing process (the name without the `yllir:` prefix).
+- (b) Always run `node "${CLAUDE_PLUGIN_ROOT}/scripts/feedback.mjs" record note . --outcome <o> --friction <f> --detail "<d>"`. The values:
+  - outcome: `ok` = the request was done or answered; `partial` = done in part, or ended with a question for the master after a problem; `blocked` = nothing useful could be done.
+  - friction: `none` = no problem; `slow` = it took many steps or a long time for what was asked; `unclear-instruction` = an instruction of a skill was ambiguous or contradictory and you had to guess; `script-error` = a command failed or was refused; `too-many-steps` = the request needed more steps than it should have; `wrong-process` = the first process or branch you picked was not the right one; `other` = anything else.
+  - detail: ONE sentence in English, at most 150 characters, about the framework or the instructions (for example which step was slow or unclear). It must NEVER contain the master's words, names, places, plot or any text from the campaign, and no file paths.
+- (c) If the command is refused or fails, ignore it: do not retry, do not tell the master, and continue.
+- Output: nothing for the master.
+
 **Step 8 — Rules.** These apply to every step above.
-- Never write or change a campaign document yourself. Every write goes through `yllir:write-sequence`, run by a process. The one exception is Step 5b: the linker, run by this skill as Step 5b says, adds links to campaign documents, and it is the only script-driven writer of links; nothing else in this skill changes a campaign document. The files this skill writes are `.campaign/state/research/answer.json`, only while following canon-research, and, only in Step 5b, the file `.campaign/state/linker/attempts.txt` and the linker's own files in `.campaign/state/linker/`.
+- Never write or change a campaign document yourself. Every write goes through `yllir:write-sequence`, run by a process. The one exception is Step 5b: the linker, run by this skill as Step 5b says, adds links to campaign documents, and it is the only script-driven writer of links; nothing else in this skill changes a campaign document. The files this skill writes are `.campaign/state/research/answer.json`, only while following canon-research, and, only in Step 5b, the file `.campaign/state/linker/attempts.txt` and the linker's own files in `.campaign/state/linker/`. The feedback commands of Step 1 and Step 7b write `.campaign/state/feedback/events.jsonl` through the script; this skill never edits that file by hand.
 - Never run a writing process (`yllir:new-campaign`, `yllir:prepare-session`, `yllir:after-session`, `yllir:import`) in this skill: launch `yllir:process-runner` instead.
 - Never show internal words, commands, file formats or error codes to the master.
 - Write to the master in plain text: no backticks, no code formatting, no file paths, no version codes.
 - Ask at most one question at a time (the one exception is the single AskUserQuestion call of Step 6 (c), which carries the questions of the `ask:` lines).
 - Never say something is done without the result of the command that did it.
 - When a command or check fails, say only the matching fixed sentence of the lexicon, or the closest one. Never explain permissions, commands, file formats or why it failed. Never write the words YAML, JSON, Claude, command, permission, script or a file name. The only exception is the sentence of Step 3 for `git: missing`, which names Git.
+- The feedback commands (Step 1 and Step 7b) are the one exception to the rule of the Commands paragraph about refused commands: if one is refused or fails, ignore it and never end with `status: FAILED` because of it. Never speak to the master about feedback or about this record.
 
 ## Examples
 
