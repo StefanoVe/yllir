@@ -19,7 +19,7 @@ Questo file descrive come il framework distribuisce il lavoro fra un agente prin
 | Ruolo | Chi lo svolge | Fa | Non fa |
 | --- | --- | --- | --- |
 | Agente principale | Modello di alto livello della famiglia Claude | Interpreta la richiesta, decide, scompone il lavoro, scrive i brief, legge i diff, decide se accettare, parla con il master | Non scrive in serie schede o codice; non revisiona da solo ciò che ha scritto |
-| Esecutore | Haiku (Claude), o Luna (Codex) se installato | Esegue un brief: scrive schede, codice, trascrizioni, immagini | Non decide il canone; non chiede nulla al master; non tocca file fuori dal proprio elenco |
+| Esecutore | Haiku (Claude); in Codex sempre Luna, indicato esplicitamente (vedi «Modello dei sub-agent in Codex») | Esegue un brief: scrive schede, codice, trascrizioni, immagini | Non decide il canone; non chiede nulla al master; non tocca file fuori dal proprio elenco |
 | Revisore indipendente | Sub-agent distinto da chi ha scritto, in sola lettura | Valuta il diff o le proposte e restituisce un esito motivato | Non modifica file; non parla con il master |
 | Verificatore deterministico | Script, non un agente | Controlla ciò che si può controllare con una regola: percorsi, formato, test, codice d'uscita | Non giudica il senso dei testi |
 | Master | L'utente | Prende le decisioni di canone e di identità, risponde alle questioni aperte | Non deve conoscere i ruoli: li vede solo come «un controllo» o «una bozza» |
@@ -147,6 +147,12 @@ Le regole di scrittura delle istruzioni per modelli minori e per Codex sono in [
 
 - non attendere input da tastiera e non chiedere conferme;
 - per i file di lavoro usare percorsi assoluti nella cartella temporanea, mai nella cartella della campagna, se il passo non lo richiede.
+
+### Modello dei sub-agent in Codex
+
+- **Deciso.** In Codex i sub-agent non scelgono da soli un modello più semplice: senza istruzione ereditano quello dell'agente principale. Perciò, quando il framework gira in Codex, ogni sub-agent esecutore (implementazione, scrittura in serie, ricerca) deve essere lanciato **esplicitamente con Luna**; il brief e la configurazione dell'agente indicano il modello, e non lo si lascia al valore predefinito.
+- **Deciso.** Un sub-agent lanciato in Codex senza il modello indicato è un difetto, non un ripiego accettabile: l'esecutore economico è parte del progetto e non deve diventare, per omissione, un esecutore di alto livello.
+- Vale per gli esecutori. I revisori indipendenti restano sub-agent distinti da chi ha scritto, anch'essi con il modello indicato in modo esplicito.
 
 ## Costi
 
