@@ -1,8 +1,8 @@
 ---
 name: write-sequence
-description: Core rule. The only way Yllir writes campaign documents: manual changes saved, continuity check, independent review, write, links, derived files, deterministic verification, saved version. Invoked by core processes with drafts already prepared.
+description: Core rule. The only way Yllir writes campaign documents: manual changes saved, independent review, write, links, derived files, deterministic verification, saved version. Invoked by core processes with drafts already prepared.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/aggregate-reviews.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/classify-write.mjs" *), Read, Write, Agent, Skill
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/aggregate-reviews.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/classify-write.mjs" *), Read, Write, Agent, Skill
 ---
 
 # Write sequence
@@ -19,7 +19,7 @@ The calling process gives:
 - `DOCUMENTS`: campaign-relative paths, comma-separated.
 - `INTENT`: one sentence.
 - `NEW_SUBJECTS`: subject ids, may be empty.
-- `CONTEXT_FILES`: existing campaign-relative documents read as context, comma-separated; may be empty. These are audited as read-only context.
+- `CONTEXT_FILES`: optional existing campaign-relative documents read as relevant context, comma-separated; may be empty. The reviewer reads these as read-only context.
 - `VERSION_MESSAGE`: one sentence in the campaign language.
 - `ROUND`: 1, 2 or 3.
 - `CONTINUE_WITH`: the step of the calling process to run after this skill, in one sentence.
@@ -35,8 +35,8 @@ Every script below is run from the campaign root, as `node "${CLAUDE_PLUGIN_ROOT
 ## Steps
 
 **1. Manual changes.** Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" list . --limit 1`. Exit ≠ 0 → end this skill with `status: FAILED`, reason "versions not readable" (the calling process continues).
-- The output is a JSON array. If it is empty (`[]`): this is a new campaign. Record "manual changes: none, no saved version yet" and go to step 2.
-- If it has one entry: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" status .`. If the output says `"clean": true`, go to step 2. Otherwise run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save-manual . --message "<sentence>"`, where the sentence is "Changes made by hand" in the campaign language. Read `language.main` in `campaign.yaml`: for `it` write `Modifiche fatte a mano`, for `en` write `Changes made by hand`, for any other code translate the English sentence into that language. Then go to step 2.
+- The output is a JSON array. If it is empty (`[]`): this is a new campaign. Record "manual changes: none, no saved version yet" and go to step 1b.
+- If it has one entry: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" status .`. If the output says `"clean": true`, go to step 1b. Otherwise run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save-manual . --message "<sentence>"`, where the sentence is "Changes made by hand" in the campaign language. Read `language.main` in `campaign.yaml`: for `it` write `Modifiche fatte a mano`, for `en` write `Changes made by hand`, for any other code translate the English sentence into that language. Then go to step 1b.
 
 **1b. Level.** Run this command from the campaign root, exactly as written, with `--subjects` present only when NEW_SUBJECTS is not empty:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/classify-write.mjs" . --files "<DOCUMENTS>" --draft-dir .campaign/state/write/draft [--subjects "<NEW_SUBJECTS>"] --out .campaign/state/write/level.json`
@@ -45,35 +45,23 @@ Read the `level:` line of its output, and its `exit:` line.
 - Exit code 2, or no `level:` line, or a value other than `low`, `medium` or `high`: LEVEL is `high`. Record `level: high (not computed)`.
 - Otherwise LEVEL is the printed value. Record `level: <LEVEL>` and keep the `decided by:` line for the report details.
 
-The level decides what runs:
+The level decides review count and the linker path:
 
-- `low`: the continuity check is skipped; ONE canon-reviewer for the whole batch; the linker runs its light path.
-- `medium`: the continuity check runs; ONE canon-reviewer for the whole batch; the linker runs its normal path.
-- `high`: the continuity check runs; when DOCUMENTS has more than one document, ONE canon-reviewer PER DOCUMENT (step 4); the linker runs its normal path.
+- `low` and `medium`: ONE canon-reviewer for the whole batch; the linker runs its light path at `low`, otherwise its normal path.
+- `high`: when DOCUMENTS has more than one document, ONE canon-reviewer PER DOCUMENT (step 3); the linker runs its normal path.
 
-The independent review of step 4 always runs, at every level. The level is computed again at each round, because this skill runs again at each round.
+Canon review always checks relevant existing canon before any draft is applied. The independent review runs at every level. The level is computed again at each round, because this skill runs again at each round.
 
-**2. Continuity check.** If LEVEL is `low`, skip the whole step and record `continuity: skipped (low)`. On ROUND 2 or 3, the reuse rule in the Rules section applies first. For `medium` and `high` the step runs exactly as written below (its audit scope also limits itself to documents that mention the subjects). EXISTING is the list of DOCUMENTS that already exist: for each document, Read `<document>`: if Read says it does not exist, the document is not in EXISTING; otherwise it is. AUDIT_FILES is the de-duplicated union of EXISTING and CONTEXT_FILES.
-- If AUDIT_FILES and NEW_SUBJECTS are both empty: skip. Record "continuity: nothing to compare yet".
-- Otherwise run a scope probe, omitting each option whose list is empty: `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" . --mode pre [--files "<AUDIT_FILES>"] [--subjects "<NEW_SUBJECTS>"] --out .campaign/state/write/scope-probe.json`.
-  - If it prints `documents: 0`: skip the audit. Record "continuity: nothing to compare yet".
-  - If its exit code is 2: end this skill with `status: FAILED`, reason "continuity check not run" (the calling process continues).
-  - Otherwise invoke the skill `yllir:continuity-audit` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `MODE=pre`, `FILES=AUDIT_FILES` (comma-separated), `SUBJECTS=NEW_SUBJECTS`, `CHANGE=INTENT`, `CONTINUE_WITH="write-sequence step 2: read the AUDIT REPORT, then step 3"`. When it has finished, read `.campaign/state/audit/report.txt` with the Read tool. That file is the AUDIT REPORT. CONTEXT_FILES are read-only; only DOCUMENTS are written.
-    - If any line starts with `- [RELATED]`: end this skill with `status: CONFLICT` (the calling process continues), and list those lines in the report.
-    - If its `status:` line is `INCOMPLETE`: continue and record `continuity: INCOMPLETE`.
-    - If its `status:` line is `COMPLETE`: continue and record `continuity: COMPLETE`.
-    - Any other status (for example `FAILED`), or the file is missing: end this skill with `status: FAILED`, reason "continuity check not run" (the calling process continues).
+**2. Draft.** For each document in DOCUMENTS, Read `.campaign/state/write/draft/<document>`: if Read says it does not exist, or the file is empty, the draft is missing. If any draft is missing: end this skill with `status: FAILED`, reason "draft missing", and list the missing paths (the calling process continues).
 
-**3. Draft.** For each document in DOCUMENTS, Read `.campaign/state/write/draft/<document>`: if Read says it does not exist, or the file is empty, the draft is missing. If any draft is missing: end this skill with `status: FAILED`, reason "draft missing", and list the missing paths (the calling process continues).
-
-**3b. System rules check.** Invoke `yllir:system-adapter` with `OPERATION=check-drafts`, `FILES` set to the comma-separated draft paths `.campaign/state/write/draft/<document>` for every path in DOCUMENTS, and `CONTINUE_WITH="write-sequence step 3b: read the ADAPTER REPORT, then step 4"`. If your tool cannot invoke a named skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/system-adapter/SKILL.md` with the Read tool or `cat`, and follow it exactly as if invoked, using these inputs. When it finishes, read `.campaign/state/system-adapter/report.txt` with the Read tool; this is the ADAPTER REPORT.
+**2b. System rules check.** Invoke `yllir:system-adapter` with `OPERATION=check-drafts`, `FILES` set to the comma-separated draft paths `.campaign/state/write/draft/<document>` for every path in DOCUMENTS, and `CONTINUE_WITH="write-sequence step 2b: read the ADAPTER REPORT, then step 3"`. If your tool cannot invoke a named skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/system-adapter/SKILL.md` with the Read tool or `cat`, and follow it exactly as if invoked, using these inputs. When it finishes, read `.campaign/state/system-adapter/report.txt` with the Read tool; this is the ADAPTER REPORT.
 - If the report status is `OK`, record `system rules: passed` and continue.
 - If the report status is `NOT_APPLICABLE`, record `system rules: no adapter` and continue.
 - If the report status is `NEEDS_ATTENTION`, end this skill with `status: FIX_NEEDED`; in report details, list every `problem:` line with the draft path prefix `.campaign/state/write/draft/` removed. Do not launch the reviewer and do not write documents.
 - If the ADAPTER REPORT `status:` line is `FAILED`, end this skill with `status: FAILED`, reason "system rules check not run". Do not launch the reviewer or write documents.
 - If the skill returns `status: FAILED`, the report is missing or unreadable, or its `status:` line is absent or unknown, end this skill with `status: FAILED`, reason "system rules check not run". Do not launch the reviewer or write documents.
 
-**4. Independent review.** Launch the sub-agent `yllir:canon-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. Its prompt is exactly these seven lines, with real values:
+**3. Independent review.** Unless LEVEL is `high` and DOCUMENTS has more than one document, launch one sub-agent `yllir:canon-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/canon-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. Its prompt is these lines, with real values:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 DRAFT_DIR: <CAMPAIGN_ROOT>/.campaign/state/write/draft
@@ -82,31 +70,32 @@ INTENT: <INTENT>
 LEVEL: <LEVEL>
 ONLY_CHANGED: <yes or no>
 PREVIOUS_ITEMS: <text>
+CONTEXT_FILES: <comma-separated paths or empty>
 ```
 
-`ONLY_CHANGED` is `no` on ROUND 1; on ROUND 2 or 3 it is `yes` when the continuity check was reused under the Rules section, otherwise `no`. `PREVIOUS_ITEMS` is `none` on ROUND 1; on ROUND 2 or 3 it is the `items` of the `review.json` saved in the previous round, copied as text before this round overwrites that file.
+`ONLY_CHANGED` is `no` on ROUND 1; on ROUND 2 or 3 it is `yes` when the fixes in the previous review were limited to its reported items, otherwise `no`. `PREVIOUS_ITEMS` is `none` on ROUND 1; on ROUND 2 or 3 it is the `items` of the `review.json` saved in the previous round, copied as text before this round overwrites that file.
 
 Save its answer exactly as received to `.campaign/state/write/review.json` with the Write tool. Then run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" .campaign/state/write/review.json --object`.
 - Exit ≠ 0 (not JSON): launch the reviewer once more with the same prompt and save the new answer the same way. If the second answer is also not JSON: end this skill with `status: FAILED`, reason "review not available" (the calling process continues). Nothing is written without a review.
 - Valid JSON with `"outcome": "FIX"`: end this skill with `status: FIX_NEEDED` (the calling process continues) and list its items in the report.
 - Valid JSON with `"outcome": "ASK"`: end this skill with `status: ASK` (the calling process continues) and put its `question` in the report.
-- Valid JSON with `"outcome": "APPLY"`: go to step 5.
+- Valid JSON with `"outcome": "APPLY"`: go to step 4.
 - Any other outcome value: end this skill with `status: FAILED`, reason "review not available" (the calling process continues).
-- The answer may also carry the optional field `"escalate": true`, valid with any outcome. If LEVEL was `low` and the answer has `"escalate": true`: set LEVEL to `medium` and record `level: medium (raised by the reviewer)`. With outcome `APPLY`, run step 2 now (the continuity check), following its normal rules (a `[RELATED]` line means `status: CONFLICT`, a failed audit means `status: FAILED`), and only if it does not stop this skill go to step 5. With outcome `FIX` or `ASK`, do not run step 2: end this skill as written above (the next round computes the level again). If LEVEL is already `medium` or `high`, ignore `"escalate"`.
 
-**Per-document review (LEVEL `high` and more than one document in DOCUMENTS).** Launch one `yllir:canon-reviewer` for each document in DOCUMENTS, all in the same message, with the Agent tool. Each prompt is the same seven lines as above, with the same `ONLY_CHANGED` and `PREVIOUS_ITEMS` values, except that `DOCUMENTS:` holds only that one document. The same Codex rule applies: set the model of each sub-agent to GPT-6 Luna in its launch call. Number the documents 1, 2, ... in the order of DOCUMENTS. Save each answer exactly as received to `.campaign/state/write/review-<n>.json` with the Write tool. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" .campaign/state/write/review-<n>.json --object` on each. If an answer is not JSON (exit ≠ 0): launch that reviewer once more with the same prompt and save the new answer the same way. If that second answer is also not JSON: end this skill with `status: FAILED`, reason "review not available" (the calling process continues). Once all answers are valid JSON, run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/aggregate-reviews.mjs" --out .campaign/state/write/review.json .campaign/state/write/review-1.json <...review-n.json in DOCUMENTS order>`. The script validates each reviewer response and builds `review.json`: `ASK` takes precedence over `FIX`, which takes precedence over `APPLY`; the first `ASK` question is retained, and items are concatenated in document order. If aggregation fails (exit ≠ 0), end this skill with `status: FAILED`, reason "review not available". Then continue with the outcome rules above. The `escalate` field is ignored at `high`. When LEVEL is `high` and DOCUMENTS has only one document, the single review above applies.
 
-**5. Write.** Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" . --draft-dir .campaign/state/write/draft --files "<DOCUMENTS>" --out .campaign/state/write/applied.json`. The script writes the structured result to `applied.json` and also prints it. Exit ≠ 0 (nothing was written): end this skill with `status: FAILED` (the calling process continues) and list its `errors` from `applied.json` when available.
+**Per-document review (LEVEL `high` and more than one document in DOCUMENTS).** Launch one `yllir:canon-reviewer` for each document in DOCUMENTS, all in the same message, with the Agent tool. Each prompt includes every line above, with the same `ONLY_CHANGED`, `PREVIOUS_ITEMS` and `CONTEXT_FILES` values, except that `DOCUMENTS:` holds only that one document. The same Codex rule applies: set the model of each sub-agent to GPT-6 Luna in its launch call. Number the documents 1, 2, ... in the order of DOCUMENTS. Save each answer exactly as received to `.campaign/state/write/review-<n>.json` with the Write tool. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" .campaign/state/write/review-<n>.json --object` on each. If an answer is not JSON (exit ≠ 0): launch that reviewer once more with the same prompt and save the new answer the same way. If that second answer is also not JSON: end this skill with `status: FAILED`, reason "review not available" (the calling process continues). Once all answers are valid JSON, run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/aggregate-reviews.mjs" --out .campaign/state/write/review.json .campaign/state/write/review-1.json <...review-n.json in DOCUMENTS order>`. The script validates each reviewer response and builds `review.json`: `ASK` takes precedence over `FIX`, which takes precedence over `APPLY`; the first `ASK` question is retained, and items are concatenated in document order. If aggregation fails (exit ≠ 0), end this skill with `status: FAILED`, reason "review not available". After aggregation, apply the outcome rules above: FIX and ASK stop the write sequence as described there; APPLY goes to step 4. When LEVEL is `high` and DOCUMENTS has only one document, use the single-review path in step 3.
 
-**6. Links.** Invoke the skill `yllir:linker` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/linker/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `FILES=DOCUMENTS`, `SUBJECTS=NEW_SUBJECTS`, `LEVEL=<LEVEL>` (the current LEVEL, including after a reviewer escalation), `CONTINUE_WITH="write-sequence step 7 (derived files), then steps 8 and 9"`. At `low` the linker runs its light path, otherwise its normal path. NEW_SUBJECTS must list the id of every NEW character sheet among DOCUMENTS (template npc): if a document in DOCUMENTS is a new sheet and its id is not in NEW_SUBJECTS, add it before invoking the linker. This is what links the documents that mention the new character to its sheet. When it has finished, read `.campaign/state/linker/report.txt` with the Read tool. That file is the LINKER REPORT.
+**4. Write.** Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" . --draft-dir .campaign/state/write/draft --files "<DOCUMENTS>" --out .campaign/state/write/applied.json`. The script writes the structured result to `applied.json` and also prints it. Exit ≠ 0 (nothing was written): end this skill with `status: FAILED` (the calling process continues) and list its `errors` from `applied.json` when available.
+
+**5. Links.** Invoke the skill `yllir:linker` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/linker/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `FILES=DOCUMENTS`, `SUBJECTS=NEW_SUBJECTS`, `LEVEL=<LEVEL>` (the current LEVEL), `CONTINUE_WITH="write-sequence step 6 (derived files), then steps 7 and 8"`. At `low` the linker runs its light path, otherwise its normal path. NEW_SUBJECTS must list the id of every NEW character sheet among DOCUMENTS (template npc): if a document in DOCUMENTS is a new sheet and its id is not in NEW_SUBJECTS, add it before invoking the linker. This is what links the documents that mention the new character to its sheet. When it has finished, read `.campaign/state/linker/report.txt` with the Read tool. That file is the LINKER REPORT.
 - Its `status:` line is `NEEDS_ATTENTION`: end this skill with `status: VERIFY_FAILED`, list its check errors and other actionable errors in report details, and do not save a version. Ambiguous names under `decisions for the master` do not by themselves block saving.
 - Its `status:` line is `FAILED`: end this skill with `status: FAILED`, reason "link verification not run", and do not save a version.
 - If its status is `DONE`: record `links: applied <n>` with the number from its `applied:` line. Copy every line under `decisions for the master` into the report details.
 - Any other status or a missing report: end this skill with `status: FAILED`, reason "link report unavailable", and do not save a version.
 
-**7. Derived files.** Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" . --out .campaign/cache/subjects.json`. Exit ≠ 0: end this skill with `status: FAILED`, reason "index not built", and its printed lines (the calling process continues). The documents already written stay marked "to check".
+**6. Derived files.** Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" . --out .campaign/cache/subjects.json`. Exit ≠ 0: end this skill with `status: FAILED`, reason "index not built", and its printed lines (the calling process continues). The documents already written stay marked "to check".
 
-**8. Deterministic verification.** Run these four commands in this order, and keep the output of each. The linker already checked the full affected scope and its report is authoritative; do not run check-links again here.
+**7. Deterministic verification.** Run these four commands in this order, and keep the output of each. The linker already checked the full affected scope and its report is authoritative; do not run check-links again here.
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" .`
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" . --check`
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . plot-cast --files "<DOCUMENTS>" --out .campaign/state/write/plot-cast.json`
@@ -122,7 +111,7 @@ Then decide:
 
 The scripts' result overrides any opinion.
 
-**9. Saved version.** Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "<VERSION_MESSAGE>" --kind framework`. Exit ≠ 0, or the JSON has `"saved": false`: end this skill with `status: FAILED`, reason "version not saved" (the calling process continues). Otherwise status `DONE`, and `saved version:` is the `hash` from the JSON.
+**8. Saved version.** Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "<VERSION_MESSAGE>" --kind framework`. Exit ≠ 0, or the JSON has `"saved": false`: end this skill with `status: FAILED`, reason "version not saved" (the calling process continues). Otherwise status `DONE`, and `saved version:` is the `hash` from the JSON.
 
 ## Limits
 
@@ -133,10 +122,9 @@ At most three cycles between draft and review, or between write and verification
 Write the report with the Write tool to `.campaign/state/write/report.txt`. Its content is exactly this block, in English. Do not print it, and do not show it to the master.
 ```
 WRITE REPORT
-status: DONE | CONFLICT | FIX_NEEDED | ASK | VERIFY_FAILED | FAILED
+status: DONE | FIX_NEEDED | ASK | VERIFY_FAILED | FAILED
 level: <low | medium | high>
 documents: <paths, comma-separated>
-continuity: <COMPLETE | INCOMPLETE | nothing to compare yet | conflict | skipped (low) | reused from previous round>
 review: <APPLY | FIX | ASK | not run>
 system rules: <passed | no adapter | n problems | not run>
 links: <applied n | FAILED | not run>
@@ -155,7 +143,6 @@ WRITE REPORT
 status: DONE
 level: low
 documents: World/Varn.md, World/Old Mill.md
-continuity: skipped (low)
 review: APPLY
 system rules: passed
 links: applied 2
@@ -163,7 +150,7 @@ verification: passed
 saved version: 3f2a9c1
 details:
 - none
-continue with: write-sequence step 7 (derived files), then steps 8 and 9
+continue with: write-sequence step 6 (derived files), then steps 7 and 8
 ```
 
 When the adapter reports problems, use the count in the `system rules:` field and list every problem in `details:`:
@@ -172,7 +159,6 @@ WRITE REPORT
 status: FIX_NEEDED
 level: high
 documents: Creatures/Guardiano.md
-continuity: nothing to compare yet
 review: not run
 system rules: 1 problem
 links: not run
@@ -183,7 +169,7 @@ details:
 continue with: <CONTINUE_WITH>
 ```
 
-Wrong example, do not do this: step 4 is skipped, and the document is written with the Write tool before any review exists. Documents are written only by `apply-draft.mjs`, and only after `review.json` says `APPLY`.
+Wrong example, do not do this: step 3 is skipped, and the document is written with the Write tool before any review exists. Documents are written only by `apply-draft.mjs`, and only after `review.json` says `APPLY`.
 
 ## Rules
 
@@ -193,6 +179,6 @@ Wrong example, do not do this: step 4 is skipped, and the document is written wi
 - Never change a sub-agent's answer. Save it exactly as received.
 - Run every command from the campaign root.
 - Never print the WRITE REPORT, never show it to the master, and never end your turn with it.
-- The sheet of a character and the plot events that use it are written in the same write sequence, so the check passes.
-- The level never lowers the independent review. It decides whether the continuity check runs, whether review is per document, and which linker path runs. Only the reviewer can raise it during the sequence; nothing lowers it.
-- On ROUND 2 or 3, rerun the continuity check (step 2) only when the draft changed a statement of fact outside what the previous report listed; if the fix only touched formatting, a link, a missing field or a statistic block, record `continuity: reused from previous round` and skip it. The independent review of step 4 still runs, but its prompt must include the line `ONLY_CHANGED: yes`: the reviewer then checks that every item of `PREVIOUS_ITEMS` is fixed and reads other documents only to check those items. The reviewer still reads the whole draft.
+- The sheet of a character and the plot events that use it are written in the same write sequence, so the reviewer can check them together.
+- The level decides review count and which linker path runs. The reviewer is the sole semantic gate before writing.
+- On ROUND 2 or 3, set `ONLY_CHANGED: yes` only when the scope of the fixes is limited to items reported in the previous review. The reviewer always reads the whole draft and checks that each previous item is fixed and that the fixes introduced no new problem. Otherwise set `ONLY_CHANGED: no` and run the full relevant-context review. Pass `CONTEXT_FILES` to every reviewer prompt, including per-document prompts; if it is empty, pass an empty value.

@@ -12,7 +12,7 @@ Una skill è affidabile quando lo stesso lavoro produce lo stesso esito indipend
 ## Problemi dichiarati dall’autore
 
 - **La skill dei collegamenti collega alcune menzioni ma non tutte.** L’istruzione di collegare «ogni menzione» è presente nelle istruzioni della skill, ma non è verificata da nulla.
-- **L’audit di continuità non segnala quasi mai nulla, eppure gli errori capitano.** L’audit è eseguito prima di ogni modifica, come richiesto dalle istruzioni dell’agente, quindi un falso negativo produce un errore nel documento.
+- **L’audit di continuità non segnala quasi mai nulla, eppure gli errori capitano.** Nella proposta precedente l’audit era eseguito prima di ogni modifica; dal 2026-11-10 il cablaggio affida il controllo della bozza canonica al revisore indipendente, mentre l’audit resta disponibile come funzione esplicita e per i processi che lo richiamano.
 - **Codex ha bisogno di istruzioni più esplicite di Claude.** Osservazione dell’autore sui modelli: le istruzioni del framework devono funzionare con entrambi.
 
 ## Modi di fallimento noti
@@ -28,7 +28,7 @@ Le voci seguenti derivano dalla lettura delle istruzioni di collegamento e di au
 | F5 | Esiti che escludono il link | Il percorso di minor resistenza è omettere: la maggior parte degli esiti impedisce di applicare il link, e il revisore, che opera in sola lettura, tende a non approvare ciò che non può verificare fino in fondo. Le istruzioni chiedono inoltre di collegare solo «corrispondenze sostanziali» e di non collegare «parole generiche», criteri che lasciano spazio all’omissione. | Esiti con campo di evidenza obbligatorio, rapporto che elenca le omissioni con il motivo, e una metrica di copertura che rende visibile il costo di omettere. | Media |
 | F6 | Audit che non trova nulla | L’audit chiede di leggere tutti i file, che in un archivio grande sono molti. Le istruzioni sono prevalentemente negative. Un agente che legge una frazione dei file e ha istruzioni negative tende al silenzio, e il silenzio non è distinguibile da un controllo completo, perché l’audit non produce un registro di copertura. | Un registro di copertura generato da script. Una dichiarazione di «nessun problema» senza registro è invalida. | Alta per la copertura non verificabile; media per l’effetto negativo |
 | F7 | Confronto in prosa | L’audit confronta fatti in forma narrativa. Una contraddizione fra due frasi distanti non viene estratta né confrontata in modo sistematico. | Estrazione dei fatti in forma strutturata e confronto meccanico (vedi [Audit con fatti strutturati](#audit-con-fatti-strutturati)). | Media |
-| F8 | Ambito dell’audit non definito | Nessuna regola restringe l’audit ai soggetti toccati dalla modifica. Se l’ambito è troppo ampio non viene eseguito a fondo; se è troppo stretto perde le contraddizioni a distanza. | Due modalità distinte: un audit pre-modifica mirato e un audit completo su richiesta. | Media |
+| F8 | Ambito dell’audit non definito | Nella proposta precedente l’audit pre-modifica aveva un ambito soggetto a sottocopertura o sovraccarico. La decisione del 2026-11-10 rimuove quel passaggio automatico: il revisore della scrittura riceve i `CONTEXT_FILES` in sola lettura e confronta la bozza col canone; l’audit autonomo resta esplicito e può essere completo. | Dichiarare i documenti di contesto forniti al revisore e mantenere il registro di copertura negli audit autonomi. | Media |
 | F9 | Istruzioni condizionali in prosa | Formule come «se disponibile», «quando possibile», «altrimenti uno strumento consentito» vengono risolte saltando il ramo più costoso. Il file di metadati di un agente contiene solo la policy di invocazione, senza istruzioni operative. | Regole di scrittura con default esplicito e comando esatto per ogni agente (vedi [Istruzioni per Claude e Codex](#istruzioni-per-claude-e-codex)). | Media |
 | F10 | Revisione non verificabile | Il revisore riceve proposte, estratti e percorsi, ma non un formato di evidenza fisso, e il suo esito è una valutazione libera. Due revisioni della stessa proposta possono dare esiti diversi senza che nulla lo riveli. | Un formato di evidenza fisso per ogni voce, con localizzatore obbligatorio, validato dallo script. | Media |
 
@@ -162,12 +162,9 @@ Il modo di fallimento F6 nasce dal chiedere all’agente di leggere tutto e di s
 
 ### Ambito
 
-Due modalità distinte, con regole diverse:
+**Proposta precedente (2026-11-08, superata per il cablaggio di scrittura dalla decisione del 2026-11-10).** L’ambito pre-modifica doveva essere largo: i soggetti toccati comprendevano quelli menzionati nei documenti coinvolti e i documenti che li citavano; fatti estratti e copertura erano memorizzati in cache. Questo disegno resta una proposta storica, non è un passaggio automatico della scrittura. La revisione obbligatoria della bozza canonica passa invece al revisore indipendente, che riceve i documenti di contesto (`CONTEXT_FILES`) in sola lettura (vedi [Processi di core](Processi%20di%20core.md#regole-comuni)).
 
-- **Pre-modifica.** Ambito ristretto ai soggetti toccati dalla modifica (ricavati dall’indice) e ai documenti che li citano, più le schede che li definiscono. È l’audit che la sequenza di scrittura richiede prima di ogni modifica (vedi [Processi di core](Processi%20di%20core.md#regole-comuni)).
-- **Completo.** Ambito tutto il repository, eseguito su richiesta o a intervalli. Produce un registro di copertura per ogni file.
-
-**Deciso (2026-11-08).** L'ambito pre-modifica resta largo: i soggetti toccati comprendono quelli menzionati nei documenti coinvolti, e con essi i documenti che li citano, così l'audit trova anche le contraddizioni a distanza. Per contenere i tempi, i fatti estratti si conservano in una cache derivata (`.campaign/cache/facts/`), indicizzata dall'impronta del contenuto del documento e del vocabolario degli attributi: si ri-estraggono solo i documenti nuovi o cambiati.
+**Audit autonomo.** La skill `continuity-audit` resta disponibile per un audit completo su richiesta o per gli altri processi che la richiamano esplicitamente. Le regole di estrazione, confronto e copertura qui sotto descrivono quella skill e non reintroducono un audit automatico nel cablaggio di scrittura.
 
 Il riesame della copertura può riutilizzare un esito positivo soltanto quando coincidono gli hash di tutte le dipendenze della revisione, inclusi fatti validati, vocabolario, documenti inclusi e istruzioni del revisore. Si conserva solo un esito `CONFIRMED` valido con `missed=[]`, dopo che l'estrazione è completa, non restano file da leggere e non ci sono fatti scartati; esiti mancati, incompleti o non validi non si riusano. La revisione indipendente della bozza resta obbligatoria anche quando si riusa il riesame della copertura. La cache derivata sta in `.campaign/cache/audit-coverage/`.
 
@@ -290,7 +287,7 @@ expected_decisions:
 Tipi di caso proposti.
 
 - **Collegamenti:** menzione singola; menzioni multiple; titolo non collegato; corsivo narrativo non collegato; blocco di codice e commento intatti; omonimo ambiguo, con decisione attesa; figura tramite non trattata come alias; link errato da correggere; nessuna proposta quando non c’è nulla da collegare.
-- **Audit:** contraddizione diretta fra due schede a distanza; discrepanza di prospettiva non classificata come errore; esclusione registrata non riproposta; fonte storica superata dal canone attuale non segnalata come problema; ipotesi del brainstorming non presentata come contraddizione; audit pre-modifica che non tocca documenti estranei.
+- **Audit:** contraddizione diretta fra due schede a distanza; discrepanza di prospettiva non classificata come errore; esclusione registrata non riproposta; fonte storica superata dal canone attuale non segnalata come problema; ipotesi del brainstorming non presentata come contraddizione; controllo del revisore sulla bozza canonica rispetto ai documenti di contesto.
 - **Generale:** l’agente non modifica file in modalità sola analisi; l’agente non prende decisioni che il rapporto dichiara da chiedere; ogni strumento citato nelle istruzioni esiste (vedi la tabella dei modi di fallimento, F2).
 
 ### Esecuzione con Claude e, se attivo, con Codex

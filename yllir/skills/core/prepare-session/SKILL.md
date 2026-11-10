@@ -68,7 +68,7 @@ Read `.campaign/cache/plot-map.json` with the Read tool. Keep `sessions`, `arcs`
 6. With IMAGINATION `yes` only: each named character that you decide to invent for the scenes (step 7) is added to REQUIRED_CHARACTERS now, by its role, so that step 6b gives it a sheet before the draft is written. Its name is chosen in step 6b, as for the other REQUIRED_CHARACTERS entries.
 - Output: the list of documents read (paths), the list of subject ids, the MISSING_CHARACTERS and MISSING_OTHER names, the REQUIRED_CHARACTERS entries (described by role, not by name), and the KNOWN_NEW ids of any skipped entry.
 
-**Step 5 — Source notes.** Using only the documents already read in Step 4, note any explicit incompatible statements about the same fact in CONTESTED, with the fact and both document paths. These facts must not appear in the draft. Put other relevant unresolved or uncertain details in NOTES. Do not run continuity-audit or launch another reviewer here; the write sequence runs the continuity audit before saving. Output: CONTESTED and NOTES (either may be empty).
+**Step 5 — Source notes.** Using only the documents already read in Step 4, note any explicit incompatible statements about the same fact in CONTESTED, with the fact and both document paths. These facts must not appear in the draft. Put other relevant unresolved or uncertain details in NOTES. Do not run continuity-audit or launch another reviewer here; the write sequence reviewer checks relevant canon before saving. Output: CONTESTED and NOTES (either may be empty).
 
 **Step 6 — Characters' entry points.** Read every document in the category whose `type` is `master-only` in `structure` of `campaign.yaml` (these are the players' characters). For each such document that names a subject of step 4, write one line: which character, and the hook written there. Keep these as ENTRY_POINTS. If none, ENTRY_POINTS is empty.
 - Output: the ENTRY_POINTS list (may be empty).
@@ -155,7 +155,7 @@ Rules for the draft:
 - `DOCUMENTS=<main file>, <scene file 1>, <scene file 2>, ..., <every path of SHEET_DRAFTS>` (campaign paths, comma-separated: the main file first, then the scene files, then every path of SHEET_DRAFTS; if SHEET_DRAFTS is empty, nothing is added)
 - `INTENT="Session preparation for <arc>: new scenes; may add scene events and unnamed extras; must not define or change the identity of existing subjects; new named characters only through their own new sheet, listed in characters; no new places; sheets define who a character is and the scenes only what they do."`
 - `NEW_SUBJECTS=<NEW_CHARACTERS, comma-separated>` (empty if NEW_CHARACTERS is empty: sessions are not subjects, and only new character sheets are)
-- `CONTEXT_FILES=<existing document paths read in step 4 plus the previous session's main and scene files, comma-separated>` (read-only context for the write-sequence continuity audit)
+- `CONTEXT_FILES=<existing document paths read in step 4 plus the previous session's main and scene files, comma-separated>` (read-only context for the write-sequence canon reviewer)
 - `VERSION_MESSAGE=` the sentence «Preparata la sessione «<session name>»» for `it`, «Prepared the session «<session name>»» for `en`, or the translation into the campaign language
 - `ROUND=1`
 - `CONTINUE_WITH="prepare-session step 8: read the write report and act on its status"`
@@ -165,7 +165,7 @@ After invoking it, read `.campaign/state/write/report.txt` with the Read tool. T
 
 Loop, starting with `ROUND=1`. Read `.campaign/state/write/report.txt`. Then:
 - If status is `FIX_NEEDED` or `VERIFY_FAILED`: open the draft, fix exactly each problem listed under `details` (if a problem is a contested fact, remove that fact), save the draft, and invoke `yllir:write-sequence` again with `ROUND` plus one and the same other inputs. Do this up to `ROUND` 3. Do not stop after the first fix: each fix is followed by a new invocation.
-- If status is `ASK` or `CONFLICT`: ask the master the question from the report in plain words, and stop.
+- If status is `ASK`: ask the master the question from the report in plain words, and stop.
 - If status is `DONE`: do the links check below, then go to step 8b.
 - If status is `FAILED`, or any other status: go to the failure sentence below, and stop.
 
@@ -232,7 +232,7 @@ Do the steps R1 to R9 in order. Each one says which of the Steps of MODE `new` i
 - the documents involved: run Step 4 (Documents involved) as written, with MASTER_MESSAGE as the source of names. A name MISSING from the subjects is treated as in Step 4: only a new named character gets a sheet, in R6.
 Output: the paths read, the subject ids, MISSING_CHARACTERS and MISSING_OTHER.
 
-**R5 — Source notes.** Using only the documents already read in R4, note explicit incompatible statements about the same fact in CONTESTED, with the fact and both document paths. Put other relevant unresolved or uncertain details in NOTES. The master's new decisions in R2 are not yet campaign facts; the write sequence audits the existing canon before the write, and its independent reviewer checks the drafts. Do not invoke continuity-audit here. Output: CONTESTED and NOTES (either may be empty).
+**R5 — Source notes.** Using only the documents already read in R4, note explicit incompatible statements about the same fact in CONTESTED, with the fact and both document paths. Put other relevant unresolved or uncertain details in NOTES. The master's new decisions in R2 are not yet campaign facts; the write-sequence reviewer checks the existing canon and drafts before the write. Do not invoke continuity-audit here. Output: CONTESTED and NOTES (either may be empty).
 
 **R6 — Character sheets.** If MISSING_CHARACTERS is empty and no REQUIRED_CHARACTERS entry applies, skip this step. Otherwise run Step 6b (Character sheets) as written, for these names and entries only. REQUIRED_CHARACTERS applies in this mode only with IMAGINATION `yes`, and only to the characters that the NEW request text needs (the master's new decisions of R2, read from MASTER_MESSAGE), computed as in Step 4: no name given, and the opponent of a fight or the person running a place or service the master asked for. A required character that an existing subject already fits is skipped, as in Step 4. Output: SHEET_DRAFTS, NEW_CHARACTERS, KNOWN_NEW, PROPOSED_NOTES, the names given to the REQUIRED_CHARACTERS entries, and the names with no sheet (may be empty).
 
@@ -250,7 +250,7 @@ Output: the paths read, the subject ids, MISSING_CHARACTERS and MISSING_OTHER.
 - VERSION_MESSAGE = the sentence «Rivista la sessione «<session name>»» for `it`, «Revised the session «<session name>»» for `en`, or the translation into the campaign language;
 - when IMAGINATION is `yes`, the INTENT ends with the same sentence as in Step 8, after a space; when `no`, it does not;
 - NEW_SUBJECTS, ROUND and CONTINUE_WITH as in Step 8, with CONTINUE_WITH = "prepare-session revise R8: read the write report and act on its status".
-- CONTEXT_FILES = the existing paths read in R4, comma-separated (target and dependent session files and existing subject documents; read-only context).
+- CONTEXT_FILES = the existing paths read in R4, comma-separated (target and dependent session files and existing subject documents; read-only context for the canon reviewer).
 The loop and the links check of Step 8 apply unchanged. Output: `status: DONE`, or the failure of Step 8.
 
 **R9 — Links and message.** Only after `status: DONE` of R8.

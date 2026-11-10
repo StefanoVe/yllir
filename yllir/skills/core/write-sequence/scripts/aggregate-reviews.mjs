@@ -18,7 +18,7 @@ function parseArgs(argv) {
 function validateReview(value, file) {
   const fail = (reason) => { throw new Error(`${file}: ${reason}`); };
   if (value === null || typeof value !== 'object' || Array.isArray(value)) fail('expected an object');
-  if (Object.keys(value).some((key) => !['outcome', 'items', 'question', 'escalate'].includes(key))) fail('contains an unknown field');
+  if (Object.keys(value).some((key) => !['outcome', 'items', 'question'].includes(key))) fail('contains an unknown field');
   if (!['APPLY', 'FIX', 'ASK'].includes(value.outcome)) fail('outcome must be APPLY, FIX or ASK');
   if (!Array.isArray(value.items)) fail('items must be an array');
   for (const [index, item] of value.items.entries()) {
@@ -33,7 +33,6 @@ function validateReview(value, file) {
     fail('ASK requires a non-empty question');
   }
   if (value.outcome !== 'ASK' && value.question !== undefined) fail('question is only valid with ASK');
-  if (value.escalate !== undefined && typeof value.escalate !== 'boolean') fail('escalate must be a boolean');
   return value;
 }
 

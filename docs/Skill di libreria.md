@@ -36,7 +36,7 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | Funzione | Strato | Motivazione | Stato |
 |---|---|---|---|
 | [Ingest di documenti](#l1-ingest-di-documenti) (`document-ingest`) | Libreria, in autorun | Portare in digitale appunti, lettere, mappe, scansioni e PDF già esistenti, e integrarli nelle schede della campagna. | Deciso |
-| [Audit di continuità](#l2-audit-di-continuità) (`continuity-audit`) | Libreria, chiamata dal core | Individuare contraddizioni e lacune prima di ogni modifica di documenti canonici. | Deciso |
+| [Audit di continuità](#l2-audit-di-continuità) (`continuity-audit`) | Libreria, chiamata esplicitamente dal core o su richiesta | Individuare contraddizioni e lacune nel perimetro scelto, senza modificare i documenti. | Deciso |
 | [Collegamenti](#l3-collegamenti) (`linker`) | Libreria, chiamata dal core | Collegare ogni menzione di un soggetto alla sua scheda o fonte, senza alterare testo, fatti o regole. | Deciso |
 | [Ricerca nel canone](#l4-ricerca-nel-canone) (`canon-research`) | Libreria, sola lettura | Rispondere a domande su chi o che cosa è qualcosa, con prove e limiti. | Deciso |
 | [Mappa della trama](#l5-mappa-della-trama) (`plot-map`) | Libreria, chiamata dal core | Vista d'insieme delle dipendenze fra documenti di trama: grafo, tabella, nodi aperti, rami. | Deciso |
@@ -97,7 +97,7 @@ Collegamento diretto (sidestep): i file già completi non vengono copiati né tr
 ### L2. Audit di continuità
 
 - **Scopo:** individuare contraddizioni e lacune fra documenti e fonti, senza modificare nulla. Sono riportate separatamente le differenze spiegabili (tempo, prospettiva, rivelazione successiva). I documenti delle fonti esterne sono letti come canone in sola lettura e riportati a parte nel conteggio, così che un audit che non ha letto il mondo condiviso si veda.
-- **Avvio:** nel flusso di scrittura, il controllo pre-modifica è eseguito una sola volta dal cablaggio; su richiesta esplicita può essere avviato anche fuori da quel flusso. Un riesame positivo della copertura si riusa solo quando gli hash di tutte le sue dipendenze coincidono; la revisione indipendente della bozza resta comunque obbligatoria.
+- **Avvio:** su richiesta esplicita o dai processi del core che la richiamano (per esempio dopo la sessione, durante l'import o nella manutenzione della continuità). Non è avviato automaticamente dal cablaggio di scrittura: lì il revisore indipendente confronta la bozza con i documenti `CONTEXT_FILES` in sola lettura. Un riesame positivo della copertura di questo audit si riusa solo quando gli hash di tutte le sue dipendenze coincidono.
 - **Input → output:** elenco dei file toccati e corpus → rapporto con gravità, localizzatori relativi, esclusioni applicate, ambito coperto (file letti e piste seguite) e dichiarazione esplicita di ciò che non è stato controllato.
 - **Deterministico:** inventario dei file; indice dei soggetti (nomi, alias, appellativi) con tutte le occorrenze; estrazione di valori ripetuti (date, CD, PF, quantità, nomi di luogo) in tabella; applicazione del registro delle esclusioni; elenco dei documenti letti.
 - **Giudizio:** confronto semantico, distinzione fra contraddizione diretta, discrepanza e prospettiva diversa.

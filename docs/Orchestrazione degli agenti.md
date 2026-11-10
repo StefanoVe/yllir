@@ -17,7 +17,7 @@ Questo file descrive come il framework distribuisce il lavoro fra un agente prin
 ## Ruoli
 
 | Ruolo | Chi lo svolge | Fa | Non fa |
-| --- | --- | --- | --- |
+| --- | --- | --- |
 | Agente principale | Modello di alto livello della famiglia Claude | Interpreta la richiesta, decide, scompone il lavoro, scrive i brief, legge i diff, decide se accettare, parla con il master | Non scrive in serie schede o codice; non revisiona da solo ciò che ha scritto |
 | Esecutore | Haiku (Claude); in Codex sempre Luna, indicato esplicitamente (vedi «Modello dei sub-agent in Codex») | Esegue un brief: scrive schede, codice, trascrizioni, immagini | Non decide il canone; non chiede nulla al master; non tocca file fuori dal proprio elenco |
 | Revisore indipendente | Sub-agent distinto da chi ha scritto, in sola lettura | Valuta il diff o le proposte e restituisce un esito motivato | Non modifica file; non parla con il master |
@@ -88,6 +88,8 @@ Steps:
 ## Files to read
 1. <path relative to the project root>
 2. <path relative to the project root>
+
+For a canon-writing review, include the read-only `CONTEXT_FILES` containing the relevant existing canon. The reviewer compares the draft with these files during the independent review; this does not invoke `continuity-audit`.
 
 ## Files you may write
 - <path>        (everything else is read-only)
@@ -165,7 +167,7 @@ Le regole di scrittura delle istruzioni per modelli minori e per Codex sono in [
 
 ### Livello di controllo proporzionato alla modifica
 
-**Proposta.** Ogni scrittura riceve un livello di controllo, basso, medio o alto, calcolato da uno script deterministico (`skills/core/write-sequence/scripts/classify-write.mjs`) prima del controllo di continuità. Il livello è il massimo fra le seguenti misure numeriche; lo script le stampa tutte, perché un essere umano possa vedere il motivo:
+**Proposta.** Ogni scrittura riceve un livello di controllo, basso, medio o alto, calcolato da uno script deterministico (`skills/core/write-sequence/scripts/classify-write.mjs`) prima della revisione. Il livello è il massimo fra le seguenti misure numeriche; lo script le stampa tutte, perché un essere umano possa vedere il motivo:
 
 - **dimensione della modifica:** righe aggiunte, rimosse e cambiate; per un documento esistente, anche la quota di testo toccata;
 - **ampiezza:** numero di documenti e di soggetti coinvolti;
@@ -176,17 +178,17 @@ Le regole di scrittura delle istruzioni per modelli minori e per Codex sono in [
 
 Comportamento per livello:
 
-| Livello | Controllo di continuità | Revisori del canone | Linker |
-| --- | --- | --- | --- |
-| basso | saltato | un solo revisore per l'intero lotto | percorso leggero: uno script deterministico accetta da solo i link ovvi (nome proprio completo di almeno due parole, tutte con l'iniziale maiuscola, fuori dal blocco riservato, un solo soggetto, scheda esistente); il revisore del linker giudica solo gli altri |
-| medio | eseguito | un solo revisore per l'intero lotto | normale, con il revisore su ogni proposta |
-| alto | eseguito | un revisore per ogni documento, se i documenti sono più d'uno (in parallelo); l'esito unico è `ASK` se uno è `ASK`, altrimenti `FIX` se uno è `FIX`, altrimenti `APPLY` | normale |
+| Livello | Revisori del canone | Linker |
+| --- | --- | --- |
+| basso | un solo revisore per l'intero lotto | percorso leggero: uno script deterministico accetta da solo i link ovvi (nome proprio completo di almeno due parole, tutte con l'iniziale maiuscola, fuori dal blocco riservato, un solo soggetto, scheda esistente); il revisore del linker giudica solo gli altri |
+| medio | un solo revisore per l'intero lotto | normale, con il revisore su ogni proposta |
+| alto | un revisore per ogni documento, se i documenti sono più d'uno (in parallelo); l'esito unico è `ASK` se uno è `ASK`, altrimenti `FIX` se uno è `FIX`, altrimenti `APPLY` | normale |
 
 Regole:
 
 - Se una misura non si può calcolare, il livello è alto.
 - **La revisione indipendente è sempre presente, a ogni livello.** È una decisione dell'autore e non si indebolisce.
-- Il revisore può solo alzare il livello, e solo da basso a medio: segnala `escalate`, e allora il controllo di continuità parte prima della scrittura. Nessuna fase abbassa il livello.
+- Nessun livello avvia un audit di continuità automatico nel cablaggio di scrittura. Il revisore delle scritture canoniche riceve i documenti `CONTEXT_FILES` in sola lettura e valuta la bozza rispetto al canone; il numero dei revisori segue il livello.
 - Il livello si ricalcola a ogni giro del ciclo fra bozza e revisione.
 - Le soglie sono costanti dello script, da tarare sul testbench.
 

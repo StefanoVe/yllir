@@ -191,7 +191,7 @@ Il generatore produce i file in `.campaign/instructions/` in questi passaggi:
 2. carica il template unico del pacchetto, nella variante per Claude (e per Codex, se attivo);
 3. sostituisce i segnaposto con i valori della configurazione (nome, lingua, registro, cartelle delle categorie, adattatore, stili);
 4. include le sezioni condizionate ai moduli attivi: per esempio la sezione della stampa compare solo con `modules.print: true`. Le funzioni di libreria non hanno sezioni condizionate;
-5. inserisce le regole di processo fisse del framework (audit di continuità prima di ogni modifica, collegamenti dopo, derivati aggiornati), che non dipendono dalla campagna e non sono modificabili dalla configurazione;
+5. inserisce le regole di processo fisse del framework (revisione della bozza canonica rispetto ai documenti di contesto, collegamenti dopo, derivati aggiornati), che non dipendono dalla campagna e non sono modificabili dalla configurazione; gli audit di continuità partono dai processi che li richiamano esplicitamente;
 6. aggiunge il rimando a `.campaign/customizations.md`, che l'agente legge insieme alle istruzioni;
 7. scrive il file con un'intestazione che dichiara che è generato e indica dove fare le modifiche;
 8. registra in `.campaign/version.yaml` un'impronta del file generato, così il validatore rileva le modifiche fatte a mano.

@@ -49,6 +49,7 @@ test('FIX wins over APPLY and APPLY remains APPLY when all documents pass', () =
 test('rejects malformed responses, missing item evidence, and unknown outcomes without an output', () => {
   for (const value of [
     { outcome: 'OTHER', items: [] },
+    { outcome: 'APPLY', items: [], escalate: true },
     { outcome: 'FIX', items: [{ document: 'a.md', problem: 'x' }] },
     { outcome: 'ASK', question: '', items: [] },
     { outcome: 'FIX', items: [] },
