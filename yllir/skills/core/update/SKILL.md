@@ -2,7 +2,7 @@
 name: update
 description: Handles the framework update for the master: campaign alignment after the assistant was updated, the update notice and its yes or no, and an interrupted update. It is read by the entry skill, never called by the master.
 user-invocable: false
-allowed-tools: Bash(node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/update-campaign.mjs" *), Bash(node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/yllir/scripts/topics.mjs" *), Bash(node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/yllir/scripts/runner-result.mjs" *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *), Read, Skill, Agent
+allowed-tools: Bash(node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/update-campaign.mjs" *), Bash(node */skills/core/update/scripts/update-campaign.mjs *), Bash(node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/post-update.mjs" *), Bash(node */skills/core/update/scripts/post-update.mjs *), Bash(node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/yllir/scripts/topics.mjs" *), Bash(node */skills/core/yllir/scripts/topics.mjs *), Bash(node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/yllir/scripts/runner-result.mjs" *), Bash(node */skills/core/yllir/scripts/runner-result.mjs *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *), Read, Skill, Agent
 ---
 
 # Update
@@ -13,7 +13,7 @@ The lexicon (`${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/yllir/lexicon.md
 
 Run every command from the campaign root (the folder the master opened). Never run a command from another folder.
 
-**Plugin root.** Resolve the installed plugin root from `PLUGIN_ROOT` in Codex, falling back to `CLAUDE_PLUGIN_ROOT` in Claude Code. If both are unset, stop before running an update command and use the lexicon’s fixed sentence for an operation that could not be completed. Do not give the master the technical reason or claim the campaign was checked or changed.
+**Plugin root.** Never put `PLUGIN_ROOT=...` or `CLAUDE_PLUGIN_ROOT=...` before a command that references that same variable: the shell expands the argument before applying the assignment. Use the existing fallback commands below when either variable is already present. In Codex, if `PLUGIN_ROOT` is absent, derive the absolute plugin root from the active skill path shown in context (remove `/skills/core/update/SKILL.md`) and run the named script by its absolute path. If no reliable path is available, stop and use the lexicon’s fixed sentence for an operation that could not be completed. Do not give the master the technical reason or claim the campaign was checked or changed.
 
 **Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: FAILED`, reason "permission refused".
 
@@ -21,7 +21,7 @@ Run every command from the campaign root (the folder the master opened). Never r
 
 Use this part when the block `YLLIR SESSION CHECK` has `campaign alignment: needed` or `post-update: needed`.
 
-1. Run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/update-campaign.mjs" .`. Read the JSON result and its `exit:` line.
+1. Select the plugin root once for this Part: use the existing `PLUGIN_ROOT` in Codex, the existing `CLAUDE_PLUGIN_ROOT` in Claude Code, or in Codex derive the absolute root from this skill's installed location shown in context (remove `/skills/core/update/SKILL.md`). Use that same root for every plugin script command in this Part. Run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/update-campaign.mjs" .` when either variable is present; otherwise substitute the derived absolute plugin root directly into the script path. Read the JSON result and its `exit:` line.
 2. If `status` is `updated`: when `sheet_migration` is `pending`, say that the assistant has been updated and that some Statistics sections need a format update (translate into the campaign language). Otherwise say the fixed sentence of the lexicon «L'assistente è stato aggiornato. Nulla di tuo è cambiato.» (in the campaign language, as it is written there). Then do the following, in this order:
    - If `migrated` is not empty (it lists the old session files that were converted), link the scenes, once:
      1. Invoke the skill `yllir:plot-map` (if your tool has no way to invoke a skill, read `${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/library/plot-map/SKILL.md` with the Read tool, and follow it exactly as if it had been invoked) with:
@@ -35,19 +35,19 @@ Use this part when the block `YLLIR SESSION CHECK` has `campaign alignment: need
    - Do not run `generate-instructions` as well.
 3. If `status` is `up-to-date`: say nothing about the framework update.
 4. If `status` is `failed` and the first item of `errors` has `code` `interrupted-update`: say the fixed sentence of the lexicon for an earlier update that was not finished. Then offer two choices in plain words: continue the update, or go back to how it was. Write no campaign content until the master chooses.
-   - On «continue»: run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/update-campaign.mjs" . --resume`. Read its JSON result and apply step 2 (`updated`) or step 5 (any other failure).
-   - On «go back»: run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/update-campaign.mjs" . --cancel`. If `status` is `cancelled`, tell the master in one sentence that everything is as it was before the update.
+   - On «continue»: run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/update-campaign.mjs" . --resume` when either variable is present. Otherwise, in Codex, use the absolute script path selected in step 1. Read its JSON result and apply step 2 (`updated`) or step 5 (any other failure).
+   - On «go back»: run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/update-campaign.mjs" . --cancel` when either variable is present. Otherwise, in Codex, use the absolute script path selected in step 1. If `status` is `cancelled`, tell the master in one sentence that everything is as it was before the update.
 5. Any other failure, or any other status: say the fixed sentence of the lexicon for an update that could not be applied, which says that nothing was changed (the script has already restored the campaign). Stop writing.
 
 Output: the campaign is aligned (updated, with the scenes linked when `migrated` was not empty, or already up to date), or the master has been told about the problem and nothing was written.
 
 ### Sheet format follow-up
 
-If the result has `sheet_migration: pending` (whether its status is `updated` or `up-to-date`), run the post-update process through `yllir:process-runner` before continuing to the master's request:
+If the result has `sheet_migration: pending` (whether its status is `updated` or `up-to-date`), run the post-update process through `yllir:process-runner` before continuing to the master's request. Never put `PLUGIN_ROOT=...` or `CLAUDE_PLUGIN_ROOT=...` before a command that references that same variable: the shell expands the argument before applying the assignment. Keep the existing fallback command when either variable is present. In Codex, if both are absent, derive the absolute plugin root from this skill's installed location shown in context and run the allowed script by absolute path. If no reliable root can be derived, stop and use the lexicon's fixed sentence for an operation that could not be completed; make no campaign checks or writes:
 
-1. Read the active topic from the session check and its handoff. If an active topic has `process: post-update` with a pending question and the master's current message does not answer it, skip this follow-up and continue to the entry skill's normal request handling. Reuse an active post-update topic if the master's message answers its pending question. If no such topic exists, run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/yllir/scripts/topics.mjs" new . --process post-update --goal "Convert old Statistics tables"` and keep its `id` and `path`.
+1. Read the active topic from the session check and its handoff. If an active topic has `process: post-update` with a pending question and the master's current message does not answer it, skip this follow-up and continue to the entry skill's normal request handling. Reuse an active post-update topic if the master's message answers its pending question. If no such topic exists, run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/yllir/scripts/topics.mjs" new . --process post-update --goal "Convert old Statistics tables"` when either variable is present; otherwise run the script by its absolute path under the plugin root selected in Part A step 1. Keep its `id` and `path`.
 2. Launch `yllir:process-runner` in the foreground, using GPT-6 Luna in Codex, with `PROCESS: yllir:post-update`, `TOPIC: <id>`, `HANDOFF: <absolute topic path>`, `CHANGED_FILES: none`, `LANGUAGE: <language.main>`, `MASTER_MESSAGE:` followed by the master's current message verbatim.
-3. Run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/yllir/scripts/runner-result.mjs" . --file .campaign/state/runner/result.txt --topic <id>`. Read its output. This validates the result and records the topic handoff or closes the topic.
+3. Run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/yllir/scripts/runner-result.mjs" . --file .campaign/state/runner/result.txt --topic <id>` when either variable is present; otherwise run the script by its absolute path under the plugin root selected in Part A step 1. Read its output. This validates the result and records the topic handoff or closes the topic.
 4. If the result command says `status: QUESTION`, send only the text under `message for the master:` and stop before the master's original request. Never repeat the same question unless the master has answered it or asked to revisit the migration. If validation fails, treat the process as FAILED, keep the marker pending, and continue with the master request.
 
 ## Part B — Update notice
@@ -60,7 +60,7 @@ Use this part when your context has a block that starts with `YLLIR UPDATE AVAIL
   3. Say whether the master's documents are touched, ONLY if the news says so. If the news says nothing about it, say nothing about it.
   4. Ask whether to update now. This is the only question of the paragraph.
   5. Last, a note: «Versione <installed> → <published>» (in English campaigns: «Version <installed> → <published>»), with the values of the block's `installed:` and `published:` lines.
-  After writing that paragraph in your message, and before the turn ends, run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/update-campaign.mjs" . --postpone` once, with nothing added. Its output is not shown to the master. Do not run it again in this turn.
+  After writing that paragraph in your message, and before the turn ends, run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/update-campaign.mjs" . --postpone` once, with nothing added. Use the plugin root selected in Part A when Part A ran; otherwise, in Codex with both variables absent, derive the root from this registered skill path shown in context by removing `/skills/core/update/SKILL.md` and substitute it directly in the command. Its output is not shown to the master. Do not run it again in this turn.
   Output: the paragraph in the final message, then the postpone command has run once.
 
 **(b) Answer to the question.** Look at your previous message in the conversation. If the master's message answers the update question of (a), do only this part (not Step 6 of the entry skill).

@@ -2,7 +2,7 @@
 name: npc-manager
 description: Library skill. Creates the draft of a character sheet (non-player character, vendor, enemy or creature) and checks that every character defined in the plot documents has a sheet. The sheet is the source of truth for who the character is, never for what the character does in the plot. Invoked by Yllir core processes (prepare-session, after-session, import) when a plot document names a character, or when asked to check character sheets. Never invoked for anything outside a Yllir campaign.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Read, Write
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Read, Write, Bash(node */scripts/session-start.mjs *), Bash(node */skills/library/npc-manager/scripts/npc-manager.mjs *)
 ---
 
 # NPC manager
@@ -10,6 +10,8 @@ allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), B
 This skill is always invoked by another skill. The result of this skill is the file `.campaign/state/npc-manager/report.txt`, not a message for the master. The invoking skill reads that file to know the result.
 
 **Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: FAILED`, reason "permission refused".
+
+**Codex plugin-root fallback.** Keep using the commands as written when `PLUGIN_ROOT` or `CLAUDE_PLUGIN_ROOT` is available. If both are absent, take the absolute path of the active Yllir skill file shown in context, remove everything from `/skills/` onward to get the plugin root, substitute that absolute root directly for `${CLAUDE_PLUGIN_ROOT}` in each command, and run the resulting single command. Never prefix an inline variable assignment. If no reliable absolute path is visible, stop before running a script and report failure; do not claim the operation ran.
 
 Run every command from the campaign root (the folder containing `campaign.yaml`): the `campaign root:` line of the session check in your context, or, if absent, the output of `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .`. Drafts go to `.campaign/state/write/draft/` followed by the campaign-relative path.
 

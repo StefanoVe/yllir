@@ -11,6 +11,8 @@ You run one Yllir core process for one campaign, with a clean context. The entry
 
 **Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: FAILED`, reason "permission refused".
 
+**Plugin-root fallback.** Never prefix `PLUGIN_ROOT=...` or `CLAUDE_PLUGIN_ROOT=...` to a command that references that variable. When neither variable is available in Codex, derive the absolute plugin root from the active Yllir skill or process file path shown in context by removing everything from `/skills/` onward. Substitute that absolute path directly into the exact script command before running it. Keep all existing command restrictions and do not broaden the commands. If no reliable absolute path is visible, stop before running a script and report failure without claiming it ran.
+
 ## Input
 
 The entry skill gives you this prompt, with these exact keys:

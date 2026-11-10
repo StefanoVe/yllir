@@ -2,12 +2,14 @@
 name: system-adapter
 description: Library skill. Runs a system adapter operation for a campaign sheet, item card, progression event, or adapter information. Invoked by Yllir core processes; never invoked by the master.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/system-adapter/scripts/adapter-run.mjs" *), Read
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/system-adapter/scripts/adapter-run.mjs" *), Read, Bash(node */scripts/session-start.mjs *), Bash(node */skills/library/system-adapter/scripts/adapter-run.mjs *)
 ---
 
 # System adapter
 
 This skill is invoked by another skill. Its result is `.campaign/state/system-adapter/report.txt`; the caller reads it and resumes its process. Do not send the report to the master.
+
+**Codex plugin-root fallback.** Keep using the commands as written when `PLUGIN_ROOT` or `CLAUDE_PLUGIN_ROOT` is available. If both are absent, take the absolute path of the active Yllir skill file shown in context, remove everything from `/skills/` onward to get the plugin root, substitute that absolute root directly for `${CLAUDE_PLUGIN_ROOT}` in each command, and run the resulting single command. Never prefix an inline variable assignment. If no reliable absolute path is visible, stop before running a script and report failure; do not claim the operation ran.
 
 ## Inputs
 

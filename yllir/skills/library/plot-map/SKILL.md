@@ -2,7 +2,7 @@
 name: plot-map
 description: Library skill. Reads the plot documents of a Yllir campaign, derives the status of every session (played, ready, waiting), reports the errors of the plot graph and generates the derived main file of each session (the concept map of its events). In mode link-events, declares how the events of a session depend on each other, from their text, and writes it through write-sequence. Invoked by Yllir core processes after any change to a plot document, after the update migrated old sessions, after new events of a session are created, or when asked to check the plot map. Never invoked for anything outside a Yllir campaign.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/plot-map/scripts/plot-map.mjs" *), Read, Edit, Write, Skill
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/plot-map/scripts/plot-map.mjs" *), Read, Edit, Write, Skill, Bash(node */skills/library/plot-map/scripts/plot-map.mjs *)
 ---
 
 # Plot map
@@ -10,6 +10,8 @@ allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/plot-map/scripts/
 This skill is always invoked by another skill (for example prepare-session or after-session). The result of this skill is the file `.campaign/state/plot-map/report.txt`, not a message for the master. The invoking skill reads that file to know the result.
 
 **Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: ERRORS`, reason "permission refused".
+
+**Codex plugin-root fallback.** Keep using the commands as written when `PLUGIN_ROOT` or `CLAUDE_PLUGIN_ROOT` is available. If both are absent, take the absolute path of the active Yllir skill file shown in context, remove everything from `/skills/` onward to get the plugin root, substitute that absolute root directly for `${CLAUDE_PLUGIN_ROOT}` in each command, and run the resulting single command. Never prefix an inline variable assignment. If no reliable absolute path is visible, stop before running a script and report failure; do not claim the operation ran.
 
 ## What this skill owns
 
