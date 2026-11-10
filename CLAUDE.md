@@ -34,6 +34,7 @@ Every implementation is orchestrated through sub-agents running Haiku or Luna. T
 - **Executors** do the writing. Use the Agent tool with `model: "haiku"`. Luna is not available as a Claude Code sub-agent: use it only through Codex, when Codex is installed.
 - **Sub-agents running in parallel** must never write the same file.
 - **If a brief fails**, rewrite it to be more explicit and rerun it. Do not take the task over yourself. A brief that only works for a stronger model is a defect, so treat it like a failing test.
+- **Codex implementation workflow.** Before each new implementation, Codex must prepare an explicit plan that breaks the work into tasks with completion criteria. It must launch executor sub-agents with `model: "gpt-6-luna"` explicitly, actively supervise their progress, review their results, and resolve blockers by refining briefs and relaunching Luna. Before finishing, Codex must verify that every plan item is complete. The main agent orchestrates this work and does not take over implementation.
 
 ## Versioning and commits (automatic)
 
