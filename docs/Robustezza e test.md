@@ -146,7 +146,7 @@ Sequenza proposta:
 3. L’agente prepara per ogni voce un testo prima e dopo, la destinazione relativa, e il motivo in una frase.
 4. Il revisore, con formato di evidenza fisso (vedi sotto), approva, corregge, omette o chiede conferma.
 5. Uno script applica i link approvati, rispettando le eccezioni, e rigenera il rapporto: le menzioni `bare` residue devono essere zero oppure elencate con il motivo.
-6. La verifica controlla che i percorsi risolvano, che i frammenti `#ancora` corrispondano a titoli esistenti e che il numero di blocchi di codice non sia cambiato.
+6. Una sola verifica completa dell'intero ambito interessato controlla che i percorsi risolvano, che i frammenti `#ancora` corrispondano a titoli esistenti e che il numero di blocchi di codice non sia cambiato. Il rapporto del linker e il risultato dettagliato in `.campaign/state/linker/check.json` registrano i file controllati e gli errori; il cablaggio di scrittura li consuma senza ripetere i controlli dei link.
 
 Il formato di evidenza del revisore è una riga per voce, con campi fissi: `id`, `file`, `occurrence`, `target`, `evidence` (localizzatore della scheda o della fonte), `outcome` (uno degli esiti della scala definita in [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md)) e `reason` (una frase). Un esito senza localizzatore non è valido, e lo script lo rifiuta.
 
@@ -168,6 +168,8 @@ Due modalità distinte, con regole diverse:
 - **Completo.** Ambito tutto il repository, eseguito su richiesta o a intervalli. Produce un registro di copertura per ogni file.
 
 **Deciso (2026-11-08).** L'ambito pre-modifica resta largo: i soggetti toccati comprendono quelli menzionati nei documenti coinvolti, e con essi i documenti che li citano, così l'audit trova anche le contraddizioni a distanza. Per contenere i tempi, i fatti estratti si conservano in una cache derivata (`.campaign/cache/facts/`), indicizzata dall'impronta del contenuto del documento e del vocabolario degli attributi: si ri-estraggono solo i documenti nuovi o cambiati.
+
+Il riesame della copertura può riutilizzare un esito positivo soltanto quando coincidono gli hash di tutte le dipendenze della revisione, inclusi fatti validati, vocabolario, documenti inclusi e istruzioni del revisore. Si conserva solo un esito `CONFIRMED` valido con `missed=[]`, dopo che l'estrazione è completa, non restano file da leggere e non ci sono fatti scartati; esiti mancati, incompleti o non validi non si riusano. La revisione indipendente della bozza resta obbligatoria anche quando si riusa il riesame della copertura. La cache derivata sta in `.campaign/cache/audit-coverage/`.
 
 Il registro di copertura è generato dallo script: elenca ogni file incluso, il numero di fatti estratti e lo stato (`to-read`, `read`, `extracted`, `not-relevant`). Un audit senza registro non è dichiarato completo.
 

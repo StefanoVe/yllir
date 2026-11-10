@@ -2,7 +2,7 @@
 name: write-sequence
 description: Core rule. The only way Yllir writes campaign documents: manual changes saved, continuity check, independent review, write, links, derived files, deterministic verification, saved version. Invoked by core processes with drafts already prepared.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/classify-write.mjs" *), Read, Write, Agent, Skill
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/classify-write.mjs" *), Read, Write, Agent, Skill
 ---
 
 # Write sequence
@@ -19,6 +19,7 @@ The calling process gives:
 - `DOCUMENTS`: campaign-relative paths, comma-separated.
 - `INTENT`: one sentence.
 - `NEW_SUBJECTS`: subject ids, may be empty.
+- `CONTEXT_FILES`: existing campaign-relative documents read as context, comma-separated; may be empty. These are audited as read-only context.
 - `VERSION_MESSAGE`: one sentence in the campaign language.
 - `ROUND`: 1, 2 or 3.
 - `CONTINUE_WITH`: the step of the calling process to run after this skill, in one sentence.
@@ -52,12 +53,12 @@ The level decides what runs:
 
 The independent review of step 4 always runs, at every level. The level is computed again at each round, because this skill runs again at each round.
 
-**2. Continuity check.** If LEVEL is `low`, skip the whole step and record `continuity: skipped (low)`. On ROUND 2 or 3, the reuse rule in the Rules section applies first. For `medium` and `high` the step runs exactly as written below (its audit scope already limits itself to the documents that mention the subjects). EXISTING is the list of DOCUMENTS that already exist: for each document, Read `<document>`: if Read says it does not exist, the document is not in EXISTING; otherwise it is.
-- If EXISTING and NEW_SUBJECTS are both empty: skip. Record "continuity: nothing to compare yet".
-- Otherwise run a scope probe, omitting each option whose list is empty: `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" . --mode pre [--files "<EXISTING>"] [--subjects "<NEW_SUBJECTS>"] --out .campaign/state/write/scope-probe.json`.
+**2. Continuity check.** If LEVEL is `low`, skip the whole step and record `continuity: skipped (low)`. On ROUND 2 or 3, the reuse rule in the Rules section applies first. For `medium` and `high` the step runs exactly as written below (its audit scope also limits itself to documents that mention the subjects). EXISTING is the list of DOCUMENTS that already exist: for each document, Read `<document>`: if Read says it does not exist, the document is not in EXISTING; otherwise it is. AUDIT_FILES is the de-duplicated union of EXISTING and CONTEXT_FILES.
+- If AUDIT_FILES and NEW_SUBJECTS are both empty: skip. Record "continuity: nothing to compare yet".
+- Otherwise run a scope probe, omitting each option whose list is empty: `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" . --mode pre [--files "<AUDIT_FILES>"] [--subjects "<NEW_SUBJECTS>"] --out .campaign/state/write/scope-probe.json`.
   - If it prints `documents: 0`: skip the audit. Record "continuity: nothing to compare yet".
   - If its exit code is 2: end this skill with `status: FAILED`, reason "continuity check not run" (the calling process continues).
-  - Otherwise invoke the skill `yllir:continuity-audit` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `MODE=pre`, `FILES=EXISTING` (comma-separated), `SUBJECTS=NEW_SUBJECTS`, `CHANGE=INTENT`, `CONTINUE_WITH="write-sequence step 2: read the AUDIT REPORT, then step 3"`. When it has finished, read `.campaign/state/audit/report.txt` with the Read tool. That file is the AUDIT REPORT.
+  - Otherwise invoke the skill `yllir:continuity-audit` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `MODE=pre`, `FILES=AUDIT_FILES` (comma-separated), `SUBJECTS=NEW_SUBJECTS`, `CHANGE=INTENT`, `CONTINUE_WITH="write-sequence step 2: read the AUDIT REPORT, then step 3"`. When it has finished, read `.campaign/state/audit/report.txt` with the Read tool. That file is the AUDIT REPORT. CONTEXT_FILES are read-only; only DOCUMENTS are written.
     - If any line starts with `- [RELATED]`: end this skill with `status: CONFLICT` (the calling process continues), and list those lines in the report.
     - If its `status:` line is `INCOMPLETE`: continue and record `continuity: INCOMPLETE`.
     - If its `status:` line is `COMPLETE`: continue and record `continuity: COMPLETE`.
@@ -98,23 +99,23 @@ Save its answer exactly as received to `.campaign/state/write/review.json` with 
 **5. Write.** Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" . --draft-dir .campaign/state/write/draft --files "<DOCUMENTS>"`. Save its printed JSON to `.campaign/state/write/applied.json` with the Write tool. Exit ≠ 0 (nothing was written): end this skill with `status: FAILED` (the calling process continues) and list its `errors`.
 
 **6. Links.** Invoke the skill `yllir:linker` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/linker/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with `FILES=DOCUMENTS`, `SUBJECTS=NEW_SUBJECTS`, `LEVEL=<LEVEL>` (the current LEVEL, including after a reviewer escalation), `CONTINUE_WITH="write-sequence step 7 (derived files), then steps 8 and 9"`. At `low` the linker runs its light path, otherwise its normal path. NEW_SUBJECTS must list the id of every NEW character sheet among DOCUMENTS (template npc): if a document in DOCUMENTS is a new sheet and its id is not in NEW_SUBJECTS, add it before invoking the linker. This is what links the documents that mention the new character to its sheet. When it has finished, read `.campaign/state/linker/report.txt` with the Read tool. That file is the LINKER REPORT.
-- Its `status:` line is `FAILED`: continue, record `links: FAILED`, and mark every document "to check" in the report.
-- Otherwise record `links: applied <n>` with the number from its `applied:` line. Copy every line under `decisions for the master` into the report details.
-- The file is missing: record `links: FAILED` and continue as above.
+- Its `status:` line is `NEEDS_ATTENTION`: end this skill with `status: VERIFY_FAILED`, list its check errors and other actionable errors in report details, and do not save a version. Ambiguous names under `decisions for the master` do not by themselves block saving.
+- Its `status:` line is `FAILED`: end this skill with `status: FAILED`, reason "link verification not run", and do not save a version.
+- If its status is `DONE`: record `links: applied <n>` with the number from its `applied:` line. Copy every line under `decisions for the master` into the report details.
+- Any other status or a missing report: end this skill with `status: FAILED`, reason "link report unavailable", and do not save a version.
 
 **7. Derived files.** Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" . --out .campaign/cache/subjects.json`. Exit ≠ 0: end this skill with `status: FAILED`, reason "index not built", and its printed lines (the calling process continues). The documents already written stay marked "to check".
 
-**8. Deterministic verification.** Run these five commands in this order, and keep the output of each:
-- `node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" . --files "<DOCUMENTS>"`
+**8. Deterministic verification.** Run these four commands in this order, and keep the output of each. The linker already checked the full affected scope and its report is authoritative; do not run check-links again here.
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" .`
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" . --check`
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . plot-cast --files "<DOCUMENTS>" --out .campaign/state/write/plot-cast.json`
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . check-sheets --files "<DOCUMENTS>"`
 
 Then decide:
-- `check-links`, `validate-config`, `plot-cast` or `check-sheets` exit 1: end this skill with `status: VERIFY_FAILED` (the calling process continues). Put every printed error line in the report details. Do NOT save a version. The caller fixes the draft and calls again with ROUND+1.
+- `validate-config`, `plot-cast` or `check-sheets` exit 1: end this skill with `status: VERIFY_FAILED` (the calling process continues). Put every printed error line in the report details. Do NOT save a version. The caller fixes the draft and calls again with ROUND+1.
   - Do not list `candidate` lines of `plot-cast` as errors. When there is at least one error line, copy every `candidate` line of `plot-cast` into the report details, each prefixed with `candidate (judge before the next round):`. When there is no error line, ignore the `candidate` lines.
-- `check-links`, `validate-config`, `plot-cast` or `check-sheets` exit with any code other than 0 or 1: end this skill with `status: FAILED`, reason "verification not run" (the calling process continues).
+- `validate-config`, `plot-cast` or `check-sheets` exit with any code other than 0 or 1: end this skill with `status: FAILED`, reason "verification not run" (the calling process continues).
 - `generate-instructions --check` exit 1 (files changed): run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" .`. Exit ≠ 0: end this skill with `status: FAILED`, reason "instructions not regenerated" (the calling process continues). Exit 0: continue.
 - `generate-instructions --check` exit ≠ 0 and ≠ 1: end this skill with `status: FAILED`, reason "instructions not checked" (the calling process continues).
 - Otherwise record `verification: passed`.

@@ -64,10 +64,16 @@ function run(root, { plan, outcomes, result, checkExit = null, statusReason = nu
   // A plan of undefined is not written, so the plan file is missing.
   const write = (name, value) => {
     const full = path.join(root, name);
+    fs.mkdirSync(path.dirname(full), { recursive: true });
     fs.writeFileSync(full, typeof value === 'string' ? value : JSON.stringify(value));
     return full;
   };
   const planPath = planFile ?? (plan === undefined ? path.join(root, 'plan.json') : write('plan.json', plan));
+  const checkPath = path.join(root, '.campaign/state/linker/check.json');
+  if (!fs.existsSync(checkPath) && (checkExit === '0' || checkExit === '1')) {
+    const errors = checkExit === '1' ? [{ file: 'Trama/Nota.md', line: 1, col: 1, code: 'missing-target', message: 'missing target' }] : [];
+    write('.campaign/state/linker/check.json', { checked: plan?.scope ?? [], links: 0, errors });
+  }
   const outcomesPath = outcomes === undefined ? null : write('outcomes.json', outcomes);
   const resultPath = result === undefined ? null : write('result.json', result);
   const outFile = path.join(root, 'out', 'report.txt');
@@ -170,18 +176,30 @@ test('status DONE with a passing check and an ok result', () => {
   });
 });
 
-test('status NEEDS_ATTENTION when check-exit is 1, with the count from check.json', () => {
-  withRoot({ ...CAMPAIGN_FILES, '.campaign/state/linker/check.json': { errors: [{ file: 'a' }, { file: 'b' }] } }, (root) => {
+test('zero-proposal plan with a broken pre-existing link is NEEDS_ATTENTION', () => {
+  withRoot({ ...CAMPAIGN_FILES, '.campaign/state/linker/check.json': { checked: ['a', 'b'], links: 0, errors: [{ file: 'a', line: 1, col: 1, code: 'missing-target', message: 'bad a' }, { file: 'b', line: 2, col: 1, code: 'missing-target', message: 'bad b' }] } }, (root) => {
     const { status, text } = run(root, { plan: planWith(), checkExit: '1' });
     assert.equal(status, 'NEEDS_ATTENTION');
     assert.match(text, /^check: 2 errors$/m);
+    assert.match(text, /^- a:1:1 missing-target bad a$/m);
   });
 });
 
 test('status NEEDS_ATTENTION when the apply result is not ok', () => {
   withRoot(CAMPAIGN_FILES, (root) => {
-    const { status } = run(root, { plan: planWith(), checkExit: '0', result: { ok: false, applied: [] } });
+    const { status, text } = run(root, {
+      plan: planWith(),
+      checkExit: '0',
+      result: {
+        ok: false,
+        applied: [],
+        rejected: [{ entry: { id: 'P001' }, reason: 'target differs from the proposal' }],
+        missing_outcome: ['P002'],
+      },
+    });
     assert.equal(status, 'NEEDS_ATTENTION');
+    assert.match(text, /^apply rejected: P001 — target differs from the proposal$/m);
+    assert.match(text, /^apply missing outcome: P002$/m);
   });
 });
 
@@ -211,19 +229,29 @@ test('status FAILED when the plan cannot be read, and FAILED wins over check-exi
   });
 });
 
-test('check line: passed, <n> errors, and not run for other codes and none', () => {
+test('check line is passed or counted, while abnormal and missing checks fail closed', () => {
   withRoot(CAMPAIGN_FILES, (root) => {
     assert.match(run(root, { plan: planWith(), checkExit: '0' }).text, /^check: passed$/m);
+  });
+  withRoot(CAMPAIGN_FILES, (root) => {
     assert.match(run(root, { plan: planWith(), checkExit: '1' }).text, /^check: 1 errors$/m);
-    assert.match(run(root, { plan: planWith(), checkExit: '2' }).text, /^check: not run$/m);
-    assert.match(run(root, { plan: planWith(), checkExit: 'other' }).text, /^check: not run$/m);
-    assert.match(run(root, { plan: planWith(), checkExit: null }).text, /^check: not run$/m);
+  });
+  withRoot(CAMPAIGN_FILES, (root) => {
+    assert.equal(run(root, { plan: planWith(), checkExit: '2' }).status, 'FAILED');
+    assert.equal(run(root, { plan: planWith(), checkExit: 'other' }).status, 'FAILED');
+    assert.equal(run(root, { plan: planWith(), checkExit: null }).status, 'FAILED');
   });
 });
 
 test('check.json with a broken shape counts as 1 error', () => {
   withRoot({ ...CAMPAIGN_FILES, '.campaign/state/linker/check.json': '{broken' }, (root) => {
-    assert.match(run(root, { plan: planWith(), checkExit: '1' }).text, /^check: 1 errors$/m);
+    assert.equal(run(root, { plan: planWith(), checkExit: '1' }).status, 'FAILED');
+  });
+});
+
+test('a passed exit without a valid zero-error check result fails closed', () => {
+  withRoot({ ...CAMPAIGN_FILES, '.campaign/state/linker/check.json': { checked: [], errors: [{ file: 'x' }] } }, (root) => {
+    assert.equal(run(root, { plan: planWith(), checkExit: '0' }).status, 'FAILED');
   });
 });
 
@@ -259,5 +287,6 @@ test('helper functions', () => {
   assert.equal(countCheckErrors([1, 2]), 2);
   assert.equal(countCheckErrors({ errors: 4 }), 4);
   assert.equal(countCheckErrors({}), 1);
-  assert.equal(computeStatus({ planOk: true, statusReason: null, checkExit: null, resultNotOk: false, attention: false }), 'DONE');
+  assert.equal(computeStatus({ planOk: true, statusReason: null, checkExit: '0', resultNotOk: false, attention: false }), 'DONE');
+  assert.equal(computeStatus({ planOk: true, statusReason: null, checkExit: '2', resultNotOk: false, attention: false }), 'FAILED');
 });

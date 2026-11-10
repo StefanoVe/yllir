@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { checkLinks } from './check-links.mjs';
+import { planLinks } from './link-plan.mjs';
 
 const CAMPAIGN = [
   'name: Test',
@@ -191,6 +192,31 @@ test('files option restricts the check', (t) => {
   const result = checkLinks(root, { files: ['Notes/b.md'] });
   assert.deepEqual(result.checked, ['Notes/b.md']);
   assert.deepEqual(result.errors.map((e) => e.file), ['Notes/b.md']);
+});
+
+test('zero-proposal plan still checks broken links in caller and inbound scope', (t) => {
+  const root = makeCampaign(t, {
+    'campaign.yaml': [
+      'name: Test',
+      'structure:',
+      '  - id: people',
+      '    folder: People',
+      '    type: subjects',
+      '  - id: notes',
+      '    folder: Notes',
+      '    type: plot',
+      '',
+    ].join('\n'),
+    'People/Teodo Marr.md': '---\nid: teodo-marr\ntemplate: npc\n---\n\n# Teodo Marr\n\n[broken](./gone.md)\n',
+    'Notes/inbound.md': '# Inbound\n\n[Teodo Marr](../People/Teodo%20Marr.md) and [broken](./absent.md)\n',
+  });
+  const plan = planLinks(root, { files: ['People/Teodo Marr.md'], subjects: [] });
+  assert.deepEqual(plan.proposals, []);
+  assert.ok(plan.scope.includes('Notes/inbound.md'));
+  const result = checkLinks(root, { files: [...new Set(['People/Teodo Marr.md', ...plan.scope])] });
+  assert.deepEqual(result.checked, ['Notes/inbound.md', 'People/Teodo Marr.md'].sort());
+  assert.deepEqual(result.errors.map((error) => error.file), ['Notes/inbound.md', 'People/Teodo Marr.md'].sort());
+  assert.equal(result.errors.length, 2);
 });
 
 const EXTERNAL_CAMPAIGN = [

@@ -2,7 +2,7 @@
 name: continuity-audit
 description: Library skill. Checks Yllir campaign documents for contradictions using structured fact extraction, mechanical comparison and an independent judge, and reports what was covered. Invoked by Yllir core processes before a document is modified (pre mode) or on request for the whole campaign (full mode). Never modifies campaign documents.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-cache.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-validate.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-compare.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-report.mjs" *), Read, Write, Agent
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-scope.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-cache.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/coverage-review-cache.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-validate.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-compare.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-report.mjs" *), Read, Write, Agent
 ---
 
 # Continuity audit
@@ -84,13 +84,18 @@ Then go to Step 4. Exit code not 0: end this skill with status `FAILED` (the inv
   ```
   Save its answer exactly as received to `.campaign/state/audit/judgments.json` with the Write tool. Do not judge the candidates yourself.
 
-**Step 6 — Coverage review.** Run this step only when Step 4 printed zero candidates. Launch `yllir:audit-coverage-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-coverage-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. The prompt is exactly these lines:
+**Step 6 — Coverage review.** Run this step only when Step 4 printed zero candidates. First run the deterministic cache lookup:
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/coverage-review-cache.mjs" lookup . --facts .campaign/state/audit/facts.json --scope .campaign/state/audit/scope.json --review .campaign/state/audit/coverage-review.json --key-out .campaign/state/audit/coverage-review-key.txt --out .campaign/cache/audit-coverage --vocab "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/audit-vocabulary.yaml" --instructions "${CLAUDE_PLUGIN_ROOT}/agents/audit-coverage-reviewer.md"`
+If the command exits nonzero for any reason, treat it as a cache miss and run the reviewer. If it prints `coverage review: reused`, skip the reviewer and go to Step 7 with the cached report. If it prints `coverage review: run reviewer`, launch `yllir:audit-coverage-reviewer` (the instructions of this sub-agent are in `${CLAUDE_PLUGIN_ROOT}/agents/audit-coverage-reviewer.md`; if your tool has no named agents, start a sub-agent, tell it to read that file first and follow it exactly) with the Agent tool. In Codex, always set the model of this sub-agent to GPT-6 Luna in the launch call itself: an omitted model silently becomes the model of the main agent, which is a defect. The prompt is exactly these lines:
 ```
 CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 FACTS: <CAMPAIGN_ROOT>/.campaign/state/audit/facts.json
 VOCABULARY: ${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/audit-vocabulary.yaml
 ```
 Save its answer exactly as received to `.campaign/state/audit/coverage-review.json` with the Write tool. When Step 4 printed candidates, skip this step.
+After saving the answer, run:
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/coverage-review-cache.mjs" store . --facts .campaign/state/audit/facts.json --scope .campaign/state/audit/scope.json --review .campaign/state/audit/coverage-review.json --key-file .campaign/state/audit/coverage-review-key.txt --out .campaign/cache/audit-coverage --vocab "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/audit-vocabulary.yaml" --instructions "${CLAUDE_PLUGIN_ROOT}/agents/audit-coverage-reviewer.md"`
+The cache stores only `CONFIRMED` reviews with no missed files, complete validated facts, and no unread or discarded facts. Its key covers the facts, vocabulary, all scoped document contents, and reviewer instructions. The store step must match the key captured before the reviewer ran; if dependencies changed, it prints `not cached`. If lookup exits nonzero, run the reviewer. If store exits nonzero, continue to the report without caching. Never reuse an incomplete, missed, malformed, or invalid review.
 
 **Step 7 — Report.** Run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/scripts/audit-report.mjs" --scope .campaign/state/audit/scope.json --facts .campaign/state/audit/facts.json --candidates .campaign/state/audit/candidates.json --judgments .campaign/state/audit/judgments.json --out .campaign/state/audit/report.json --text .campaign/state/audit/report.txt`

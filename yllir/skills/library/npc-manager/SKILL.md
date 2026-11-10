@@ -39,10 +39,66 @@ The sheet is the source of truth for WHO the character is: name, role, appearanc
 
 ## Inputs
 
-- `MODE`: `create`, `check` or `gaps`. Any other value: write the report with `status: FAILED` and `reason: unknown MODE <value>`.
+- `MODE`: `create`, `create-batch`, `check` or `gaps`. Any other value: write the report with `status: FAILED` and `reason: unknown MODE <value>`.
 - `CONTINUE_WITH`: text naming the caller's next step. If absent, use "the step of the invoking skill that called npc-manager".
 
 Mode `create` also takes `NAME` (the name as written by the master or the plot; a double quote in it means `status: FAILED`, reason "name not usable"), `LOCATION` (comma-separated place ids, may be empty; for an enemy or creature, every place where it lives, and empty means errant), `DETAILS` (facts about the character as plain text, may be empty), `REQUESTED_BY` (comma-separated campaign-relative paths of the documents that asked for this character: the scene files, a sheet, an ingested page; may be empty) and `TEMPLATE` (`npc`, `vendor`, `enemy` or `creature`; default `npc`). The caller gives TEMPLATE: never guess it. `PROPOSE`: `yes` or `no`, default `no`. Any other value means `no`. With `yes`, the skill fills the gaps with creative proposals consistent with the campaign (see Step 5). The caller passes `yes` only when the master asked for something that needs this character (for example a fight, or a shop) and gave no details. With `no`, the sheet holds only what DETAILS says. `IMAGINATION`: `yes` or `no`, default `no`; any other value means `no`. With `yes`, the sheet may hold details that no source gives, as set out in Step 5. IMAGINATION `yes` with PROPOSE `no` behaves as PROPOSE `yes`. Mode `check` also takes `FILES` (comma-separated campaign-relative paths; empty means the whole campaign). Mode `gaps` takes `FILES` (comma-separated campaign-relative paths, required) and optional `BASE` (a campaign-relative folder that holds the files instead of the campaign root).
+Mode `create-batch` takes `CHARACTERS`, an ordered list of records. Each record has the same fields and defaults as `create`: `NAME`, `LOCATION`, `DETAILS`, `REQUESTED_BY`, `TEMPLATE`, `PROPOSE`, and `IMAGINATION`. The caller supplies each template; do not guess. Process records in their given order. This is an instruction-level batch interface, not a script input format.
+
+## Mode `create-batch`
+
+Use this mode when one caller needs several new character sheets in one invocation. The batch shares setup and one final report; each character still follows the existing create rules.
+
+1. Validate the input before making any draft: `CHARACTERS` must be a non-empty ordered list, and every item must be a record with a non-empty `NAME`. If not, write one batch report with overall `status: FAILED`, `reason: invalid CHARACTERS: expected a non-empty list of records with NAME`, and no item blocks; then follow `CONTINUE_WITH`. Locate the campaign root once using the Working folder rule. Read `campaign.yaml` once and `.campaign/cache/subjects.json` once if it exists. Use these contents for category and ID checks. For each distinct requested TEMPLATE, resolve the category by applying create Step 1 exactly. Read any exemplar sheet needed to establish its `template` from the shared subjects index; reuse that read when multiple templates need the same category. Never select a category from configuration or cached index alone. The `find --name` command in create Step 3 performs its own per-name index lookup; run it once for each record and apply its exact/partial campaign match behavior unchanged. If no `subjects` category exists, mark affected records `FAILED` using the create Step 1 reason. A category unavailable for one template does not prevent processing other records.
+2. Keep a batch-wide list of earlier records that produced drafts, plus reserved IDs and paths. For each record in order, validate its name and template using create Steps 2 and 4, then run `find --name` as described above. For prior batch drafts, check only deterministic collisions: same ID under the create Step 4 slug rule, or same proposed sheet path after applying the create Step 4 filename sanitization. Do not make a subjective partial-name judgment between batch items. On an ID collision, mark the later item `ASK` with a question asking whether it is the same character as the earlier item; do not write another draft. On a path collision with different IDs, mark it `FAILED` with reason `draft path collision` and do not overwrite. Reserve an ID and path only when an item is proceeding to draft.
+3. For each record that may proceed, use create Step 5 to draft, Step 6 to read back and validate, and run the gaps command for that draft. Keep all create semantics, including safety for master-only content, `PROPOSE`, `IMAGINATION`, and statistics. Use only that record's fields. Write each successful draft to its own path under `.campaign/state/write/draft/`. Never overwrite a draft made for another record. A per-record failure or question does not stop later records.
+4. Accumulate each record's result in memory. Do not write `.campaign/state/npc-manager/report.txt` during this mode and do not emit one report per item. After every record has been processed, write exactly one aggregate report to `.campaign/state/npc-manager/batch-report.txt`.
+
+The aggregate report begins with `NPC MANAGER BATCH REPORT`, followed by `mode: create-batch`, overall `status`, overall `reason`, and `continue with:`. Overall `reason` is `none` unless input validation failed. Overall status is `DONE` only when every record is `DONE`; `INCOMPLETE` when at least one record is `DONE` and at least one is not; `ASK` when no record is `DONE` and every record is `ASK`; otherwise `FAILED`. Then include one block per input record, in input order, with one-based `item:` and these fields: `name`, `status`, `draft`, `exists`, `new subject`, `propose`, `proposed`, `requested by`, `usable`, `question`, `reason`, `problems`, and `open points`. Use the same values and meanings as the single-create report; use `none` for inapplicable values. For any successful draft, include all open points from create Step 7 and gaps, and compute `usable` with the create Step 7 rule. For non-draft results, `usable: none`. Use this layout exactly so the caller can parse results by item order:
+
+```text
+NPC MANAGER BATCH REPORT
+mode: create-batch
+status: INCOMPLETE
+reason: none
+continue with: <CONTINUE_WITH>
+
+item: 1
+name: Ilde Varno
+status: DONE
+draft: .campaign/state/write/draft/Personaggi/Ilde Varno.md
+exists: none
+new subject: ilde-varno
+propose: no
+proposed: none
+requested by: Trama/Sessione 2/Eventi/Il ponte.md
+usable: no
+question: none
+reason: none
+problems:
+- none
+open points:
+- aspect and manner
+
+item: 2
+name: Ilde
+status: ASK
+draft: none
+exists: none
+new subject: none
+propose: no
+proposed: none
+requested by: Trama/Sessione 2/Eventi/Il ponte.md
+usable: none
+question: Is Ilde the same character as Ilde Varno?
+reason: none
+problems:
+- none
+open points:
+- none
+```
+
+Do not print the aggregate report or show it to the master. The caller reads this file and associates each item block with its ordered request. A failed item never erases earlier drafts or results. If the batch report cannot be written, report failure according to the invoking skill's error handling; do not fall back to writing per-item reports.
 
 ## Mode `create`
 

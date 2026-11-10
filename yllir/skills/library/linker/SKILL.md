@@ -31,8 +31,6 @@ Step 0. From the campaign root (the folder containing `campaign.yaml`), keep CAM
 
 ## Steps
 
-**Repeat check (before Step 1).** If the previous linker pass in this same write (same documents, same draft) applied 0 links and the documents' text has not changed since, do not run the full pass again: record `applied: 0` and finish (go to Step 5; do not run Steps 1 to 4 again).
-
 **Step 1 — Plan.** Run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" . --files "<FILES>" --subjects "<SUBJECTS>" --out .campaign/state/linker/plan.json`
 Omit `--files` if FILES is empty. Omit `--subjects` when SUBJECTS is empty.
@@ -40,7 +38,7 @@ Omit `--files` if FILES is empty. Omit `--subjects` when SUBJECTS is empty.
 External subjects are included automatically as link targets. The script reads the external folders (categories of type `external`) by itself: a mention in FILES of a subject that exists only in an external folder is planned and linked to that external sheet. Do not add external files to FILES, and do not drop or ignore proposals whose target is external. Run the command as written whether or not the master mentioned external sources.
 
 - If the exit code is 1 or 2: go to Step 5 with `--status-reason "<the error lines, joined by ; >"`.
-- If the output contains `proposals: 0` and `review: 0`: go to Step 5 with no status reason.
+- If the output contains `proposals: 0` and `review: 0`: go to Step 4 directly (no outcomes or apply step is needed).
 - Otherwise: go to Step 1b.
 
 **Step 1b — Light path (only when LEVEL is `low`).** When LEVEL is not `low`, skip this step and go to Step 2 as written. When LEVEL is `low`, run:
@@ -67,12 +65,12 @@ Read `.campaign/state/linker/result.json`.
 - If `rejected` or `missing_outcome` is not empty, and this is round 3 or later: go to Step 4.
 - Otherwise: launch `yllir:linker-reviewer` again. In Codex, set the model to GPT-6 Luna, as in the first launch. Its prompt is the two PLAN lines of Step 2 plus a line `PIDS: <comma-separated pids from rejected and missing_outcome>` and a line `REASONS:` followed by one line per pid, `<pid>: <reason from result.json>`. Merge its new entries into `outcomes.json`: replace each entry with the same `id`, add the rest. Save the merged array with the Write tool. Then run Step 3 again. At most 3 rounds of Step 3 in total.
 
-**Step 4 — Verify.** Build the file list from `scope` in `plan.json` (the array of files), joined with commas. Run:
-`node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" . --files "<comma-separated scope files>" --out .campaign/state/linker/check.json`
-Keep the exit code as CHECK_EXIT (0, 1, or any other value). Then go to Step 5. The report script turns CHECK_EXIT into the check result; never decide the status yourself.
+**Step 4 — Verify.** Build the de-duplicated file list from `FILES` and `scope` in `plan.json` (the array of files), joined with commas. This preserves every caller document and includes every file discovered by the linker, including inbound mentions. Run:
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" . --files "<FILES plus plan scope>" --out .campaign/state/linker/check.json`
+Keep the exit code as CHECK_EXIT (0, 1, or any other value). Always run this fresh check, including when there are zero proposals or zero links applied. Then go to Step 5. The report script turns CHECK_EXIT into the check result; never decide the status yourself.
 
 **Step 5 — Report.** Run this command. It writes the report file. Use `--check-exit none` if Step 4 did not run:
-`node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" . --plan .campaign/state/linker/plan.json --outcomes .campaign/state/linker/outcomes.json --result .campaign/state/linker/result.json --check-exit <CHECK_EXIT or none> --continue-with "<CONTINUE_WITH>" --out .campaign/state/linker/report.txt`
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" . --plan .campaign/state/linker/plan.json --outcomes .campaign/state/linker/outcomes.json --result .campaign/state/linker/result.json --check-exit <CHECK_EXIT> --continue-with "<CONTINUE_WITH>" --out .campaign/state/linker/report.txt`
 Add `--status-reason "<reason>"` when an earlier step sent you here with a failure reason.
 
 Your last action in this skill is that command. Do not print the report and do not write it by hand. Then, in the same turn, do what CONTINUE_WITH says.

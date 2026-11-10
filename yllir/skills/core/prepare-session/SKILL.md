@@ -1,6 +1,6 @@
 ---
 name: prepare-session
-description: Core process. Prepares the next session of a Yllir campaign as a new session (a main file and one file per scene): checks what was played, reads the documents involved, runs a read-only continuity check, drafts the scenes and writes them through the write sequence. Runs inside the process runner.
+description: Core process. Prepares the next session of a Yllir campaign as a new session (a main file and one file per scene): checks what was played, reads the documents involved, drafts the scenes and writes them through the write sequence. Runs inside the process runner.
 user-invocable: false
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/plot-map/scripts/plot-map.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/new-campaign/scripts/add-category.mjs" *), Read, Write, Skill
 ---
@@ -68,55 +68,18 @@ Read `.campaign/cache/plot-map.json` with the Read tool. Keep `sessions`, `arcs`
 6. With IMAGINATION `yes` only: each named character that you decide to invent for the scenes (step 7) is added to REQUIRED_CHARACTERS now, by its role, so that step 6b gives it a sheet before the draft is written. Its name is chosen in step 6b, as for the other REQUIRED_CHARACTERS entries.
 - Output: the list of documents read (paths), the list of subject ids, the MISSING_CHARACTERS and MISSING_OTHER names, the REQUIRED_CHARACTERS entries (described by role, not by name), and the KNOWN_NEW ids of any skipped entry.
 
-**Step 5 — Read-only check.** Invoke the skill `yllir:continuity-audit` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/continuity-audit/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with:
-- `MODE=pre`
-- `FILES=<the documents read in step 4, plus the previous session's main file and scene files, comma-separated>`
-- `SUBJECTS=<the subject ids of step 4, comma-separated>`
-- `CHANGE="<one sentence: the session being prepared>"`
-- `CONTINUE_WITH="prepare-session step 5: read the audit report, then step 6"`
-
-When it has finished, read `.campaign/state/audit/report.txt` with the Read tool. Keep the problem lines that concern the subjects of step 4, in two lists:
-- CONTESTED: each problem where two documents contradict each other about a fact (for example, how two characters are related). Record the fact in plain words, and the two documents involved. These are facts the draft must not state.
-- NOTES: every other problem line that concerns these documents, in plain words.
-These lists never block the preparation. If the file is missing, record "check not run" and go on.
-- Output: the CONTESTED and NOTES lists (may be empty).
+**Step 5 — Source notes.** Using only the documents already read in Step 4, note any explicit incompatible statements about the same fact in CONTESTED, with the fact and both document paths. These facts must not appear in the draft. Put other relevant unresolved or uncertain details in NOTES. Do not run continuity-audit or launch another reviewer here; the write sequence runs the continuity audit before saving. Output: CONTESTED and NOTES (either may be empty).
 
 **Step 6 — Characters' entry points.** Read every document in the category whose `type` is `master-only` in `structure` of `campaign.yaml` (these are the players' characters). For each such document that names a subject of step 4, write one line: which character, and the hook written there. Keep these as ENTRY_POINTS. If none, ENTRY_POINTS is empty.
 - Output: the ENTRY_POINTS list (may be empty).
 
-**Step 6b — Character sheets.** Keep four lists, all empty at first: SHEET_DRAFTS (campaign paths of the sheet drafts), NEW_CHARACTERS (subject ids of the new sheets), KNOWN_NEW (subject ids of sheets that already exist; keep the ids that step 4 already added, never empty it) and PROPOSED_NOTES (for each character created with PROPOSE `yes`: its name, and the list of sections named in the report's `proposed:` line). Two rules first. (a) With IMAGINATION `no`, REQUIRED_CHARACTERS entries are NOT processed here: they get no name and no sheet. (b) If MISSING_CHARACTERS is empty, and either IMAGINATION is `no` or REQUIRED_CHARACTERS is empty, skip this step and go to step 7. Otherwise do the following for each name in MISSING_CHARACTERS, and, with IMAGINATION `yes` only, for each entry in REQUIRED_CHARACTERS, one at a time:
+**Step 6b — Character sheets.** Keep four lists, all empty at first: SHEET_DRAFTS (campaign paths of the sheet drafts), NEW_CHARACTERS (subject ids of new sheets), KNOWN_NEW (subject ids of sheets that already exist; keep ids added in Step 4), and PROPOSED_NOTES (for each character created with PROPOSE `yes`: name and proposed sections). With IMAGINATION `no`, skip REQUIRED_CHARACTERS entries. If there are no MISSING_CHARACTERS and no applicable REQUIRED_CHARACTERS, skip this step and go to Step 7.
 
-For a REQUIRED_CHARACTERS entry (IMAGINATION `yes` only, see above), first choose its NAME: 1 to 3 words, fitting the campaign language (`language.main` in `campaign.yaml`) and the places and documents read. The name must not equal any subject form in `subjects.json`, and it is never a famous name from a book, film or game. This chosen name is the NAME used in the steps below, in the report handling and in the message. For a MISSING_CHARACTERS name, the NAME is the one the master gave.
+Otherwise prepare the ordered CHARACTERS list: first each name in MISSING_CHARACTERS, then each REQUIRED_CHARACTERS entry when IMAGINATION is `yes`. For each item choose NAME (the master's name, or a 1–3 word name fitting the campaign language and the places and documents read for a required role). A chosen name must not equal any form in `subjects.json` and must not be a famous name from a book, film or game. Choose TEMPLATE using the numbered rules below, LOCATION from the main place ids of Step 4 (for enemy or creature, where it lives; empty means errant), DETAILS copied only from MASTER_MESSAGE, PROPOSE (`yes` whenever IMAGINATION is `yes`, otherwise `no`), IMAGINATION as given, and REQUESTED_BY empty. Do not invent DETAILS. For TEMPLATE, use the first matching rule: vendor (sells/buys goods or runs a shop, stall, forge or inn with goods and prices); enemy (hostile, fought, monster/beast that attacks, hunts or guards); creature (animal/beast only described or used, not fighting); npc (every other person). If multiple match, the earlier rule wins.
 
-0. Decide TEMPLATE for the name. Never ask the master for the kind. Use ONLY MASTER_MESSAGE, the previous session text and the documents read in step 4. Never guess from the name alone. Go through this numbered list and take the FIRST rule that matches:
-   1. `vendor`: the context says the character sells or buys goods, or runs a shop, stall, forge or inn with goods and prices.
-   2. `enemy`: the context says the character is hostile or will be fought, or is a monster or beast that attacks, hunts or guards (the master wants a fight, a threat, an ambush).
-   3. `creature`: an animal or beast that is only described or used (mount, pet, livestock, wildlife) and does not fight.
-   4. `npc`: every other person.
-   A person who sells AND could fight is `vendor` (the richer model; never two sheets). If two rules fit, the lower number wins. Write the choice and a one-line reason in plain words, from the context, in your notes.
-   Pass `TEMPLATE=<the choice>` to `yllir:npc-manager` in step 1.
-1. Invoke the skill `yllir:npc-manager` with:
-   - `MODE=create`
-   - `NAME=<the name>`
-   - `TEMPLATE=<the choice of step 0>`
-   - `LOCATION=<the main place ids of step 4, comma-separated, or empty; for an enemy or creature, the places where it lives, and empty means errant>`
-   - `DETAILS=<only what MASTER_MESSAGE says about this character, copied; empty if nothing>`. For a REQUIRED_CHARACTERS entry, DETAILS is only what MASTER_MESSAGE says about the role (for example «leads the bandits the characters fight at the ford»), copied. Never invent a fact.
-   - `PROPOSE=<yes or no>`: with IMAGINATION `no`, ALWAYS `no`. With IMAGINATION `yes` only: `yes` for every REQUIRED_CHARACTERS entry, and for every MISSING_CHARACTERS name whose DETAILS is empty or almost empty (the master gave a name and nothing else). `no` only when MASTER_MESSAGE describes this character in detail itself. When IMAGINATION is `yes`, `PROPOSE=yes` for every sheet created, whatever its DETAILS.
-   - `IMAGINATION=<yes or no>`: the value of IMAGINATION. Pass `IMAGINATION=yes` when it is `yes`, and `IMAGINATION=no` when it is `no`.
-   - `REQUESTED_BY=` empty: the scene file names are decided in step 7, which runs after this step, so they are not known yet. Step 8 links the scenes to the new sheet anyway, through NEW_SUBJECTS.
-   - `CONTINUE_WITH="prepare-session step 6b: read the npc-manager report, then step 7"`
-   If your tool cannot invoke a named skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/SKILL.md` with the Read tool and follow it exactly as if it had been invoked, with the same inputs.
-2. When it has finished, read `.campaign/state/npc-manager/report.txt` with the Read tool. This is the NPC REPORT. It is for you, never for the master: do not show it or quote it. If the file is missing, treat the status as `FAILED`.
-3. Act on the `status:` line of the NPC REPORT:
-   - `DONE` with a `draft:` path (not none): add the draft path to SHEET_DRAFTS, and add the `new subject:` id to NEW_CHARACTERS. If the report has a `proposed:` line, keep it with the name as PROPOSED_NOTES: the name, and the list of sections it names. A DONE report whose statistics are «to be defined» is normal when PROPOSE was `yes`: go on.
-   - `DONE` with an `exists:` id (not none): the character already has a sheet. Add that id to KNOWN_NEW. Create nothing.
-   - `ASK`: ask the master the `question:` line in plain words, in the campaign language, then stop. Never answer it yourself and never invent statistics.
-   - `FAILED` with reason "no creature category": treat the name as MISSING_OTHER, and add to the final message (step 9) that this creature has no sheet yet.
-   - `NOT_AVAILABLE`, any other `FAILED`, or the file is missing: treat the name as MISSING_OTHER. It appears as plain text with a ``` note, as in step 7. Add to the final message (step 9) that this character has no sheet yet.
+Invoke `yllir:npc-manager` once with `MODE=create-batch`, the ordered `CHARACTERS` list, and `CONTINUE_WITH="prepare-session step 6b: read the npc-manager batch report, then step 7"`. If your tool cannot invoke a named skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/SKILL.md` and follow it with these inputs. Read `.campaign/state/npc-manager/batch-report.txt`. Require its declared overall status and exactly one ordered block per input item; every block must contain all fields defined by the batch report format, use a recognized item status, and have valid status-dependent values (a `DONE` result must be exactly one of a draft plus new subject id, or an existing subject id; other statuses must not supply either). If the report is missing or fails this schema, end with `status: FAILED` and the normal plain-language failure sentence; consume no item result. For each valid draft, require a safe campaign-relative path beginning exactly `.campaign/state/write/draft/`, reject absolute paths and any `..` component, strip that prefix, and store the remainder in SHEET_DRAFTS. Add the paired new subject id to NEW_CHARACTERS and keep `proposed:` sections; add an existing id to KNOWN_NEW. If any item is `ASK`, ask its `question:` in plain words and stop before drafting. For other non-DONE items, note the name for the final message. An overall `INCOMPLETE` report is valid: continue with successful drafts and record failed items. Output SHEET_DRAFTS, NEW_CHARACTERS, KNOWN_NEW, PROPOSED_NOTES, names assigned to REQUIRED_CHARACTERS, and names without a sheet.
 
-A character with empty DETAILS still gets a sheet, with its sections marked as still to be defined. Where PROPOSE was `yes`, the sheet also holds the assistant's proposals (listed in PROPOSED_NOTES). Step 9 tells the master what is still open.
-- Output: SHEET_DRAFTS, NEW_CHARACTERS, KNOWN_NEW and PROPOSED_NOTES (may be empty), the names given to the REQUIRED_CHARACTERS entries, and the names of the characters with no sheet.
-
+A character whose details are empty still gets a sheet with open sections marked to be defined. If PROPOSE is `yes`, report those proposals in PROPOSED_NOTES for the final message.
 **Step 7 — Draft.** Write the session as drafts under `.campaign/state/write/draft/`, each at `.campaign/state/write/draft/` followed by its campaign path from step 2. There are two kinds of file.
 
 1. The main file, `<session name>/<session name>.md`. Use exactly this form:
@@ -192,6 +155,7 @@ Rules for the draft:
 - `DOCUMENTS=<main file>, <scene file 1>, <scene file 2>, ..., <every path of SHEET_DRAFTS>` (campaign paths, comma-separated: the main file first, then the scene files, then every path of SHEET_DRAFTS; if SHEET_DRAFTS is empty, nothing is added)
 - `INTENT="Session preparation for <arc>: new scenes; may add scene events and unnamed extras; must not define or change the identity of existing subjects; new named characters only through their own new sheet, listed in characters; no new places; sheets define who a character is and the scenes only what they do."`
 - `NEW_SUBJECTS=<NEW_CHARACTERS, comma-separated>` (empty if NEW_CHARACTERS is empty: sessions are not subjects, and only new character sheets are)
+- `CONTEXT_FILES=<existing document paths read in step 4 plus the previous session's main and scene files, comma-separated>` (read-only context for the write-sequence continuity audit)
 - `VERSION_MESSAGE=` the sentence «Preparata la sessione «<session name>»» for `it`, «Prepared the session «<session name>»» for `en`, or the translation into the campaign language
 - `ROUND=1`
 - `CONTINUE_WITH="prepare-session step 8: read the write report and act on its status"`
@@ -240,7 +204,7 @@ When it has finished, read `.campaign/state/plot-map/report.txt` with the Read t
 - for each ENTRY_POINTS line, one sentence: which character can enter the scene, and how;
 - one sentence on what the master can do next (for example «say what happens in the first scene, and I will change it»).
 
-No paths, no ids, no codes, no backticks, no formatting marks. The report of Step 8b is never shown: do not write its NOTE lines, and nothing else from it. The NPC REPORT of step 6b is never shown either, and the words template and sheet-template never appear.
+No paths, no ids, no codes, no backticks, no formatting marks. The report of Step 8b is never shown: do not write its NOTE lines, and nothing else from it. The NPC batch report of step 6b is never shown either, and the words template and sheet-template never appear.
 
 ## Mode: revise
 
@@ -268,12 +232,7 @@ Do the steps R1 to R9 in order. Each one says which of the Steps of MODE `new` i
 - the documents involved: run Step 4 (Documents involved) as written, with MASTER_MESSAGE as the source of names. A name MISSING from the subjects is treated as in Step 4: only a new named character gets a sheet, in R6.
 Output: the paths read, the subject ids, MISSING_CHARACTERS and MISSING_OTHER.
 
-**R5 — Read-only check.** Run Step 5 (Read-only check) as written, with these differences:
-- FILES = the paths read in R4 (the main file of TARGET, all its scene files, the main files of DEPENDENT sessions, and the documents involved), comma-separated;
-- SUBJECTS = the subject ids of R4;
-- CHANGE = "<one sentence: the revision of the scenes <titles> of the session <name>, with the master's new decisions in plain words>";
-- CONTINUE_WITH = "prepare-session revise R5: read the audit report, then R6".
-The new decisions of the master are what this check is about: it must find whether they contradict a document. The lists CONTESTED and NOTES are kept as Step 5 says. Output: CONTESTED and NOTES (may be empty).
+**R5 — Source notes.** Using only the documents already read in R4, note explicit incompatible statements about the same fact in CONTESTED, with the fact and both document paths. Put other relevant unresolved or uncertain details in NOTES. The master's new decisions in R2 are not yet campaign facts; the write sequence audits the existing canon before the write, and its independent reviewer checks the drafts. Do not invoke continuity-audit here. Output: CONTESTED and NOTES (either may be empty).
 
 **R6 — Character sheets.** If MISSING_CHARACTERS is empty and no REQUIRED_CHARACTERS entry applies, skip this step. Otherwise run Step 6b (Character sheets) as written, for these names and entries only. REQUIRED_CHARACTERS applies in this mode only with IMAGINATION `yes`, and only to the characters that the NEW request text needs (the master's new decisions of R2, read from MASTER_MESSAGE), computed as in Step 4: no name given, and the opponent of a fight or the person running a place or service the master asked for. A required character that an existing subject already fits is skipped, as in Step 4. Output: SHEET_DRAFTS, NEW_CHARACTERS, KNOWN_NEW, PROPOSED_NOTES, the names given to the REQUIRED_CHARACTERS entries, and the names with no sheet (may be empty).
 
@@ -291,6 +250,7 @@ The new decisions of the master are what this check is about: it must find wheth
 - VERSION_MESSAGE = the sentence «Rivista la sessione «<session name>»» for `it`, «Revised the session «<session name>»» for `en`, or the translation into the campaign language;
 - when IMAGINATION is `yes`, the INTENT ends with the same sentence as in Step 8, after a space; when `no`, it does not;
 - NEW_SUBJECTS, ROUND and CONTINUE_WITH as in Step 8, with CONTINUE_WITH = "prepare-session revise R8: read the write report and act on its status".
+- CONTEXT_FILES = the existing paths read in R4, comma-separated (target and dependent session files and existing subject documents; read-only context).
 The loop and the links check of Step 8 apply unchanged. Output: `status: DONE`, or the failure of Step 8.
 
 **R9 — Links and message.** Only after `status: DONE` of R8.

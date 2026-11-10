@@ -44,8 +44,9 @@ function isPlan(value) {
  * status reason is given; NEEDS_ATTENTION when the check failed, the apply
  * result is not ok, or an input could not be read; DONE otherwise.
  */
-export function computeStatus({ planOk, statusReason, checkExit, resultNotOk, attention }) {
+export function computeStatus({ planOk, statusReason, checkExit, resultNotOk, attention, checkValid = true }) {
   if (!planOk || statusReason !== null) return 'FAILED';
+  if ((checkExit !== '0' && checkExit !== '1') || !checkValid) return 'FAILED';
   if (checkExit === '1' || resultNotOk || attention) return 'NEEDS_ATTENTION';
   return 'DONE';
 }
@@ -79,7 +80,7 @@ export function countCheckErrors(value) {
  * @param {string} input.continueWith
  * @returns {string}
  */
-export function renderReport({ plan, validOutcomes, result, status, statusReason, check, continueWith }) {
+export function renderReport({ plan, validOutcomes, result, status, statusReason, check, checkDetails = [], applyDetails = [], continueWith }) {
   const byPid = new Map(validOutcomes.map((o) => [o.id, o]));
   const applied = result !== null && Array.isArray(result.applied) ? result.applied.length : 0;
 
@@ -112,6 +113,8 @@ export function renderReport({ plan, validOutcomes, result, status, statusReason
     'decisions for the master:',
     ...(decisions.length === 0 ? ['- none'] : decisions),
     `check: ${check}`,
+    ...checkDetails,
+    ...applyDetails,
     `continue with: ${continueWith}`,
   ];
   return `${lines.join('\n')}\n`;
@@ -170,9 +173,17 @@ export function writeLinkerReport({
   }
 
   let checkErrors = null;
-  if (checkExit === '1') {
+  let checkDetails = [];
+  let checkValid = false;
+  if (checkExit === '0' || checkExit === '1') {
     const read = readJsonFile(path.join(root, '.campaign', 'state', 'linker', 'check.json'));
-    checkErrors = read.state === 'ok' ? countCheckErrors(read.value) : 1;
+    const checkJson = read.value;
+    checkValid = read.state === 'ok' && isPlainObject(checkJson) && Array.isArray(checkJson.checked) && Array.isArray(checkJson.errors);
+    if (checkValid) {
+      checkErrors = checkJson.errors.length;
+      checkValid = (checkExit === '0' && checkJson.errors.length === 0) || (checkExit === '1' && checkJson.errors.length > 0);
+      checkDetails = checkJson.errors.map((error) => `- ${error.file}:${error.line}:${error.col} ${error.code} ${error.message}`);
+    }
   }
 
   const status = computeStatus({
@@ -181,7 +192,21 @@ export function writeLinkerReport({
     checkExit,
     resultNotOk: result !== null && result.ok === false,
     attention,
+    checkValid,
   });
+
+  const applyDetails = [];
+  if (result !== null && isPlainObject(result)) {
+    for (const rejected of Array.isArray(result.rejected) ? result.rejected : []) {
+      const rawId = rejected?.entry?.id;
+      const pid = typeof rawId === 'string' && /^P\d+$/.test(rawId) ? rawId : '(unknown)';
+      const reason = typeof rejected?.reason === 'string' ? rejected.reason : 'invalid rejected entry';
+      applyDetails.push(`apply rejected: ${pid} — ${reason}`);
+    }
+    for (const pid of Array.isArray(result.missing_outcome) ? result.missing_outcome : []) {
+      applyDetails.push(`apply missing outcome: ${typeof pid === 'string' && /^P\d+$/.test(pid) ? pid : '(unknown)'}`);
+    }
+  }
 
   const text = renderReport({
     plan,
@@ -190,6 +215,8 @@ export function writeLinkerReport({
     status,
     statusReason,
     check: checkLine(checkExit, checkErrors),
+    checkDetails,
+    applyDetails,
     continueWith,
   });
 
