@@ -126,6 +126,27 @@ test('apply-draft CLI prints JSON and uses exit codes 0, 1 and 2', () => {
   assert.match(usage.stderr, /usage: node apply-draft\.mjs/);
 });
 
+test('apply-draft --out persists the exact stdout JSON for success and refusal', () => {
+  const { root, drafts } = setup();
+  const output = path.join(root, '.campaign', 'state', 'write', 'applied.json');
+  const ok = spawnSync(process.execPath, [CLI, root, '--draft-dir', drafts, '--files', 'Mondo/Lago.md', '--out', output], { encoding: 'utf8' });
+  assert.equal(ok.status, 0, ok.stderr);
+  assert.equal(fs.readFileSync(output, 'utf8'), stripExitLine(ok.stdout));
+  const refused = spawnSync(process.execPath, [CLI, root, '--draft-dir', drafts, '--files', 'CLAUDE.md', '--out', output], { encoding: 'utf8' });
+  assert.equal(refused.status, 1);
+  assert.equal(fs.readFileSync(output, 'utf8'), stripExitLine(refused.stdout));
+  assert.deepEqual(JSON.parse(fs.readFileSync(output, 'utf8')).errors.map((e) => e.code), ['protected-file']);
+});
+
+test('apply-draft refuses an unusable --out before applying drafts', () => {
+  const { root, drafts } = setup();
+  const output = path.join(root, 'is-a-directory');
+  fs.mkdirSync(output);
+  const result = spawnSync(process.execPath, [CLI, root, '--draft-dir', drafts, '--files', 'Mondo/Lago.md', '--out', output], { encoding: 'utf8' });
+  assert.equal(result.status, 2);
+  assert.equal(fs.existsSync(path.join(root, 'Mondo')), false);
+});
+
 const PLOT_CAMPAIGN = [
   'name: Test',
   'structure:',

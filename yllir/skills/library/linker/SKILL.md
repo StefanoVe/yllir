@@ -2,7 +2,7 @@
 name: linker
 description: Library skill. Adds Markdown links to every mention of a campaign subject in the given documents, using deterministic scripts and an independent reviewer. Invoked by Yllir core processes after a document is written, or when asked to link mentions in specific campaign files. Never invoked for anything outside a Yllir campaign.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/auto-outcomes.mjs" *), Read, Write, Agent
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/plan-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/linker-report.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/auto-outcomes.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/merge-outcomes.mjs" *), Read, Write, Agent
 ---
 
 # Linker
@@ -27,7 +27,7 @@ If both FILES and SUBJECTS are empty, stop and ask the caller which documents to
 ## Working folder
 
 Step 0. From the campaign root (the folder containing `campaign.yaml`), keep CAMPAIGN_ROOT: it is the `campaign root:` line of the session check in your context; if that line is not there, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and read that line. All files below go in `.campaign/state/linker/`:
-`plan.json`, `outcomes.json`, `result.json`, `check.json`, `report.txt`.
+`plan.json`, `outcomes.json`, `reviewer-response.json`, `result.json`, `check.json`, `report.txt`.
 
 ## Steps
 
@@ -52,18 +52,21 @@ CAMPAIGN_ROOT: <CAMPAIGN_ROOT>
 PLAN: <CAMPAIGN_ROOT>/.campaign/state/linker/plan.json
 ```
 Do not add your own opinion or review the proposals yourself.
-- The reviewer answers with a JSON array. Save its answer exactly as received to `.campaign/state/linker/outcomes.json` with the Write tool.
-- If the answer is not a JSON array: launch the reviewer again once with the same prompt. In Codex, set the model to GPT-6 Luna, as in the first launch. If the second answer is also not a JSON array: go to Step 5 with `--status-reason "review not available"`. Nothing is applied without a review.
+- First check that the answer is a JSON array. Save it exactly once, without editing, to `.campaign/state/linker/reviewer-response.json` with the Write tool. Then run the merge command below with `--mode all` to validate and write `outcomes.json`. Full review replaces stale outcomes. If the answer is not an array or the merge script rejects it, launch the reviewer again once with the same prompt and follow the same save-and-merge steps. In Codex, set GPT-6 Luna in the launch call. If the second answer is not an array or is rejected by the script, go to Step 5 with `--status-reason "review not available"`. Nothing is applied without a valid review.
 - Otherwise: go to Step 3.
 
-**Light path (only when you come from Step 1b with uncertain proposals).** The reviewer judges only the uncertain proposals. Its prompt is the two PLAN lines above plus a third line `PIDS: <the uncertain pids from the output of Step 1b, comma-separated>`. In Codex, set the model to GPT-6 Luna as in the first launch. Instead of the first bullet above: check that its answer is a JSON array (if it is not, launch the reviewer again once with the same prompt; if the second answer is not an array either, go to Step 5 with `--status-reason "review not available"`). Then read `.campaign/state/linker/outcomes.json` with the Read tool, keep the entries the script wrote, add the reviewer's entries exactly as received (never edited), and save the merged array with the Write tool. Then go to Step 3.
+**Light path (only when you come from Step 1b with uncertain proposals).** The reviewer judges only the uncertain proposals. Its prompt is the two PLAN lines above plus a third line `PIDS: <the uncertain pids from the output of Step 1b, comma-separated>`. In Codex, set the model to GPT-6 Luna in the launch call. Check that its answer is a JSON array, save it once to `reviewer-response.json`, and run the merge command with scoped mode and the uncertain PIDs. If the answer is not an array or the merge script rejects it, launch the reviewer once more with the same prompt and repeat. If the second answer is not an array or is rejected, go to Step 5 with `--status-reason "review not available"`. The script appends reviewed entries and preserves automatic decisions. Then go to Step 3.
 
 **Step 3 — Apply.** Run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/apply-links.mjs" . --plan .campaign/state/linker/plan.json --outcomes .campaign/state/linker/outcomes.json --out .campaign/state/linker/result.json`
 Read `.campaign/state/linker/result.json`.
 - If `ok` is true: go to Step 4.
 - If `rejected` or `missing_outcome` is not empty, and this is round 3 or later: go to Step 4.
-- Otherwise: launch `yllir:linker-reviewer` again. In Codex, set the model to GPT-6 Luna, as in the first launch. Its prompt is the two PLAN lines of Step 2 plus a line `PIDS: <comma-separated pids from rejected and missing_outcome>` and a line `REASONS:` followed by one line per pid, `<pid>: <reason from result.json>`. Merge its new entries into `outcomes.json`: replace each entry with the same `id`, add the rest. Save the merged array with the Write tool. Then run Step 3 again. At most 3 rounds of Step 3 in total.
+- Otherwise: launch `yllir:linker-reviewer` again. In Codex, set the model to GPT-6 Luna, as in the first launch. Its prompt is the two PLAN lines of Step 2 plus a line `PIDS: <comma-separated pids from rejected and missing_outcome>` and a line `REASONS:` followed by one line per pid, `<pid>: <reason from result.json>`. Save the accepted JSON array exactly once to `reviewer-response.json`, then run the merge command with scoped mode for those PIDs. It replaces only those IDs and preserves all other decisions. Then run Step 3 again. At most 3 rounds of Step 3 in total.
+
+**Merge command.** After each valid reviewer response, run:
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/merge-outcomes.mjs" . --plan .campaign/state/linker/plan.json --base .campaign/state/linker/outcomes.json --response .campaign/state/linker/reviewer-response.json --out .campaign/state/linker/outcomes.json --mode all`
+For the light path or a retry, replace `--mode all` with `--mode scoped --pids "<comma-separated PIDs>"`. The script validates JSON arrays, outcome schema, IDs and scope before writing. If a retry merge fails, keep the existing outcomes and use another reviewer round only when one remains under the three-round limit. The script writes atomically, so invalid input cannot truncate the prior outcomes file.
 
 **Step 4 — Verify.** Build the de-duplicated file list from `FILES` and `scope` in `plan.json` (the array of files), joined with commas. This preserves every caller document and includes every file discovered by the linker, including inbound mentions. Run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/linker/scripts/check-links.mjs" . --files "<FILES plus plan scope>" --out .campaign/state/linker/check.json`
@@ -92,6 +95,7 @@ continue with: write-sequence step 7
 
 - Only `apply-links.mjs` writes links. Never edit campaign files in this skill.
 - Auto outcomes only ever come from `auto-outcomes.mjs`. Never write an APPLY entry yourself.
+- Never merge outcome arrays yourself. Save reviewer output once in `reviewer-response.json` and use `merge-outcomes.mjs`.
 - Never apply a mention listed in `plan.review`. The report script lists it under "decisions for the master".
 - Never write or edit `report.txt` yourself. Only `linker-report.mjs` writes it.
 - Never quote the content of a master-only block. Refer to the file and line, for example `Characters/Ada Rook.md:22`.
