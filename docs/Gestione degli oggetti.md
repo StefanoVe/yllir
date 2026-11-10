@@ -62,13 +62,13 @@ Le prime tre sono la parte pubblica. Le note del master stanno nel blocco riserv
 | Sezione | Pubblica | Contenuto |
 | --- | --- | --- |
 | titolo `#` | sì | il nome dell'oggetto |
-| `## In breve` | sì | descrizione breve: una o due frasi, quello che si coglie a colpo d'occhio. È il testo che le uscite brevi (carta, tooltip, elenchi) possono riusare. |
-| `## Descrizione` | sì | descrizione completa: ciò che i personaggi vedono o sanno, in prosa nel registro della campagna. |
-| `## Effetti` | sì | gli effetti di gioco, nel formato dell'adattatore del sistema; senza effetti, «Nessun effetto di gioco». |
+| `## In breve` | sì | una o due frasi su aspetto fisico e funzione essenziale stabilita; è il testo che le uscite brevi (carta, tooltip, elenchi) possono riusare. |
+| `## Descrizione` | sì | descrizione completa: aggiunge contesto stabilito sull'oggetto, come provenienza, materiali o usi, quando disponibile, in prosa nel registro della campagna; non si limita a ripetere la breve. |
+| `## Effetti` | sì | tutti i dettagli meccanici, nel formato dell'adattatore del sistema; senza effetti, «Nessun effetto di gioco». |
 | sezioni facoltative | sì | `## Origine`, `## Ritrovamento`, `## Testo`, `## Valore`, in quest’ordine; ciascuna può essere omessa. |
 | blocco riservato `### Indicazioni per il master` | no | note del master: origine vera, segreti, usi in trama. Ultimo contenuto del file. |
 
-La presenza di una sezione facoltativa non rende pubblica un’informazione riservata: i fatti non noti ai personaggi stanno soltanto nel blocco master.
+La presenza di una sezione facoltativa non rende pubblica un’informazione riservata: i fatti non noti ai personaggi stanno soltanto nel blocco master. La breve e la completa devono essere coerenti e non contraddirsi; ciascuna include i fatti stabiliti pertinenti al proprio scopo, ma la breve non deve riassumere ogni fatto della completa. Non si inventano fatti salvo quanto consentito dalla regola sull’immaginazione qui sotto.
 
 Esempio, con valori fittizi (lo schema reale degli effetti è quello dell'adattatore):
 
@@ -83,7 +83,7 @@ location: [porto-di-selce]
 
 ## In breve
 
-Una lanterna di ottone con il vetro annerito dal fumo.
+Una lanterna di ottone dal vetro annerito, usata per illuminare gli ambienti.
 
 ## Descrizione
 
@@ -108,6 +108,7 @@ La sigla è quella della nave scomparsa. Chi la riconosce sa dove è stata fabbr
 - **Identità e trama.** Un testo di trama che ha bisogno di un fatto sull'identità dell'oggetto lo scrive prima nella scheda. Se la trama contraddice la scheda, la skill chiede al master.
 - **Posizione.** `location` è il luogo attuale, aggiornato dopo la sessione da `after-session` su dichiarazione del master.
 - **Riservato.** Le note del master non compaiono mai nelle descrizioni, nelle carte, nelle ricerche web, nei prompt per le immagini né nei revisori di testi destinati ai giocatori. Il passaggio da riservato a pubblico avviene solo per azione esplicita del master. Un rimando a una nota riservata usa l'ancora `#master`.
+- **Descrizioni brevi e complete (Deciso, 2026-11-10).** La breve descrive concisamente l’aspetto fisico e la funzione essenziale stabilita. La completa aggiunge il contesto stabilito disponibile, come provenienza, materiali e usi, invece di ripetere soltanto la breve. Entrambe restano coerenti con i fatti noti ai personaggi; non si inventano fatti salvo l’immaginazione descrittiva autorizzata nella richiesta.
 - **Tono delle descrizioni (Deciso, 2026-11-10).** Sia la descrizione breve sia quella completa seguono, nell’ordine, le regole del master in `.campaign/customizations.md`, il registro `prose.register` di `campaign.yaml`, e gli esempi già scritti nella campagna per ciò che le prime due fonti non specificano. La skill non ha un tono suo e non ne inventa uno. Il revisore giudica la coerenza; un tono dubbio è una domanda per il master.
 - **Effetti (Deciso, 2026-11-10).** La parte pubblica riporta soltanto gli effetti noti ai personaggi. Gli effetti reali non noti restano nel blocco master. Non si scrivono a mano fuori dal formato dell’adattatore; la validazione è obbligatoria prima della revisione. Senza adattatore (`system.adapter: none`) la sezione `## Effetti` resta in testo libero e il controllo dell'adattatore è saltato, dichiarandolo nel rapporto.
 - **Collegamenti.** Ogni menzione dell'oggetto in altri documenti diventa un link alla scheda dopo la scrittura, come per ogni soggetto; la scheda è inclusa nell'indice dei soggetti con i suoi alias.
@@ -129,7 +130,7 @@ La sigla è quella della nave scomparsa. Chi la riconosce sa dove è stata fabbr
 - una scheda che diventa una seconda trama (azioni e vicende scritte nella scheda);
 - effetti di gioco scritti a mano e non validati dall'adattatore;
 - note del master finite nella parte pubblica, per esempio dentro la descrizione breve che le uscite riusano;
-- la descrizione breve e quella completa che divergono nei fatti: la breve è un riassunto della completa, mai una fonte autonoma;
+- una descrizione breve che non dà una visione concisa di aspetto e funzione, oppure una descrizione completa che si limita a ripetere la breve;
 - oggetti duplicati con nomi diversi perché la ricerca non ha guardato gli alias;
 - un tono scritto nella skill invece che letto dalla campagna: una descrizione aulica in una campagna sobria (o il contrario) è un errore che l'audit non vede;
 - modelli che si moltiplicano per eccezioni fino a non essere più uno standard.
