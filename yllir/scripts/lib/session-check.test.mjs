@@ -149,6 +149,31 @@ describe('campaign checks', () => {
     assert.equal(result.instructions, 'up-to-date');
   });
 
+  test('a pending post-update conversion is reported even when framework versions match', () => {
+    const root = campaign();
+    write(root, '.campaign/state/update.yaml', [
+      'status: completed',
+      'sheet_migration: pending',
+      'sheet_pending:',
+      '  - Creature/Guardiano.md',
+      '',
+    ].join('\n'));
+
+    const result = sessionCheck(root);
+    assert.equal(result.framework_version, FRAMEWORK_VERSION);
+    assert.equal(result.campaign_framework_version, FRAMEWORK_VERSION);
+    assert.equal(result.post_update, 'needed');
+    assert.match(formatCheck(result), /^post-update: needed$/m);
+  });
+
+  test('a completed post-update conversion is not reported', () => {
+    const root = campaign();
+    write(root, '.campaign/state/update.yaml', 'status: completed\nsheet_migration: complete\n');
+    const result = sessionCheck(root);
+    assert.equal(result.post_update, null);
+    assert.doesNotMatch(formatCheck(result), /^post-update:/m);
+  });
+
   test('a hand edit of CLAUDE.md is reported as changed by hand and as unsaved', () => {
     const root = savedCampaign();
     fs.appendFileSync(path.join(root, 'CLAUDE.md'), 'mia nota\n');
@@ -342,6 +367,24 @@ describe('formatCheck', () => {
       campaign_framework_version: '0.2.0',
       topics: null,
     });
+    assert.doesNotMatch(text, /campaign alignment/);
+  });
+
+  test('a pending post-update conversion is printed independently of version alignment', () => {
+    const text = formatCheck({
+      root: '/campagne/le-isole-dambra',
+      folder: 'campaign',
+      git: 'ok',
+      versions: null,
+      unsaved: null,
+      settings: null,
+      instructions: 'up-to-date',
+      framework_version: '0.2.0',
+      campaign_framework_version: '0.2.0',
+      post_update: 'needed',
+      topics: null,
+    });
+    assert.match(text, /^post-update: needed$/m);
     assert.doesNotMatch(text, /campaign alignment/);
   });
 

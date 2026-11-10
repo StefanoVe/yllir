@@ -19,6 +19,7 @@ import { writeSessionMaps } from '../../../../../skills/library/plot-map/scripts
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { listVersions, restore, saveManualChanges, saveVersion, status } from '../../../../../scripts/lib/versions.mjs';
 import { migrateSessions } from './migrate-sessions.mjs';
+import { completePostUpdate, preparePostUpdate } from './post-update.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../../../../.claude-plugin/plugin.json');
 const CONFIG_PATH = 'campaign.yaml';
@@ -26,10 +27,11 @@ const VERSION_PATH = '.campaign/version.yaml';
 const CUSTOMIZATIONS_PATH = '.campaign/customizations.md';
 const UPDATE_PATH = '.campaign/state/update.yaml';
 const NOTICE_PATH = '.campaign/state/update-notice.yaml';
+const SHEET_MIGRATION_ID = 'statistics-tables-v1';
 
 // Keys written without quotes: their values never need escaping.
-const UNQUOTED_KEYS = new Set(['status', 'started_on', 'completed_on', 'last_notified_on', 'snoozed_until']);
-const UPDATE_KEYS = ['status', 'from_version', 'to_version', 'restore_point', 'started_on', 'completed_on'];
+const UNQUOTED_KEYS = new Set(['status', 'started_on', 'completed_on', 'last_notified_on', 'snoozed_until', 'sheet_migration']);
+const UPDATE_KEYS = ['status', 'from_version', 'to_version', 'restore_point', 'started_on', 'completed_on', 'sheet_migration_id', 'sheet_migration'];
 const DAY_MS = 86_400_000;
 
 /**
@@ -41,6 +43,11 @@ const DAY_MS = 86_400_000;
  *   rewritten: string[],
  *   restored_by_hand: string[],
  *   migrated: string[],
+ *   sheet_migration: 'pending' | 'complete' | null,
+ *   sheet_migration_files: string[],
+ *   sheet_migration_drafted: string[],
+ *   sheet_migration_pending: string[],
+ *   sheet_migration_errors: Array<{code: string, message: string}>,
  *   errors: Array<{ code: string, message: string, file?: string, line?: number | null }>,
  * }} UpdateResult
  */
@@ -183,6 +190,19 @@ function runUpdate(root, out, { dryRun, resume, today }) {
   // Step 2: nothing to do when the versions match and no generated file was changed by hand.
   const fingerprints = checkFingerprints(root);
   if (!resuming && out.from === to && fingerprints.ok) {
+    if (saved?.sheet_migration === 'pending') {
+      const migration = preparePostUpdate(root);
+      if (migration.status === 'failed') return failWith(out, 'sheet-migration-scan-failed', migration.errors[0]?.message ?? 'sheet scan failed');
+      out.sheet_migration = migration.status;
+      out.sheet_migration_files = [...new Set([...migration.drafted, ...migration.pending.map((item) => item.file)])].sort();
+      out.sheet_migration_drafted = migration.drafted;
+      out.sheet_migration_pending = migration.pending.map((item) => item.file);
+      out.sheet_migration_errors = migration.errors;
+      if (migration.status === 'complete' && !dryRun) {
+        const completed = completePostUpdate(root);
+        if (completed.status === 'failed') return failWith(out, 'sheet-migration-state-failed', completed.errors[0]?.message ?? 'could not update migration state');
+      }
+    }
     out.status = 'up-to-date';
     return out;
   }
@@ -206,6 +226,16 @@ function runUpdate(root, out, { dryRun, resume, today }) {
     out.status = 'would-update';
     out.rewritten = plan.written;
     out.migrated = dry.migrated;
+    const sheetDry = preparePostUpdate(root);
+    if (sheetDry.status === 'failed') {
+      out.errors = sheetDry.errors;
+      return out;
+    }
+    out.sheet_migration = sheetDry.status;
+    out.sheet_migration_files = [...new Set([...sheetDry.drafted, ...sheetDry.pending.map((item) => item.file)])].sort();
+    out.sheet_migration_drafted = sheetDry.drafted;
+    out.sheet_migration_pending = sheetDry.pending.map((item) => item.file);
+    out.sheet_migration_errors = sheetDry.errors;
     out.errors = dry.errors;
     return out;
   }
@@ -254,8 +284,15 @@ function runUpdate(root, out, { dryRun, resume, today }) {
         writeSessionMaps(root, map.sessions);
         out.rewritten = generated.written;
         out.errors = migration.errors;
+        const sheetScan = preparePostUpdate(root);
+        if (sheetScan.status === 'failed') throw new Error(sheetScan.errors[0]?.message ?? 'sheet scan failed');
+        out.sheet_migration = sheetScan.status;
+        out.sheet_migration_files = [...new Set([...sheetScan.drafted, ...sheetScan.pending.map((item) => item.file)])].sort();
+        out.sheet_migration_drafted = sheetScan.drafted;
+        out.sheet_migration_pending = sheetScan.pending.map((item) => item.file);
+        out.sheet_migration_errors = sheetScan.errors;
         saveVersion(root, { message: `Updated Yllir to ${to}`, kind: 'framework' });
-        writeUpdateState(root, { ...state, status: 'completed', completed_on: today });
+        writeUpdateState(root, { ...state, status: 'completed', completed_on: today, sheet_migration_id: SHEET_MIGRATION_ID, sheet_migration: out.sheet_migration });
         out.status = 'updated';
         return out;
       }
@@ -368,7 +405,7 @@ function readInstalledVersion() {
 // ---------------------------------------------------------------- helpers
 
 function newResult(from, to) {
-  return { status: 'failed', from, to, restore_point: null, rewritten: [], restored_by_hand: [], migrated: [], errors: [] };
+  return { status: 'failed', from, to, restore_point: null, rewritten: [], restored_by_hand: [], migrated: [], sheet_migration: null, sheet_migration_files: [], sheet_migration_drafted: [], sheet_migration_pending: [], sheet_migration_errors: [], errors: [] };
 }
 
 function failWith(out, code, message) {

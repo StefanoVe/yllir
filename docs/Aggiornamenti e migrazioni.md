@@ -260,7 +260,7 @@ Regole del changelog per il master: ogni voce dice se tocca i contenuti (sì/no)
 
 Decise dall’autore:
 
-- **Perimetro.** Nell’MVP si costruisce solo la base: `version.yaml`, controllo all’avvio, aggiornamento dei file generati della campagna. Migrazioni escluse.
+- **Perimetro.** La decisione base del 2026-11-09 prevedeva `version.yaml`, controllo all’avvio e aggiornamento dei file generati della campagna. La conversione post-aggiornamento delle statistiche è stata approvata il 2026-11-10.
 - **Distribuzione.** Plugin e marketplace (ipotesi A). Il numero di versione si fissa a mano in `plugin.json`; non si usa lo SHA del commit. Si sceglie un solo posto per il numero (non anche nella voce del marketplace).
 - **Avviso.** Una volta al giorno, finché il master non aggiorna. L’avviso dice chiaramente che la versione installata è obsoleta e riporta le novità per il master. **La decisione di aggiornare è sempre del master**: senza un suo sì non si aggiorna nulla.
 
@@ -278,6 +278,14 @@ Scelte di implementazione dell’MVP, da confermare:
 - **Memoria dell’avviso** in `.campaign/state/update-notice.yaml` (ultima versione avvisata, data, eventuale rinvio), non in una cartella dati del plugin: funziona anche in Codex e non dipende da una variabile d’ambiente.
 - **Novità per il master** in `news/<versione>.md` (con variante `news/<versione>.<lingua>.md`) dentro il plugin pubblicato.
 - **Stato dell’aggiornamento** in `.campaign/state/update.yaml` (`in_progress`, `completed`, `cancelled`), con il punto di ripristino: se resta `in_progress`, alla sessione dopo si propone di riprendere o tornare com’era.
+
+## Conversione delle statistiche dopo l’aggiornamento (Deciso, 2026-11-10)
+
+Quando una nuova versione introduce il formato a tabelle per `## Statistiche`, al completamento dell’aggiornamento il framework avvia automaticamente una ricognizione delle schede coinvolte. La ricognizione meccanica è deterministica. Per ogni scheda convertibile, Luna prepara la disposizione in tre tabelle: `Caratteristica` / `Valore`, `Attacco o capacità` / `Dettagli` e `Oggetto` / `Dettagli` per l’equipaggiamento, con intestazioni nella lingua della campagna. La bozza passa sempre dal cablaggio di scrittura, compresa la revisione indipendente, prima di essere applicata.
+
+La conversione conserva ogni valore e dettaglio già presente; non inventa, elimina o ricalcola dati. Non cambia le scorte o i prezzi dei venditori, le personalizzazioni del master né il confine fra testo pubblico e blocco riservato. I segnaposto restano segnaposto e una creatura non combattente conserva la dichiarazione «Nessuna statistica: non combatte» senza ricevere tabelle.
+
+Se la forma precedente è ambigua, la scheda resta intatta e la conversione risulta in sospeso. Il framework la ripropone alla sessione successiva e può riprendere il lavoro dopo la decisione necessaria del master. Lo stato registra quali schede attendono la conversione; completare di nuovo un passaggio già applicato non duplica cambiamenti. Git fornisce il punto di ripristino e consente di annullare le modifiche della migrazione.
 
 ## Questioni aperte
 

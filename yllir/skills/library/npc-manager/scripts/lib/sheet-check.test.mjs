@@ -56,7 +56,12 @@ const IT_ENEMY_BODY = [
   '',
   '## Statistiche',
   '',
-  'CA 12, 11 PF.',
+  '### Caratteristiche',
+  '',
+  '| Caratteristica | Valore |',
+  '| --- | --- |',
+  '| CA | 12 |',
+  '| PF | 11 |',
   '',
   '## Bottino',
   '',
@@ -139,7 +144,11 @@ test('a valid sheet with a master block and optional sections passes', () => {
     '',
     '## Statistiche',
     '',
-    'CA 12.',
+    '### Caratteristiche',
+    '',
+    '| Caratteristica | Valore |',
+    '| --- | --- |',
+    '| CA | 12 |',
     '',
     '## Assortimento',
     '',
@@ -323,7 +332,11 @@ test('a valid vendor sheet with every optional section in order passes', () => {
     '',
     '## Statistiche',
     '',
-    'CA 12.',
+    '### Caratteristiche',
+    '',
+    '| Caratteristica | Valore |',
+    '| --- | --- |',
+    '| CA | 12 |',
     '',
     '## Assortimento',
     '',
@@ -413,7 +426,7 @@ test('a valid enemy sheet passes, with its optional Loot section', () => {
 });
 
 test('enemy: a missing Statistics section is section-missing', () => {
-  const body = IT_ENEMY_BODY.replace('## Statistiche\n\nCA 12, 11 PF.\n\n', '');
+  const body = IT_ENEMY_BODY.replace(/## Statistiche\n\n[\s\S]*?\n## Bottino\n/, '## Bottino\n');
   withCampaign({ 'Creature/Lupo.md': sheet({ id: 'lupo', template: 'enemy', body }) }, (root) => {
     const result = checkSheets(root);
     assert.deepEqual(codesOf(result), ['section-missing']);
@@ -450,7 +463,11 @@ test('enemy: Loot before Nature is section-order', () => {
     '',
     '## Statistiche',
     '',
-    'CA 12.',
+    '### Caratteristiche',
+    '',
+    '| Caratteristica | Valore |',
+    '| --- | --- |',
+    '| CA | 12 |',
     '',
   ].join('\n');
   withCampaign({ 'Creature/Lupo.md': sheet({ id: 'lupo', template: 'enemy', body }) }, (root) => {
@@ -478,7 +495,11 @@ test('creature: the phrase is checked in English too, and other languages skip i
     '',
     '## Statistics',
     '',
-    'AC 12.',
+    '### Characteristics',
+    '',
+    '| Characteristic | Value |',
+    '| --- | --- |',
+    '| AC | 12 |',
     '',
   ].join('\n');
   withCampaign(
@@ -493,7 +514,7 @@ test('creature: the phrase is checked in English too, and other languages skip i
       'Creature/Fish.md': sheet({
         id: 'fish',
         template: 'creature',
-        body: en.replace('AC 12.', 'No statistics: it does not fight.'),
+        body: en.replace('| AC | 12 |', 'No statistics: it does not fight.'),
       }),
     },
     (root) => {
@@ -517,7 +538,11 @@ test('an en campaign works for an enemy with English headings', () => {
     '',
     '## Statistics',
     '',
-    'AC 12.',
+    '### Characteristics',
+    '',
+    '| Characteristic | Value |',
+    '| --- | --- |',
+    '| AC | 12 |',
     '',
     '## Loot',
     '',
@@ -621,6 +646,25 @@ test('a campaign in another language skips the section names', () => {
   withCampaign({ 'Personaggi/Oria Valdes.md': sheet({ body: '# Altro\n\nTesto.\n' }) }, (root) => {
     assert.deepEqual(codesOf(checkSheets(root)), ['title']);
   }, 'fr');
+});
+
+test('statistics must use the localized tables, including optional npc statistics', () => {
+  const npcWithStats = IT_BODY + '\n## Statistiche\n\n### Caratteristiche\n\n| Caratteristica | Valore |\n| --- | --- |\n| CA | 12 |\n';
+  withCampaign({ 'Personaggi/Oria Valdes.md': sheet({ body: npcWithStats }) }, (root) => {
+    assert.deepEqual(checkSheets(root).errors, []);
+  });
+  const legacy = IT_ENEMY_BODY.replace(/### Caratteristiche[\s\S]*?(?=\n## Bottino)/, 'CA 12, 11 PF.\n');
+  withCampaign({ 'Creature/Lupo.md': sheet({ id: 'lupo', template: 'enemy', body: legacy }) }, (root) => {
+    assert.ok(codesOf(checkSheets(root)).includes('statistics-table'));
+  });
+  const noFightEnemy = IT_ENEMY_BODY.replace(/### Caratteristiche[\s\S]*?(?=\n## Bottino)/, 'Nessuna statistica: non combatte.\n');
+  withCampaign({ 'Creature/Lupo.md': sheet({ id: 'lupo', template: 'enemy', body: noFightEnemy }) }, (root) => {
+    assert.ok(codesOf(checkSheets(root)).includes('statistics-table'));
+  });
+  const badHeading = IT_ENEMY_BODY.replace('### Caratteristiche', '#### Note');
+  withCampaign({ 'Creature/Lupo.md': sheet({ id: 'lupo', template: 'enemy', body: badHeading }) }, (root) => {
+    assert.ok(codesOf(checkSheets(root)).includes('statistics-table'));
+  });
 });
 
 test('a sheet with template item is still skipped', () => {

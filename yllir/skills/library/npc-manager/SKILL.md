@@ -76,7 +76,7 @@ Mode `create` also takes `NAME` (the name as written by the master or the plot; 
 | haggling | `## Trattare` | `## Haggling` | vendor, optional |
 | exceptions | `## Deroghe` | `## Exceptions` | vendor, optional |
 | nature | `## Natura` | `## Nature` | enemy, creature |
-| statistics | `## Statistiche` | `## Statistics` | enemy, creature |
+| statistics | `## Statistiche` | `## Statistics` | enemy, creature; optional for npc and vendor |
 | loot | `## Bottino` | `## Loot` | enemy, creature, optional |
 | todefine | `## Da definire` | `## To define` | all, optional |
 
@@ -123,14 +123,33 @@ location: [<LOCATION ids, separated by commas, or nothing>]
 ## Natura
 <text>
 ## Statistiche
-<statistics>
+
+### Caratteristiche
+
+| Caratteristica | Valore |
+| --- | --- |
+| <characteristic> | <value> |
+
+### Attacchi e capacità
+
+| Attacco o capacità | Dettagli |
+| --- | --- |
+| <attack or ability> | <details> |
+
+### Equipaggiamento
+
+| Oggetto | Dettagli |
+| --- | --- |
+| <item> | <details> |
 ## Bottino
 <loot>
 ```
 
+For English campaigns, translate these subsection headings and use `| Characteristic | Value |`, `| Attack or ability | Details |`, and `| Item | Details |`. For other campaign languages, translate the headings and headers. Include only groups supported by supplied facts. A non-empty statistics section must contain at least one of these tables. Keep values exactly as given, including punctuation, links and inline code. Escape a literal pipe inside a cell as `\\|`.
+
 - The image line is OPTIONAL for all four templates (npc, vendor, enemy, creature). It is written only if DETAILS gives an image path, in the form `![<short description>](<image path>)`, right under the `# <NAME>` title. It is never invented, never required, and a sheet without it is complete and valid. Its absence is never listed in `open points:`. Otherwise omit it.
 - `location` is REQUIRED: with an empty LOCATION write `location: []`. `## Natura`: public lore only, what the creature is and what the characters can know, from DETAILS.
-- `## Statistiche`, enemy, adapter `none` or absent: the text DETAILS gives, copied as written; if DETAILS gives none, `Da definire.` (`en`: `To be defined.`) and add "statistics" to the To define list. Enemy with adapter set: the statistics block from DETAILS, copied exactly. Creature: exactly this one sentence and nothing else: `Nessuna statistica: non combatte.` (`en`: `No statistics: it does not fight.`). `## Bottino`: optional, only if DETAILS gives loot. Copy the values as written. Invent none.
+- `## Statistiche`, enemy, adapter `none` or absent: copy each supplied statistic value exactly into the relevant table; if DETAILS gives none, `Da definire.` (`en`: `To be defined.`) and add "statistics" to the To define list. Enemy with adapter set: preserve every supplied value exactly in the table format below; the adapter reads labels from the tables. Creature: exactly this one sentence and nothing else: `Nessuna statistica: non combatte.` (`en`: `No statistics: it does not fight.`). NPCs and vendors may have an optional `## Statistiche` section and use the same tables. `## Bottino`: optional, only if DETAILS gives loot. Copy the values as written. Invent none.
 
 Content rules, for every template:
 - The image line under the title is optional for every template, as stated in Step 5: never invent it, never require it.
@@ -152,7 +171,7 @@ Content rules, for every template:
     - `## Ruolo` (npc, vendor) or `## Natura` (enemy, creature): the role, history and past events, and the relations to other named characters;
     - `## Aspetto e modi` (npc, vendor): the aspect, as one italic paragraph (`_..._`);
     - `## Al tavolo` (npc, vendor): the manner of speaking and what the character wants;
-    - `## Statistiche` (enemy): a complete, playable block: armor class, hit points, speed, ability scores, at least one attack or action with its bonus and damage, and the equipment the character carries when the system has that notion; the arithmetic must be right. Use the stat format of the system adapter when ADAPTER is `set`; when ADAPTER is `none`, plain labelled lines, one statistic per row. Creature keeps its one-sentence rule for `## Statistiche`;
+    - `## Statistiche` (enemy): a complete, playable block: armor class, hit points, speed, ability scores, at least one attack or action with its bonus and damage, and the equipment the character carries when the system has that notion; the arithmetic must be right. Use the localized table format for every adapter. Creature keeps its one-sentence rule for `## Statistiche`;
     - `## Assortimento` (vendor): rows of items, prices and notes, in the header format; the rule "Never invent an item or a price" does not apply;
     - `## Bottino` (enemy, creature): entries; the rule "Invent none" does not apply.
     Each section holds at most 5 short sentences, and what DETAILS says always wins and is copied as written.
@@ -161,9 +180,11 @@ Content rules, for every template:
   - Never name a proposal as a proposal inside the sheet text: no words such as "proposal", "suggested" or "proposta".
 
 **Step 6 — Check the draft by reading it back.** Do NOT run `check-sheets` on a draft: that script checks campaign files only. Read the draft with the Read tool and check the points for its TEMPLATE. An image line under the title, if present, is not a section: it is never counted as one, and its absence is never a failure.
-- npc: front matter has `id`, `template: npc`, `location`; one `#` title equal to NAME; `## Ruolo`, `## Aspetto e modi`, `## Al tavolo` present in this order, each with text; the only other `##` section is `## Da definire`, last; the master block, if any, is last.
-- vendor: as npc with `template: vendor`; `## Assortimento` after `## Al tavolo`, with the header `| Oggetto | Prezzo | Nota |` (`en`: `| Item | Price | Note |`) and a separator row; `## Trattare` and `## Deroghe` optional, in that order, before `## Da definire`.
+- npc: front matter has `id`, `template: npc`, `location`; one `#` title equal to NAME; `## Ruolo`, `## Aspetto e modi`, `## Al tavolo` present in this order, each with text; optional `## Statistiche` after `## Al tavolo`, using the localized two-column tables above; `## Da definire`, if present, is last; the master block, if any, is last.
+- vendor: as npc with `template: vendor`; optional `## Statistiche` after `## Al tavolo`, using the localized two-column tables above; `## Assortimento` after those sections, with the header `| Oggetto | Prezzo | Nota |` (`en`: `| Item | Price | Note |`) and a separator row; `## Trattare` and `## Deroghe` optional, in that order, before `## Da definire`.
 - enemy: front matter has `id`, `template: enemy`, `location` (a list, `[]` allowed); one `#` title equal to NAME; `## Natura` and `## Statistiche` present in order, each with text; `## Bottino` optional, after `## Statistiche`; no conduct text in a public section; the master block, if any, is last. creature: as enemy with `template: creature`, and `## Statistiche` contains exactly the creature sentence.
+
+For every non-empty statistics section except the fixed noncombat creature sentence, verify that each original entry is retained in the appropriate two-column table, including repeated identical entries, with no entry invented, omitted or merged. Check each table's localized header and separator. Optional action and equipment tables appear only when supplied facts support them.
 
 With PROPOSE `yes`, the sections filled by a proposal count as having text. A proposal that contains a secret, a past event or a relation to another named character fails the check, and is fixed as described above. With IMAGINATION `yes`, the sections filled by invention count as having text, the failure rule above does not apply to past events and relations to other named characters, and a secret, or master-only text outside the master block, still fails the check.
 

@@ -337,7 +337,7 @@ Una boa segna un passaggio che sulle carte non esiste: lo conoscono solo i pesca
 **Categoria:** `Personaggi/`, tipo `subjects`.
 **Metadati:** `id`; `template: npc`; `location` come lista dei luoghi in cui si trova di norma.
 **Obbligatorie, in ordine:** titolo; `## Ruolo`; `## Aspetto e modi`; `## Al tavolo`, con voce, modo di parlare e che cosa vuole.
-**Facoltative, in ordine:** immagine sotto il titolo (ritratto); `## Statistiche`, obbligatoria se il PNG può combattere; `## Assortimento`, per i venditori (4.4); `## Da definire`.
+**Facoltative, in ordine:** immagine sotto il titolo (ritratto); `## Statistiche`, obbligatoria se il PNG può combattere; `## Assortimento`, per i venditori (4.4); `## Da definire`. Quando presente, `## Statistiche` usa le tabelle localizzate descritte in 4.3. Può comparire anche nella scheda di un venditore, se pertinente.
 **Blocco riservato:** `### Indicazioni per il master`, con motivazioni e segreti.
 
 Un PNG che svolge più ruoli usa il modello più ricco e dichiara le sezioni facoltative che usa. Non si crea una scheda per ciascun ruolo (L14 in [Skill di libreria](Skill%20di%20libreria.md#l14-gestione-dei-png)).
@@ -378,11 +378,11 @@ Un PNG nominato da un documento di trama ha la sua scheda prima del primo evento
 
 **Categoria:** `Creature/`, tipo `subjects`.
 **Metadati:** `id`; `template`: `enemy` per una creatura che combatte, `creature` per una che non combatte (animali, cavalcature); `location`, obbligatorio: la lista di tutti i luoghi in cui vive, `[]` se è errante.
-**Obbligatorie, in ordine:** titolo; `## Natura`, lore pubblica su ciò che la creatura è e su ciò che i personaggi possono sapere di lei; `## Statistiche`, con il blocco fornito dall'adattatore. Se la creatura non combatte (`template: creature`), la sezione dichiara «Nessuna statistica: non combatte».
+**Obbligatorie, in ordine:** titolo; `## Natura`, lore pubblica su ciò che la creatura è e su ciò che i personaggi possono sapere di lei; `## Statistiche`, con le tabelle localizzate fornite dall'adattatore. Se la creatura non combatte (`template: creature`), la sezione dichiara «Nessuna statistica: non combatte» al posto delle tabelle.
 **Facoltative, in ordine:** immagine sotto il titolo; `## Bottino`, con il valore ricavato dal documento di economia; `## Da definire`.
 **Blocco riservato:** `### Indicazioni per il master`, con condotta, tattica, quando fugge e segreti.
 
-Il modello separa tre cose in tre posti: la lore sta nella parte pubblica (`## Natura`), le regole nella parte pubblica (`## Statistiche`, con il formato dell'adattatore), le indicazioni per il master solo nel blocco riservato. Un testo di condotta non sta mai fra le sezioni pubbliche.
+Il modello separa tre cose in tre posti: la lore sta nella parte pubblica (`## Natura`), le regole nella parte pubblica (`## Statistiche`, con il formato dell'adattatore), le indicazioni per il master solo nel blocco riservato. Un testo di condotta non sta mai fra le sezioni pubbliche. Le statistiche usano tabelle distinte per caratteristiche e valori, attacchi o capacità e dettagli, ed equipaggiamento e dettagli. Le intestazioni sono localizzate secondo la lingua della campagna.
 
 ```markdown
 ---
@@ -399,8 +399,25 @@ _Una creatura bassa e massiccia, coperta di cristalli di sale, che sorveglia le 
 
 ## Statistiche
 
-Esempio con valori fittizi (lo schema reale è quello dell'adattatore): Minaccia 2 · Parametro A 14 · Parametro B 30
-Attacco: colpo, danno da taglio pari a un dado più un modificatore.
+### Caratteristiche
+
+| Caratteristica | Valore |
+| --- | --- |
+| Minaccia | 2 |
+| Parametro A | 14 |
+| Parametro B | 30 |
+
+### Attacchi e capacità
+
+| Attacco o capacità | Dettagli |
+| --- | --- |
+| Colpo | Danno da taglio pari a un dado più un modificatore. |
+
+### Equipaggiamento
+
+| Oggetto | Dettagli |
+| --- | --- |
+| Scudo di legno | Riduce i danni da impatto. |
 
 <!-- master -->
 ## Master
@@ -410,6 +427,8 @@ Attacco: colpo, danno da taglio pari a un dado più un modificatore.
 Si ritira verso l'acqua quando scende sotto la metà dei punti struttura.
 <!-- /master -->
 ```
+
+Per una campagna in inglese, le intestazioni delle colonne sono `Characteristic` / `Value`, `Attack or ability` / `Details` e `Item` / `Details`. Gli esempi riportano valori fittizi; lo schema reale è quello dell'adattatore.
 
 ### 4.4 Venditore
 

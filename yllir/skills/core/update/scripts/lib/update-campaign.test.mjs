@@ -126,6 +126,16 @@ test('an up-to-date campaign is reported and nothing is written', () => {
   assert.equal(fs.existsSync(path.join(dir, '.campaign/state/update.yaml')), false);
 });
 
+test('a dry-run never clears a stale pending sheet-migration marker', () => {
+  const dir = makeCampaign();
+  const state = 'status: completed\nsheet_migration_id: "statistics-tables-v1"\nsheet_migration: pending\n';
+  write(dir, '.campaign/state/update.yaml', state);
+  const result = updateCampaign(dir, { dryRun: true });
+  assert.equal(result.status, 'up-to-date');
+  assert.equal(result.sheet_migration, 'complete');
+  assert.equal(read(dir, '.campaign/state/update.yaml'), state);
+});
+
 test('a campaign made with an older version is updated and saved as one version', () => {
   const dir = makeCampaign();
   setVersion(dir, OLD);
@@ -145,6 +155,23 @@ test('a campaign made with an older version is updated and saved as one version'
   assert.match(state, /^status: completed$/m);
   assert.match(state, /^completed_on: 2026-11-09$/m);
   assert.match(state, /^started_on: 2026-11-09$/m);
+});
+
+test('an update identifies legacy statistics blocks and leaves their documents for post-update review', () => {
+  const dir = makeCampaign();
+  write(dir, 'campaign.yaml', MINIMAL_CONFIG.replace('type: plot', 'type: plot\n  - id: subjects\n    folder: Subjects\n    type: subjects'));
+  write(dir, 'Subjects/Guardia.md', '---\nid: guardia\ntemplate: npc\n---\n\n# Guardia\n\n## Statistiche\n\nCA: 13\nPF: 24\n');
+  setVersion(dir, OLD);
+  const dry = updateCampaign(dir, { dryRun: true });
+  assert.equal(dry.sheet_migration, 'pending');
+  assert.deepEqual(dry.sheet_migration_files, ['Subjects/Guardia.md']);
+  assert.match(read(dir, 'Subjects/Guardia.md'), /CA: 13/);
+  const result = updateCampaign(dir, { today: '2026-11-09' });
+  assert.equal(result.status, 'updated');
+  assert.equal(result.sheet_migration, 'pending');
+  assert.deepEqual(result.sheet_migration_files, ['Subjects/Guardia.md']);
+  assert.match(read(dir, '.campaign/state/update.yaml'), /^sheet_migration: pending$/m);
+  assert.match(read(dir, 'Subjects/Guardia.md'), /CA: 13/);
 });
 
 test('a generated file edited by hand is restored, and the edit stays in history', () => {

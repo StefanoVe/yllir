@@ -81,9 +81,9 @@ Section keys used in this file, with their headings in the heading table of Step
 - Output: ESTABLISHED facts per section (may be empty for each), RESEARCH_INCOMPLETE (yes or no).
 
 **Step 5 — Rules facts (statistics and stock).** Run this step only when TEMPLATE is `enemy` and the `statistics` section is a gap, or when TEMPLATE is `vendor` and the `stock` section is a gap. Otherwise output "no rules gap" and go to Step 6. Rules are never written from memory and never invented, except as follows.
-0. If MASTER_MESSAGE explicitly authorizes you to invent or choose the statistics or stock yourself (for example «inventale tu», «scegli tu le statistiche», «puoi inventarle», «make them up»), this is a master-given authorization, and it overrides the rule above: do not search the sources and do not ask any question. Draft a complete, plausible RULES_BLOCK yourself, using the stat format of the system adapter if ADAPTER is `set` (ask nothing); otherwise use plain labelled lines. Write it in the sheet, and mention in the message to the master that the statistics (or the stock and prices) are invented and can be changed. This RULES_BLOCK is treated as any other RULES_BLOCK in Step 7 and Step 9. Then go to the Output of this step.
+0. If MASTER_MESSAGE explicitly authorizes you to invent or choose the statistics or stock yourself (for example «inventale tu», «scegli tu le statistiche», «puoi inventarle», «make them up»), this is a master-given authorization, and it overrides the rule above: do not search the sources and do not ask any question. Draft a complete, plausible RULES_BLOCK yourself using the campaign's statistics tables below; retain the system's field labels where ADAPTER is `set`. Write it in the sheet, and mention in the message to the master that the statistics (or the stock and prices) are invented and can be changed. This RULES_BLOCK is treated as any other RULES_BLOCK in Step 7 and Step 9. Then go to the Output of this step.
 0b. If IMAGINATION is `yes` (and the message of point 0 does not apply): sources and the master's own block come first. Follow points 1 to 4 below. Wherever they would leave the section `Da definire.` or set QUESTION_RULES (no block in the message, ADAPTER `none`, research not DONE, or no block in the sources), do not leave it and do not ask: draft the RULES_BLOCK yourself as point 0 says, and mention in the message to the master that it is invented. A block that a source or the message gives always wins over an invented one.
-1. If MASTER_MESSAGE contains a block of statistics (enemy) or of stock items with prices (vendor): copy that block exactly, character by character, into RULES_BLOCK. Then go to the Output of this step. Do not search the sources.
+1. If MASTER_MESSAGE contains a block of statistics (enemy) or of stock items with prices (vendor): keep its values and punctuation exactly in RULES_BLOCK; Step 7 formats statistics into the required tables. Then go to the Output of this step. Do not search the sources.
 2. Otherwise, if ADAPTER is `none`: the section stays `Da definire.` (English `To be defined.`). Add the section to TO_DEFINE. No question is asked. Go to the Output of this step.
 3. Otherwise (ADAPTER is `set`): invoke the skill `yllir:canon-research` with:
    - `QUESTION="What are the statistics of <TITLE> in the rules sources?"` for an enemy, or `QUESTION="What are the stock and prices of <TITLE> in the rules sources?"` for a vendor;
@@ -128,7 +128,7 @@ If QUESTION_CREATIVE is set: do not write any draft. Go to Step 9 and send only 
    - A GAP section (empty, or with only `Da definire.` or `To be defined.`, or missing) gets, in this order of preference:
      1. the ESTABLISHED facts of Step 4 that describe it;
      2. the PROPOSAL of Step 6, only if one exists (with IMAGINATION `no` none exists) and the section still has no text;
-     3. for `statistics` and `stock`: the RULES_BLOCK of Step 5 copied exactly, or the sentence `Da definire.` (English `To be defined.`) when there is no RULES_BLOCK;
+     3. for `statistics` and `stock`: the values from RULES_BLOCK of Step 5, with statistics rendered in the required tables, or the sentence `Da definire.` (English `To be defined.`) when there is no RULES_BLOCK;
      4. any other gap section that still has no text: the sentence `Da definire.` (English `To be defined.`), and its section key is added to TO_DEFINE.
    - A missing section is added in the order of the heading table below.
    - The master block (`<!-- master -->` ... `<!-- /master -->`) is kept byte for byte, stays the LAST part of the sheet, and is never added to and never moved.
@@ -136,8 +136,8 @@ If QUESTION_CREATIVE is set: do not write any draft. Go to Step 9 and send only 
    - A PROPOSAL is never listed under `## Da definire`.
    - The words proposal, suggested and proposta (and their translations) never appear in the sheet.
    - A place keeps its `## Descrizione` section with an italic opening paragraph.
-   - With IMAGINATION `yes`, for an enemy, creature or vendor the rules block must be a PLAYABLE block, not only the required fields: at least armor class, hit points, speed, ability scores, at least one attack or action with its attack bonus and damage, and the equipment the character carries (if the system has such a notion). Check the arithmetic (modifiers, bonuses) before writing. With IMAGINATION `no`, the rules block is copied exactly as the source or the master gives it: add no statistic, item or price to it, and check only the arithmetic of what it states.
-   - Statistics are written as a Markdown table, or as lines each ending with two spaces or as a list, never as consecutive plain lines that Markdown collapses into one paragraph. After writing the draft, read it back and check that every statistic is on its own row.
+   - With IMAGINATION `yes`, for an enemy or vendor the rules block must be PLAYABLE, not only contain required fields: an enemy needs at least armor class, hit points, speed, ability scores, one attack or action with its bonus and damage, and equipment if the system has that notion; a vendor needs plausible stock with prices. Check arithmetic where applicable. With IMAGINATION `no`, preserve every value exactly as the source or master gives it: add no statistic, item or price, and check only the arithmetic of what it states.
+   - Render statistics using localized `###` subsections and two-column tables. Italian headings and headers: `### Caratteristiche` with `| Caratteristica | Valore |`; `### Attacchi e capacità` with `| Attacco o capacità | Dettagli |`; `### Equipaggiamento` with `| Oggetto | Dettagli |`. English: `### Characteristics` with `| Characteristic | Value |`; `### Attacks and abilities` with `| Attack or ability | Details |`; `### Equipment` with `| Item | Details |`. Use only groups supported by facts, preserving each value and its punctuation exactly; escape literal pipes as `\\|`. A non-empty block uses at least one of these tables. After writing the draft, read it back and verify every table header, row and value.
 
    Heading table, with the sections of each template (the `it` heading for an Italian campaign, the `en` heading for an English one, and the translation for any other language):
 
@@ -150,12 +150,12 @@ If QUESTION_CREATIVE is set: do not write any draft. Go to Step 9 and send only 
    | haggling | `## Trattare` | `## Haggling` | vendor, optional |
    | exceptions | `## Deroghe` | `## Exceptions` | vendor, optional |
    | nature | `## Natura` | `## Nature` | enemy, creature |
-   | statistics | `## Statistiche` | `## Statistics` | enemy, creature |
+   | statistics | `## Statistiche` | `## Statistics` | enemy, creature; optional for npc and vendor |
    | loot | `## Bottino` | `## Loot` | enemy, creature, optional |
    | description | `## Descrizione` | `## Description` | place |
    | todefine | `## Da definire` | `## To define` | all, last before the master block |
 
-   Order of the sections for each template: npc: role, appearance, table. vendor: role, appearance, table, stock, haggling, exceptions. enemy: nature, statistics, loot. creature: nature, statistics, loot. place: description. Then `## Da definire` (if any), then the master block.
+   Order of the sections for each template: npc: role, appearance, table, optional statistics. vendor: role, appearance, table, optional statistics, stock, haggling, exceptions. enemy: nature, statistics, loot. creature: nature, statistics, loot. place: description. Then `## Da definire` (if any), then the master block.
 
 3. Read the draft back with the Read tool and check each point. Every point must be true:
    - the front matter is identical to the front matter of the sheet;
@@ -164,7 +164,7 @@ If QUESTION_CREATIVE is set: do not write any draft. Go to Step 9 and send only 
    - the master block is identical to the sheet's master block and is the last part of the file;
    - the words proposal, suggested and proposta do not appear;
    - a place's `## Descrizione` opens with an italic paragraph;
-   - every statistic is on its own row, and a statistic block of an enemy, creature or vendor has right arithmetic (point 2) and, with IMAGINATION `yes` only, is playable.
+   - statistics use localized `###` subsections and the specified two-column tables, with values preserved exactly; a statistic block of an enemy has right arithmetic (point 2) and, with IMAGINATION `yes` only, is playable. A creature's statistics section is exactly `Nessuna statistica: non combatte.` (`en`: `No statistics: it does not fight.`).
    If a point fails: fix the draft with the Write tool (Read it first), and read it back again.
 4. Run this command, with `<SHEET_PATH>` replaced by the value from Step 2:
    `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . gaps --files "<SHEET_PATH>" --base .campaign/state/write/draft`

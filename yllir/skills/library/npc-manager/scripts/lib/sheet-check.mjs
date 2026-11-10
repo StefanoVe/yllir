@@ -8,6 +8,7 @@ import path from 'node:path';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../../../../scripts/lib/zones.mjs';
+import { validateStatisticsTables } from '../../../../../scripts/lib/statistics-tables.mjs';
 import {
   readStructure,
   listSheets,
@@ -249,7 +250,11 @@ function checkSections(lines, template, language, add) {
   const sections = [];
   let current = null;
   for (const line of lines) {
-    if (line.inMaster || line.block === 'blank' || line.block === 'comment') continue;
+    if (line.inMaster || line.block === 'blank') continue;
+    if (line.block === 'comment') {
+      if (current?.name === headings.statistics) current.lines.push(line);
+      continue;
+    }
     if (line.block.startsWith('master-')) continue;
     if (line.block === 'heading') {
       if (line.level === 2) {
@@ -257,6 +262,8 @@ function checkSections(lines, template, language, add) {
         sections.push(current);
       } else if (line.level === 1) {
         current = null;
+      } else if (line.level >= 3 && current?.name === headings.statistics) {
+        current.lines.push(line);
       }
       continue;
     }
@@ -305,6 +312,11 @@ function checkSections(lines, template, language, add) {
     if (!flat.includes(phrase)) {
       add('creature-statistics', `the Statistics section of a creature must say "${phrase}"`);
     }
+  }
+  if (statistics && template !== 'creature') {
+    const content = statistics.lines.map((line) => line.text).join('\n');
+    const validation = validateStatisticsTables(content, language);
+    if (!validation.ok) add('statistics-table', validation.reason ?? `section "${statistics.name}" must use the localized statistics tables`);
   }
 }
 

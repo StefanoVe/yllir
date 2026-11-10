@@ -2,7 +2,7 @@
 name: update
 description: Handles the framework update for the master: campaign alignment after the assistant was updated, the update notice and its yes or no, and an interrupted update. It is read by the entry skill, never called by the master.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *), Read, Skill
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/runner-result.mjs" *), Bash(claude plugin update *), Bash(codex plugin marketplace upgrade *), Read, Skill, Agent
 ---
 
 # Update
@@ -17,10 +17,10 @@ Run every command from the campaign root (the folder the master opened). Never r
 
 ## Part A — Campaign alignment
 
-Use this part only when the block `YLLIR SESSION CHECK` has the line `campaign alignment: needed`: the assistant was updated and the campaign's generated files are older.
+Use this part when the block `YLLIR SESSION CHECK` has `campaign alignment: needed` or `post-update: needed`.
 
 1. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" .`. Read the JSON result and its `exit:` line.
-2. If `status` is `updated`: say the fixed sentence of the lexicon «L'assistente è stato aggiornato. Nulla di tuo è cambiato.» (in the campaign language, as it is written there). Then do the following, in this order:
+2. If `status` is `updated`: when `sheet_migration` is `pending`, say that the assistant has been updated and that some Statistics sections need a format update (translate into the campaign language). Otherwise say the fixed sentence of the lexicon «L'assistente è stato aggiornato. Nulla di tuo è cambiato.» (in the campaign language, as it is written there). Then do the following, in this order:
    - If `migrated` is not empty (it lists the old session files that were converted), link the scenes, once:
      1. Invoke the skill `yllir:plot-map` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/plot-map/SKILL.md` with the Read tool, and follow it exactly as if it had been invoked) with:
         - `MODE=link-events`
@@ -31,13 +31,22 @@ Use this part only when the block `YLLIR SESSION CHECK` has the line `campaign a
      4. If its `status` is `FAILED`, or any other status: say nothing about it and do not retry. The check runs again the next time the master prepares a session.
    - If `restored_by_hand` is not empty, add in one sentence that a file managed by the assistant was restored, and that their own rules belong in «Your rules».
    - Do not run `generate-instructions` as well.
-3. If `status` is `up-to-date`: say nothing.
+3. If `status` is `up-to-date`: say nothing about the framework update.
 4. If `status` is `failed` and the first item of `errors` has `code` `interrupted-update`: say the fixed sentence of the lexicon for an earlier update that was not finished. Then offer two choices in plain words: continue the update, or go back to how it was. Write no campaign content until the master chooses.
    - On «continue»: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" . --resume`. Read its JSON result and apply step 2 (`updated`) or step 5 (any other failure).
    - On «go back»: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/update/scripts/update-campaign.mjs" . --cancel`. If `status` is `cancelled`, tell the master in one sentence that everything is as it was before the update.
 5. Any other failure, or any other status: say the fixed sentence of the lexicon for an update that could not be applied, which says that nothing was changed (the script has already restored the campaign). Stop writing.
 
 Output: the campaign is aligned (updated, with the scenes linked when `migrated` was not empty, or already up to date), or the master has been told about the problem and nothing was written.
+
+### Sheet format follow-up
+
+If the result has `sheet_migration: pending` (whether its status is `updated` or `up-to-date`), run the post-update process through `yllir:process-runner` before continuing to the master's request:
+
+1. Read the active topic from the session check and its handoff. If an active topic has `process: post-update` with a pending question and the master's current message does not answer it, skip this follow-up and continue to the entry skill's normal request handling. Reuse an active post-update topic if the master's message answers its pending question. If no such topic exists, run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/topics.mjs" new . --process post-update --goal "Convert old Statistics tables"` and keep its `id` and `path`.
+2. Launch `yllir:process-runner` in the foreground, using GPT-6 Luna in Codex, with `PROCESS: yllir:post-update`, `TOPIC: <id>`, `HANDOFF: <absolute topic path>`, `CHANGED_FILES: none`, `LANGUAGE: <language.main>`, `MASTER_MESSAGE:` followed by the master's current message verbatim.
+3. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/runner-result.mjs" . --file .campaign/state/runner/result.txt --topic <id>`. Read its output. This validates the result and records the topic handoff or closes the topic.
+4. If the result command says `status: QUESTION`, send only the text under `message for the master:` and stop before the master's original request. Never repeat the same question unless the master has answered it or asked to revisit the migration. If validation fails, treat the process as FAILED, keep the marker pending, and continue with the master request.
 
 ## Part B — Update notice
 
@@ -57,7 +66,7 @@ Use this part when your context has a block that starts with `YLLIR UPDATE AVAIL
   Plugin update command, in Codex: `codex plugin marketplace upgrade yllir --json`
   Run the one for the tool you are running in (you know whether you are Claude Code or Codex). Never run both. These are the only places where the commands are written; change them here if the marketplace name changes.
   - «yes» (any clear consent, for example «sì», «aggiorna», «ok, aggiorna pure»): run the Plugin update command of your tool above, as one single command, exactly as written there.
-    If its exit code is 0 (and, in Codex, the JSON `errors` list is empty; if it is not empty, treat it like a non-zero exit code): tell the master in plain words that the update is ready, that they must close and reopen the assistant once for it to start working, and that nothing of theirs changes. Say that the campaign itself is aligned the next time it is opened (the entry skill's Step 4). If the exit code is not 0: say the fixed sentence of the lexicon for an update that could not be applied, which says that nothing was changed.
+    If its exit code is 0 (and, in Codex, the JSON `errors` list is empty; if it is not empty, treat it like a non-zero exit code): tell the master in plain words that the update is ready and they must close and reopen the assistant once for it to start working. If the update notice says old Statistics sections need a format change, say that those sections may be updated the next time the campaign is opened. Otherwise say that nothing in the campaign changes. Say that the campaign itself is aligned the next time it is opened (the entry skill's Step 4). If the exit code is not 0: say the fixed sentence of the lexicon for an update that could not be applied, which says that nothing was changed.
   - «no» or «later» (or any clear refusal): say that it is fine and that you will mention it again tomorrow. Run nothing.
   - Anything else (a new request): handle it normally with Step 6 of the entry skill. Do not repeat the question.
   Output: the update is ready, or nothing was changed, or nothing was run.

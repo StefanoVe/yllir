@@ -15,6 +15,7 @@ import { checkUpdate, formatUpdateNotice } from './update-check.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
 const VERSION_PATH = '.campaign/version.yaml';
+const UPDATE_STATE_PATH = '.campaign/state/update.yaml';
 // Paths the framework never counts as changes (same rules as versions.mjs).
 const IGNORED_PREFIXES = ['.campaign/state', '.campaign/cache'];
 const VERSION_LIMIT = 1000000;
@@ -34,6 +35,7 @@ const NEXT_STEP = 'next: invoke the skill yllir:yllir before answering the maste
  *   instructions: 'up-to-date' | 'missing' | { changed: string[] } | null,
  *   framework_version: string | null,
  *   campaign_framework_version: string | null,
+ *   post_update: 'needed' | null,
  *   topics: { active: object | null, open: number } | null,
  *   update: { installed: string, published: string, news: string | null } | null,
  * }}
@@ -51,6 +53,7 @@ export function sessionCheck(root) {
     instructions: null,
     framework_version: attempt(readFrameworkVersion, null),
     campaign_framework_version: null,
+    post_update: null,
     topics: null,
     update: null,
   };
@@ -77,6 +80,7 @@ export function sessionCheck(root) {
     return { changed: [...fingerprints.changed] };
   }, null);
   result.campaign_framework_version = attempt(() => readCampaignVersion(dir), null);
+  result.post_update = attempt(() => readPostUpdate(dir), null);
   result.topics = attempt(() => topicsState(dir), null);
   result.update = attempt(() => checkUpdate(dir), null);
   return result;
@@ -125,6 +129,9 @@ export function formatCheck(result) {
     ) {
       lines.push('campaign alignment: needed');
     }
+  }
+  if (result.post_update === 'needed') {
+    lines.push('post-update: needed');
   }
   if (result.topics?.active) {
     const active = result.topics.active;
@@ -255,6 +262,15 @@ function readCampaignVersion(dir) {
   if (parsed.errors.length > 0 || parsed.data === null || typeof parsed.data !== 'object') return null;
   const version = parsed.data.framework_version;
   return typeof version === 'string' ? version : null;
+}
+
+/** Pending post-update sheet conversion, read without changing campaign state. */
+function readPostUpdate(dir) {
+  const text = readTextOrNull(path.join(dir, UPDATE_STATE_PATH));
+  if (text === null) return null;
+  const parsed = parseYamlLite(text);
+  if (parsed.errors.length > 0 || parsed.data === null || typeof parsed.data !== 'object') return null;
+  return parsed.data.sheet_migration === 'pending' ? 'needed' : null;
 }
 
 function readFrameworkVersion() {
