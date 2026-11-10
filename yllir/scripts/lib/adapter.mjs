@@ -70,7 +70,7 @@ function validate(adapter, folderId) {
   if (adapter.id !== folderId) error('id-mismatch', 'id', `id must match the adapter folder ${folderId}`);
   if (typeof adapter.name !== 'string' || !adapter.name.trim()) error('bad-value', 'name', 'name must be nonempty text');
   if (!Number.isInteger(adapter.version)) error('bad-value', 'version', 'version must be a whole number');
-  const headingKeys = ['statistics', 'description', 'effects'];
+  const headingKeys = ['statistics', 'description', 'effects', 'brief'];
   if (!isMapping(adapter.headings)) {
     error('bad-type', 'headings', 'headings must be a mapping');
   } else {
@@ -78,6 +78,7 @@ function validate(adapter, folderId) {
       if (!headingKeys.includes(key)) error('unknown-key', `headings.${key}`, `"${key}" is not a supported heading`);
     }
     for (const key of headingKeys) {
+      if (key === 'brief' && adapter.headings[key] === undefined) continue;
       const field = adapter.headings[key];
       if (!isMapping(field)) {
         error('bad-type', `headings.${key}`, `headings.${key} must be a mapping`);

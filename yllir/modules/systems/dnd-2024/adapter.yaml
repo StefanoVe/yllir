@@ -8,6 +8,9 @@ headings:
   description:
     it: Descrizione
     en: Description
+  brief:
+    it: In breve
+    en: In brief
   effects:
     it: Effetti
     en: Effects

@@ -1,0 +1,13 @@
+case: item-manager-check
+checks:
+  detects_missing_brief_on_legacy_sheet: true
+  detects_brief_full_contradiction: true
+  detects_secret_outside_master_block: true
+  detects_medallion_omitted_from_items: true
+  detects_missing_sheet_for_relevant_key: true
+  asks_about_plot_vs_sheet_effect_conflict: true
+  does_not_flag_scenery_lantern: true
+  does_not_flag_excluded_sigillo: true
+  treats_ada_alias_collision_as_ambiguous: true
+  does_not_rewrite_existing_sheets: true
+  reports_scope_and_counts: true

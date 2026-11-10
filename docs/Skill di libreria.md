@@ -41,7 +41,8 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | [Ricerca nel canone](#l4-ricerca-nel-canone) (`canon-research`) | Libreria, sola lettura | Rispondere a domande su chi o che cosa è qualcosa, con prove e limiti. | Deciso |
 | [Mappa della trama](#l5-mappa-della-trama) (`plot-map`) | Libreria, chiamata dal core | Vista d'insieme delle dipendenze fra documenti di trama: grafo, tabella, nodi aperti, rami. | Deciso |
 | [Intrecci dei PG](#l6-intrecci-dei-pg) (`pc-weaving`) | Libreria, chiamata dal core | Trasformare la scheda di un giocatore in un piano di integrazione con la trama. | Deciso |
-| [Schede di luoghi e oggetti](#l7-schede) (`sheets`) | Libreria, chiamata dal core | Creare e aggiornare le schede di luoghi e oggetti, con un blocco riservato al master. | Deciso |
+| [Schede di luoghi](#l7-schede) (`sheets`) | Libreria, chiamata dal core | Creare e aggiornare le schede dei luoghi, con un blocco riservato al master. | Deciso |
+| [Gestione degli oggetti](Gestione%20degli%20oggetti.md) (`item-manager`) | Libreria, chiamata dal core | Creare bozze e controllare le schede degli oggetti, senza scrivere direttamente nella campagna. | Deciso (2026-11-10) |
 | [Gestione dei PNG](#l14-gestione-dei-png) (`npc-manager`) | Libreria, chiamata dal core | Creare e mantenere personaggi non giocanti, nemici e venditori con schede sempre standardizzate. | Deciso |
 | [Artwork](#l8-artwork) (`artwork`) | Libreria, chiamata dal core | Dipingere una creatura o un personaggio partendo da una descrizione verificata, e collegare il dipinto alla scheda. | Deciso |
 | [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Deciso |
@@ -189,15 +190,15 @@ Le destinazioni dei collegamenti possono essere anche documenti di categorie `ex
 
 ### L7. Schede
 
-- **Scopo:** creare e aggiornare le schede di luoghi e oggetti, con un blocco riservato al master e i collegamenti a immagini e output. Personaggi non giocanti, nemici e venditori sono della [gestione dei PNG](#l14-gestione-dei-png).
-- **Avvio:** dal core, su richiesta (nuovo luogo, nuovo oggetto) o dopo una sessione per gli aggiornamenti.
+- **Scopo:** creare e aggiornare le schede dei luoghi, con un blocco riservato al master e i collegamenti a immagini e output. Gli oggetti sono gestiti dalla skill dedicata [item-manager](Gestione%20degli%20oggetti.md); personaggi non giocanti, nemici e venditori sono della [gestione dei PNG](#l14-gestione-dei-png).
+- **Avvio:** dal core, su richiesta per un nuovo luogo o dopo una sessione per i suoi aggiornamenti.
 - **Input → output:** dettagli dell'autore, tipo, luogo → scheda Markdown nella categoria giusta, con sezioni obbligatorie del tipo, immagini collegate, esito di validazione.
 - **Deterministico:** template per tipo; ricerca del luogo già esistente e dei duplicati prima di creare; nome del file e slug; validazione (sezioni, blocco riservato come ultimo contenuto, segnaposti, percorsi delle immagini che esistono).
 - **Giudizio:** prosa, distinzione fra parte pubblica e riservata, cosa conoscono i personaggi.
 - **Modello:** vedi [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md).
-- **Dipendenze:** adattatore del sistema di gioco (sezioni delle statistiche e degli effetti); profilo di stile e registro della prosa; [economia](#l16-economia) in lettura (prezzi e valore degli oggetti); moduli di output (`print`, `encyclopedia`).
+- **Dipendenze:** profilo di stile e registro della prosa; moduli di output (`print`, `encyclopedia`).
 - **Requisiti:**
-  - una sola skill con due tipi (luogo, oggetto), con i modelli nel [formato dei contenuti](Formato%20dei%20contenuti.md) (proposta); i prezzi degli oggetti seguono il documento di [economia](#l16-economia);
+  - il modello dei luoghi segue il [formato dei contenuti](Formato%20dei%20contenuti.md);
   - gli attributi di stampa e di enciclopedia non stanno nella skill ma nei moduli di output;
   - lo stato di stampa è letto da un validatore comune, non da ciascuno strumento.
 - **Rischi da evitare:**
@@ -228,6 +229,7 @@ Le destinazioni dei collegamenti possono essere anche documenti di categorie `ex
 - **Input → output:** parte pubblica della scheda (con limite temporale), profilo grafico → coppia PNG e PSD nella `img/` della categoria.
 - **Deterministico:** misure e impaginazione del testo (conteggio delle righe con metriche del font); esportazione alla dimensione fissa; nomi delle coppie; controllo dei livelli del PSD; ritaglio della trasparenza.
 - **Giudizio:** quale testo mettere sulla carta (ciò che i personaggi sanno al momento scelto); sintesi se il testo è troppo lungo; revisione indipendente del testo.
+- **Testo dell'oggetto (Deciso, 2026-11-10):** usa `## In breve`; se una scheda legacy non ce l'ha, usa `## Descrizione` senza modificarla.
 - **Modello:** vedi [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md).
 - **Dipendenze:** profilo di stile (base grafica, font, layout); adattatore del renderer (Photoshop oggi); modulo `encyclopedia` (la parte di regole sta lì, non sulla carta).
 - **Requisiti:**

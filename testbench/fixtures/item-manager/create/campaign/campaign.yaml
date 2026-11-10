@@ -1,0 +1,33 @@
+schema: 1
+campaign:
+  name: "La diga di Cenere"
+  slug: diga-di-cenere
+  description: "Una comunità vive attorno a una diga antica."
+  created: 2026-11-10
+language:
+  main: it
+  other: []
+prose:
+  register: plain
+system:
+  adapter: none
+structure:
+  - id: trama
+    folder: Trama
+    type: plot
+  - id: oggetti
+    folder: Oggetti
+    type: objects
+  - id: personaggi
+    folder: Personaggi
+    type: subjects
+  - id: luoghi
+    folder: Mondo
+    type: places
+audit:
+  exclusions:
+    - subject: sigillo-di-cenere
+      attribute: plot.items
+      values: ["sigillo di cenere"]
+      reason: "Il master ha escluso questo dettaglio dalla verifica degli oggetti da scheda."
+      date: 2026-11-10

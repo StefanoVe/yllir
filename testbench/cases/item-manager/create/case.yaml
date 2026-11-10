@@ -1,0 +1,19 @@
+case: item-manager-create
+fixture: item-manager/create
+skill: item-manager
+mode: create
+name: Sigillo di Cenere
+location: guado-nero
+details: "La custode ha confermato che il sigillo è un disco di bronzo con tre tacche, apre il condotto della diga e, quando piove, emette una debole luce dorata. È importante nella trama. I personaggi non devono essere informati che la lega contiene argento lunare. Non assegnare altri effetti o valori."
+requested_by: Trama/Scena.md
+files: Trama/Scena.md
+imagination: no
+prompt: |
+  Sei il processo core. Chiama la skill yllir:item-manager in modalità create
+  con tutti i valori di questo caso. Completa la bozza usando soltanto i fatti
+  autorizzati, chiedi al master se manca un fatto indispensabile, e lascia la
+  bozza nello stato della scrittura senza modificare i documenti della campagna.
+  Controlla anche `find` per `Luce di Ada` e `Lanterna`: riferisci l'alias esatto
+  e i risultati di ricerca senza creare duplicati. Non creare schede per nomi di
+  luogo/personaggio o oggetti di sola scenografia. Riporta una risposta breve
+  in italiano.

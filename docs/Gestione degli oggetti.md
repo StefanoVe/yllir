@@ -1,13 +1,13 @@
 # Gestione degli oggetti
 
-**Stato:** Bozza di progetto
+**Stato:** Decisioni approvate; implementazione in corso
 **Parte di:** [Skill di libreria](Skill%20di%20libreria.md)
 
 ## Scopo del documento
 
-Questo file descrive la skill di libreria che crea e mantiene le schede degli oggetti (`item-manager`). Oggi il catalogo prevede le schede di oggetti dentro la funzione generica [L7, Schede](Skill%20di%20libreria.md#l7-schede), insieme ai luoghi, e nel repository non esiste alcuna skill che scriva la bozza di un oggetto: esiste solo la validazione dell'adattatore del sistema (`validate-sheet` con `KIND=item`). Questo documento propone una skill dedicata, sul modello di `npc-manager`.
+Questo file definisce la skill di libreria che prepara bozze e controlla schede di oggetti (`item-manager`). La skill non scrive nella campagna: il core passa la bozza al cablaggio di scrittura. I luoghi restano in L7, mentre i personaggi sono gestiti da `npc-manager`.
 
-Convenzioni: ciò che è **Deciso** dall'autore è dichiarato come tale; il resto è **Proposta**. Nulla qui è ancora implementato. Le questioni aperte sono in fondo e non sono risolte.
+Le decisioni dell’autore sono marcate **Deciso**. I dettagli non fissati restano **Proposta** e le questioni aperte in fondo non sono risolte.
 
 ## Che cos'è un oggetto
 
@@ -22,9 +22,9 @@ Le prime tre sono la parte pubblica. Le note del master stanno nel blocco riserv
 
 ## La skill
 
-- **Nome (proposta):** `item-manager`, skill di libreria in `yllir/skills/library/item-manager/`, con i suoi script accanto a `SKILL.md`.
-- **Scopo:** creare la bozza della scheda di un oggetto e controllare che ogni oggetto nominato nei documenti di trama abbia una scheda valida. Non scrive mai un documento della campagna: la bozza passa da `write-sequence`.
-- **Avvio:** dal core, quando una scena, una cronaca o un documento importato nomina un oggetto che non ha ancora una scheda (`prepare-session`, `after-session`, `import`); oppure su richiesta («sistema le schede degli oggetti»). Mai chiamata dal master. Non parte in autorun.
+- **Nome (Deciso, 2026-11-10):** `item-manager`, skill di libreria in `yllir/skills/library/item-manager/`, con i suoi script accanto a `SKILL.md`.
+- **Scopo:** creare bozze di schede e controllare le schede e i candidati nei documenti di trama. Non scrive mai un documento della campagna: la bozza passa da `write-sequence`.
+- **Avvio:** dal core, su richiesta del master o quando un processo rileva un oggetto meritevole di scheda. Non parte in autorun.
 - **Input → output:**
   - modalità `create`: nome, luogo (`location`, può essere vuoto), dettagli dati dal master o dal documento, documenti che lo richiedono → bozza della scheda nella categoria degli oggetti, esito;
   - modalità `check`: elenco di file (vuoto = tutta la campagna) → rapporto degli oggetti nominati senza scheda e delle schede che non rispettano il modello.
@@ -38,26 +38,26 @@ Le prime tre sono la parte pubblica. Le note del master stanno nel blocco riserv
   - generazione dello scheletro dal modello: metadati, titolo, sezioni obbligatorie nell'ordine, blocco riservato nella forma esatta;
   - nome del file e `id` (slug, mai riusato);
   - validazione: sezioni presenti e in ordine, blocco riservato ultimo e unico, nessun segnaposto rimasto, percorsi delle immagini esistenti, `location` che risolve su luoghi esistenti;
-  - controllo `plot-items`, analogo a `plot-cast`: ogni oggetto citato dai documenti di trama ha una scheda (vedi la questione aperta sul modo di dichiarare gli oggetti negli eventi).
+  - controllo `plot-items`, analogo a `plot-cast`: controllo del campo `items` negli eventi; i candidati trovati nel testo ma omessi dal campo sono presentati all’agente, che giudica identità, pertinenza ed esclusioni.
 - **Giudizio (agente):**
   - scrittura delle due descrizioni nel tono della campagna (vedi «Tono delle descrizioni»);
   - la separazione fra ciò che i personaggi possono sapere (pubblico) e ciò che sa solo il master (riservato);
-  - se un testo di trama contraddice la scheda: è una domanda per il master (`status: ASK`), mai una correzione silenziosa.
+  - identificazione dei candidati trovati nel testo e applicazione delle esclusioni dichiarate; se un testo di trama contraddice la scheda, domanda al master (`status: ASK`), mai correzione silenziosa.
 - **Dipendenze:**
   - adattatore del sistema di gioco, tramite la skill `system-adapter`: la sezione degli effetti nel formato del sistema e il controllo `validate-sheet` con `KIND=item`, che al passo 3b di `write-sequence` precede la revisione indipendente;
-  - documento di economia, in sola lettura, per il valore e il prezzo (opzionale);
+  - documento di economia, in sola lettura, per la sola verifica del valore (opzionale);
   - `write-sequence` per la scrittura, `linker` per i collegamenti, `canon-research` per cercare l'oggetto già stabilito altrove;
   - moduli di output (carte, stampa, enciclopedia), che leggono soltanto la parte pubblica.
 - **Modello:** vedi [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md); le istruzioni sono scritte per funzionare con il più debole degli esecutori.
 
 ## Modello della scheda
 
-**Proposta.** Il modello estende quello già descritto in [Formato dei contenuti](Formato%20dei%20contenuti.md), sezione 4.5, che oggi ha una sola sezione `## Descrizione` e una sezione `## Effetti`. Per recepire la decisione dell'autore, la descrizione si divide in due.
+**Deciso (2026-11-10).** Il modello estende quello già descritto in [Formato dei contenuti](Formato%20dei%20contenuti.md), sezione 4.5, dividendo la descrizione in una breve e una completa.
 
 **Categoria:** `Oggetti/`, tipo `objects`, `template: item`.
 **Metadati:** `id`; `template: item`; `location` (dove si trova adesso, lista di `id` di luoghi, `[]` se non ha un luogo fisso); `aliases` facoltativo; `print` solo se la categoria produce carte. Nei metadati non c'è nulla di riservato.
 
-**Sezioni, in ordine:**
+**Sezioni, in ordine (Deciso):**
 
 | Sezione | Pubblica | Contenuto |
 | --- | --- | --- |
@@ -65,9 +65,10 @@ Le prime tre sono la parte pubblica. Le note del master stanno nel blocco riserv
 | `## In breve` | sì | descrizione breve: una o due frasi, quello che si coglie a colpo d'occhio. È il testo che le uscite brevi (carta, tooltip, elenchi) possono riusare. |
 | `## Descrizione` | sì | descrizione completa: ciò che i personaggi vedono o sanno, in prosa nel registro della campagna. |
 | `## Effetti` | sì | gli effetti di gioco, nel formato dell'adattatore del sistema; senza effetti, «Nessun effetto di gioco». |
+| sezioni facoltative | sì | `## Origine`, `## Ritrovamento`, `## Testo`, `## Valore`, in quest’ordine; ciascuna può essere omessa. |
 | blocco riservato `### Indicazioni per il master` | no | note del master: origine vera, segreti, usi in trama. Ultimo contenuto del file. |
 
-Le sezioni facoltative già previste (`## Origine`, `## Ritrovamento`, `## Testo`, `## Valore`) restano com'erano; l'ordine fra esse e le quattro sopra è una questione aperta.
+La presenza di una sezione facoltativa non rende pubblica un’informazione riservata: i fatti non noti ai personaggi stanno soltanto nel blocco master.
 
 Esempio, con valori fittizi (lo schema reale degli effetti è quello dell'adattatore):
 
@@ -107,15 +108,12 @@ La sigla è quella della nave scomparsa. Chi la riconosce sa dove è stata fabbr
 - **Identità e trama.** Un testo di trama che ha bisogno di un fatto sull'identità dell'oggetto lo scrive prima nella scheda. Se la trama contraddice la scheda, la skill chiede al master.
 - **Posizione.** `location` è il luogo attuale, aggiornato dopo la sessione da `after-session` su dichiarazione del master.
 - **Riservato.** Le note del master non compaiono mai nelle descrizioni, nelle carte, nelle ricerche web, nei prompt per le immagini né nei revisori di testi destinati ai giocatori. Il passaggio da riservato a pubblico avviene solo per azione esplicita del master. Un rimando a una nota riservata usa l'ancora `#master`.
-- **Tono delle descrizioni.** **Deciso (dall'autore, 2026-11-09).** Sia la descrizione breve sia quella completa seguono il tono della campagna. Fonti, in ordine di precedenza (proposta):
-  1. le regole date dal master a parole in `.campaign/customizations.md` (per esempio «nei dialoghi del porto il tono è ruvido»);
-  2. il registro `prose.register` di `campaign.yaml` (`elevated`, `plain`, `colloquial`, `mixed`);
-  3. per ciò che le prime due non dicono, il tono delle schede e delle sessioni già scritte nella campagna, che la skill legge prima di scrivere.
-  La skill non ha un tono suo e non ne inventa uno. Il tono vale anche per la descrizione breve, che non è una scheda tecnica. Il tono non riguarda `## Effetti`, che segue l'adattatore. Il revisore indipendente controlla il tono insieme al resto; un tono dubbio è una domanda per il master, non una riscrittura silenziosa.
-- **Effetti.** Mai scritti a mano fuori dal formato dell'adattatore; la validazione dell'adattatore è obbligatoria prima della revisione. Senza adattatore (`system.adapter: none`) la sezione `## Effetti` resta in testo libero e il controllo dell'adattatore è saltato, dichiarandolo nel rapporto.
+- **Tono delle descrizioni (Deciso, 2026-11-10).** Sia la descrizione breve sia quella completa seguono, nell’ordine, le regole del master in `.campaign/customizations.md`, il registro `prose.register` di `campaign.yaml`, e gli esempi già scritti nella campagna per ciò che le prime due fonti non specificano. La skill non ha un tono suo e non ne inventa uno. Il revisore giudica la coerenza; un tono dubbio è una domanda per il master.
+- **Effetti (Deciso, 2026-11-10).** La parte pubblica riporta soltanto gli effetti noti ai personaggi. Gli effetti reali non noti restano nel blocco master. Non si scrivono a mano fuori dal formato dell’adattatore; la validazione è obbligatoria prima della revisione. Senza adattatore (`system.adapter: none`) la sezione `## Effetti` resta in testo libero e il controllo dell'adattatore è saltato, dichiarandolo nel rapporto.
 - **Collegamenti.** Ogni menzione dell'oggetto in altri documenti diventa un link alla scheda dopo la scrittura, come per ogni soggetto; la scheda è inclusa nell'indice dei soggetti con i suoi alias.
 - **Duplicati.** Prima di creare, ricerca per nome e alias. Una corrispondenza esatta non crea nulla e restituisce l'`id` esistente; una parziale genera una domanda per il master («`<nome>` è lo stesso oggetto di `<titolo>`?»).
-- **Schede vecchie.** Una scheda esistente non si riscrive in silenzio: la standardizzazione propone le differenze e le applica dopo conferma, conservando ogni contenuto.
+- **Identità, stato e cronologia (Deciso, 2026-11-10).** La scheda descrive identità e stato corrente; `location` si aggiorna soltanto su fatti confermati dal master. Le azioni e i passaggi nel tempo restano nei documenti di trama e nella cronaca.
+- **Schede esistenti (Deciso, 2026-11-10).** Non si riscrivono o migrano automaticamente; il controllo segnala le lacune senza normalizzazione implicita.
 - **Lingua.** Il testo della scheda segue la lingua della campagna; la skill, i nomi interni e il rapporto sono in inglese.
 
 ## Dove si colloca nel flusso
@@ -136,19 +134,16 @@ La sigla è quella della nave scomparsa. Chi la riconosce sa dove è stata fabbr
 - un tono scritto nella skill invece che letto dalla campagna: una descrizione aulica in una campagna sobria (o il contrario) è un errore che l'audit non vede;
 - modelli che si moltiplicano per eccezioni fino a non essere più uno standard.
 
+## Quando un oggetto ha una scheda
+
+**Deciso (2026-11-10).** La scheda si crea su richiesta esplicita del master o quando l’oggetto ha effetti di gioco, valore significativo, un segreto o un ruolo nella trama. Gli oggetti di sola scenografia non richiedono scheda.
+
+Gli eventi possono dichiarare gli oggetti con `items: [id, ...]`. Il controllo valida gli ID e presenta all’agente anche candidati trovati nel testo ma omessi dal campo. L’agente decide se sono davvero oggetti da scheda, tenendo conto di omonimi, alias, personaggi o luoghi con nomi simili e delle esclusioni. Un’esclusione dell’oggetto usa `audit.exclusions` con `subject: <id>` e `attribute: plot.items`; l’agente applica il motivo registrato.
+
 ## Testbench
 
-**Proposta.** Un caso di prova per la modalità `create` e uno per `check`, con campagna sintetica e chiave delle risposte fuori dalla cartella leggibile dall'agente. Trappole da seminare: omonimi (due oggetti con lo stesso nome in luoghi diversi), alias che coincide con il nome di un luogo o di un personaggio, un oggetto citato in trama senza scheda, una scheda con la nota del master fuori dal blocco riservato, una descrizione breve che contraddice la completa, una campagna con registro `plain` e una regola di tono in `customizations.md` che la bozza deve rispettare, un oggetto che la trama fa usare contro ciò che dice la scheda (deve diventare una domanda, non una correzione), un oggetto già escluso nel registro delle esclusioni che non va segnalato. Ogni caso gira più volte per agente e il risultato è un tasso di successo registrato con modello e hash delle istruzioni (vedi [Robustezza e test](Robustezza%20e%20test.md)).
+Due casi sintetici separano `create` e `check`; ciascun agente riceve soltanto una copia della campagna e non la chiave. Le trappole e gli esiti attesi sono in `testbench/cases/item-manager/` e `testbench/fixtures/item-manager/`. Il runner registra agente, modello, hash delle istruzioni e tasso di successo. I risultati riportano solo prove effettivamente eseguite.
 
 ## Questioni aperte
 
-- **Una skill o due.** `item-manager` separato, o funzione unica con i luoghi come in L7 del catalogo? La decisione dell'autore sulle schede dedicate non dice se la skill è separata: la proposta è separata, come `npc-manager`, perché i luoghi e gli oggetti hanno controlli diversi (adattatore, economia, carte).
-- **Descrizione breve.** Il modello di 4.5 ha oggi una sola `## Descrizione`: va aggiunta la sezione `## In breve` (proposta di questo documento) o la breve è un campo dei metadati? I metadati non possono contenere testo riservato, ma sono dati di sistema e non contenuto: la proposta è la sezione, non il metadato. Occorre anche decidere se la carta stampata usa la breve o la completa (oggi usa la descrizione, con al massimo otto righe).
-- **Ordine delle sezioni facoltative** (`## Origine`, `## Ritrovamento`, `## Testo`, `## Valore`) rispetto alle quattro sezioni fisse.
-- **Oggetti negli eventi di trama.** Come si dichiarano gli oggetti usati da un evento? Per i personaggi esiste `characters: [id, ...]`. Un campo analogo (`items`) è una proposta e va deciso, perché il controllo `plot-items` dipende da questo.
-- **Oggetti senza effetti.** Un oggetto di sola scena (una lettera, una lanterna) ha davvero bisogno di una scheda, o la soglia è «ha un effetto, un valore o un segreto»? Senza soglia, ogni oggetto citato diventerebbe una scheda.
-- **Oggetti con stato.** Un oggetto che cambia nel tempo (si rompe, si identifica, passa di mano) aggiorna la scheda o resta nella cronaca? La proposta è: l'identità nella scheda, le vicende nella cronaca, con `location` come unico dato di stato.
-- **Oggetti magici e identificazione.** Il testo pubblico di un oggetto non identificato mostra gli effetti reali o quelli apparenti? Dipende dal sistema di gioco: la decisione spetta all'adattatore o al master?
-- **Tono: precedenza e verifica.** L'ordine delle fonti del tono (personalizzazioni, registro, schede esistenti) è una proposta. Resta da decidere se il tono di una scheda si può verificare in modo deterministico o solo con il giudizio del revisore.
-- **Prezzi.** La skill legge il documento di economia solo per validare, o propone anche un valore? La proposta è la sola validazione.
-- **Nome del campo e della categoria** per sistemi in cui la voce `objects` ha un altro nome nella lingua della campagna: già coperto dal campo `type` in `structure`, da confermare.
+- Per oggetti magici non identificati, quale contenuto pubblico mostrare dipende dall’adattatore e dai fatti confermati dal master.

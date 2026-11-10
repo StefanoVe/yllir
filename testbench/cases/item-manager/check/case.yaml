@@ -1,0 +1,13 @@
+case: item-manager-check
+fixture: item-manager/check
+skill: item-manager
+mode: check
+files: Trama/Diga 1/Eventi/Scena 1.md,Trama/Diga 1/Eventi/Scena 2.md,Oggetti/Scatola.md,Oggetti/Cerchio.md,Oggetti/Medaglione.md
+prompt: |
+  Sei il processo core. Chiama yllir:item-manager in modalità check per i file
+  indicati e completa il controllo anche con plot-items. Valuta i candidati nel
+  loro contesto: distingui il personaggio Ada dall'alias omonimo, identifica gli
+  oggetti che richiedono una scheda, rispetta l'esclusione registrata e non
+  riscrivere le schede. Se la trama contraddice una scheda, formula una domanda
+  per il master. Scrivi il rapporto nello stato previsto dalla skill e rispondi
+  in italiano con i problemi e le domande essenziali.

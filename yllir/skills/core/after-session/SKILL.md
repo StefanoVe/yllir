@@ -13,7 +13,8 @@ Records the evening that was played as one chronicle page. Run every command fro
 
 **Scope of this version.** This process:
 - creates ONE new chronicle page, and marks which plot sessions were played;
-- does NOT change character, place, item, creature or plot documents, and creates no document other than the chronicle page;
+- may update an item's current `location` only from a location the master explicitly confirmed, and may create a sheet for a newly introduced item with significant value, effects, secrets, or a plot role; those drafts go through the same write sequence as the chronicle;
+- does NOT change character, place, creature or plot documents, and creates no document other than the chronicle page and approved item sheets;
 - does NOT rewrite an existing chronicle page. If the master asks to change a page already written, say in one sentence that this is not available yet, and stop;
 - lists the canon changes the master may want as things NOT written into the cards. It never proposes them as already done;
 - records a milestone in the chronicle only when the master explicitly declares one and the system adapter confirms it;
@@ -67,11 +68,13 @@ From `campaign.yaml` keep:
 2. For each name, compare it with each form of each subject (the `text` of each form). Compare ignoring case and accents. A match is a subject id.
 3. Read the document of each matched subject. Its path is the `sheet` of the subject. Read the whole document, master notes included.
 4. Read the main file of each played session (its `file` in the map), and every file listed in its `events` (the scene text is there). Read the whole file, master notes included.
-5. A name the master uses that matches no subject is MISSING. Do not create a document for it.
-- Output: the list of documents read (paths), the list of subject ids, and the MISSING names.
+5. A name the master uses that matches no subject is MISSING. Separate significant new items from incidental props and places. An item is significant when the master requests its sheet or it has significant value, effects, secrets, or a plot role. Do not create sheets for scenery or incidental props.
+- Output: the list of documents read (paths), the list of subject ids, MISSING_ITEMS, and other MISSING names.
 
 **Step 6 — Read-only check of the documents.** Only for the check of the contradictions. Compare what the master said (MASTER_MESSAGE) with the documents read in step 5. Write down each place where the master's account contradicts a document, in plain words, as CONTRADICTIONS (may be empty). Do not decide which of the two is right.
 - Output: the CONTRADICTIONS list (may be empty).
+
+**Step 6b — Item drafts.** Keep ITEM_DRAFTS, NEW_ITEMS and ITEM_UPDATES empty at first. For each MISSING_ITEMS entry, invoke `yllir:item-manager` with `MODE=create`, `NAME=<name>`, `LOCATION=<explicitly confirmed current place id or empty>`, `DETAILS=<facts stated by the master>`, `REQUESTED_BY=<chronicle path>`, `IMAGINATION=no`, `FILES=<relevant documents read>`, and `CONTINUE_WITH="after-session step 6b: read the item-manager report, then step 7"`. Record the invocation under the local feedback protocol. Read `.campaign/state/item-manager/report.txt`. Accept only a valid report: `DONE` with `draft:` must begin exactly `.campaign/state/write/draft/`, be relative and contain no `..` component; strip that prefix once to get the campaign-relative path for ITEM_DRAFTS, and add `new subject:` to NEW_ITEMS. `DONE` with `exists:` means an existing sheet and continue to the update check; `ASK` asks its question and stops; other statuses record the item as unavailable. Missing or malformed reports fail the process. For each existing item whose current state the master explicitly confirmed has changed, prepare a draft under `.campaign/state/write/draft/` by copying its complete sheet and changing only the confirmed current-state facts in existing fields (for example `location` metadata, damage, transformation, or identification); preserve every other line and do not add chronology. Record its campaign-relative path in ITEM_DRAFTS and id in ITEM_UPDATES. Never infer possession, location, effects or any current-state fact. Keep item identity and effects in the item sheet, and chronology in the chronicle. Unknown effects must remain absent from public claims and reserved only when the master explicitly stated a secret about them. Output ITEM_DRAFTS, NEW_ITEMS and ITEM_UPDATES.
 
 **Step 7 — Draft.** Write the chronicle page to `.campaign/state/write/draft/<CHRONICLE FOLDER>/<file name>`, where `<file name>` is the name from step 3. Use exactly this form, with the headings in the CAMPAIGN LANGUAGE (the Italian headings below are for `it`; for `en` use «## What happened» and «## Open threads»; for any other language translate the two headings):
 
@@ -113,9 +116,9 @@ Rules for the draft:
 - Output: the draft file exists at its path; NOT_WRITTEN is kept.
 
 **Step 8 — Write sequence.** Invoke the skill `yllir:write-sequence` (if your tool has no way to invoke a skill, read `${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/SKILL.md` with the Read tool or `cat`, and follow it exactly as if it had been invoked, with the same inputs) with:
-- `DOCUMENTS=<CHRONICLE FOLDER>/<file name>`
-- `INTENT="Chronicle of the evening <date>: records only what the master said happened; must not define or change the identity of existing subjects; no new named characters or places."`
-- `NEW_SUBJECTS=` (empty: chronicle pages are not subjects)
+- `DOCUMENTS=<CHRONICLE FOLDER>/<file name>, <every path of ITEM_DRAFTS>` (campaign-relative paths, chronicle first)
+- `INTENT="Chronicle of the evening <date>: records only what the master said happened; must not define or change the identity of existing subjects; no new named characters or places; may add approved new item sheets and update only item state the master explicitly confirmed, without adding chronology to item sheets."`
+- `NEW_SUBJECTS=<NEW_ITEMS, comma-separated>` (empty when there are no new item sheets; existing item updates are not new subjects)
 - `VERSION_MESSAGE=` the sentence «Registrata la serata del <date>» for `it`, «Recorded the evening of <date>» for `en`, or the translation into the campaign language
 - `ROUND=1`
 - `CONTINUE_WITH="after-session step 8: read the write report and act on its status"`
@@ -138,6 +141,7 @@ Output: `status: DONE`.
 - if sessions were marked as played: one sentence naming them by their `name`;
 - if a session was marked although its prerequisite is not played: one sentence saying so, and naming the prerequisite;
 - if MISSING is not empty: one sentence «these have no document yet: <names>»;
+- for each item in NEW_ITEMS: one sentence saying its item sheet was created; for each item in ITEM_UPDATES: one sentence saying its confirmed current state was updated; for each item unavailable or not updated, say that its current state was not changed in the item sheet;
 - each CONTRADICTION that was left out of the page: one plain sentence saying which two sources disagree, and that the page was written without that detail. Never choose a version;
 - each entry of NOT_WRITTEN: one short plain sentence, saying that this is not written in the cards yet;
 - one sentence on what the master can do next (for example «tell me what you want to prepare next»).

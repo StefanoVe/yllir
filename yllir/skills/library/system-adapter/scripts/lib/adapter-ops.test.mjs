@@ -73,6 +73,27 @@ test('card fields expose only printable title and description', () => {
   assert.equal(JSON.stringify(result.fields).includes('Segreto'), false);
 });
 
+test('card fields prefer the brief description and never expose master notes', () => {
+  const text = `---\nid: synthetic-item\ntemplate: item\n---\n\n# Lanterna\n\n## In breve\n\nUna lanterna compatta.\n\n## Descrizione\n\nLa lanterna ha una storia più completa.\n\n## Effetti\n\nEffetto pubblico.\n\n<!-- master -->\n## Master\n\n### Indicazioni per il master\n\nSegreto nascosto.\n<!-- /master -->`;
+  const result = cardFields(adapter, text, 'it');
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.fields, { title: 'Lanterna', description: 'Una lanterna compatta.' });
+  assert.equal(JSON.stringify(result.fields).includes('Segreto'), false);
+  assert.equal(JSON.stringify(result.fields).includes('Effetto pubblico'), false);
+});
+
+test('legacy item cards fall back to Description', () => {
+  const text = '# Token\n\n## Descrizione\n\nUn token antico.\n\n## Effetti\n\nNessun effetto.';
+  assert.deepEqual(cardFields(adapter, text, 'it').fields, { title: 'Token', description: 'Un token antico.' });
+});
+
+test('card-fields uses the conventional brief heading when an adapter omits it', () => {
+  const withoutBrief = { ...adapter, headings: { ...adapter.headings } };
+  delete withoutBrief.headings.brief;
+  const text = '# Token\n\n## In breve\n\nUn token compatto.\n\n## Descrizione\n\nDettaglio esteso.\n\n## Effetti\n\nNessun effetto.';
+  assert.deepEqual(cardFields(withoutBrief, text, 'it').fields, { title: 'Token', description: 'Un token compatto.' });
+});
+
 test('inline master marker truncates item description', () => {
   const text = '# Lanterna anonima\n\n## Descrizione\n\nUna lanterna. <!-- master --> Segreto da escludere.\n\n## Effetti\n\nNessun effetto.';
   const result = cardFields(adapter, text, 'it');

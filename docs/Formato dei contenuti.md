@@ -35,6 +35,7 @@ Sono ammessi solo i campi della tabella. Ogni altro campo è un errore: un campo
 | `played` | pagine di cronaca (**Deciso**, 2026-11-07) | lista di `id` delle sessioni o attività giocate quella sera; `[]` se nessuna | unica fonte per sapere che cosa è stato giocato: la preparazione verifica i prerequisiti da qui; lo scrive il processo «dopo la sessione» |
 | `depends_on` | sessioni e attività di trama | lista di `id` di sessioni o attività; `[]` se non ne ha | prerequisiti (vedi sezione 2) |
 | `characters` | facoltativo, nei file evento di trama | lista di `id` di schede di personaggio; `[]` o assente se l'evento non nomina personaggi | i personaggi che l'evento nomina e fa agire o parlare; **Proposta** |
+| `items` | facoltativo, nei file evento di trama (**Deciso, 2026-11-10**) | lista senza duplicati di `id` di schede oggetto; `[]` o assente se l'evento non nomina oggetti rilevanti | gli ID sono validati meccanicamente; oggetti con scheda coinvolti nell'evento; i candidati nel testo omessi dal campo richiedono giudizio dell'agente |
 | `print` | oggetti con carta | `to-print`, `printed` o `reprint` | stato fisico della carta; è l'unico posto in cui sta |
 | `template` | categorie con più modelli: Personaggi (`npc`, `vendor`), Creature (`enemy`, `creature`), Oggetti (`item`, `notice`) | uno dei valori indicati | modello della scheda, da cui il validatore ricava le sezioni obbligatorie |
 | `aliases` | facoltativo, per ogni scheda | lista di nomi alternativi | forme alternative del nome; fonte unica per l'indice dei soggetti |
@@ -449,14 +450,17 @@ Per una campagna in inglese, le intestazioni delle colonne sono `Characteristic`
 
 ### 4.5 Oggetto (con carta)
 
+**Deciso (2026-11-10):** la scheda dell'oggetto ha `## In breve`, `## Descrizione` e `## Effetti`, seguiti dalle sezioni facoltative `## Origine`, `## Ritrovamento`, `## Testo`, `## Valore`, in quest'ordine, e dal blocco riservato finale `### Indicazioni per il master`. La skill `item-manager` crea bozze e controlla le schede, senza riscrivere o migrare quelle esistenti.
+
 **Categoria:** `Oggetti/`, tipo `objects`, con `template: item`. La categoria produce carte se la sua voce in `structure` dichiara `cards: true`.
 **Metadati:** `id`; `template: item`; `location` (dove si trova adesso, come lista); `print`, solo per gli oggetti con carta.
-**Obbligatorie, in ordine:** titolo; immagine di carta sotto il titolo, se la categoria produce carte; `## Descrizione`, ciò che i personaggi vedono o sanno; `## Effetti`, nel formato dell'adattatore, oppure «Nessun effetto di gioco».
+**Obbligatorie, in ordine:** titolo; `## In breve`, sintesi pubblica; `## Descrizione`, ciò che i personaggi vedono o sanno; `## Effetti`, nel formato dell'adattatore, oppure «Nessun effetto di gioco». L'immagine di carta, se prevista, segue il titolo e precede le sezioni.
 **Facoltative, in ordine:** `## Origine`, pubblica solo se i personaggi possono conoscerla; `## Ritrovamento`; `## Testo`, per il testo integrale di una lettera o di un libro (prosa normale, senza corsivo); `## Valore`, che segue il documento di economia.
 **Blocco riservato:** `### Indicazioni per il master`, con l'origine vera e i segreti.
 
 **Regole della carta.**
 
+- La carta usa `## In breve`; per una scheda legacy senza questa sezione usa `## Descrizione` come ripiego, senza modificare la scheda.
 - L'immagine finale è `img/<nome-base>.png`, con il sorgente `img/<nome-base>.psd` accanto.
 - Il titolo stampato sulla carta è il titolo `#` della scheda. Quando il titolo cambia, la carta è marcata come da rigenerare: se era `printed`, passa a `reprint`.
 - Una carta già stampata mantiene il nome del file: i codici QR puntano all'`id`, quindi non si rinomina per non rompere la stampa.
@@ -473,6 +477,10 @@ print: to-print
 
 ![Lanterna di ottone con vetro annerito](img/lanterna-da-bordo.png)
 
+## In breve
+
+Una lanterna di ottone con il vetro annerito dal fumo.
+
 ## Descrizione
 
 Una lanterna di ottone con il vetro annerito dal fumo. La fiamma è ancora tiepida.
@@ -480,6 +488,14 @@ Una lanterna di ottone con il vetro annerito dal fumo. La fiamma è ancora tiepi
 ## Effetti
 
 Nessun effetto di gioco.
+
+<!-- master -->
+## Master
+
+### Indicazioni per il master
+
+Non contiene segreti.
+<!-- /master -->
 ```
 
 ### 4.6 Annuncio di bacheca

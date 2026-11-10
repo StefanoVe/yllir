@@ -74,7 +74,11 @@ export function cardFields(adapter, markdown, lang) {
   const allowed = adapter.item_sheet?.printable_fields ?? [];
   const body = publicBody(markdown);
   const titleMatch = /^#[ \t]+(.+?)[ \t]*#*[ \t]*$/m.exec(body);
-  const description = section(body, adapter.headings?.description?.[lang] ?? '');
+  const briefTitle = adapter.headings?.brief?.[lang] ?? (lang === 'it' ? 'In breve' : 'In brief');
+  const brief = briefTitle ? section(body, briefTitle) : null;
+  const description = brief === null
+    ? section(body, adapter.headings?.description?.[lang] ?? '')
+    : brief;
 
   for (const name of allowed) {
     if (name === 'title' && titleMatch) fields.title = titleMatch[1].trim();

@@ -2,7 +2,7 @@
 name: write-sequence
 description: Core rule. The only way Yllir writes campaign documents: manual changes saved, independent review, write, links, derived files, deterministic verification, saved version. Invoked by core processes with drafts already prepared.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/aggregate-reviews.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/classify-write.mjs" *), Read, Write, Agent, Skill, Bash(node */scripts/session-start.mjs *), Bash(node */scripts/versions.mjs *), Bash(node */skills/core/write-sequence/scripts/apply-draft.mjs *), Bash(node */skills/core/write-sequence/scripts/aggregate-reviews.mjs *), Bash(node */scripts/build-index.mjs *), Bash(node */skills/core/write-sequence/scripts/validate-config.mjs *), Bash(node */skills/core/yllir/scripts/generate-instructions.mjs *), Bash(node */skills/core/write-sequence/scripts/json-check.mjs *), Bash(node */skills/library/npc-manager/scripts/npc-manager.mjs *), Bash(node */skills/core/write-sequence/scripts/classify-write.mjs *)
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/apply-draft.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/aggregate-reviews.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/validate-config.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/json-check.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/item-manager/scripts/item-manager.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/write-sequence/scripts/classify-write.mjs" *), Read, Write, Agent, Skill, Bash(node */scripts/session-start.mjs *), Bash(node */scripts/versions.mjs *), Bash(node */skills/core/write-sequence/scripts/apply-draft.mjs *), Bash(node */skills/core/write-sequence/scripts/aggregate-reviews.mjs *), Bash(node */scripts/build-index.mjs *), Bash(node */skills/core/write-sequence/scripts/validate-config.mjs *), Bash(node */skills/core/yllir/scripts/generate-instructions.mjs *), Bash(node */skills/core/write-sequence/scripts/json-check.mjs *), Bash(node */skills/library/npc-manager/scripts/npc-manager.mjs *), Bash(node */skills/library/item-manager/scripts/item-manager.mjs *), Bash(node */skills/core/write-sequence/scripts/classify-write.mjs *)
 ---
 
 # Write sequence
@@ -56,7 +56,9 @@ Canon review always checks relevant existing canon before any draft is applied. 
 
 **2. Draft.** For each document in DOCUMENTS, Read `.campaign/state/write/draft/<document>`: if Read says it does not exist, or the file is empty, the draft is missing. If any draft is missing: end this skill with `status: FAILED`, reason "draft missing", and list the missing paths (the calling process continues).
 
-**2b. System rules check.** Invoke `yllir:system-adapter` with `OPERATION=check-drafts`, `FILES` set to the comma-separated draft paths `.campaign/state/write/draft/<document>` for every path in DOCUMENTS, and `CONTINUE_WITH="write-sequence step 2b: read the ADAPTER REPORT, then step 3"`. If your tool cannot invoke a named skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/system-adapter/SKILL.md` with the Read tool or `cat`, and follow it exactly as if invoked, using these inputs. When it finishes, read `.campaign/state/system-adapter/report.txt` with the Read tool; this is the ADAPTER REPORT.
+**2b. Item checks.** Run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/item-manager/scripts/item-manager.mjs" . check --files "<DOCUMENTS>" --base ".campaign/state/write/draft"`. The paths in FILES are campaign-relative; BASE points to the draft tree. This check is restricted to this write's drafts; it must not block this write because of unrelated legacy item sheets elsewhere in the campaign. Exit 0 means the drafts pass. Exit 1 means item draft problems: end with `status: FIX_NEEDED` and list each reported error in details. Any other exit code means the check did not run: end with `status: FAILED`, reason "item check not run". Continue to step 2c only on exit 0.
+
+**2c. System rules check.** Invoke `yllir:system-adapter` with `OPERATION=check-drafts`, `FILES` set to the comma-separated draft paths `.campaign/state/write/draft/<document>` for every path in DOCUMENTS, and `CONTINUE_WITH="write-sequence step 2c: read the ADAPTER REPORT, then step 3"`. If your tool cannot invoke a named skill, read `${CLAUDE_PLUGIN_ROOT}/skills/library/system-adapter/SKILL.md` with the Read tool or `cat`, and follow it exactly as if invoked, using these inputs. When it finishes, read `.campaign/state/system-adapter/report.txt` with the Read tool; this is the ADAPTER REPORT.
 - If the report status is `OK`, record `system rules: passed` and continue.
 - If the report status is `NOT_APPLICABLE`, record `system rules: no adapter` and continue.
 - If the report status is `NEEDS_ATTENTION`, end this skill with `status: FIX_NEEDED`; in report details, list every `problem:` line with the draft path prefix `.campaign/state/write/draft/` removed. Do not launch the reviewer and do not write documents.
@@ -103,6 +105,8 @@ Save its answer exactly as received to `.campaign/state/write/review.json` with 
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . plot-cast --files "<DOCUMENTS>" --out .campaign/state/write/plot-cast.json`
 - `node "${CLAUDE_PLUGIN_ROOT}/skills/library/npc-manager/scripts/npc-manager.mjs" . check-sheets --files "<DOCUMENTS>"`
 
+After those commands, invoke `yllir:item-manager` with `MODE=check`, `FILES=<DOCUMENTS>`, `CONTINUE_WITH="write-sequence step 7: read the item-manager report, then decide verification"`. Record this invocation under the local feedback protocol. This post-write check validates the affected item sheets and plot-event item metadata together, so newly applied item sheets count. Read `.campaign/state/item-manager/report.txt`. If status is `ERRORS`, end with `status: VERIFY_FAILED` and put every safe problem line in details; the item-manager has judged plot-item candidates and does not expose master-only text. If status is `ASK`, end with `status: ASK` and pass through its question. If status is `FAILED` or `NOT_AVAILABLE`, end with `status: FAILED`, reason "item verification not run". Only `DONE` passes.
+
 Then decide:
 - `validate-config`, `plot-cast` or `check-sheets` exit 1: end this skill with `status: VERIFY_FAILED` (the calling process continues). Put every printed error line in the report details. Do NOT save a version. The caller fixes the draft and calls again with ROUND+1.
   - Do not list `candidate` lines of `plot-cast` as errors. When there is at least one error line, copy every `candidate` line of `plot-cast` into the report details, each prefixed with `candidate (judge before the next round):`. When there is no error line, ignore the `candidate` lines.
@@ -129,6 +133,7 @@ level: <low | medium | high>
 documents: <paths, comma-separated>
 review: <APPLY | FIX | ASK | not run>
 system rules: <passed | no adapter | n problems | not run>
+items: <passed | n problems | not run>
 links: <applied n | FAILED | not run>
 verification: <passed | n errors | not run>
 saved version: <hash | none>
@@ -147,6 +152,7 @@ level: low
 documents: World/Varn.md, World/Old Mill.md
 review: APPLY
 system rules: passed
+items: passed
 links: applied 2
 verification: passed
 saved version: 3f2a9c1
@@ -163,6 +169,7 @@ level: high
 documents: Creatures/Guardiano.md
 review: not run
 system rules: 1 problem
+items: passed
 links: not run
 verification: not run
 saved version: none

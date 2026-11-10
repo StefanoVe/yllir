@@ -19,6 +19,10 @@ testbench/
   runners/check-scan.mjs        grades the deterministic mention scanner
 ```
 
+The item-manager fixtures live in `fixtures/item-manager/<mode>/campaign/`; the sibling `key.yaml` files are kept outside the agent-readable folder. Run a create or check trial with `node testbench/runners/run-item-manager-case.mjs testbench/cases/item-manager/create --agent codex --model gpt-6-luna --runs 2 --keep` (or replace `create` with `check`). Each JSONL record stores the agent, model, item-manager instruction hash, checks and pass result. Use only actual runner output as measured results; fixture keys are never placed in campaign copies.
+
+When an isolated sub-agent runs the skill directly, grade and record that real copy with `node testbench/runners/run-item-manager-case.mjs testbench/cases/item-manager/create --agent codex --model gpt-6-luna --grade-only <campaignCopy> --record-grade --execution-source collaboration-subagent --run 1`. This records the explicitly stated execution source, current instruction hash and pass result; it does not rerun or claim that the local CLI ran the model.
+
 Grade the mention scanner:
 
 ```sh

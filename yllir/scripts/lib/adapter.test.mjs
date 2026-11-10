@@ -35,6 +35,7 @@ test('discovers installed adapters in sorted order and loads the D&D manifest', 
     statistics: { it: 'Statistiche', en: 'Statistics' },
     description: { it: 'Descrizione', en: 'Description' },
     effects: { it: 'Effetti', en: 'Effects' },
+    brief: { it: 'In breve', en: 'In brief' },
   });
   assert.equal(loaded.adapter.creature_sheet.required.length, 9);
   assert.deepEqual(loaded.adapter.item_sheet.printable_fields, ['title', 'description']);

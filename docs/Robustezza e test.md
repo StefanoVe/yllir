@@ -38,6 +38,8 @@ Un conteggio grezzo delle occorrenze di un soggetto, per sottostringa e senza co
 
 Un conteggio come questo non misura la qualità dei collegamenti. Serve come base per la metrica di copertura, cioè il numero di menzioni eleggibili collegate correttamente, con la stessa definizione di eleggibile applicata a tutti i run.
 
+La skill `item-manager` usa casi distinti per la creazione e il controllo delle schede. Ogni run copia soltanto `campaign/` nell'ambiente dell'agente; la chiave resta fuori dalla copia. Il rapporto misura il tasso di successo per modello e hash delle istruzioni e include soltanto run realmente eseguiti.
+
 ## Principio: deterministico per il meccanico, agente per il giudizio
 
 Proposta: ogni skill si divide in tre strati.
