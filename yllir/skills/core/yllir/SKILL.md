@@ -16,6 +16,7 @@ This skill receives every message of the master. It checks the folder, keeps the
 **Step 1 — Check.** Find the block that starts with `YLLIR SESSION CHECK` in your context. Keep its values: `folder`, `git`, `campaign root`, `saved versions`, `changes not yet saved`, `settings`, `instructions`, `framework version` (with its «campaign made with» part, when there is one), `campaign alignment` (when that line is in the block), `update notice` (the block `YLLIR UPDATE AVAILABLE`, when it is in your context).
 - If the block is not in your context: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and keep its output the same way.
 - Turn record: if the block `YLLIR TURN CHECK` is not in your context (no hook runs in this tool), run `node "${CLAUDE_PLUGIN_ROOT}/scripts/feedback.mjs" record turn .` once per master message. Ignore its result, whatever it is.
+- Per-skill record: read `${CLAUDE_PLUGIN_ROOT}/templates/feedback-protocol.md`. On a campaign, start an invocation record for `yllir:yllir` here and keep its id through Step 7b. Follow the protocol for every skill this entry point invokes or reads as a substitute, including linker and canon-research, and pass the parent id in the runner prompt as `FEEDBACK_PARENT:`. Record end status and a local transcript before the final answer. If this runtime does not expose the skill input/output or a feedback command fails, record transcript status `unavailable`; never claim automatic skill-hook coverage. Outside a campaign the log cannot be stored, so continue without claiming a record.
 - Output: the values of the block, kept for the next steps.
 
 **Step 2 — Lexicon.** Read `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/lexicon.md` and read the table.
@@ -82,6 +83,7 @@ Otherwise, a campaign file was changed outside the write sequence (by hand, by a
     CHANGED_FILES: <comma-separated campaign-relative paths from the topic check, or none>
     LANGUAGE: <ISO code of the language the master writes in>
     IMAGINATION: <yes | no | keep>
+    FEEDBACK_PARENT: <this entry invocation id>
     MASTER_MESSAGE:
     <the master's message, verbatim; when the master answers a question of the runner, the earlier question followed by the answer>
     ```
@@ -121,10 +123,12 @@ Otherwise, a campaign file was changed outside the write sequence (by hand, by a
   - friction: `none` = no problem; `slow` = it took many steps or a long time for what was asked; `unclear-instruction` = an instruction of a skill was ambiguous or contradictory and you had to guess; `script-error` = a command failed or was refused; `too-many-steps` = the request needed more steps than it should have; `wrong-process` = the first process or branch you picked was not the right one; `other` = anything else.
   - detail: ONE sentence in English, at most 150 characters, about the framework or the instructions (for example which step was slow or unclear). It must NEVER contain the master's words, names, places, plot or any text from the campaign, and no file paths.
 - (c) If the command is refused or fails, ignore it: do not retry, do not tell the master, and continue.
+- (d) End the `yllir:yllir` invocation with `record skill-end`, including on a question, failure or early stop. Write a local transcript JSON with the master's exact message as `input` and the exact answer you're about to send as `output`, save it first as `.campaign/state/feedback/pending-<id>.json`, and pass it through `--transcript`. Use the matching final status (`ok`, `partial`, `failed`, `blocked` or `question`). If the runtime cannot provide the content, record `--transcript-status unavailable`. This does not change the response to the master.
 - Output: nothing for the master.
 
 **Step 8 — Rules.** These apply to every step above.
 - Never write or change a campaign document yourself. Every write goes through `yllir:write-sequence`, run by a process. The one exception is Step 5b: the linker, run by this skill as Step 5b says, adds links to campaign documents, and it is the only script-driven writer of links; nothing else in this skill changes a campaign document. The files this skill writes are `.campaign/state/research/answer.json`, only while following canon-research, and, only in Step 5b, the file `.campaign/state/linker/attempts.txt` and the linker's own files in `.campaign/state/linker/`. The feedback commands of Step 1 and Step 7b write `.campaign/state/feedback/events.jsonl` through the script; this skill never edits that file by hand.
+- The feedback transcript command reads a temporary JSON file under `.campaign/state/feedback/pending-<id>.json` (written with the Write tool as an explicit exception to the campaign-document rule) and writes `.campaign/state/feedback/transcripts/<id>.json`; these are private local state files and never campaign documents.
 - Never run a writing process (`yllir:new-campaign`, `yllir:prepare-session`, `yllir:after-session`, `yllir:complete-sheet`, `yllir:import`, `yllir:post-update`) in this skill: launch `yllir:process-runner` instead.
 - Never show internal words, commands, file formats or error codes to the master.
 - Write to the master in plain text: no backticks, no code formatting, no file paths, no version codes.

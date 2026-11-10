@@ -26,6 +26,7 @@ Questo file è l’indice: raccoglie le decisioni dell’autore, che sono vincol
 | [Esperienza utente](Esperienza%20utente.md) | Uso da parte di chi non programma: ingresso, onboarding, lessico, versioni, dialoghi d’esempio |
 | [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md) | Versioni, controllo all’avvio, migrazioni, skill di update |
 | [Robustezza e test](Robustezza%20e%20test.md) | Modi di fallimento noti di collegamenti e audit, script deterministici, casi di prova |
+| [Feedback d’uso](Feedback%20d’uso.md) | Copertura per skill, trascrizioni locali, rapporti ed esportazioni sicure |
 | [Integrazioni esterne](Integrazioni%20esterne.md) | Photoshop MCP, fornitori di immagini alternativi a Codex, altre skill utili |
 | [Sicurezza e privacy](Sicurezza%20e%20privacy.md) | Contenuti non fidati, chiavi e segreti, cosa esce dal computer, pubblicazione, permessi, dati dei giocatori |
 | [Installazione e requisiti](Installazione%20e%20requisiti.md) | Requisiti minimi e per modulo, installazione guidata, controlli all’avvio, disinstallazione |
@@ -42,6 +43,7 @@ Questo file è l’indice: raccoglie le decisioni dell’autore, che sono vincol
 - **Revisione indipendente sempre.** Ogni scrittura passa da una revisione indipendente di un sub-agent distinto, senza eccezioni.
 - **Codex è facoltativo.**
 - **Consenso una volta, all’attivazione.** Il consenso a far uscire dati dal computer si chiede quando si attiva un’integrazione, in linguaggio semplice, ed è revocabile; non a ogni invio (vedi [Sicurezza e privacy](Sicurezza%20e%20privacy.md)).
+- **Trascrizioni locali del feedback (deciso dall’autore, 2026-11-10).** Ogni uso di skill può conservare in locale l’ingresso, l’uscita e i passaggi osservabili della chiamata, per rendere il rapporto diagnostico utile; i runtime senza hook per singola skill usano il protocollo esplicito del chiamante. Trascrizioni e dettagli restano nella cartella di feedback, senza invio di rete. Le esportazioni dettagliate richiedono una scelta esplicita e non includono testi, percorsi o trascrizioni che potrebbero contenere note riservate (vedi [Feedback d’uso](Feedback%20d’uso.md)).
 - **Note riservate e agenti.** Gli agenti che lavorano sul canone vedono anche il blocco riservato; non lo ricevono mai i revisori dei testi destinati ai giocatori, i fornitori di immagini, le ricerche web e i servizi di pubblicazione (vedi [Principi](Principi.md)).
 - **Interfacce semplici.** Icone con tooltip invece di testi, niente complessità non richiesta.
 - **Navigazione a scelta.** Il master può muoversi da solo nelle cartelle della campagna, con un editor qualunque, oppure usare il master screen. La struttura resta quindi leggibile a mano: Markdown semplice e link relativi standard (vedi [Architettura](Architettura.md#3-campagna-generata)).

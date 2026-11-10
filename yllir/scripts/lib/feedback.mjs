@@ -1,7 +1,7 @@
 // Append-only local log of usage feedback, one JSON object per line, in
-// <root>/.campaign/state/feedback/events.jsonl. It stores no master text and no
-// campaign content: only event types, counts, outcomes, frictions, timings and
-// at most MAX_DETAIL characters of free text written by the assistant.
+// <root>/.campaign/state/feedback/. Legacy turn/end/note fields are compact
+// metadata. New skill invocation fields and transcripts may contain campaign
+// text and are deliberately retained only in this local state folder.
 // The writing functions never throw: they return { ok, error } instead.
 
 import fs from 'node:fs';
@@ -17,7 +17,7 @@ export const FRICTIONS = [
   'wrong-process',
   'other',
 ];
-export const EVENT_TYPES = ['turn', 'end', 'note'];
+export const EVENT_TYPES = ['turn', 'end', 'note', 'skill-start', 'skill-end'];
 export const MAX_DETAIL = 200;
 
 const MAX_RECENT_NOTES = 5;
@@ -25,6 +25,95 @@ const MAX_RECENT_NOTES = 5;
 /** Absolute path of the feedback log for a campaign root. */
 export function feedbackFile(root) {
   return path.join(path.resolve(root), '.campaign', 'state', 'feedback', 'events.jsonl');
+}
+
+export function skillTranscriptFile(root, invocation) {
+  if (!validInvocation(invocation)) throw new Error('invalid invocation id');
+  return path.join(path.dirname(feedbackFile(root)), 'transcripts', `${invocation}.json`);
+}
+
+/** Record one skill invocation boundary. Details stay in the local log. */
+export function recordSkillStart(root, fields) {
+  if (!validInvocation(fields?.invocation)) return fail('invalid invocation id');
+  if (readEvents(root).some((event) => event.invocation === fields.invocation)) return fail('invocation id already exists');
+  return recordEvent(root, { ...fields, type: 'skill-start' });
+}
+
+/** Finish an invocation, optionally saving the caller's input/output transcript locally. */
+export function recordSkillEnd(root, fields) {
+  try {
+    if (!validInvocation(fields?.invocation)) return fail('invalid invocation id');
+    const existing = readEvents(root);
+    if (!existing.some((event) => event.type === 'skill-start' && event.invocation === fields.invocation)) return fail('skill start record is missing');
+    if (existing.some((event) => event.type === 'skill-end' && event.invocation === fields.invocation)) return fail('invocation already ended');
+    if (!['ok', 'partial', 'failed', 'blocked', 'question'].includes(fields.status)) return fail('invalid skill status');
+    if (fields.transcriptStatus !== undefined && !['unavailable', 'empty', 'not-provided'].includes(fields.transcriptStatus)) return fail('invalid transcript status');
+    const start = existing.find((event) => event.type === 'skill-start' && event.invocation === fields.invocation);
+    for (const key of ['skill', 'parent', 'session']) {
+      if (fields[key] !== undefined && start[key] !== fields[key]) return fail(`${key} does not match skill start record`);
+    }
+    const transcript = typeof fields.transcript === 'string' ? fields.transcript : undefined;
+    const invocation = fields.invocation;
+    const safe = { ...fields };
+    delete safe.transcript;
+    if (transcript !== undefined) {
+      if (typeof invocation !== 'string' || invocation === '') return fail('invocation is required for a transcript');
+      try {
+        const parsed = JSON.parse(transcript);
+        if (!parsed || typeof parsed !== 'object' || !Object.hasOwn(parsed, 'input') || !Object.hasOwn(parsed, 'output')) return fail('transcript JSON must contain input and output');
+      } catch { return fail('transcript must be valid JSON'); }
+      const file = skillTranscriptFile(root, invocation);
+      ensureTranscriptDirectory(root);
+      if (fs.existsSync(file)) return fail('transcript already exists for this invocation');
+      fs.writeFileSync(file, `${transcript.replace(/\r\n/g, '\n')}\n`, { mode: 0o600, flag: 'wx' });
+      safe.transcript = { status: 'captured-local', file: path.relative(path.dirname(feedbackFile(root)), file).split(path.sep).join('/') };
+    } else if (safe.transcriptStatus === undefined) {
+      safe.transcript = { status: 'unavailable' };
+    } else {
+      safe.transcript = { status: safe.transcriptStatus };
+    }
+    delete safe.transcriptStatus;
+    safe.parent ??= start.parent;
+    safe.model ??= start.model;
+    return recordEvent(root, { ...safe, session: fields.session ?? start.session, type: 'skill-end' });
+  } catch (error) {
+    return fail(errorText(error));
+  }
+}
+
+/** Full local per-skill report; transcript bodies are read only from local files. */
+export function skillReport(root, events, { includeTranscripts = false } = {}) {
+  const starts = new Map();
+  const rows = [];
+  for (const event of Array.isArray(events) ? events : []) {
+    if (event.type === 'skill-start') starts.set(event.invocation, event);
+    if (event.type !== 'skill-end') continue;
+    const start = starts.get(event.invocation);
+    let transcript = '';
+    if (includeTranscripts && event.transcript?.status === 'captured-local' && typeof event.transcript.file === 'string') {
+      try {
+        const expected = `transcripts/${event.invocation}.json`;
+        if (event.transcript.file !== expected) throw new Error('invalid transcript reference');
+        const base = ensureTranscriptDirectory(root, { create: false });
+        const file = fs.realpathSync(path.join(path.dirname(feedbackFile(root)), event.transcript.file));
+        if (!file.startsWith(`${base}${path.sep}`)) throw new Error('transcript path escapes local storage');
+        transcript = fs.readFileSync(file, 'utf8');
+      } catch { transcript = '[transcript unavailable]'; }
+    }
+    const durationS = start ? Math.max(0, Math.floor((Date.parse(event.ts) - Date.parse(start.ts)) / 1000)) : null;
+    rows.push({ start: start ?? null, end: event, duration_s: Number.isFinite(durationS) ? durationS : null, ...(includeTranscripts ? { transcript } : {}) });
+  }
+  const pending = [...starts.values()].filter((start) => !rows.some((row) => row.end.invocation === start.invocation));
+  const bySkill = Object.create(null);
+  for (const row of rows) {
+    const name = row.end.skill;
+    bySkill[name] ??= { count: 0, failed: 0, blocked: 0, duration_s: 0 };
+    bySkill[name].count += 1;
+    if (row.end.status === 'failed') bySkill[name].failed += 1;
+    if (row.end.status === 'blocked') bySkill[name].blocked += 1;
+    bySkill[name].duration_s += row.duration_s ?? 0;
+  }
+  return { by_skill: bySkill, invocations: rows, incomplete: pending };
 }
 
 /** Appends one validated event. Returns { ok: true } or { ok: false, error }. Never throws. */
@@ -172,6 +261,26 @@ function isText(value) {
   return typeof value === 'string' && value !== '';
 }
 
+function validInvocation(value) {
+  return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(value);
+}
+
+function ensureTranscriptDirectory(root, { create = true } = {}) {
+  const feedbackDir = path.dirname(feedbackFile(root));
+  const directory = path.join(feedbackDir, 'transcripts');
+  if (!fs.existsSync(directory)) {
+    if (!create) throw new Error('transcript directory is missing');
+    fs.mkdirSync(directory, { recursive: false });
+  }
+  if (fs.lstatSync(directory).isSymbolicLink()) throw new Error('transcript directory must not be a symlink');
+  const realFeedback = fs.realpathSync(feedbackDir);
+  const expectedFeedback = path.join(fs.realpathSync(path.resolve(root)), '.campaign', 'state', 'feedback');
+  if (realFeedback !== expectedFeedback) throw new Error('feedback directory escapes the campaign folder');
+  const realDirectory = fs.realpathSync(directory);
+  if (realDirectory !== path.join(realFeedback, 'transcripts')) throw new Error('transcript directory escapes local storage');
+  return realDirectory;
+}
+
 /** Index of the last turn event (with the given session, when given), or -1. */
 function lastTurnIndex(events, session) {
   for (let i = events.length - 1; i >= 0; i -= 1) {
@@ -194,6 +303,21 @@ function checkEvent(event) {
 
   if (type === 'turn') {
     copyStrings(event, fields, ['topic']);
+  }
+
+  if (type === 'skill-start' || type === 'skill-end') {
+    copyStrings(event, fields, ['invocation', 'parent', 'skill', 'session', 'model']);
+    if (!fields.invocation || !fields.skill) return fail('invocation and skill are required');
+    if (type === 'skill-start') copyStrings(event, fields, ['input']);
+    if (type === 'skill-end') {
+      if (!['ok', 'partial', 'failed', 'blocked', 'question'].includes(event.status)) return fail('status must be ok, partial, failed, blocked, or question');
+      fields.status = event.status;
+      copyStrings(event, fields, ['artifacts', 'issues']);
+      if (event.transcript && typeof event.transcript === 'object') {
+        fields.transcript = {};
+        copyStrings(event.transcript, fields.transcript, ['status', 'file']);
+      }
+    }
   }
 
   if (type === 'end') {

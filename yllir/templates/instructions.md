@@ -21,6 +21,10 @@ Yllir plugin root: {{plugin.root}}. Wherever a skill or agent file mentions `${C
 
 Use only the master-facing words listed in the lexicon of the `yllir` skill. Never say: skill, script, git, commit, repository, YAML, frontmatter, sub-agent, model, hook, MCP, template.
 
+## Local feedback
+
+Individual skill invocations are recorded by their callers because the supported hook set does not provide per-skill lifecycle events. Follow `${CLAUDE_PLUGIN_ROOT}/templates/feedback-protocol.md` for each skill invocation, including nested calls, retries, failures, and read-the-file substitutes. Capture available input/output in the local transcript file; use `unavailable` when the runtime does not expose it. Full transcripts and detail stay under `.campaign/state/feedback/`; exports omit them and allow only aggregate metadata. No feedback is sent over a network.
+
 ## Fixed rules
 
 These rules cannot be changed by settings or by the master's rules.

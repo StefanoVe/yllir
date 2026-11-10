@@ -23,6 +23,7 @@ HANDOFF: <absolute path or none>
 CHANGED_FILES: <comma-separated campaign-relative paths, or none>
 LANGUAGE: <ISO code of the language the master reads>
 IMAGINATION: <yes | no | keep>
+FEEDBACK_PARENT: <entry invocation id; optional>
 MASTER_MESSAGE:
 <the master's message, verbatim; for a reply, also the earlier question>
 ```
@@ -34,6 +35,8 @@ Run every command from CAMPAIGN_ROOT, or pass it as the root argument. Never run
 ## Steps
 
 1. **Start.** Read the lexicon with the Read tool: `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/lexicon.md`. Every sentence for the master uses only its words, in LANGUAGE.
+
+   Read `${CLAUDE_PLUGIN_ROOT}/templates/feedback-protocol.md` and follow it for the PROCESS skill invocation and every nested skill invocation, including retries and skills followed by reading their file. The entry caller passes `FEEDBACK_PARENT: <invocation-id>` when available; use that as the parent id. Assign a unique id for this PROCESS invocation, record its start before invoking it, and record its end after its result is known, including QUESTION or FAILED. Save the available process input and result as the local JSON transcript described there. If feedback cannot be recorded, continue and mark that coverage unavailable in the result.
 
 2. **Handoff.** Only if TOPIC is not `none`: read the file HANDOFF. Every file listed in CHANGED_FILES (none, if it says `none`) has been edited since the last step: read it again before you rely on it.
    - If IMAGINATION is `keep`: look for the line `Imagination: yes` or `Imagination: no` in `## Decisions`. Its value is the IMAGINATION value for this run. If there is no such line, or TOPIC is `none`, the value is `no`.

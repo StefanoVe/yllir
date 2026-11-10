@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // Feedback log of a campaign: records and reads the usage events in
-// .campaign/state/feedback/events.jsonl. Records are skipped outside a campaign.
+// .campaign/state/feedback/events.jsonl plus optional local invocation transcripts.
+// Legacy aggregate events contain no campaign text; skill events may contain
+// caller-provided text in local metadata and transcript files.
 // Commands:
 //   record turn [root] [--session S] [--agent A] [--version V] [--topic T]
 //   record end [root] [--session S] [--agent A] [--version V] [--process P]
@@ -20,21 +22,27 @@ import {
   readEvents,
   recordEnd,
   recordEvent,
+  recordSkillStart,
+  recordSkillEnd,
+  skillReport,
   summarize,
 } from './lib/feedback.mjs';
 import { frameworkVersion, hookAgent, isCampaign } from './lib/feedback-hook.mjs';
 import { activeTopic } from './lib/topics.mjs';
 
 const USAGE =
-  'usage: node feedback.mjs <record turn|record end|record note|summary|export> [root] [options]';
+  'usage: node feedback.mjs <record turn|record end|record note|record skill-start|record skill-end|summary|report|export> [root] [options]';
 
 // Options accepted by each command (the root is a plain argument, not an option).
 const OPTIONS = {
   'record turn': ['session', 'agent', 'version', 'topic'],
   'record end': ['session', 'agent', 'version', 'process'],
   'record note': ['outcome', 'friction', 'detail'],
+  'record skill-start': ['session', 'invocation', 'parent', 'skill', 'input', 'model'],
+  'record skill-end': ['session', 'invocation', 'parent', 'skill', 'status', 'artifacts', 'issues', 'transcript', 'transcript-status', 'model'],
   summary: [],
-  export: ['out'],
+  report: ['include-transcripts'],
+  export: ['out', 'include-details'],
 };
 
 class UsageError extends Error {}
@@ -80,6 +88,10 @@ function parseArgs(argv) {
     if (options.outcome === undefined) usageError('--outcome is required for record note');
     if (options.friction === undefined) usageError('--friction is required for record note');
   }
+  if (command === 'record skill-start' && (!options.invocation || !options.skill)) usageError('--invocation and --skill are required for record skill-start');
+  if (command === 'record skill-end' && (!options.invocation || !options.skill || !options.status)) usageError('--invocation, --skill and --status are required for record skill-end');
+  if (command === 'report' && options['include-transcripts'] !== undefined && options['include-transcripts'] !== 'yes') usageError('--include-transcripts accepts only yes');
+  if (command === 'export' && options['include-details'] !== undefined && options['include-details'] !== 'yes') usageError('--include-details accepts only yes');
   if (command === 'export' && options.out === undefined) {
     usageError('--out is required for export');
   }
@@ -127,6 +139,18 @@ function recordCommand(command, root, options) {
       }),
     );
   }
+  if (command === 'record skill-start') {
+    return report(recordSkillStart(root, { ...options, agent, version, session: options.session ?? latestSession(root) }));
+  }
+  if (command === 'record skill-end') {
+    const { 'transcript-status': transcriptStatus, transcript, ...rest } = options;
+    let transcriptText;
+    if (transcript !== undefined) {
+      try { transcriptText = fs.readFileSync(path.resolve(root, transcript), 'utf8'); }
+      catch (error) { write(`error: transcript could not be read: ${error.message.split('\n')[0]}\n`); return 1; }
+    }
+    return report(recordSkillEnd(root, { ...rest, agent, version, transcript: transcriptText, transcriptStatus }));
+  }
   if (command === 'record end') {
     return report(
       recordEnd(root, {
@@ -157,15 +181,49 @@ function exportLog(root, options) {
     return 0;
   }
   const target = path.resolve(options.out);
+  const feedbackDir = path.dirname(source);
   try {
+    const canonicalTarget = resolveThroughExistingAncestor(target);
+    const canonicalFeedbackDir = fs.realpathSync(feedbackDir);
+    if (canonicalTarget === canonicalFeedbackDir || canonicalTarget.startsWith(`${canonicalFeedbackDir}${path.sep}`)) {
+      write('error: export destination must be outside local feedback storage\n');
+      return 1;
+    }
     fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.copyFileSync(source, target);
+    const lines = readEvents(root).flatMap((event) => {
+      // Export aggregate metadata by default. Per-skill metadata is opt-in;
+      // paths, free text, topic, transcript references and bodies stay local.
+      if ((event.type === 'skill-start' || event.type === 'skill-end') && options['include-details'] !== 'yes') return [];
+      const safe = {};
+      for (const key of ['type', 'ts', 'session', 'agent', 'version', 'duration_s', 'process', 'status', 'model', 'files', 'outcome', 'friction']) {
+        if (event[key] !== undefined) safe[key] = event[key];
+      }
+      if (event.type === 'skill-start' || event.type === 'skill-end') {
+        for (const key of ['invocation', 'parent', 'skill', 'model']) if (event[key] !== undefined) safe[key] = event[key];
+        if (event.type === 'skill-end' && event.transcript?.status) safe.transcript = { status: event.transcript.status };
+      }
+      return [JSON.stringify(safe)];
+    });
+    fs.writeFileSync(target, `${lines.join('\n')}${lines.length ? '\n' : ''}`);
   } catch (error) {
     write(`error: ${error.message.split('\n')[0]}\n`);
     return 1;
   }
   write(`exported: ${target}\n`);
   return 0;
+}
+
+function resolveThroughExistingAncestor(target) {
+  if (fs.existsSync(target)) return fs.realpathSync(target);
+  let ancestor = target;
+  const suffix = [];
+  while (!fs.existsSync(ancestor)) {
+    suffix.unshift(path.basename(ancestor));
+    const parent = path.dirname(ancestor);
+    if (parent === ancestor) throw new Error('cannot resolve export destination');
+    ancestor = parent;
+  }
+  return path.join(fs.realpathSync(ancestor), ...suffix);
 }
 
 function main() {
@@ -185,6 +243,9 @@ function main() {
     code = recordCommand(command, root, options);
   } else if (command === 'summary') {
     write(`${summarize(readEvents(root))}\n`);
+    code = 0;
+  } else if (command === 'report') {
+    write(`${JSON.stringify(skillReport(root, readEvents(root), { includeTranscripts: options['include-transcripts'] === 'yes' }), null, 2)}\n`);
     code = 0;
   } else {
     code = exportLog(root, options);
