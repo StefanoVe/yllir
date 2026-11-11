@@ -8,10 +8,8 @@ import { inspectStatisticsTables, convertStatisticsTables } from '../../../../..
 import { listSheets, readStructure } from '../../../../../scripts/lib/subjects.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 
-const STATE_PATH = '.campaign/state/update.yaml';
 const DRAFT_ROOT = '.campaign/state/write/draft';
 const MANIFEST_PATH = '.campaign/state/update/sheet-drafts.json';
-const MIGRATION_ID = 'statistics-tables-v1';
 const TEMPLATE_TYPES = new Set(['npc', 'vendor', 'enemy', 'creature']);
 const CATEGORY_TYPES = new Set(['subjects', 'places', 'objects', 'free', 'master-only']);
 
@@ -126,24 +124,16 @@ export function verifyPostUpdateDrafts(root, files) {
   return { status: errors.length === 0 ? 'verified' : 'failed', errors };
 }
 
-/** Mark migration complete only after a full re-scan finds no old table blocks. */
+/**
+ * The guided part is finished only after a full re-scan finds no old table block.
+ * It writes no state: update-campaign.mjs records the result.
+ */
 export function completePostUpdate(root) {
   root = path.resolve(root);
   const scan = preparePostUpdate(root);
   if (scan.status === 'failed') return scan;
   if (scan.status === 'pending') return { ...scan, status: 'pending' };
-  let converted = [];
-  try { converted = Object.keys(JSON.parse(fs.readFileSync(path.join(root, MANIFEST_PATH), 'utf8'))).sort(); } catch { /* no staged work */ }
-  const statePath = path.join(root, STATE_PATH);
-  try {
-    const state = parseYamlLite(fs.readFileSync(statePath, 'utf8'));
-    if (state.errors.length === 0 && state.data?.status === 'completed' && state.data?.sheet_migration_id === MIGRATION_ID && state.data?.sheet_migration === 'pending') {
-      setMigrationState(root, 'complete');
-    }
-  } catch (err) {
-    if (err.code !== 'ENOENT') return { ...scan, status: 'failed', errors: [{ code: 'update-state-failed', message: err.message }] };
-  }
-  return { ...scan, status: 'complete', converted };
+  return { ...scan, status: 'complete' };
 }
 
 function stageDraft(root, file, content, owned) {
@@ -203,17 +193,4 @@ function readLanguage(root) {
   } catch {
     return 'en';
   }
-}
-
-function setMigrationState(root, value) {
-  const file = path.join(root, STATE_PATH);
-  let text = '';
-  try { text = fs.readFileSync(file, 'utf8'); } catch (err) { if (err.code !== 'ENOENT') throw err; }
-  if (/^sheet_migration:\s*.*$/m.test(text)) {
-    text = text.replace(/^sheet_migration:\s*.*$/m, `sheet_migration: ${value}`);
-  } else {
-    text = `${text}${text !== '' && !text.endsWith('\n') ? '\n' : ''}sheet_migration: ${value}\n`;
-  }
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, text, 'utf8');
 }

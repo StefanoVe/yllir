@@ -309,16 +309,16 @@ test('toLegacyLayout puts a session without arc directly in the category folder'
 });
 
 /** A campaign in the old layout, saved, then migrated by the real update. Remove prepared.tmp when done. */
-function migratedFolder() {
+async function migratedFolder() {
   const prepared = setupScenario('legacy-sessions');
-  const result = withIsolatedGit(() => updateCampaign(prepared.dir));
+  const result = await withIsolatedGit(() => updateCampaign(prepared.dir));
   assert.equal(result.status, 'updated', JSON.stringify(result.errors));
   assert.equal(result.migrated.length, LEGACY_SESSIONS.length);
   return prepared;
 }
 
-test('the migrated session and event files have no broken link and the links are back at event depth', () => {
-  const { tmp, dir, setup } = migratedFolder();
+test('the migrated session and event files have no broken link and the links are back at event depth', async () => {
+  const { tmp, dir, setup } = await migratedFolder();
   try {
     const files = [];
     for (const [session, scenes] of Object.entries(setup.scenes)) {
@@ -334,8 +334,8 @@ test('the migrated session and event files have no broken link and the links are
   }
 });
 
-test('gradeLegacy passes a campaign migrated by the real update (L1 to L4)', () => {
-  const { tmp, dir, setup } = migratedFolder();
+test('gradeLegacy passes a campaign migrated by the real update (L1 to L4)', async () => {
+  const { tmp, dir, setup } = await migratedFolder();
   try {
     const results = gradeLegacy({ dir, setup, report: LEGACY_REPORT });
     assert.deepEqual(failing(results), [], JSON.stringify(results));
@@ -344,8 +344,8 @@ test('gradeLegacy passes a campaign migrated by the real update (L1 to L4)', () 
   }
 });
 
-test('gradeLegacy fails L1 when an event file is missing', () => {
-  const { tmp, dir, setup } = migratedFolder();
+test('gradeLegacy fails L1 when an event file is missing', async () => {
+  const { tmp, dir, setup } = await migratedFolder();
   try {
     fs.rmSync(path.join(dir, 'Trama', 'Sessione 2', 'Eventi', 'Verso il pozzo.md'));
     const results = gradeLegacy({ dir, setup, report: LEGACY_REPORT });
@@ -355,8 +355,8 @@ test('gradeLegacy fails L1 when an event file is missing', () => {
   }
 });
 
-test('gradeLegacy accepts the added links and provenance and kind lines (L3)', () => {
-  const { tmp, dir, setup } = migratedFolder();
+test('gradeLegacy accepts the added links and provenance and kind lines (L3)', async () => {
+  const { tmp, dir, setup } = await migratedFolder();
   try {
     const file = path.join(dir, 'Trama', 'Sessione 2', 'Eventi', 'Verso il pozzo.md');
     const text = fs.readFileSync(file, 'utf8');
@@ -370,8 +370,8 @@ test('gradeLegacy accepts the added links and provenance and kind lines (L3)', (
   }
 });
 
-test('gradeLegacy fails L3 when a frontmatter line other than provenance or kind changes', () => {
-  const { tmp, dir, setup } = migratedFolder();
+test('gradeLegacy fails L3 when a frontmatter line other than provenance or kind changes', async () => {
+  const { tmp, dir, setup } = await migratedFolder();
   try {
     const file = path.join(dir, 'Trama', 'Sessione 2', 'Eventi', 'Verso il pozzo.md');
     fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('depends_on: []', 'depends_on: [altro]'));
@@ -382,8 +382,8 @@ test('gradeLegacy fails L3 when a frontmatter line other than provenance or kind
   }
 });
 
-test('gradeLegacy fails L3 when a scene text is altered', () => {
-  const { tmp, dir, setup } = migratedFolder();
+test('gradeLegacy fails L3 when a scene text is altered', async () => {
+  const { tmp, dir, setup } = await migratedFolder();
   try {
     const file = path.join(dir, 'Trama', 'Sessione 2', 'Eventi', 'Verso il pozzo.md');
     const text = fs.readFileSync(file, 'utf8');

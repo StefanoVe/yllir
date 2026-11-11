@@ -1,0 +1,7 @@
+id: session-layout-v1
+after: []
+introduced_in: 0.5.0
+needed: detect
+deterministic: deterministic.mjs
+guided: null
+complete: null

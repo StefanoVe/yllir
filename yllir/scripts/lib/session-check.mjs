@@ -12,12 +12,10 @@ import { listVersions, status } from './versions.mjs';
 import { parseYamlLite } from './yaml-lite.mjs';
 import { workNote } from './work-note.mjs';
 import { checkUpdate, formatUpdateNotice } from './update-check.mjs';
-import { listSheets, readStructure } from './subjects.mjs';
-import { parseFrontmatter } from './frontmatter.mjs';
+import { UPDATE_STATE_PATH, parseUpdateState, pendingMigrations } from './update-state.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
 const VERSION_PATH = '.campaign/version.yaml';
-const UPDATE_STATE_PATH = '.campaign/state/update.yaml';
 // Paths the framework never counts as changes (same rules as versions.mjs).
 const IGNORED_PREFIXES = ['.campaign/state', '.campaign/cache'];
 const VERSION_LIMIT = 1000000;
@@ -37,7 +35,7 @@ const NEXT_STEP = 'next: invoke the skill yllir:yllir before answering the maste
  *   instructions: 'up-to-date' | 'missing' | { changed: string[] } | null,
  *   framework_version: string | null,
  *   campaign_framework_version: string | null,
- *   post_update: 'needed' | null,
+ *   post_update: string[] | null,       ids of the pending migrations, in registry order
  *   work_note: string | null,
  *   update: { installed: string, published: string, news: string | null } | null,
  * }}
@@ -132,8 +130,8 @@ export function formatCheck(result) {
       lines.push('campaign alignment: needed');
     }
   }
-  if (result.post_update === 'needed') {
-    lines.push('post-update: needed');
+  if (Array.isArray(result.post_update) && result.post_update.length > 0) {
+    lines.push(`post-update needed: ${result.post_update.join(', ')}`);
   }
   if (result.work_note !== null) {
     lines.push(`work note: ${result.work_note}`);
@@ -254,40 +252,17 @@ function readCampaignVersion(dir) {
   return typeof version === 'string' ? version : null;
 }
 
-/** Pending post-update sheet conversion, read without changing campaign state. */
+/**
+ * The pending migrations of update.yaml (read without changing anything), or null
+ * when there is no such file or it cannot be read.
+ */
 function readPostUpdate(dir) {
-  const itemText = readTextOrNull(path.join(dir, '.campaign/state/update/item-descriptions.json'));
-  if (itemText === null && hasItemSheets(dir) && isAtLeast(readFrameworkVersion(), '0.26.0')) return 'needed';
-  if (itemText !== null) {
-    try {
-      const inventory = JSON.parse(itemText);
-      if (inventory.migration_id !== 'item-descriptions-v1' || !Array.isArray(inventory.items)) return 'needed';
-      if (inventory.items.some((item) => !item || typeof item.file !== 'string' || item.status !== 'complete')) return 'needed';
-    } catch { return 'needed'; }
-  }
   const text = readTextOrNull(path.join(dir, UPDATE_STATE_PATH));
   if (text === null) return null;
-  const parsed = parseYamlLite(text);
-  if (parsed.errors.length > 0 || parsed.data === null || typeof parsed.data !== 'object') return null;
-  return parsed.data.sheet_migration === 'pending' || parsed.data.geography_migration === 'pending' ? 'needed' : null;
-}
-
-function hasItemSheets(dir) {
-  const { structure } = readStructure(dir);
-  if (!structure) return false;
-  for (const category of structure.filter((entry) => entry.type === 'objects' && typeof entry.folder === 'string')) {
-    for (const file of listSheets(dir, category.folder)) {
-      try { if (parseFrontmatter(fs.readFileSync(path.join(dir, file), 'utf8')).data?.template === 'item') return true; }
-      catch { return true; }
-    }
-  }
-  return false;
-}
-
-function isAtLeast(version, minimum) {
-  const parse = (value) => /^\d+\.\d+\.\d+$/.test(value ?? '') ? value.split('.').map(Number) : null;
-  const a = parse(version), b = parse(minimum);
-  return Boolean(a && b && (a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] >= b[2])))));
+  const state = parseUpdateState(text);
+  if (state === null) return null;
+  const pending = pendingMigrations(state);
+  return pending.length > 0 ? pending : null;
 }
 
 function readFrameworkVersion() {

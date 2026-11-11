@@ -1,0 +1,7 @@
+id: item-descriptions-v1
+after: [category-first-geography-v1]
+introduced_in: 0.26.0
+needed: detect
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs

@@ -13,7 +13,7 @@ You receive every message of the master in a campaign folder or in an empty fold
 
 ## Steps
 
-**Step 1 — Check.** Find the block that starts with `YLLIR SESSION CHECK` in your context. Keep its values: `folder`, `git`, `campaign root`, `framework version` (with its «campaign made with» part, when there is one), `campaign alignment` (when that line is in the block), `work note`, and the block `YLLIR UPDATE AVAILABLE` when it is in your context. If the block is not in your context, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and keep its output the same way.
+**Step 1 — Check.** Find the block that starts with `YLLIR SESSION CHECK` in your context. Keep its values: `folder`, `git`, `campaign root`, `framework version` (with its «campaign made with» part, when there is one), `campaign alignment` and `post-update needed` (when those lines are in the block), `work note`, and the block `YLLIR UPDATE AVAILABLE` when it is in your context. If the block is not in your context, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and keep its output the same way.
 
 **Step 2 — Lexicon.** Read `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/lexicon.md`. From now on, every sentence to the master uses only its words, in the campaign language: `language.main` in `campaign.yaml`, or, in an empty folder, the language the master writes in.
 
@@ -24,7 +24,7 @@ You receive every message of the master in a campaign folder or in an empty fold
 - `folder: campaign`: go on to Step 4.
 
 **Step 4 — Health (silent).**
-- `campaign alignment` needed, or `post-update` needed: invoke `yllir:update` with the Skill tool and follow its Part A exactly, instead of the instructions repair below.
+- `campaign alignment` needed, or a `post-update needed` line: invoke `yllir:update` with the Skill tool and follow its Part A exactly, instead of the instructions repair below.
 - `instructions: missing`, or `instructions: changed by hand` and no `campaign alignment` line: run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" .`. If the value said `changed by hand`, tell the master in one sentence that a file managed by the assistant was restored, and that their own rules belong in «Your rules».
 - `settings: problems`: say the fixed sentence of the lexicon for a campaign settings problem, and offer to fix it. Write no campaign content until it is fixed.
 

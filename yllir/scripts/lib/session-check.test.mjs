@@ -148,57 +148,51 @@ describe('campaign checks', () => {
     assert.equal(result.instructions, 'up-to-date');
   });
 
-  test('a pending post-update conversion is reported even when framework versions match', () => {
+  test('pending migrations are reported by id, in registry order, even when framework versions match', () => {
     const root = campaign();
     write(root, '.campaign/state/update.yaml', [
       'status: completed',
-      'sheet_migration: pending',
-      'geography_migration_id: "category-first-geography-v1"',
-      'geography_migration: pending',
-      'sheet_pending:',
-      '  - Creature/Guardiano.md',
+      'migrations:',
+      '  - id: "category-first-geography-v1"',
+      '    status: pending',
+      '  - id: "item-descriptions-v1"',
+      '    status: complete',
+      '  - id: "statistics-tables-v1"',
+      '    status: pending',
       '',
     ].join('\n'));
 
     const result = sessionCheck(root);
     assert.equal(result.framework_version, FRAMEWORK_VERSION);
     assert.equal(result.campaign_framework_version, FRAMEWORK_VERSION);
-    assert.equal(result.post_update, 'needed');
-    assert.match(formatCheck(result), /^post-update: needed$/m);
+    assert.deepEqual(result.post_update, ['category-first-geography-v1', 'statistics-tables-v1']);
+    assert.match(formatCheck(result), /^post-update needed: category-first-geography-v1, statistics-tables-v1$/m);
   });
 
-  test('a completed post-update conversion is not reported', () => {
+  test('a state with no pending migration is not reported', () => {
     const root = campaign();
-    write(root, '.campaign/state/update.yaml', 'status: completed\nsheet_migration: complete\n');
+    write(root, '.campaign/state/update.yaml', 'status: completed\nmigrations:\n  - id: "statistics-tables-v1"\n    status: complete\n');
     const result = sessionCheck(root);
     assert.equal(result.post_update, null);
-    assert.doesNotMatch(formatCheck(result), /^post-update:/m);
+    assert.doesNotMatch(formatCheck(result), /^post-update/m);
   });
 
-  test('a pending geographic migration uses the existing post-update signal', () => {
+  test('an update.yaml of the older form is read: its pending keys are reported as migrations', () => {
     const root = campaign();
-    write(root, '.campaign/state/update.yaml', 'status: completed\ngeography_migration: pending\n');
+    write(root, '.campaign/state/update.yaml', 'status: completed\nsheet_migration: pending\ngeography_migration: complete\nworld_migration: pending\n');
     const result = sessionCheck(root);
-    assert.equal(result.post_update, 'needed');
-    assert.match(formatCheck(result), /^post-update: needed$/m);
-    assert.doesNotMatch(formatCheck(result), /^post-geography:/m);
+    assert.deepEqual(result.post_update, ['statistics-tables-v1', 'world-graph-v1']);
   });
 
-  test('a pending item-description migration triggers post-update even without update.yaml', () => {
+  test('an unreadable update.yaml is not reported as pending', () => {
+    const root = campaign();
+    write(root, '.campaign/state/update.yaml', 'status: [broken\n');
+    assert.equal(sessionCheck(root).post_update, null);
+  });
+
+  test('the item inventory alone does not trigger post-update: the update state decides', () => {
     const root = campaign();
     write(root, '.campaign/state/update/item-descriptions.json', JSON.stringify({ migration_id: 'item-descriptions-v1', items: [{ file: 'Oggetti/Chiave.md', status: 'pending' }] }));
-    assert.equal(sessionCheck(root).post_update, 'needed');
-  });
-
-  test('malformed or unknown item-description state remains resumable', () => {
-    const root = campaign();
-    write(root, '.campaign/state/update/item-descriptions.json', '{broken');
-    assert.equal(sessionCheck(root).post_update, 'needed');
-  });
-
-  test('completed item-description migration does not trigger post-update', () => {
-    const root = campaign();
-    write(root, '.campaign/state/update/item-descriptions.json', JSON.stringify({ migration_id: 'item-descriptions-v1', items: [{ file: 'Oggetti/Chiave.md', status: 'complete' }] }));
     assert.equal(sessionCheck(root).post_update, null);
   });
 
@@ -392,10 +386,10 @@ describe('formatCheck', () => {
       instructions: 'up-to-date',
       framework_version: '0.2.0',
       campaign_framework_version: '0.2.0',
-      post_update: 'needed',
+      post_update: ['statistics-tables-v1'],
       work_note: null,
     });
-    assert.match(text, /^post-update: needed$/m);
+    assert.match(text, /^post-update needed: statistics-tables-v1$/m);
     assert.doesNotMatch(text, /campaign alignment/);
   });
 

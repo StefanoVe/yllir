@@ -1,0 +1,8 @@
+id: world-graph-v1
+after: [statistics-tables-v1]
+introduced_in: 0.30.0
+needed: detect
+deterministic: deterministic.mjs
+guided: null
+complete: null
+version_record_before: true

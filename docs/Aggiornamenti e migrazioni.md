@@ -308,6 +308,27 @@ La migrazione è idempotente: si può interrompere e riprendere senza duplicare 
 
 La migrazione non ricava relazioni, perché nessuna si può leggere con certezza dalla prosa con uno script: restano in sospeso, e le dichiara l’autore quando tocca i documenti (Implementato in 0.30.0; Riprogettazione, sezione 10).
 
+## Registro delle migrazioni (Deciso, 2026-11-11)
+
+Le migrazioni post-aggiornamento non sono più una catena scritta a mano nello script di aggiornamento. Ogni migrazione è una cartella sotto `yllir/skills/library/update/migrations/<id>/`, e un solo esecutore generico le legge tutte dal registro.
+
+- **Una cartella per migrazione.** Contiene `migration.yaml` (i campi), la parte deterministica (un modulo che sa dire se la migrazione serve e la applica), la parte guidata, se esiste (`guided.md`, le istruzioni per l’agente per quella migrazione soltanto), e la verifica di completamento (`complete.mjs`, che dice se la parte guidata è finita).
+- **Ordine.** Ogni migrazione dichiara da quali altre dipende (`after`). L’ordine è quello che ne deriva; a parità, vince l’id in ordine alfabetico, così l’ordine è sempre lo stesso. Un ciclo o un id sconosciuto sono errori.
+- **Quando serve.** Due modi: `needed: detect`, quando il contenuto della campagna dice che c’è lavoro da fare (per esempio una scheda nel vecchio formato); oppure `needed: {from_version_below: <versione>}`, quando la campagna è più vecchia della versione indicata (una campagna di versione sconosciuta è trattata come la più vecchia). Una migrazione in stato «in sospeso» viene sempre riprovata, anche se il controllo dice che non serve più.
+- **Parte guidata.** Quando la parte deterministica non basta, la migrazione resta «in sospeso» finché l’agente non ha finito il suo `guided.md`; poi esegue il controllo di completamento (`update-campaign.mjs . --complete <id>`). Il controllo di completamento segna completa una parte guidata solo quando passa; l’aggiornamento lo rifà da sé quando la parte deterministica non trova più lavoro.
+- **Stato generico.** In `.campaign/state/update.yaml` ogni migrazione ha uno stato: `complete`, `pending` (in sospeso) o `not-needed` (non serve). Lo stato degli aggiornamenti precedenti (le chiavi `sheet_migration`, `geography_migration` e `world_migration`) viene letto e tradotto nel nuovo; non viene più scritto. Così un aggiornamento interrotto con la versione vecchia riprende senza perdere nulla.
+- **Avvio al controllo.** La sessione legge solo lo stato: la riga `post-update needed: <id, id>` elenca le migrazioni in sospeso nell’ordine del registro. Non c’è più logica per ogni migrazione nel controllo all’avvio.
+- **Campagna già aggiornata.** Un controllo che trova una migrazione da applicare, che cambia file della campagna, esegue l’aggiornamento completo (punto di ripristino, versione salvata, ripristino in caso d’errore). Se resta solo la parte guidata, lo stato viene aggiornato e basta. Così nessun file scritto da una migrazione resta fuori dalla storia.
+- **Versione salvata.** La versione del framework («Updated Yllir to …») viene salvata nel punto del registro indicato da `version_record_before`, che è la migrazione del mondo: come prima, la storia git mostra prima la versione del framework e poi il formato del mondo sopra di essa.
+- **Versione minima supportata.** `migrations/registry.yaml` contiene `supported_from`. Una campagna più vecchia di quella versione è rifiutata con il codice `unsupported-version`, senza scrivere nulla. Il valore è `0.0.0`: oggi tutte le campagne sono supportate. **Decide l’autore quando alzarlo.**
+
+Scelte di implementazione prese in questa fase, da confermare:
+
+- **Ordine delle parti guidate.** L’ordine è: forma degli eventi, geografia, descrizioni degli oggetti, tabelle delle statistiche, poi il mondo. La geografia sposta le schede e le altre parti guidate leggono i loro percorsi, quindi viene prima; era l’ordine con cui l’agente le seguiva già (la vecchia esecuzione deterministica le preparava in un altro ordine, ma senza effetti sui file).
+- **Forma dello stato.** Le chiavi del registro contengono trattini, che il lettore YAML di base non accetta. Lo stato elenca quindi le migrazioni come una lista di coppie `id` e `status`, nell’ordine del registro.
+- **Migrazione del mondo.** Il suo `needed` è `detect`: serve finché il piano trova lavoro, anche in una campagna 0.30.x che ha ancora l’`AGENTS.md` generato (rimosso dalla versione 0.31.0). Una campagna già aggiornata con lavoro del mondo ancora da fare viene completata con un aggiornamento pieno.
+- **Statistiche.** La fase deterministica legge soltanto. Le bozze si scrivono nella parte guidata (`post-update.mjs --prepare`), come prima.
+
 ## Questioni aperte
 
 - Dove si trova, sul computer del master, la cartella del plugin pubblicato (la sorgente delle novità): per ora il controllo la legge dalla variabile `YLLIR_PUBLISHED_SOURCE`, e senza di essa tace. Va verificato come il marketplace la rende disponibile.

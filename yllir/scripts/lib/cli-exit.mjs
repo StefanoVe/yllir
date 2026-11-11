@@ -10,16 +10,21 @@ export function exitWith(code) {
 }
 
 /**
- * Runs the main function of a CLI. Any uncaught error is reported on stderr and
- * the tool exits with 2 (usage or unexpected failure).
+ * Runs the main function of a CLI, which may return a promise. Any uncaught error
+ * is reported on stderr and the tool exits with 2 (usage or unexpected failure).
  */
 export function runCli(main) {
-  try {
-    main();
-  } catch (err) {
+  const fail = (err) => {
     process.stderr.write(`${err?.message ?? String(err)}\n`);
     exitWith(2);
+  };
+  try {
+    const result = main();
+    if (result && typeof result.then === 'function') return result.catch(fail);
+  } catch (err) {
+    fail(err);
   }
+  return undefined;
 }
 
 /** Removes the trailing `exit: <code>` line that every CLI prints. */

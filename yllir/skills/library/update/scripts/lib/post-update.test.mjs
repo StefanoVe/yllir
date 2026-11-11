@@ -104,29 +104,27 @@ test('draft verification rejects outside-section changes and stale source after 
   assert.equal(verifyPostUpdateDrafts(root, [rel]).errors[0].code, 'source-changed');
 });
 
-test('completion is recorded only after a clean rescan and only for a pending completed update', () => {
+test('completion is decided by a clean rescan alone and writes no state', () => {
   const root = campaign('it', { 'Guardia.md': itSheet() });
   preparePostUpdate(root, { writeDrafts: true });
   fs.mkdirSync(path.join(root, '.campaign/state'), { recursive: true });
-  fs.writeFileSync(path.join(root, '.campaign/state/update.yaml'), 'status: completed\nsheet_migration_id: "statistics-tables-v1"\nsheet_migration: pending\n');
+  const state = 'status: completed\nmigrations: []\n';
+  fs.writeFileSync(path.join(root, '.campaign/state/update.yaml'), state);
   const converted = `---\nid: guardia\ntemplate: npc\n---\n\n# Guardia\n\nDescrizione stabile.\n\n## Statistiche\n\n### Caratteristiche\n\n| Caratteristica | Valore |\n| --- | --- |\n| CA | 13 |\n| PF | 24 |\n| Velocità | 9 m |\n\n<!-- master -->\n## Master\n\nNon toccare.\n<!-- /master -->\n`;
   fs.writeFileSync(path.join(root, 'Subjects/Guardia.md'), converted);
   const result = completePostUpdate(root);
   assert.equal(result.status, 'complete');
-  assert.deepEqual(result.converted, ['Subjects/Guardia.md']);
-  assert.match(fs.readFileSync(path.join(root, '.campaign/state/update.yaml'), 'utf8'), /sheet_migration: complete/);
+  assert.equal(fs.readFileSync(path.join(root, '.campaign/state/update.yaml'), 'utf8'), state);
 });
 
 test('dry-run never clears a stale pending marker', () => {
   const root = campaign('it', {});
   fs.mkdirSync(path.join(root, '.campaign/state'), { recursive: true });
   const file = path.join(root, '.campaign/state/update.yaml');
-  const original = 'status: completed\nsheet_migration_id: "statistics-tables-v1"\nsheet_migration: pending\n';
+  const original = 'status: completed\nmigrations:\n  - id: "statistics-tables-v1"\n    status: pending\n';
   fs.writeFileSync(file, original);
   assert.equal(completePostUpdate(root).status, 'complete');
-  // Restore the pending marker to model a stale state that a dry-run may inspect.
-  fs.writeFileSync(file, original);
-  const before = fs.readFileSync(file, 'utf8');
+  assert.equal(fs.readFileSync(file, 'utf8'), original);
   assert.deepEqual(preparePostUpdate(root), { status: 'complete', drafted: [], pending: [], candidates: [], errors: [] });
-  assert.equal(fs.readFileSync(file, 'utf8'), before);
+  assert.equal(fs.readFileSync(file, 'utf8'), original);
 });

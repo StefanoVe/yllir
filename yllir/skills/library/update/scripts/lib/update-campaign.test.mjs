@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   cancelInterruptedUpdate,
-  completeGeographicMigration,
+  completeMigration,
   postponeNotice,
   updateCampaign,
 } from './update-campaign.mjs';
@@ -14,6 +14,7 @@ import { generateInstructions } from '../../../../../scripts/lib/instructions.mj
 import { ensureRepo, listVersions, saveVersion } from '../../../../../scripts/lib/versions.mjs';
 import { stripExitLine } from '../../../../../scripts/lib/cli-exit.mjs';
 import { plotMap } from '../../../../../scripts/lib/plot/plot-map.mjs';
+import { MIGRATIONS_DIR } from './registry.mjs';
 
 // Identity logic is exercised only when no global or system git config exists.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
@@ -81,6 +82,18 @@ function makeCampaign(config = MINIMAL_CONFIG) {
   return dir;
 }
 
+// A campaign of the current format: it has its seed, so the world migration has nothing to do.
+const SEED_FILE = 'Seme del mondo.md';
+function makeCurrentCampaign(config = MINIMAL_CONFIG) {
+  const dir = tmp();
+  ensureRepo(dir);
+  write(dir, 'campaign.yaml', config.replace('  name: "Prova"', `  name: "Prova"\n  seed: "${SEED_FILE}"`));
+  write(dir, SEED_FILE, '# Seme del mondo\n');
+  generateInstructions(dir);
+  saveVersion(dir, { message: 'Campaign created.', kind: 'framework' });
+  return dir;
+}
+
 // Rewrites the recorded framework version and saves it, as an older install would have left it.
 function setVersion(dir, version) {
   const text = read(dir, '.campaign/version.yaml');
@@ -118,11 +131,11 @@ function writeState(dir, text) {
   write(dir, '.campaign/state/update.yaml', text);
 }
 
-test('an up-to-date campaign is reported and nothing is written', () => {
-  const dir = makeCampaign();
+test('an up-to-date campaign is reported and nothing is written', async () => {
+  const dir = makeCurrentCampaign();
   const head = git(dir, 'rev-parse', 'HEAD');
   const count = listVersions(dir, { limit: 100 }).length;
-  const result = updateCampaign(dir);
+  const result = await updateCampaign(dir);
   assert.equal(result.status, 'up-to-date');
   assert.equal(result.from, INSTALLED);
   assert.equal(result.to, INSTALLED);
@@ -131,69 +144,71 @@ test('an up-to-date campaign is reported and nothing is written', () => {
   assert.equal(fs.existsSync(path.join(dir, '.campaign/state/update.yaml')), false);
 });
 
-test('an aligned campaign records pending geography without moving files', () => {
-  const dir = makeCampaign(GEOGRAPHIC_CONFIG);
+test('an aligned campaign records pending geography without moving files', async () => {
+  const dir = makeCurrentCampaign(GEOGRAPHIC_CONFIG);
   write(dir, 'Subjects/Guardia.md', '---\nid: guardia\n---\n\n# Guardia\n');
   saveVersion(dir, { message: 'Added a subject', kind: 'manual' });
 
-  const result = updateCampaign(dir);
-  assert.equal(result.status, 'up-to-date');
-  assert.equal(result.geography_migration, 'pending');
-  assert.deepEqual(result.geography_migration_errors, []);
+  const result = await updateCampaign(dir);
+  // The first time the geography is found it is an alignment: the full update records it.
+  assert.equal(result.status, 'updated');
+  assert.equal(result.migrations['category-first-geography-v1'], 'pending');
+  assert.deepEqual(result.pending_migrations, ['category-first-geography-v1']);
   assert.equal(fs.existsSync(path.join(dir, 'Subjects/Guardia.md')), true);
   assert.equal(fs.existsSync(path.join(dir, 'Subjects/Da collocare/Guardia.md')), false);
-  assert.match(read(dir, '.campaign/state/update.yaml'), /^geography_migration_id: "category-first-geography-v1"$/m);
-  assert.match(read(dir, '.campaign/state/update.yaml'), /^geography_migration: pending$/m);
+  assert.match(read(dir, '.campaign/state/update.yaml'), /- id: "category-first-geography-v1"\n    status: pending/);
+  // Only the guided part is left now: the next run is an ordinary up-to-date check.
+  const again = await updateCampaign(dir, { today: '2026-11-09' });
+  assert.equal(again.status, 'up-to-date');
+  assert.equal(again.migrations['category-first-geography-v1'], 'pending');
 });
 
-test('a dry-run reports pending geography without writing its marker', () => {
-  const dir = makeCampaign(GEOGRAPHIC_CONFIG);
+test('a dry-run reports pending geography without writing its marker', async () => {
+  const dir = makeCurrentCampaign(GEOGRAPHIC_CONFIG);
   write(dir, 'Subjects/Guardia.md', '---\nid: guardia\n---\n\n# Guardia\n');
   saveVersion(dir, { message: 'Added a subject', kind: 'manual' });
   const before = snapshot(dir);
 
-  const result = updateCampaign(dir, { dryRun: true });
-  assert.equal(result.status, 'up-to-date');
-  assert.equal(result.geography_migration, 'pending');
+  const result = await updateCampaign(dir, { dryRun: true });
+  assert.equal(result.status, 'would-update');
+  assert.equal(result.migrations['category-first-geography-v1'], 'pending');
   assert.deepEqual(snapshot(dir), before);
 });
 
-test('geography completion refuses pending work and preserves other update markers', () => {
-  const dir = makeCampaign(GEOGRAPHIC_CONFIG);
+test('geography completion refuses pending work and preserves other update markers', async () => {
+  const dir = makeCurrentCampaign(GEOGRAPHIC_CONFIG);
   write(dir, 'Subjects/Guardia.md', '---\nid: guardia\n---\n\n# Guardia\n');
   saveVersion(dir, { message: 'Added a subject', kind: 'manual' });
-  assert.equal(updateCampaign(dir).geography_migration, 'pending');
+  assert.equal((await updateCampaign(dir)).migrations['category-first-geography-v1'], 'pending');
   const savedBefore = read(dir, '.campaign/state/update.yaml');
 
-  const blocked = completeGeographicMigration(dir);
-  assert.equal(blocked.status, 'failed');
+  const blocked = await completeMigration(dir, 'category-first-geography-v1');
+  assert.equal(blocked.status, 'pending');
   assert.equal(blocked.errors[0].code, 'geography-migration-incomplete');
 
   fs.mkdirSync(path.join(dir, 'Subjects/Da collocare'), { recursive: true });
   fs.renameSync(path.join(dir, 'Subjects/Guardia.md'), path.join(dir, 'Subjects/Da collocare/Guardia.md'));
-  const completed = completeGeographicMigration(dir);
+  const completed = await completeMigration(dir, 'category-first-geography-v1');
   assert.equal(completed.status, 'complete');
-  assert.match(read(dir, '.campaign/state/update.yaml'), /^geography_migration: complete$/m);
-  // Completion changes only the geography status; every other saved marker stays as it was.
-  const withoutGeography = (text) => text.split('\n').filter((line) => !line.startsWith('geography_migration:'));
-  assert.deepEqual(withoutGeography(read(dir, '.campaign/state/update.yaml')), withoutGeography(savedBefore));
+  // Completion changes only this migration's status; the file is otherwise as it was.
+  assert.equal(read(dir, '.campaign/state/update.yaml'), savedBefore.replace('status: pending', 'status: complete'));
 });
 
-test('a dry-run never clears a stale pending sheet-migration marker', () => {
-  const dir = makeCampaign();
+test('a dry-run never clears a stale pending sheet-migration marker', async () => {
+  const dir = makeCurrentCampaign();
   const state = 'status: completed\nsheet_migration_id: "statistics-tables-v1"\nsheet_migration: pending\n';
   write(dir, '.campaign/state/update.yaml', state);
-  const result = updateCampaign(dir, { dryRun: true });
+  const result = await updateCampaign(dir, { dryRun: true });
   assert.equal(result.status, 'up-to-date');
-  assert.equal(result.sheet_migration, 'complete');
+  assert.equal(result.migrations['statistics-tables-v1'], 'complete');
   assert.equal(read(dir, '.campaign/state/update.yaml'), state);
 });
 
-test('a campaign made with an older version is updated: the update version, then the format version', () => {
+test('a campaign made with an older version is updated: the update version, then the format version', async () => {
   const dir = makeCampaign();
   setVersion(dir, OLD);
   const before = listVersions(dir, { limit: 100 }).length;
-  const result = updateCampaign(dir, { today: '2026-11-09' });
+  const result = await updateCampaign(dir, { today: '2026-11-09' });
   assert.equal(result.status, 'updated');
   assert.equal(result.from, OLD);
   assert.equal(result.to, INSTALLED);
@@ -205,38 +220,37 @@ test('a campaign made with an older version is updated: the update version, then
   assert.equal(versions[0].message, 'Aggiornamento del formato della campagna');
   assert.equal(versions[1].message, `Updated Yllir to ${INSTALLED}`);
   assert.equal(versions[1].kind, 'framework');
-  assert.equal(result.world_migration, 'complete');
+  assert.equal(result.migrations['world-graph-v1'], 'complete');
   assert.ok(result.world_migration_files.includes('Seme del mondo.md'));
   const state = read(dir, '.campaign/state/update.yaml');
-  assert.match(state, /^world_migration_id: "world-graph-v1"$/m);
-  assert.match(state, /^world_migration: complete$/m);
+  assert.match(state, /- id: "world-graph-v1"\n    status: complete/);
   assert.match(state, /^status: completed$/m);
   assert.match(state, /^completed_on: 2026-11-09$/m);
   assert.match(state, /^started_on: 2026-11-09$/m);
 });
 
-test('an update identifies legacy statistics blocks and leaves their documents for post-update review', () => {
+test('an update identifies legacy statistics blocks and leaves their documents for post-update review', async () => {
   const dir = makeCampaign();
   write(dir, 'campaign.yaml', MINIMAL_CONFIG.replace('type: plot', 'type: plot\n  - id: subjects\n    folder: Subjects\n    type: subjects'));
   write(dir, 'Subjects/Guardia.md', '---\nid: guardia\ntemplate: npc\n---\n\n# Guardia\n\n## Statistiche\n\nCA: 13\nPF: 24\n');
   setVersion(dir, OLD);
-  const dry = updateCampaign(dir, { dryRun: true });
-  assert.equal(dry.sheet_migration, 'pending');
-  assert.deepEqual(dry.sheet_migration_files, ['Subjects/Guardia.md']);
+  const dry = await updateCampaign(dir, { dryRun: true });
+  assert.equal(dry.migrations['statistics-tables-v1'], 'pending');
+  assert.deepEqual(dry.details['statistics-tables-v1'].changed, ['Subjects/Guardia.md']);
   assert.match(read(dir, 'Subjects/Guardia.md'), /CA: 13/);
-  const result = updateCampaign(dir, { today: '2026-11-09' });
+  const result = await updateCampaign(dir, { today: '2026-11-09' });
   assert.equal(result.status, 'updated');
-  assert.equal(result.sheet_migration, 'pending');
-  assert.deepEqual(result.sheet_migration_files, ['Subjects/Guardia.md']);
-  assert.match(read(dir, '.campaign/state/update.yaml'), /^sheet_migration: pending$/m);
+  assert.equal(result.migrations['statistics-tables-v1'], 'pending');
+  assert.deepEqual(result.details['statistics-tables-v1'].changed, ['Subjects/Guardia.md']);
+  assert.match(read(dir, '.campaign/state/update.yaml'), /- id: "statistics-tables-v1"\n    status: pending/);
   assert.match(read(dir, 'Subjects/Guardia.md'), /CA: 13/);
 });
 
-test('a generated file edited by hand is restored, and the edit stays in history', () => {
+test('a generated file edited by hand is restored, and the edit stays in history', async () => {
   const dir = makeCampaign();
   const original = read(dir, 'CLAUDE.md');
   write(dir, 'CLAUDE.md', `${original}Hand edit line\n`);
-  const result = updateCampaign(dir);
+  const result = await updateCampaign(dir);
   assert.equal(result.status, 'updated');
   assert.deepEqual(result.restored_by_hand, ['CLAUDE.md']);
   assert.equal(read(dir, 'CLAUDE.md'), original);
@@ -246,7 +260,7 @@ test('a generated file edited by hand is restored, and the edit stays in history
   assert.match(git(dir, 'show', `${manual.hash}:CLAUDE.md`), /Hand edit line/);
 });
 
-test('customizations.md is never changed by an update', () => {
+test('customizations.md is never changed by an update', async () => {
   const dir = makeCampaign();
   write(dir, '.campaign/customizations.md', '# Le mie regole\n\nNiente spoiler sul drago.\n');
   saveVersion(dir, { message: 'Master rules', kind: 'manual' });
@@ -254,19 +268,19 @@ test('customizations.md is never changed by an update', () => {
   const historyBefore = git(dir, 'log', '--oneline', '--', '.campaign/customizations.md');
   setVersion(dir, OLD);
 
-  const result = updateCampaign(dir);
+  const result = await updateCampaign(dir);
   assert.equal(result.status, 'updated');
   assert.equal(result.restored_by_hand.includes('.campaign/customizations.md'), false);
   assert.ok(fs.readFileSync(path.join(dir, '.campaign/customizations.md')).equals(original));
   assert.equal(git(dir, 'log', '--oneline', '--', '.campaign/customizations.md'), historyBefore);
 });
 
-test('pending master changes are saved as a manual version before the update', () => {
+test('pending master changes are saved as a manual version before the update', async () => {
   const dir = makeCampaign();
   setVersion(dir, OLD);
   write(dir, 'Trama/session.md', 'Notes from the table.\n');
 
-  const result = updateCampaign(dir);
+  const result = await updateCampaign(dir);
   assert.equal(result.status, 'updated');
   const log = git(dir, 'log', '--format=%s').split('\n');
   assert.equal(log[0], 'Aggiornamento del formato della campagna');
@@ -275,17 +289,17 @@ test('pending master changes are saved as a manual version before the update', (
   assert.match(git(dir, 'show', '--name-only', '--format=', 'HEAD~2'), /Trama\/session\.md/);
 });
 
-test('a dry run reports the plan and writes nothing at all', () => {
+test('a dry run reports the plan and writes nothing at all', async () => {
   const dir = makeCampaign();
   setVersion(dir, OLD);
   write(dir, 'Trama/session.md', 'Not saved by a dry run.\n');
   const before = snapshot(dir);
 
-  const result = updateCampaign(dir, { dryRun: true });
+  const result = await updateCampaign(dir, { dryRun: true });
   assert.equal(result.status, 'would-update');
   assert.equal(result.from, OLD);
   assert.equal(result.restore_point, null);
-  assert.equal(result.world_migration, 'pending');
+  assert.equal(result.migrations['world-graph-v1'], 'pending');
   assert.ok(result.world_migration_files.includes('Seme del mondo.md'));
   assert.ok(result.rewritten.includes('CLAUDE.md'));
   assert.ok(result.rewritten.includes('.campaign/version.yaml'));
@@ -295,25 +309,25 @@ test('a dry run reports the plan and writes nothing at all', () => {
   assert.equal(fs.existsSync(path.join(dir, '.campaign/state')), false);
 });
 
-test('a folder that is not a git repository is refused', () => {
+test('a folder that is not a git repository is refused', async () => {
   const dir = tmp();
   write(dir, 'campaign.yaml', MINIMAL_CONFIG);
-  const result = updateCampaign(dir);
+  const result = await updateCampaign(dir);
   assert.equal(result.status, 'failed');
   assert.equal(result.errors[0].code, 'no-repo');
   assert.equal(result.restore_point, null);
   assert.equal(fs.existsSync(path.join(dir, '.git')), false);
 });
 
-test('a folder without campaign.yaml is refused', () => {
+test('a folder without campaign.yaml is refused', async () => {
   const dir = tmp();
   ensureRepo(dir);
-  const result = updateCampaign(dir);
+  const result = await updateCampaign(dir);
   assert.equal(result.status, 'failed');
   assert.equal(result.errors[0].code, 'missing-config');
 });
 
-test('an interrupted update is reported, not started again, and can be cancelled', () => {
+test('an interrupted update is reported, not started again, and can be cancelled', async () => {
   const dir = makeCampaign();
   setVersion(dir, OLD);
   const head = git(dir, 'rev-parse', '--short', 'HEAD');
@@ -322,7 +336,7 @@ test('an interrupted update is reported, not started again, and can be cancelled
     `status: in_progress\nfrom_version: "${OLD}"\nto_version: "${INSTALLED}"\nrestore_point: "${head}"\nstarted_on: 2026-11-09\n`,
   );
 
-  const blocked = updateCampaign(dir);
+  const blocked = await updateCampaign(dir);
   assert.equal(blocked.status, 'failed');
   assert.equal(blocked.errors[0].code, 'interrupted-update');
   assert.equal(blocked.restore_point, head);
@@ -340,7 +354,7 @@ test('an interrupted update is reported, not started again, and can be cancelled
   assert.equal(cancelInterruptedUpdate(dir).errors[0].code, 'no-interrupted-update');
 });
 
-test('resume finishes an interrupted update and keeps its restore point', () => {
+test('resume finishes an interrupted update and keeps its restore point', async () => {
   const dir = makeCampaign();
   setVersion(dir, OLD);
   const head = git(dir, 'rev-parse', '--short', 'HEAD');
@@ -348,20 +362,20 @@ test('resume finishes an interrupted update and keeps its restore point', () => 
     dir,
     `status: in_progress\nfrom_version: "${OLD}"\nto_version: "${INSTALLED}"\nrestore_point: "${head}"\nstarted_on: 2026-11-08\n`,
   );
-  const result = updateCampaign(dir, { resume: true, today: '2026-11-09' });
+  const result = await updateCampaign(dir, { resume: true, today: '2026-11-09' });
   assert.equal(result.status, 'updated');
   assert.equal(result.restore_point, head);
   assert.match(read(dir, '.campaign/version.yaml'), new RegExp(`framework_version: "${INSTALLED}"`));
   assert.match(read(dir, '.campaign/state/update.yaml'), /^status: completed$/m);
 });
 
-test('a generation error restores the campaign and marks the update cancelled', () => {
+test('a generation error restores the campaign and marks the update cancelled', async () => {
   const dir = makeCampaign();
   setVersion(dir, OLD);
   const versionText = read(dir, '.campaign/version.yaml');
   write(dir, 'campaign.yaml', 'campaign: [unclosed\n');
 
-  const result = updateCampaign(dir);
+  const result = await updateCampaign(dir);
   assert.equal(result.status, 'failed');
   assert.equal(result.errors[0].code, 'yaml-syntax');
   assert.ok(result.restore_point);
@@ -372,7 +386,7 @@ test('a generation error restores the campaign and marks the update cancelled', 
   assert.match(git(dir, 'show', 'HEAD:campaign.yaml'), /campaign: \[unclosed/);
 });
 
-test('postponeNotice writes the notice file with a one-day snooze by default', () => {
+test('postponeNotice writes the notice file with a one-day snooze by default', async () => {
   const dir = tmp();
   const result = postponeNotice(dir, { today: '2026-11-09' });
   assert.deepEqual(result, {
@@ -387,7 +401,7 @@ test('postponeNotice writes the notice file with a one-day snooze by default', (
   );
 });
 
-test('postponeNotice keeps an existing last_notified_version', () => {
+test('postponeNotice keeps an existing last_notified_version', async () => {
   const dir = tmp();
   write(dir, '.campaign/state/update-notice.yaml', 'last_notified_version: "0.0.9"\nlast_notified_on: 2026-11-01\nsnoozed_until: 2026-11-02\n');
   const result = postponeNotice(dir, { today: '2026-11-09', days: 3 });
@@ -396,15 +410,15 @@ test('postponeNotice keeps an existing last_notified_version', () => {
   assert.match(read(dir, '.campaign/state/update-notice.yaml'), /^last_notified_version: "0\.0\.9"$/m);
 });
 
-test('postponeNotice rolls the date over the end of a month and a year', () => {
+test('postponeNotice rolls the date over the end of a month and a year', async () => {
   const dir = tmp();
   assert.equal(postponeNotice(dir, { today: '2026-01-31' }).snoozed_until, '2026-02-01');
   assert.equal(postponeNotice(dir, { today: '2026-12-31' }).snoozed_until, '2027-01-01');
   assert.equal(postponeNotice(dir, { today: '2028-02-25', days: 7 }).snoozed_until, '2028-03-03');
 });
 
-test('the CLI prints one JSON document and ends with the exit line', () => {
-  const dir = makeCampaign();
+test('the CLI prints one JSON document and ends with the exit line', async () => {
+  const dir = makeCurrentCampaign();
   const run = spawnSync(process.execPath, [CLI, dir], { encoding: 'utf8' });
   assert.equal(run.status, 0);
   const lines = run.stdout.trimEnd().split('\n');
@@ -412,7 +426,7 @@ test('the CLI prints one JSON document and ends with the exit line', () => {
   assert.equal(JSON.parse(stripExitLine(run.stdout)).status, 'up-to-date');
 });
 
-test('the CLI exits 2 on a usage error and 1 on a known failure', () => {
+test('the CLI exits 2 on a usage error and 1 on a known failure', async () => {
   const usage = spawnSync(process.execPath, [CLI], { encoding: 'utf8' });
   assert.equal(usage.status, 2);
   assert.equal(usage.stdout.trimEnd().split('\n').pop(), 'exit: 2');
@@ -424,7 +438,7 @@ test('the CLI exits 2 on a usage error and 1 on a known failure', () => {
   assert.equal(JSON.parse(stripExitLine(failed.stdout)).errors[0].code, 'no-repo');
 });
 
-test('an old-layout campaign is migrated to the session folders in one saved version', () => {
+test('an old-layout campaign is migrated to the session folders in one saved version', async () => {
   const dir = makeCampaign();
   write(
     dir,
@@ -433,7 +447,7 @@ test('an old-layout campaign is migrated to the session folders in one saved ver
   );
   setVersion(dir, OLD);
 
-  const result = updateCampaign(dir, { today: '2026-11-09' });
+  const result = await updateCampaign(dir, { today: '2026-11-09' });
   assert.equal(result.status, 'updated');
   assert.deepEqual(result.migrated, ['Trama/Ombre/Sessione 1.md']);
   assert.deepEqual(result.errors, []);
@@ -450,31 +464,124 @@ test('an old-layout campaign is migrated to the session folders in one saved ver
   assert.equal(map.sessions[0].events.length, 2);
 });
 
-test('a pending world migration of an up-to-date campaign is finished on the next update', () => {
+test('a pending world migration of an up-to-date campaign is finished on the next update', async () => {
   const dir = makeCampaign();
-  write(dir, 'Trama/Sessione 1.md', '---\nid: sessione-1\n---\n\n# Sessione 1\n\nTesto.\n');
+  write(dir, 'Trama/Sessione 1/Eventi/Arrivo.md', '---\nid: arrivo\n---\n\nTesto.\n');
   saveVersion(dir, { message: 'Test: a place without kind', kind: 'manual' });
   writeState(dir, 'status: completed\nfrom_version: "0.0.1"\nto_version: "' + INSTALLED + '"\nrestore_point: "abc1234"\nworld_migration_id: "world-graph-v1"\nworld_migration: pending\n');
 
-  const result = updateCampaign(dir, { today: '2026-11-09' });
-  assert.equal(result.status, 'up-to-date');
-  assert.equal(result.world_migration, 'complete');
-  assert.deepEqual(result.world_migration_errors, []);
-  assert.match(read(dir, 'Trama/Sessione 1.md'), /^provenance: master$/m);
-  assert.match(read(dir, '.campaign/state/update.yaml'), /^world_migration: complete$/m);
-  assert.equal(listVersions(dir, { limit: 1 })[0].message, 'Aggiornamento del formato della campagna');
+  const result = await updateCampaign(dir, { today: '2026-11-09' });
+  // The world migration changes files: the full update runs (restore point, saved version).
+  assert.equal(result.status, 'updated');
+  assert.equal(result.migrations['world-graph-v1'], 'complete');
+  assert.deepEqual(result.errors, []);
+  assert.match(read(dir, 'Trama/Sessione 1/Eventi/Arrivo.md'), /^provenance: master$/m);
+  assert.match(read(dir, '.campaign/state/update.yaml'), /- id: "world-graph-v1"\n    status: complete/);
+  assert.doesNotMatch(read(dir, '.campaign/state/update.yaml'), /world_migration/);
+  assert.equal(listVersions(dir, { limit: 2 })[0].message, 'Aggiornamento del formato della campagna');
 });
 
-test('a world migration that cannot be applied restores the campaign to the restore point', () => {
+test('a world migration that cannot be applied restores the campaign to the restore point', async () => {
   const dir = makeCampaign();
   setVersion(dir, OLD);
   write(dir, 'Seme del mondo.md', '# Altro\n\nScritto dal master.\n');
   const campaignBefore = read(dir, 'campaign.yaml');
 
-  const result = updateCampaign(dir, { today: '2026-11-09' });
+  const result = await updateCampaign(dir, { today: '2026-11-09' });
   assert.equal(result.status, 'failed');
   assert.equal(result.errors[0].code, 'seed-exists');
   assert.equal(read(dir, 'Seme del mondo.md'), '# Altro\n\nScritto dal master.\n');
   assert.equal(read(dir, 'campaign.yaml'), campaignBefore);
   assert.match(read(dir, '.campaign/state/update.yaml'), /^status: cancelled$/m);
 });
+
+test('an update interrupted by the previous version resumes; its old keys name the migrations that are pending', async () => {
+  const dir = makeCampaign();
+  setVersion(dir, OLD);
+  const head = git(dir, 'rev-parse', '--short', 'HEAD');
+  writeState(
+    dir,
+    `status: in_progress\nfrom_version: "${OLD}"\nto_version: "${INSTALLED}"\nrestore_point: "${head}"\nstarted_on: 2026-11-08\nsheet_migration_id: "statistics-tables-v1"\nsheet_migration: pending\nworld_migration_id: "world-graph-v1"\nworld_migration: pending\n`,
+  );
+  const result = await updateCampaign(dir, { resume: true, today: '2026-11-09' });
+  assert.equal(result.status, 'updated');
+  assert.equal(result.restore_point, head);
+  assert.equal(result.migrations['statistics-tables-v1'], 'complete');
+  assert.equal(result.migrations['world-graph-v1'], 'complete');
+  const state = read(dir, '.campaign/state/update.yaml');
+  assert.match(state, /- id: "world-graph-v1"\n    status: complete/);
+  assert.doesNotMatch(state, /sheet_migration|world_migration/);
+});
+
+test('a campaign older than supported_from, or a broken registry, is refused before anything is written', async () => {
+  const dir = makeCampaign();
+  setVersion(dir, OLD);
+  const tooOld = tmp();
+  fs.cpSync(MIGRATIONS_DIR, tooOld, { recursive: true });
+  write(tooOld, 'registry.yaml', 'supported_from: "0.0.5"\n');
+  const before = snapshot(dir);
+  const refused = await updateCampaign(dir, { registryDir: tooOld });
+  assert.equal(refused.status, 'failed');
+  assert.equal(refused.errors[0].code, 'unsupported-version');
+  assert.match(refused.errors[0].message, /too old to be updated automatically/);
+  assert.deepEqual(snapshot(dir), before);
+
+  const broken = tmp();
+  fs.cpSync(MIGRATIONS_DIR, broken, { recursive: true });
+  write(broken, 'registry.yaml', 'supported_from: soon\n');
+  const invalid = await updateCampaign(dir, { registryDir: broken });
+  assert.equal(invalid.errors[0].code, 'registry-invalid');
+  assert.deepEqual(snapshot(dir), before);
+});
+
+test('a migration that is not pending cannot be completed, and an unknown id is refused', async () => {
+  const dir = makeCampaign();
+  const notPending = await completeMigration(dir, 'statistics-tables-v1');
+  assert.equal(notPending.status, 'failed');
+  assert.equal(notPending.errors[0].code, 'not-pending');
+  const unknown = await completeMigration(dir, 'no-such-migration');
+  assert.equal(unknown.status, 'failed');
+  assert.equal(unknown.errors[0].code, 'unknown-migration');
+});
+
+test('the CLI takes --complete with one migration id only', () => {
+  const dir = makeCampaign();
+  const missingId = spawnSync(process.execPath, [CLI, dir, '--complete'], { encoding: 'utf8' });
+  assert.equal(missingId.status, 2);
+  const mixed = spawnSync(process.execPath, [CLI, dir, '--complete', 'statistics-tables-v1', '--dry-run'], { encoding: 'utf8' });
+  assert.equal(mixed.status, 2);
+  const unknown = spawnSync(process.execPath, [CLI, dir, '--complete', 'no-such-migration'], { encoding: 'utf8' });
+  assert.equal(unknown.status, 1);
+  assert.equal(JSON.parse(stripExitLine(unknown.stdout)).errors[0].code, 'unknown-migration');
+});
+
+test('an up-to-date campaign with a file the migrations change goes through the full update and saves it', async () => {
+  const dir = makeCurrentCampaign();
+  write(dir, 'Trama/Ombre/Sessione 1.md', '---\nid: ombre-1\ndepends_on: []\nlocation: []\n---\n\n# Arrivo\n\nAl porto.\n');
+  saveVersion(dir, { message: 'Test: a session in the old layout', kind: 'manual' });
+  const result = await updateCampaign(dir, { today: '2026-11-09' });
+  assert.equal(result.status, 'updated');
+  assert.deepEqual(result.migrated, ['Trama/Ombre/Sessione 1.md']);
+  assert.ok(result.restore_point, 'the update has a restore point');
+  const versions = listVersions(dir, { limit: 100 });
+  assert.ok(versions.some((entry) => entry.message === `Updated Yllir to ${INSTALLED}` && entry.kind === 'framework'));
+  assert.equal(git(dir, 'status', '--porcelain', '--untracked-files=all'), '');
+});
+
+test('a campaign at 0.30.x with the generated AGENTS.md gets it removed by the world migration', async () => {
+  const dir = makeCurrentCampaign();
+  write(
+    dir,
+    'AGENTS.md',
+    '<!-- Generated by Yllir. Do not edit: changes are lost. Your own rules go in .campaign/customizations.md -->\n' +
+      'Before doing anything, read `.campaign/instructions/agent.md` and `.campaign/customizations.md` and follow them.\n',
+  );
+  saveVersion(dir, { message: 'Test: the generated AGENTS.md of 0.30', kind: 'framework' });
+  setVersion(dir, '0.30.1');
+  const result = await updateCampaign(dir, { today: '2026-11-09' });
+  assert.equal(result.status, 'updated');
+  assert.equal(result.migrations['world-graph-v1'], 'complete');
+  assert.equal(fs.existsSync(path.join(dir, 'AGENTS.md')), false);
+  assert.deepEqual(result.errors, []);
+});
+

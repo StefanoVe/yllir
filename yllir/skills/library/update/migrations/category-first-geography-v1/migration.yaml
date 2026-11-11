@@ -1,0 +1,7 @@
+id: category-first-geography-v1
+after: [session-layout-v1]
+introduced_in: 0.26.0
+needed: detect
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs

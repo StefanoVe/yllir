@@ -1,0 +1,5 @@
+# The migration registry of the update skill. Each migration is one folder here,
+# named by its id, with migration.yaml. The runner is scripts/lib/registry.mjs.
+# supported_from: a campaign made with an older framework version is refused with
+# the code unsupported-version. The author decides when this is raised.
+supported_from: "0.0.0"

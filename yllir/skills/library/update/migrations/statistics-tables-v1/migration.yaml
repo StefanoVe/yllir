@@ -1,0 +1,7 @@
+id: statistics-tables-v1
+after: [item-descriptions-v1]
+introduced_in: 0.20.0
+needed: detect
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs

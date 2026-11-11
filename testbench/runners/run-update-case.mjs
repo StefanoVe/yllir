@@ -600,16 +600,25 @@ function checkLegacyLayout(dir, layout) {
 export function withIsolatedGit(fn) {
   const names = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM'];
   const saved = names.map((name) => [name, process.env[name]]);
-  process.env.GIT_CONFIG_GLOBAL = '/dev/null';
-  process.env.GIT_CONFIG_NOSYSTEM = '1';
-  try {
-    return fn();
-  } finally {
+  const restore = () => {
     for (const [name, value] of saved) {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     }
+  };
+  process.env.GIT_CONFIG_GLOBAL = '/dev/null';
+  process.env.GIT_CONFIG_NOSYSTEM = '1';
+  let result;
+  try {
+    result = fn();
+  } catch (err) {
+    restore();
+    throw err;
   }
+  // A promise (the update is asynchronous) keeps the isolation until it settles.
+  if (result && typeof result.then === 'function') return result.finally(restore);
+  restore();
+  return result;
 }
 
 function readInstalledVersion() {
