@@ -44,7 +44,7 @@ import {
   runAgent,
 } from './lib/case-common.mjs';
 import { generateInstructions } from '../../yllir/scripts/lib/instructions.mjs';
-import { ensureRepo, saveManualChanges, saveVersion, status } from '../../yllir/scripts/lib/versions.mjs';
+import { ensureRepo, listVersions, saveManualChanges, saveVersion, status } from '../../yllir/scripts/lib/versions.mjs';
 import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
 import { parseYamlLite } from '../../yllir/scripts/lib/yaml-lite.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
@@ -58,8 +58,6 @@ const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle-legacy',
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
 const PLUGIN_JSON = path.join(REPO_ROOT, 'yllir', '.claude-plugin', 'plugin.json');
 const VERSION_PATH = '.campaign/version.yaml';
-/** Subject of the version saved by the world-graph-v1 migration, in each language. */
-const FORMAT_MESSAGES = ['Aggiornamento del formato della campagna', 'Campaign format update'];
 const AGENT_PATH = '.campaign/instructions/agent.md';
 const CUSTOMIZATIONS_PATH = '.campaign/customizations.md';
 const UPDATE_PATH = '.campaign/state/update.yaml';
@@ -85,6 +83,8 @@ const REWOUND = ['stale-campaign', 'legacy-sessions'];
 const TRAMA = 'Trama';
 const EVENT_FOLDER = 'Eventi';
 const EVENT_LINK = /\]\(([^)\s]+)\)/;
+const UPDATE_SUBJECT = /^Updated Yllir to \S+/;
+const ADDED_EVENT_KEYS = /^(provenance|kind):/;
 const EXTRA_TECHNICAL_WORDS = ['framework', 'hash', 'fingerprint'];
 const ACK_WORDS = ['domani', 'ricord', 'va bene', "d'accordo", 'nessun problema', 'certo', 'perfetto'];
 const VERSION_RE = /\b\d+\.\d+\.\d+\b/g;
@@ -267,14 +267,27 @@ export function gradeStale({ dir, setup, report }) {
   const s3 = [];
   if (readText(dir, CUSTOMIZATIONS_PATH) !== setup.customizationsText) s3.push('customizations.md changed');
 
+  // Every version saved after the setup is a framework version (the update and the migrations it runs),
+  // at least one of them is the update itself, and none is a manual one.
   const s4 = [];
   const count = commitCount(dir);
-  // The update saves its own version; the world-graph-v1 migration saves one more only when it changed a document.
   const saved = count - setup.commits;
-  const recent = (tryGit(dir, ['log', '-n', '2', '--format=%s']) ?? '').split('\n');
-  const formatSaved = recent.some((subject) => FORMAT_MESSAGES.includes(subject));
-  const ok = saved === 1 || (saved === 2 && formatSaved);
-  if (!ok) s4.push(`commit count is ${Number.isNaN(count) ? 'unknown' : count} (want ${setup.commits + 1}, or ${setup.commits + 2} with the format version)`);
+  if (Number.isNaN(count) || saved < 1) {
+    s4.push(`no version saved after the setup (commit count ${Number.isNaN(count) ? 'unknown' : count}, setup ${setup.commits})`);
+  } else {
+    let versions = [];
+    try {
+      versions = listVersions(dir, { limit: saved });
+    } catch (err) {
+      s4.push(`listVersions: ${err.message}`);
+    }
+    for (const version of versions) {
+      if (version.kind !== 'framework') s4.push(`version "${version.message}" is ${version.kind}, want framework`);
+    }
+    if (versions.length > 0 && !versions.some((version) => UPDATE_SUBJECT.test(version.message))) {
+      s4.push('no version says «Updated Yllir to …»');
+    }
+  }
   s4.push(...dirtyReasons(dir));
 
   const s5 = [];
@@ -359,6 +372,19 @@ const mainPath = (session) => `${TRAMA}/${session}/${session}.md`;
 /** Campaign-relative path of the file of one event of a session. */
 const eventPath = (session, title) => `${TRAMA}/${session}/${EVENT_FOLDER}/${eventFileName(title)}.md`;
 
+/** Lines of the frontmatter of a Markdown text, without the --- lines; [] when there is none. */
+function frontmatterLines(text) {
+  const lines = text.split('\n');
+  if (lines[0] !== '---') return [];
+  const close = lines.indexOf('---', 1);
+  return close < 0 ? [] : lines.slice(1, close);
+}
+
+/** The text with every [text](target) replaced by text, trimmed. */
+function withoutLinks(text) {
+  return text.replace(MARKDOWN_LINK, (whole, label) => label).trim();
+}
+
 /** Legacy layout checks L1 to L4 on top of the stale-campaign checks S1 to S6. */
 export function gradeLegacy({ dir, setup, report }) {
   const stale = gradeStale({ dir, setup, report });
@@ -391,12 +417,15 @@ export function gradeLegacy({ dir, setup, report }) {
   }
 
   // A missing event file is reported by L1 only.
+  // The engine adds Markdown links and the world migration adds provenance and kind lines.
   const l3 = [];
   for (const [session, scenes] of sessions) {
     for (const scene of scenes) {
       const text = readText(dir, eventPath(session, scene.title));
       if (text === null) continue;
-      if (parseFrontmatter(text).body.trim() !== scene.body) l3.push(`${scene.title}: text changed`);
+      if (withoutLinks(parseFrontmatter(text).body) !== withoutLinks(scene.body)) l3.push(`${scene.title}: text changed`);
+      const kept = frontmatterLines(text).filter((line) => !ADDED_EVENT_KEYS.test(line));
+      if (kept.join('\n') !== (scene.frontmatter ?? []).join('\n')) l3.push(`${scene.title}: frontmatter changed`);
     }
   }
 
@@ -531,7 +560,7 @@ export function toLegacyLayout(dir) {
 
     const scenes = eventNamesOf(body).map((name) => {
       const text = fs.readFileSync(path.join(dir, TRAMA, session, EVENT_FOLDER, `${name}.md`), 'utf8');
-      return { title: name, body: parseFrontmatter(text).body.trim() };
+      return { title: name, body: parseFrontmatter(text).body.trim(), frontmatter: frontmatterLines(text) };
     });
     const blocks = scenes.map((scene) => {
       const eventDir = `${TRAMA}/${session}/${EVENT_FOLDER}`;

@@ -3,7 +3,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { checkFingerprints, generateInstructions, renderTemplate } from './instructions.mjs';
+import {
+  allowedToolsOf,
+  checkFingerprints,
+  generateInstructions,
+  projectAllowRules,
+  projectSettingsText,
+  renderTemplate,
+  skillFiles,
+} from './instructions.mjs';
 import { parseYamlLite } from './yaml-lite.mjs';
 
 const REPO = path.resolve(import.meta.dirname, '../../..');
@@ -50,6 +58,65 @@ function campaignWith(configText, language = null) {
 function frameworkVersion() {
   return JSON.parse(fs.readFileSync(PLUGIN_JSON, 'utf8')).version;
 }
+
+describe('project allow rules', () => {
+  const SKILLS = path.join(REPO, 'yllir/skills');
+
+  test('the real skills give one rule per plugin script, the update command, and the fixed rules', () => {
+    const allow = projectAllowRules();
+    assert.deepEqual(allow, [...new Set(allow)].sort(), 'sorted and unique');
+    for (const rule of ['Skill(yllir:*)', 'Edit(.campaign/state/**)', 'Edit(.campaign/drafts/**)', 'Bash(claude plugin update *)']) {
+      assert.ok(allow.includes(rule), rule);
+    }
+    assert.ok(allow.includes('Bash(node "*/scripts/engine.mjs" *)'));
+    assert.ok(allow.includes('Bash(node "*/skills/core/update/scripts/item-descriptions.mjs" *)'));
+    assert.ok(allow.includes('Bash(node "*/skills/core/update/scripts/post-update.mjs" *)'));
+    assert.ok(allow.includes('Bash(node "*/skills/library/document-ingest/scripts/ingest-check.mjs" *)'));
+    assert.ok(!allow.some((rule) => rule.includes('CLAUDE_PLUGIN_ROOT')), 'no unexpanded variable');
+    assert.ok(!allow.some((rule) => /Bash\(node \*\//.test(rule)), 'unrooted forms are not repeated');
+  });
+
+  test('every node script that a skill allows is covered by a rule', () => {
+    const allow = new Set(projectAllowRules());
+    for (const file of skillFiles(SKILLS)) {
+      const allowed = allowedToolsOf(fs.readFileSync(file, 'utf8')) ?? '';
+      for (const match of allowed.matchAll(/Bash\(node "\$\{CLAUDE_PLUGIN_ROOT\}\/([^"]+)" \*\)/g)) {
+        assert.ok(allow.has(`Bash(node "*/${match[1]}" *)`), `${path.relative(REPO, file)}: ${match[1]}`);
+      }
+    }
+  });
+
+  test('reads the allowed-tools line of a skill and returns null without one', () => {
+    assert.equal(
+      allowedToolsOf('---\nname: x\nallowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/a.mjs" *), Read\n---\nBody\n'),
+      'Bash(node "${CLAUDE_PLUGIN_ROOT}/a.mjs" *), Read',
+    );
+    assert.equal(allowedToolsOf('---\nname: x\n---\nallowed-tools: Read\n'), null);
+    assert.equal(allowedToolsOf('no frontmatter\n'), null);
+  });
+
+  test('builds the rules from a small skills folder: rooted scripts, the update command, duplicates and unrooted forms', () => {
+    const dir = tempDir();
+    fs.mkdirSync(path.join(dir, 'a'), { recursive: true });
+    fs.mkdirSync(path.join(dir, 'b'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'a/SKILL.md'),
+      '---\nname: a\nallowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/x.mjs" *), Bash(node */scripts/x.mjs *), Bash(claude plugin update *), Read\n---\n',
+    );
+    fs.writeFileSync(
+      path.join(dir, 'b/SKILL.md'),
+      '---\nname: b\nallowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/x.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/b/y.mjs" *)\n---\n',
+    );
+    assert.deepEqual(projectAllowRules(dir), [
+      'Bash(claude plugin update *)',
+      'Bash(node "*/b/y.mjs" *)',
+      'Bash(node "*/scripts/x.mjs" *)',
+      'Edit(.campaign/drafts/**)',
+      'Edit(.campaign/state/**)',
+      'Skill(yllir:*)',
+    ]);
+  });
+});
 
 describe('renderTemplate', () => {
   test('replaces a placeholder with the value at its path', () => {
@@ -180,25 +247,16 @@ describe('generateInstructions', () => {
     assert.equal(fs.readFileSync(path.join(root, '.campaign/customizations.md'), 'utf8'), '# Your rules\n');
   });
 
-  test('writes .claude/settings.json with exactly the project permissions', () => {
+  test('writes .claude/settings.json with the rules generated from the skills', () => {
     const root = campaignWith(MINIMAL_CONFIG);
     generateInstructions(root);
     assert.equal(
       fs.readFileSync(path.join(root, '.claude/settings.json'), 'utf8'),
-      [
-        '{',
-        '  "permissions": {',
-        '    "allow": [',
-        '      "Skill(yllir:*)",',
-        '      "Edit(.campaign/state/**)",',
-        '      "Edit(.campaign/drafts/**)",',
-        '      "Bash(node \\"*/scripts/engine.mjs\\" *)"',
-        '    ]',
-        '  }',
-        '}',
-        '',
-      ].join('\n'),
+      projectSettingsText(),
     );
+    const allow = JSON.parse(fs.readFileSync(path.join(root, '.claude/settings.json'), 'utf8')).permissions.allow;
+    assert.deepEqual(Object.keys(JSON.parse(fs.readFileSync(path.join(root, '.claude/settings.json'), 'utf8'))), ['permissions']);
+    assert.deepEqual(allow, projectAllowRules());
   });
 
   test('never reads or writes .claude/settings.local.json', () => {

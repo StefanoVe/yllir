@@ -73,11 +73,16 @@ function makeRepo(files) {
   return dir;
 }
 
-/** Adds one commit that changes a note file, so the folder has one more commit. */
-function addCommit(dir) {
+/**
+ * Adds one commit that changes a note file, so the folder has one more commit. With a kind, the commit
+ * is a saved version with that Yllir-Kind trailer, as saveVersion writes it.
+ */
+function addCommit(dir, { subject = 'two', kind = null } = {}) {
   fs.writeFileSync(path.join(dir, 'nota.md'), `nota ${Math.random()}\n`);
   git(dir, ['add', '-A']);
-  git(dir, ['commit', '-qm', 'two']);
+  const args = ['commit', '-qm', subject];
+  if (kind !== null) args.push('-m', `Yllir-Kind: ${kind}`);
+  git(dir, args);
 }
 
 /** The failing check ids of a list of [id, ok, reasons] tuples. */
@@ -98,7 +103,7 @@ const STALE_FILES = () => ({
 /** A stale-campaign folder: framework 0.1.0 after the update, one commit more than the setup. */
 function staleFolder({ files = STALE_FILES(), addSecond = true } = {}) {
   const dir = makeRepo(files);
-  if (addSecond) addCommit(dir);
+  if (addSecond) addCommit(dir, { subject: 'Updated Yllir to 0.1.0', kind: 'framework' });
   return dir;
 }
 
@@ -350,6 +355,33 @@ test('gradeLegacy fails L1 when an event file is missing', () => {
   }
 });
 
+test('gradeLegacy accepts the added links and provenance and kind lines (L3)', () => {
+  const { tmp, dir, setup } = migratedFolder();
+  try {
+    const file = path.join(dir, 'Trama', 'Sessione 2', 'Eventi', 'Verso il pozzo.md');
+    const text = fs.readFileSync(file, 'utf8');
+    assert.ok(text.includes('provenance: master'), 'the migration adds provenance');
+    const linked = text.replace('Il sentiero si divide', 'Il sentiero [si divide](../../../Luoghi/Pozzo.md)');
+    fs.writeFileSync(file, linked.replace('\n---\n', '\nkind: event\n---\n'));
+    const results = gradeLegacy({ dir, setup, report: LEGACY_REPORT });
+    assert.deepEqual(results.find(([id]) => id === 'L3')[2], [], JSON.stringify(results));
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('gradeLegacy fails L3 when a frontmatter line other than provenance or kind changes', () => {
+  const { tmp, dir, setup } = migratedFolder();
+  try {
+    const file = path.join(dir, 'Trama', 'Sessione 2', 'Eventi', 'Verso il pozzo.md');
+    fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('depends_on: []', 'depends_on: [altro]'));
+    const results = gradeLegacy({ dir, setup, report: LEGACY_REPORT });
+    assert.deepEqual(results.find(([id]) => id === 'L3')[2], ['Verso il pozzo: frontmatter changed']);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
 test('gradeLegacy fails L3 when a scene text is altered', () => {
   const { tmp, dir, setup } = migratedFolder();
   try {
@@ -393,6 +425,37 @@ test('gradeStale fails each check that the update broke', () => {
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  }
+});
+
+test('gradeStale accepts the format version and the update version, both framework (S4)', () => {
+  const dir = staleFolder({ addSecond: false });
+  addCommit(dir, { subject: 'Campaign format update', kind: 'framework' });
+  addCommit(dir, { subject: 'Updated Yllir to 0.1.0', kind: 'framework' });
+  try {
+    const results = gradeStale({ dir, setup: STALE_SETUP, report: 'Ciao!' });
+    assert.deepEqual(failing(results), [], JSON.stringify(results));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('gradeStale fails S4 when a manual version follows the setup, or no version is the update', () => {
+  const manual = staleFolder({ addSecond: false });
+  addCommit(manual, { subject: 'Updated Yllir to 0.1.0', kind: 'framework' });
+  addCommit(manual, { subject: 'Modifiche a mano', kind: 'manual' });
+  const noUpdate = staleFolder({ addSecond: false });
+  addCommit(noUpdate, { subject: 'Campaign format update', kind: 'framework' });
+  try {
+    const first = gradeStale({ dir: manual, setup: STALE_SETUP, report: 'Ciao!' });
+    assert.ok(failing(first).includes('S4'), JSON.stringify(first));
+    assert.ok(first.find(([id]) => id === 'S4')[2].some((reason) => reason.includes('is manual')));
+    const second = gradeStale({ dir: noUpdate, setup: STALE_SETUP, report: 'Ciao!' });
+    assert.ok(failing(second).includes('S4'), JSON.stringify(second));
+    assert.ok(second.find(([id]) => id === 'S4')[2].some((reason) => reason.includes('Updated Yllir')));
+  } finally {
+    fs.rmSync(manual, { recursive: true, force: true });
+    fs.rmSync(noUpdate, { recursive: true, force: true });
   }
 });
 
