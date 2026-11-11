@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   buildSubjectIndex,
+  canonicalInternalPath,
   compareStrings,
   masterOnlyChecker,
   readStructure,
@@ -56,12 +57,13 @@ export function planFromScan(campaignRoot, { index, scan }, { files = null, subj
   } else {
     const validFiles = new Set();
     if (files !== null) {
-      for (const file of new Set(files)) {
+      for (const rawFile of new Set(files)) {
+        const file = canonicalInternalPath(campaignRoot, rawFile);
         if (scanned.has(file)) {
           scope.add(file);
           validFiles.add(file);
         } else {
-          errors.push({ file, message: 'file not in scan' });
+          errors.push({ file: rawFile, message: 'file not in scan' });
         }
       }
     }

@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   cancelInterruptedUpdate,
+  completeGeographicMigration,
   postponeNotice,
   updateCampaign,
 } from './update-campaign.mjs';
@@ -38,6 +39,10 @@ structure:
     folder: Trama
     type: plot
 `;
+const GEOGRAPHIC_CONFIG = MINIMAL_CONFIG.replace(
+  'type: plot',
+  'type: plot\n  - id: places\n    folder: Places\n    type: places\n  - id: subjects\n    folder: Subjects\n    type: subjects',
+);
 
 const tempDirs = [];
 after(() => {
@@ -67,10 +72,10 @@ function read(dir, file) {
 }
 
 // A campaign made by the framework and saved as one version (the tree is clean).
-function makeCampaign() {
+function makeCampaign(config = MINIMAL_CONFIG) {
   const dir = tmp();
   ensureRepo(dir);
-  write(dir, 'campaign.yaml', MINIMAL_CONFIG);
+  write(dir, 'campaign.yaml', config);
   generateInstructions(dir);
   saveVersion(dir, { message: 'Campaign created.', kind: 'framework' });
   return dir;
@@ -124,6 +129,54 @@ test('an up-to-date campaign is reported and nothing is written', () => {
   assert.equal(git(dir, 'rev-parse', 'HEAD'), head);
   assert.equal(listVersions(dir, { limit: 100 }).length, count);
   assert.equal(fs.existsSync(path.join(dir, '.campaign/state/update.yaml')), false);
+});
+
+test('an aligned campaign records pending geography without moving files', () => {
+  const dir = makeCampaign(GEOGRAPHIC_CONFIG);
+  write(dir, 'Subjects/Guardia.md', '---\nid: guardia\n---\n\n# Guardia\n');
+  saveVersion(dir, { message: 'Added a subject', kind: 'manual' });
+
+  const result = updateCampaign(dir);
+  assert.equal(result.status, 'up-to-date');
+  assert.equal(result.geography_migration, 'pending');
+  assert.deepEqual(result.geography_migration_errors, []);
+  assert.equal(fs.existsSync(path.join(dir, 'Subjects/Guardia.md')), true);
+  assert.equal(fs.existsSync(path.join(dir, 'Subjects/Da collocare/Guardia.md')), false);
+  assert.match(read(dir, '.campaign/state/update.yaml'), /^geography_migration_id: "category-first-geography-v1"$/m);
+  assert.match(read(dir, '.campaign/state/update.yaml'), /^geography_migration: pending$/m);
+});
+
+test('a dry-run reports pending geography without writing its marker', () => {
+  const dir = makeCampaign(GEOGRAPHIC_CONFIG);
+  write(dir, 'Subjects/Guardia.md', '---\nid: guardia\n---\n\n# Guardia\n');
+  saveVersion(dir, { message: 'Added a subject', kind: 'manual' });
+  const before = snapshot(dir);
+
+  const result = updateCampaign(dir, { dryRun: true });
+  assert.equal(result.status, 'up-to-date');
+  assert.equal(result.geography_migration, 'pending');
+  assert.deepEqual(snapshot(dir), before);
+});
+
+test('geography completion refuses pending work and preserves other update markers', () => {
+  const dir = makeCampaign(GEOGRAPHIC_CONFIG);
+  write(dir, 'Subjects/Guardia.md', '---\nid: guardia\n---\n\n# Guardia\n');
+  saveVersion(dir, { message: 'Added a subject', kind: 'manual' });
+  assert.equal(updateCampaign(dir).geography_migration, 'pending');
+  const savedBefore = read(dir, '.campaign/state/update.yaml');
+
+  const blocked = completeGeographicMigration(dir);
+  assert.equal(blocked.status, 'failed');
+  assert.equal(blocked.errors[0].code, 'geography-migration-incomplete');
+
+  fs.mkdirSync(path.join(dir, 'Subjects/Da collocare'), { recursive: true });
+  fs.renameSync(path.join(dir, 'Subjects/Guardia.md'), path.join(dir, 'Subjects/Da collocare/Guardia.md'));
+  const completed = completeGeographicMigration(dir);
+  assert.equal(completed.status, 'complete');
+  assert.match(read(dir, '.campaign/state/update.yaml'), /^geography_migration: complete$/m);
+  // Completion changes only the geography status; every other saved marker stays as it was.
+  const withoutGeography = (text) => text.split('\n').filter((line) => !line.startsWith('geography_migration:'));
+  assert.deepEqual(withoutGeography(read(dir, '.campaign/state/update.yaml')), withoutGeography(savedBefore));
 });
 
 test('a dry-run never clears a stale pending sheet-migration marker', () => {

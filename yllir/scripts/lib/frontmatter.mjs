@@ -1,6 +1,8 @@
 // Minimal parser for the YAML-like frontmatter used in Yllir Markdown files.
-// Supports only `key: value` scalars and flow lists `[a, b]`; everything else
-// is reported as an error. Values are always strings.
+// Supports `key: value` scalars and flow lists `[a, b]`, plus block YAML for
+// the structured `appearances` field. Other keys retain string semantics.
+
+import { parseYamlLite } from './yaml-lite.mjs';
 
 const KEY_LINE = /^([a-z][a-z0-9_]*):(?: (.*)|)$/;
 
@@ -91,8 +93,22 @@ export function parseFrontmatter(text) {
 
   const data = {};
   const errors = [];
+  const appearanceStart = lines.findIndex((line, i) => i > 0 && i < close && /^appearances:\s*$/.test(line));
+  let appearanceEnd = -1;
+  if (appearanceStart >= 0) {
+    appearanceEnd = appearanceStart + 1;
+    while (appearanceEnd < close && (/^\s/.test(lines[appearanceEnd]) || /^ *$/.test(lines[appearanceEnd]) || /^ *#/.test(lines[appearanceEnd]))) appearanceEnd++;
+    const block = ['appearances:', ...lines.slice(appearanceStart + 1, appearanceEnd)].join('\n');
+    const parsed = parseYamlLite(block);
+    if (parsed.errors.length) {
+      errors.push({ line: appearanceStart + parsed.errors[0].line, message: parsed.errors[0].message });
+    } else {
+      data.appearances = parsed.data.appearances;
+    }
+  }
 
   for (let i = 1; i < close; i++) {
+    if (appearanceStart >= 0 && i >= appearanceStart && i < appearanceEnd) continue;
     const line = lines[i];
     const lineNo = i + 1;
 

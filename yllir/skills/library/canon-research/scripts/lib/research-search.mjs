@@ -11,7 +11,7 @@ import {
   buildSubjectIndex,
   compareStrings,
   listExternalSheets,
-  listSheets,
+  listCanonicalSheets,
   masterOnlyChecker,
   readStructure,
 } from '../../../../../scripts/lib/subjects.mjs';
@@ -183,7 +183,7 @@ export function searchCampaign(campaignRoot, terms) {
       }
       continue;
     }
-    for (const file of listSheets(campaignRoot, category.folder)) {
+    for (const file of (category.type === 'external' ? listExternalSheets(campaignRoot, category.folder, category.exclude) : listCanonicalSheets(campaignRoot, category.folder))) {
       if (file.startsWith('.campaign/')) continue;
       if (!categoryByFile.has(file)) categoryByFile.set(file, categoryOf(structure, file));
     }

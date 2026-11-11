@@ -11,14 +11,15 @@
 import path from 'node:path';
 import {
   cancelInterruptedUpdate,
+  completeGeographicMigration,
   postponeNotice,
   updateCampaign,
 } from './lib/update-campaign.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE =
-  'usage: node update-campaign.mjs <campaignRoot> [--dry-run] [--resume] [--cancel] [--postpone]';
-const FLAGS = ['--dry-run', '--resume', '--cancel', '--postpone'];
+  'usage: node update-campaign.mjs <campaignRoot> [--dry-run] [--resume] [--cancel] [--postpone] [--complete-geography]';
+const FLAGS = ['--dry-run', '--resume', '--cancel', '--postpone', '--complete-geography'];
 
 function parseArgs(argv) {
   const flags = new Set();
@@ -37,7 +38,7 @@ function parseArgs(argv) {
   }
   if (root === null) return null;
   // --cancel and --postpone each stand alone.
-  if ((flags.has('--cancel') || flags.has('--postpone')) && flags.size > 1) return null;
+  if ((flags.has('--cancel') || flags.has('--postpone') || flags.has('--complete-geography')) && flags.size > 1) return null;
   return { root, flags };
 }
 
@@ -49,6 +50,8 @@ function main() {
   let result;
   if (args.flags.has('--postpone')) {
     result = postponeNotice(campaignRoot);
+  } else if (args.flags.has('--complete-geography')) {
+    result = completeGeographicMigration(campaignRoot);
   } else if (args.flags.has('--cancel')) {
     result = cancelInterruptedUpdate(campaignRoot);
   } else {

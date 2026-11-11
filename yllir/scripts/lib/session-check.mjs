@@ -12,6 +12,8 @@ import { listVersions, status } from './versions.mjs';
 import { parseYamlLite } from './yaml-lite.mjs';
 import { activeTopic, listTopics } from './topics.mjs';
 import { checkUpdate, formatUpdateNotice } from './update-check.mjs';
+import { listSheets, readStructure } from './subjects.mjs';
+import { parseFrontmatter } from './frontmatter.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
 const VERSION_PATH = '.campaign/version.yaml';
@@ -266,11 +268,38 @@ function readCampaignVersion(dir) {
 
 /** Pending post-update sheet conversion, read without changing campaign state. */
 function readPostUpdate(dir) {
+  const itemText = readTextOrNull(path.join(dir, '.campaign/state/update/item-descriptions.json'));
+  if (itemText === null && hasItemSheets(dir) && isAtLeast(readFrameworkVersion(), '0.26.0')) return 'needed';
+  if (itemText !== null) {
+    try {
+      const inventory = JSON.parse(itemText);
+      if (inventory.migration_id !== 'item-descriptions-v1' || !Array.isArray(inventory.items)) return 'needed';
+      if (inventory.items.some((item) => !item || typeof item.file !== 'string' || item.status !== 'complete')) return 'needed';
+    } catch { return 'needed'; }
+  }
   const text = readTextOrNull(path.join(dir, UPDATE_STATE_PATH));
   if (text === null) return null;
   const parsed = parseYamlLite(text);
   if (parsed.errors.length > 0 || parsed.data === null || typeof parsed.data !== 'object') return null;
-  return parsed.data.sheet_migration === 'pending' ? 'needed' : null;
+  return parsed.data.sheet_migration === 'pending' || parsed.data.geography_migration === 'pending' ? 'needed' : null;
+}
+
+function hasItemSheets(dir) {
+  const { structure } = readStructure(dir);
+  if (!structure) return false;
+  for (const category of structure.filter((entry) => entry.type === 'objects' && typeof entry.folder === 'string')) {
+    for (const file of listSheets(dir, category.folder)) {
+      try { if (parseFrontmatter(fs.readFileSync(path.join(dir, file), 'utf8')).data?.template === 'item') return true; }
+      catch { return true; }
+    }
+  }
+  return false;
+}
+
+function isAtLeast(version, minimum) {
+  const parse = (value) => /^\d+\.\d+\.\d+$/.test(value ?? '') ? value.split('.').map(Number) : null;
+  const a = parse(version), b = parse(minimum);
+  return Boolean(a && b && (a[0] > b[0] || (a[0] === b[0] && (a[1] > b[1] || (a[1] === b[1] && a[2] >= b[2])))));
 }
 
 function readFrameworkVersion() {

@@ -152,6 +152,8 @@ Rules for the draft:
   8. Whatever the master or a document states still wins and is copied as is. Invention only fills what is missing.
 - Every named character who acts or speaks in a scene is listed in that scene's `characters`, and has a sheet: an existing subject, or one of NEW_CHARACTERS or KNOWN_NEW. The `characters` list may hold ids of sheets of any kind: npc, vendor, enemy or creature.
 - List an item id in optional `items: [id]` metadata when the scene uses a significant item with a sheet. This is derived metadata, not a chronology or item state record.
+- Add `appearances: [{subject: ID, location: [PLACE_IDS]}]` only when the scene text explicitly establishes that subject's presence in those places. Do not infer presence from `characters`, `items`, names, links or mentions. This metadata feeds the reviewed geographic layout; it does not change a subject's current `location`.
+- Draft paths for new sheets are provisional. The write sequence determines their canonical category-first geographic paths from `location` and explicit scene appearances; use its returned paths after it applies the layout.
 - A scene text names the character and says what they do. It never states or changes who the character is (role, looks, personality, motives, secrets): such facts live only in the sheet.
 - A scene may make a character do things the sheet does not mention, but never against what the sheet says. If the only way to write an event is to contradict the sheet, write the scene without that action, and say so in the final message (step 9).
 - A name from MISSING_OTHER appears as plain text, with a note in a ``` block saying that its document does not exist yet.

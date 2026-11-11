@@ -36,6 +36,7 @@ Sono ammessi solo i campi della tabella. Ogni altro campo è un errore: un campo
 | `depends_on` | sessioni e attività di trama | lista di `id` di sessioni o attività; `[]` se non ne ha | prerequisiti (vedi sezione 2) |
 | `characters` | facoltativo, nei file evento di trama | lista di `id` di schede di personaggio; `[]` o assente se l'evento non nomina personaggi | i personaggi che l'evento nomina e fa agire o parlare; **Proposta** |
 | `items` | facoltativo, nei file evento di trama (**Deciso, 2026-11-10**) | lista senza duplicati di `id` di schede oggetto; `[]` o assente se l'evento non nomina oggetti rilevanti | gli ID sono validati meccanicamente; oggetti con scheda coinvolti nell'evento; i candidati nel testo omessi dal campo richiedono giudizio dell'agente |
+| `appearances` | facoltativo, nei file evento di trama (**Deciso, 2026-11-10**) | lista di `{subject: ID, location: [PLACE_IDS]}` | presenza esplicita di un soggetto nella scena e nei luoghi dichiarati; non si deduce da `characters`, `items` o menzioni |
 | `print` | oggetti con carta | `to-print`, `printed` o `reprint` | stato fisico della carta; è l'unico posto in cui sta |
 | `template` | categorie con più modelli: Personaggi (`npc`, `vendor`), Creature (`enemy`, `creature`), Oggetti (`item`, `notice`) | uno dei valori indicati | modello della scheda, da cui il validatore ricava le sezioni obbligatorie |
 | `aliases` | facoltativo, per ogni scheda | lista di nomi alternativi | forme alternative del nome; fonte unica per l'indice dei soggetti |
@@ -48,6 +49,7 @@ Sono ammessi solo i campi della tabella. Ogni altro campo è un errore: un campo
 - Le chiavi sono in minuscolo, con il trattino basso dove serve. Le liste sono in forma `[a, b]`.
 - Un `id` è uno slug: solo minuscole, cifre e trattini. Si assegna alla creazione e non cambia mai, neppure quando il titolo cambia.
 - I riferimenti (`location`, `depends_on`, `characters`) puntano sempre a `id`, mai a nomi di file o a link. Così una rinomina non rompe nulla.
+- `appearances[].subject` e `appearances[].location` puntano sempre agli `id` delle schede del soggetto e dei luoghi.
 - Il nome del soggetto, il tipo e la categoria non si ripetono nei metadati.
 - I metadati non contengono nulla di riservato: sono dati di sistema, non contenuto.
 
@@ -135,6 +137,12 @@ _La nebbia sale dal molo prima dell'alba e si impiglia nelle reti stese._
 - Le sezioni tecniche (statistiche, prezzi, metadati, tabelle, esiti delle prove) sono neutre e non cambiano con il registro.
 - I testi della campagna sono nella lingua di `language.main`. I titoli delle sezioni dei modelli (`## Descrizione`, `## Effetti` e le altre) sono contenuto della campagna e si traducono dalla lingua configurata; i nomi dei metadati e dei tipi restano in inglese, come nel resto del framework.
 
+### 1.10 Struttura geografica canonica
+
+**Deciso (2026-11-10).** L'archivio canonico è organizzato prima per categoria e poi per geografia. Il documento canonico di un soggetto è collocato sotto la propria categoria al comune antenato della sua location corrente e di tutte le location indicate nelle sue `appearances` esplicite. Se non è nota alcuna location, il documento si trova nella cartella localizzata `Da collocare` della categoria. Per i luoghi, il file del luogo che contiene sotto-luoghi ha la forma `<Luogo>/<Luogo>.md`; un luogo foglia usa il proprio nome file sotto al luogo contenitore. Per esempio, `Mondo/Costa di Selce/Costa di Selce.md` definisce la costa, mentre `Mondo/Costa di Selce/Porto.md` definisce il porto foglia.
+
+I file degli eventi restano nelle cartelle delle sessioni e sono le fonti originali. Le viste geografiche degli eventi sono collegamenti simbolici rigenerabili: non si creano copie del testo, e restano nella cartella di trama, dentro una cartella localizzata (`Per luogo` / `By location`), mentre la cartella dei soggetti senza luogo è `Da collocare` / `Unplaced`. I percorsi geografici sono derivati e il piano completo di spostamenti, collegamenti, rimozioni e riscritture viene rivisto indipendentemente prima dell'applicazione. Il linker e i controlli successivi lavorano sui percorsi canonici.
+
 ## 2. Testi di trama (sessioni e attività)
 
 I testi di trama stanno nella categoria `Trama/`, con una cartella per sessione o per attività. Le attività minori seguono la stessa forma e si distinguono solo per il titolo.
@@ -163,6 +171,7 @@ Trama/
 - Un file evento dichiara anche `session`, l'`id` della sua sessione, perché ogni evento appartiene a una sola sessione.
 - `location` è facoltativo e indica il luogo principale della scena o dell'evento.
 - `characters` (**Proposta**, 2026-11-09) è facoltativo nei file evento di trama: elenca gli `id` dei personaggi che l'evento nomina e fa agire o parlare, ciascuno con la sua scheda (vedi 2.6). Un evento che non nomina personaggi dichiara `[]` oppure non scrive il campo. Ogni `id` deve essere una scheda di personaggio (`npc`, `vendor`, `enemy` o `creature`).
+- `appearances` (**Deciso**, 2026-11-10) è facoltativo nei file evento: elenca solo le presenze geografiche esplicitamente stabilite dal testo della scena, nella forma `- subject: ID` / `location: [PLACE_IDS]`. Non si inferisce la presenza da `characters`, `items`, link, nomi o menzioni. Ogni soggetto e luogo deve avere una scheda.
 
 ```yaml
 ---
@@ -192,6 +201,9 @@ session: il-faro-spento-02
 depends_on: [il-faro-spento-02-arrivo]
 location: [porto-di-selce]
 characters: [ilde-varno, bruno-tesi]
+appearances:
+  - subject: ilde-varno
+    location: [porto-di-selce]
 ---
 ```
 
@@ -450,7 +462,7 @@ Per una campagna in inglese, le intestazioni delle colonne sono `Characteristic`
 
 ### 4.5 Oggetto (con carta)
 
-**Deciso (2026-11-10):** la scheda dell'oggetto ha `## In breve`, `## Descrizione` e `## Effetti`, seguiti dalle sezioni facoltative `## Origine`, `## Ritrovamento`, `## Testo`, `## Valore`, in quest'ordine, e dal blocco riservato finale `### Indicazioni per il master`. La skill `item-manager` crea bozze e controlla le schede, senza riscrivere o migrare quelle esistenti.
+**Deciso (2026-11-10):** la scheda dell'oggetto ha `## In breve`, `## Descrizione` e `## Effetti`, seguiti dalle sezioni facoltative `## Origine`, `## Ritrovamento`, `## Testo`, `## Valore`, in quest'ordine, e dal blocco riservato finale `### Indicazioni per il master`. La skill `item-manager` crea bozze e controlla le schede senza riscrivere quelle esistenti; le descrizioni delle schede già presenti si adattano una volta, dopo l'aggiornamento del framework, con la migrazione riprendibile descritta in [Gestione degli oggetti](Gestione%20degli%20oggetti.md).
 
 **Categoria:** `Oggetti/`, tipo `objects`, con `template: item`. La categoria produce carte se la sua voce in `structure` dichiara `cards: true`.
 **Metadati:** `id`; `template: item`; `location` (dove si trova adesso, come lista); `print`, solo per gli oggetti con carta.

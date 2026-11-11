@@ -4,7 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { readStructure, listSheets, compareStrings, masterOnlyChecker } from '../../../../../scripts/lib/subjects.mjs';
+import { readStructure, listCanonicalSheets, canonicalInternalPath, compareStrings, masterOnlyChecker } from '../../../../../scripts/lib/subjects.mjs';
 import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../../../../scripts/lib/zones.mjs';
 import { headingAnchor } from '../../../../../scripts/lib/normalize.mjs';
@@ -29,7 +29,7 @@ export function checkLinks(campaignRoot, { files = null } = {}) {
   const listed =
     files === null
       ? listAllSheets(root, structure)
-      : files.map((file) => relOf(root, path.resolve(root, file)));
+      : files.map((file) => canonicalInternalPath(root, relOf(root, path.resolve(root, file))));
   // External documents belong to another campaign: they are link targets, never checked.
   const toCheck = [...new Set(listed)].filter((rel) => !isExternal(rel)).sort(compareStrings);
 
@@ -148,7 +148,7 @@ export function checkLinks(campaignRoot, { files = null } = {}) {
     const found = new Set();
     for (const entry of entries) {
       if (typeof entry.folder !== 'string') continue;
-      for (const sheet of listSheets(rootDir, entry.folder)) found.add(sheet);
+      for (const sheet of listCanonicalSheets(rootDir, entry.folder)) found.add(sheet);
     }
     return [...found];
   }

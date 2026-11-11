@@ -5,7 +5,7 @@ import path from 'node:path';
 import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../../../../scripts/lib/zones.mjs';
 import { foldForm } from '../../../../../scripts/lib/fold.mjs';
-import { readStructure, listSheets, buildSubjectIndex, compareStrings } from '../../../../../scripts/lib/subjects.mjs';
+import { readStructure, listCanonicalSheets, buildSubjectIndex, compareStrings } from '../../../../../scripts/lib/subjects.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 
 const PLACEHOLDER = /(?:\b(?:TODO|TBD|PLACEHOLDER|to be defined|Da definire)\b|<(?![!]--)[^>]+>)/iu;
@@ -45,7 +45,7 @@ export function makeDraft(root, { name, location = '', details = '', requestedBy
   if (!id) return { status:'FAILED', problems:['NAME cannot produce a safe subject id'] };
   const ids = new Set(buildSubjectIndex(root).subjects.map(x => x.id));
   const pendingFolder=`.campaign/state/write/draft/${category.folder.replace(/^\/+|\/+$/g,'')}`;
-  for(const pending of listSheets(root,pendingFolder)) {
+  for(const pending of listCanonicalSheets(root,pendingFolder)) {
     try { const p=parseFrontmatter(fs.readFileSync(path.join(root,pending),'utf8')); if(p.data?.id) ids.add(String(p.data.id)); } catch {}
   }
   if (ids.has(id)) return { status: 'ASK', question: `The safe ID ${id} is already used by another subject or pending draft.` };
@@ -69,7 +69,7 @@ export function checkItemSheets(root, { files = null, base = null } = {}) {
   const cats = structure.filter(x => x.type === 'objects' && typeof x.folder === 'string');
   const wanted = files?.length ? new Set(files) : null;
   const errors = [], warnings = [], checked = [];
-  const scan = wanted === null ? cats.flatMap(c=>listSheets(root,c.folder)) : [...wanted];
+  const scan = wanted === null ? cats.flatMap(c=>listCanonicalSheets(root,c.folder)) : [...wanted];
   for (const file of scan) {
     if (base === null && wanted !== null && !cats.some(c=>file.startsWith(`${c.folder.replace(/\/$/,'')}/`))) continue;
     checked.push(file);
@@ -137,7 +137,7 @@ export function plotItems(root, { files = null } = {}) {
     errors.push({code:'campaign-config',file:'campaign.yaml',message:'audit.exclusions must be a list of entries with subject and attribute'});
     return {events:0,declared:0,errors,candidates:[]};
   }
-  for (const c of structure.filter(x=>x.type==='plot' && typeof x.folder==='string')) for (const file of listSheets(root,c.folder)) {
+  for (const c of structure.filter(x=>x.type==='plot' && typeof x.folder==='string')) for (const file of listCanonicalSheets(root,c.folder)) {
     if (wanted && !wanted.has(file)) continue;
     const text = fs.readFileSync(path.join(root,file),'utf8'), p=parseFrontmatter(text);
     if (!p.data || typeof p.data.session !== 'string') continue;

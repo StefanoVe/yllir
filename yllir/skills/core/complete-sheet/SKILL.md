@@ -9,6 +9,8 @@ allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/build-index.mjs" *), Bas
 
 Completes or corrects ONE existing sheet: a character, a vendor, an enemy, a creature or a place. Run every command from the campaign root (the folder that contains `campaign.yaml`). Keep every value you read from a script, and never guess one.
 
+The path read from the subjects index is only the current path. The write sequence reviews and applies the canonical category-first geographic path from explicit location data; after it finishes, use its returned canonical path for any further read or check.
+
 **Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: FAILED`, reason "permission refused".
 
 **Scope of this version.** This process:

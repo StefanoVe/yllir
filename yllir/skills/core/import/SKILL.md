@@ -76,6 +76,8 @@ Here the ids are the ids of the cards that hold the open question (normally one)
 - when IMAGINATION is `yes`, the INTENT that the ingest skill gives to its write sequence ends with this exact sentence, after a space: `The master allowed invented details: new names, places, history, relations and rules that no source gives are allowed; contradictions with the canon are not.`
 - `CONTINUE_WITH="import step 7"`.
 
+This step hands the drafts of new sheets and plot events to the ingest skill, so these rules are passed on to it: draft paths of new sheets are provisional, because the write sequence moves each sheet to its canonical category-first geographic path, decided only from explicit `location` and scene `appearances`; after it finishes, use the paths in the `documents:` line of `.campaign/state/write/report.txt` for any further read or check. When an imported plot event explicitly establishes that a subject is present at a place, record it as `appearances: [{subject: ID, location: [PLACE_IDS]}]`; never infer presence from `characters`, `items`, names, links or mentions.
+
 With IMAGINATION `yes`, the invention allowed by this sentence fills only what the sources leave out of a character sheet (its looks, manner, history). It never fills a line of a source that cannot be read, and it never changes a claim taken from a source.
 
 When it has finished, read `.campaign/state/ingest/report.txt` with the Read tool. The report is for you, never for the master: do not show it, quote it or name its status to the master.

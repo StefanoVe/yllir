@@ -25,6 +25,7 @@ Run every command from the campaign root (the folder containing `campaign.yaml`)
 The sheet is the source of truth for WHO the character is: name, role, appearance, manner, voice, what they want, secrets. It is NOT the source of truth for WHAT the character does during the plot: actions, events, scenes. Those belong to the plot documents.
 
 - A plot event declares the characters it uses in its metadata field `characters: [id, ...]` (ids of sheets, like `location`). Absent means none. Every named character that acts or speaks in the event is listed there and has a sheet.
+- New sheet drafts may start in their category's draft path; the write sequence computes and reviews the canonical category-first geographic path from explicit `location` and scene `appearances`. Do not infer a scene appearance from `characters`, names, or mentions.
 - The plot text names the character and says what they do. It never states or changes who the character is (role, looks, personality, motives, secrets). If an event needs a fact about the character's identity, that fact goes into the sheet first.
 - The sheet never records what the character does in a given session or event ("in session 2 he betrays..."). That stays in the plot and, once played, in the chronicle.
 - If a plot event makes a character act against the sheet, that is not an error of the plot and not an error of the sheet. Report it as a question for the master (`status: ASK`). Never choose silently, never edit the sheet to match the plot.

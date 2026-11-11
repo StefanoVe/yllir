@@ -203,9 +203,11 @@ mia-campagna/
 
 I nomi delle cartelle dei contenuti sono nella lingua della campagna e si fissano alla creazione; i processi li leggono dalla configurazione (`structure[].folder`), non li scrivono nelle istruzioni. La struttura è facoltativa alla creazione: la campagna nasce con i file core, e una cartella compare quando nasce la prima scheda della sua categoria (vedi [Configurazione](Configurazione.md)).
 
-### Perché solo il mondo è a cascata
+### Struttura prima per categoria, poi per geografia
 
-La geografia è gerarchica per natura: un porto sta in una costa, una costa in una regione. Per questo `Mondo/` è l'unica categoria a cascata. Personaggi (`Personaggi/`), creature (`Creature/`) e oggetti (`Oggetti/`) invece non hanno un posto fisso: un personaggio viaggia, un oggetto passa di mano, una creatura vive in più regioni. Se la cartella ne indicasse il luogo, il luogo sarebbe scritto due volte (nella cartella e nella scheda) e la cartella invecchierebbe male. Per questo queste tre categorie sono piatte, e il luogo è un dato della scheda (`location`).
+Ogni categoria conserva la propria radice (`Mondo/`, `Personaggi/`, `Creature/`, `Oggetti/` e così via), poi organizza i documenti per luoghi. La scheda del luogo descrive la gerarchia geografica; ogni altro soggetto è canonico al comune antenato della categoria e delle sue location esplicitamente registrate, sia nella scheda corrente sia nei metadati `appearances` degli eventi. Se non ha una location nota, sta in `Da collocare`, tradotto nella lingua della campagna. Il percorso non aggiunge fatti: riflette solo i dati espliciti.
+
+I file delle scene restano nelle cartelle della sessione e restano le fonti originali. Le viste geografiche sono symlink rigenerabili verso quegli stessi file, mai copie. Per i luoghi con sotto-luoghi la scheda canonica si chiama come la cartella (`Mondo/Costa di Selce/Costa di Selce.md`); per un luogo foglia il file è sotto la cartella del suo luogo contenitore (`Mondo/Costa di Selce/Porto.md`).
 
 `Trama/` è organizzata per sessione: una cartella per sessione, con il file principale (derivato) e gli eventi in `Eventi/`. **Proposta (2026-11-09):** l'arco non è più una cartella; se serve raggrupparle, lo si dichiara nei metadati e non nel percorso. È un ordine di lavoro, non un luogo, e non ripete la gerarchia del mondo.
 
@@ -220,7 +222,8 @@ Ripetere le stesse aree in più categorie, con lo stesso nome da mantenere allin
 | Identità stabile | `id` nei metadati in testa alla scheda | Route dell'enciclopedia, QR delle carte |
 | Tipo di soggetto | La cartella di categoria | Regole di creazione e di collegamento |
 | Modello della scheda (solo per le categorie con più modelli) | `template` nei metadati | Validazione della forma della scheda |
-| Luogo attuale di un personaggio, una creatura, un oggetto | `location` nei metadati (uno o più `id` di luoghi) | Vista «chi e che cosa c'è qui» per ogni luogo |
+| Presenza esplicita di un soggetto in una scena | `appearances` nel frontmatter dell'evento, con ID del soggetto e dei luoghi | Percorso canonico del soggetto e viste geografiche |
+| Luogo attuale di un personaggio, una creatura, un oggetto | `location` nei metadati (uno o più `id` di luoghi) | Percorso canonico del soggetto e vista «chi e che cosa c'è qui» |
 | Gerarchia dei luoghi | La posizione della cartella in `Mondo/` | Percorsi, breadcrumb, carte del mondo |
 | Prerequisito di una sessione | `depends_on` nei metadati della sessione | Mappa della trama |
 | Che cosa è successo al tavolo | La pagina di `Cronaca/` | Riepilogo «dove eravamo rimasti» |
@@ -233,7 +236,8 @@ Ripetere le stesse aree in più categorie, con lo stesso nome da mantenere allin
 
 Regole che ne discendono:
 
-- **Metadati minimi.** In testa alla scheda stanno solo i dati che non sono già nel testo: `id`, e quando servono `location`, `depends_on`, `print`, `merged_ids` (dopo un'unione), `aliases` e `template` (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md#12-metadati-in-testa)). Il nome non si ripete nei metadati, e il tipo non si dichiara: lo dice la cartella. I metadati li scrive e li legge il framework; il master non deve toccarli, ma se apre il file li trova leggibili.
+- **Metadati minimi.** In testa alla scheda stanno solo i dati che non sono già nel testo: `id`, e quando servono `location`, `appearances`, `depends_on`, `print`, `merged_ids` (dopo un'unione), `aliases` e `template` (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md#12-metadati-in-testa)). Il nome non si ripete nei metadati, e il tipo non si dichiara: lo dice la cartella. I metadati li scrive e li legge il framework; il master non deve toccarli, ma se apre il file li trova leggibili.
+- **Una sola dichiarazione della presenza.** `characters` elenca chi agisce o parla; da solo non dice dove si trova. Solo `appearances` dichiara che un soggetto è presente in uno o più luoghi per una specifica scena. Menzioni, personaggi, oggetti e link non bastano per inferire la presenza.
 - **Una sola posizione, quella attuale.** Il luogo nei metadati è quello di adesso. La storia degli spostamenti non si tiene in un campo: è già nella cronaca, ed è da lì che l'audit di continuità la ricava se serve.
 - **Preparato e accaduto sono separati.** `Trama/` contiene ciò che il master prepara e non si riscrive dopo il gioco per farlo coincidere con ciò che è successo. `Cronaca/` registra gli eventi giocati. I cambiamenti di canone finiscono nelle schede; la cronaca racconta, non ridefinisce.
 - **Rinomine sicure.** Il nome del file segue il titolo. Rinomine, unioni, divisioni, spostamenti e cancellazioni passano dalla [manutenzione della continuità](Skill%20di%20libreria.md#l19-manutenzione-della-continuità) (`continuity-keeper`): l'`id` resta stabile, quindi QR stampati ed enciclopedia continuano a funzionare.
@@ -249,7 +253,7 @@ Si aggiungono solo quando una campagna reale ne ha bisogno:
 - archivi storici in sola lettura separati dal canone;
 - una cronologia delle posizioni nei metadati;
 - una cartella separata o un archivio esterno per i sorgenti pesanti delle immagini;
-- sottocartelle per area nelle categorie piatte.
+- nessun livello geografico ulteriore oltre ai dati espliciti che già determinano la posizione canonica.
 
 ## 4. Flusso di una richiesta
 

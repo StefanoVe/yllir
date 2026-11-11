@@ -195,6 +195,31 @@ test('a symlink to a regular Markdown file is indexed as a subject under its own
   }
 });
 
+test('internal symlink aliases collapse to the original path and retain access paths', () => {
+  const root = makeCampaign({
+    'Places/Zona.md': sheet('zona', 'Zona'),
+  });
+  fs.mkdirSync(path.join(root, 'Places', 'PerZona'), { recursive: true });
+  fs.symlinkSync('../Zona.md', path.join(root, 'Places/PerZona/Zona.md'));
+  const { subjects, errors } = buildSubjectIndex(root);
+  assert.deepEqual(errors, []);
+  assert.equal(subjects.length, 1);
+  assert.equal(subjects[0].sheet, 'Places/Zona.md');
+  assert.deepEqual(subjects[0].paths, ['Places/PerZona/Zona.md', 'Places/Zona.md']);
+});
+
+test('an internal alias in another subject category is owned by the original category', () => {
+  const yaml = `${CAMPAIGN}  - id: aliases\n    folder: Alias\n    type: places\n`;
+  const root = makeCampaign({ 'People/Oria.md': sheet('oria', 'Oria') }, yaml);
+  fs.mkdirSync(path.join(root, 'Alias'), { recursive: true });
+  fs.symlinkSync('../People/Oria.md', path.join(root, 'Alias/Oria.md'));
+  const { subjects, errors } = buildSubjectIndex(root);
+  assert.deepEqual(errors, []);
+  assert.equal(subjects.length, 1);
+  assert.equal(subjects[0].sheet, 'People/Oria.md');
+  assert.equal(subjects[0].category, 'people');
+});
+
 test('a broken symlink is ignored without error', () => {
   const root = makeCampaign({ 'People/Oria.md': sheet('oria', 'Oria') });
   fs.symlinkSync(path.join(root, 'nowhere.md'), path.join(root, 'People/Rotto.md'));

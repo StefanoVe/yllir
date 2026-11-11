@@ -154,6 +154,8 @@ describe('campaign checks', () => {
     write(root, '.campaign/state/update.yaml', [
       'status: completed',
       'sheet_migration: pending',
+      'geography_migration_id: "category-first-geography-v1"',
+      'geography_migration: pending',
       'sheet_pending:',
       '  - Creature/Guardiano.md',
       '',
@@ -172,6 +174,33 @@ describe('campaign checks', () => {
     const result = sessionCheck(root);
     assert.equal(result.post_update, null);
     assert.doesNotMatch(formatCheck(result), /^post-update:/m);
+  });
+
+  test('a pending geographic migration uses the existing post-update signal', () => {
+    const root = campaign();
+    write(root, '.campaign/state/update.yaml', 'status: completed\ngeography_migration: pending\n');
+    const result = sessionCheck(root);
+    assert.equal(result.post_update, 'needed');
+    assert.match(formatCheck(result), /^post-update: needed$/m);
+    assert.doesNotMatch(formatCheck(result), /^post-geography:/m);
+  });
+
+  test('a pending item-description migration triggers post-update even without update.yaml', () => {
+    const root = campaign();
+    write(root, '.campaign/state/update/item-descriptions.json', JSON.stringify({ migration_id: 'item-descriptions-v1', items: [{ file: 'Oggetti/Chiave.md', status: 'pending' }] }));
+    assert.equal(sessionCheck(root).post_update, 'needed');
+  });
+
+  test('malformed or unknown item-description state remains resumable', () => {
+    const root = campaign();
+    write(root, '.campaign/state/update/item-descriptions.json', '{broken');
+    assert.equal(sessionCheck(root).post_update, 'needed');
+  });
+
+  test('completed item-description migration does not trigger post-update', () => {
+    const root = campaign();
+    write(root, '.campaign/state/update/item-descriptions.json', JSON.stringify({ migration_id: 'item-descriptions-v1', items: [{ file: 'Oggetti/Chiave.md', status: 'complete' }] }));
+    assert.equal(sessionCheck(root).post_update, null);
   });
 
   test('a hand edit of CLAUDE.md is reported as changed by hand and as unsaved', () => {

@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
-import { readStructure, listSheets, compareStrings } from '../../../../../scripts/lib/subjects.mjs';
+import { readStructure, listCanonicalSheets, compareStrings } from '../../../../../scripts/lib/subjects.mjs';
 
 const EVENT_FOLDERS = new Set(['Eventi', 'Events']);
 
@@ -34,7 +34,7 @@ export function plotMap(root) {
   const plotFiles = new Map(); // file -> 'session' | 'event' | 'legacy' (first category listing it wins)
   for (const category of categoriesOf('plot')) {
     const folder = path.posix.normalize(category.folder);
-    for (const file of listSheets(root, category.folder)) {
+    for (const file of listCanonicalSheets(root, category.folder)) {
       if (plotFiles.has(file)) continue;
       plotFiles.set(file, classifyPlotFile(path.posix.relative(folder, file)));
     }
@@ -198,7 +198,7 @@ export function plotMap(root) {
   const playedRefs = []; // { id, file } for every id listed in a chronicle page
   const chronicleFiles = new Map();
   for (const category of categoriesOf('chronicle')) {
-    for (const file of listSheets(root, category.folder)) {
+    for (const file of listCanonicalSheets(root, category.folder)) {
       chronicleFiles.set(file, true);
     }
   }

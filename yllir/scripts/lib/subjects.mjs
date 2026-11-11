@@ -103,6 +103,41 @@ export function listSheets(campaignRoot, folder) {
 }
 
 /**
+ * Lists campaign documents once per original file. Internal symlink aliases
+ * resolve to the original campaign path; links whose target is outside the
+ * campaign keep their access path (document-ingest originals).
+ */
+export function listCanonicalSheets(campaignRoot, folder) {
+  const root = path.resolve(campaignRoot);
+  let realRoot;
+  try { realRoot = fs.realpathSync(root); } catch { realRoot = root; }
+  const byRealPath = new Map();
+  for (const accessPath of listSheets(root, folder)) {
+    let real;
+    try { real = fs.realpathSync(path.join(root, accessPath)); } catch { continue; }
+    const relReal = path.relative(realRoot, real).split(path.sep).join('/');
+    const canonical = relReal !== '..' && !relReal.startsWith('../') && !path.isAbsolute(relReal)
+      ? relReal
+      : accessPath;
+    const key = relReal;
+    const previous = byRealPath.get(key);
+    if (!previous || compareStrings(canonical, previous) < 0) byRealPath.set(key, canonical);
+  }
+  return [...new Set(byRealPath.values())].sort(compareStrings);
+}
+
+/** Resolves an internal symlink alias to its original campaign path. */
+export function canonicalInternalPath(campaignRoot, relativePath) {
+  const root = path.resolve(campaignRoot);
+  let realRoot;
+  try { realRoot = fs.realpathSync(root); } catch { realRoot = root; }
+  let real;
+  try { real = fs.realpathSync(path.join(root, relativePath)); } catch { return relativePath; }
+  const rel = path.relative(realRoot, real).split(path.sep).join('/');
+  return rel !== '..' && !rel.startsWith('../') && !path.isAbsolute(rel) ? rel : relativePath;
+}
+
+/**
  * True for a regular file, or for a symlink whose target is a regular file.
  * Directory symlinks are never followed; any error (broken link, loop) is false.
  */
@@ -219,6 +254,9 @@ export function buildSubjectIndex(campaignRoot) {
   const bySubjectId = new Map(); // id -> sheet of the first subject with that id
   const indexErrors = [];
 
+  const internalGroups = new Map();
+  let realRoot;
+  try { realRoot = fs.realpathSync(campaignRoot); } catch { realRoot = path.resolve(campaignRoot); }
   for (const category of structure) {
     if (typeof category.folder !== 'string') continue;
     if (category.type === 'external') {
@@ -227,49 +265,69 @@ export function buildSubjectIndex(campaignRoot) {
     }
     if (!SUBJECT_TYPES.has(category.type)) continue;
 
-    for (const sheet of listSheets(campaignRoot, category.folder)) {
-      const text = fs.readFileSync(path.join(campaignRoot, sheet), 'utf8');
-      const { data, body, bodyStartLine } = parseFrontmatter(text);
-
-      if (!data || typeof data.id !== 'string' || data.id === '') {
-        indexErrors.push({ file: sheet, message: 'missing id' });
-        continue;
-      }
-
-      const title = firstTitle(analyzeMarkdown(body, bodyStartLine).lines);
-      if (title === null) {
-        indexErrors.push({ file: sheet, message: 'missing title' });
-        continue;
-      }
-
-      let aliases = [];
-      if (data.aliases !== undefined) {
-        if (Array.isArray(data.aliases)) {
-          aliases = data.aliases.map(String);
-        } else {
-          indexErrors.push({ file: sheet, message: 'aliases must be a list' });
-        }
-      }
-
-      if (bySubjectId.has(data.id)) {
-        indexErrors.push({
-          file: sheet,
-          message: `duplicate id ${data.id} (also in ${bySubjectId.get(data.id)})`,
-        });
-        continue;
-      }
-      bySubjectId.set(data.id, sheet);
-
-      subjects.push({
-        id: data.id,
-        category: category.id,
-        type: category.type,
-        sheet,
-        forms: buildForms(title, aliases),
-      });
+    for (const accessPath of listSheets(campaignRoot, category.folder)) {
+      let real;
+      try { real = fs.realpathSync(path.join(campaignRoot, accessPath)); } catch { continue; }
+      const relReal = path.relative(realRoot, real).split(path.sep).join('/');
+      const inside = relReal !== '..' && !relReal.startsWith('../') && !path.isAbsolute(relReal);
+      const canonical = inside ? relReal : accessPath;
+      const group = internalGroups.get(real) ?? { canonical, paths: new Set(), category, inside };
+      group.paths.add(accessPath);
+      group.paths.add(canonical);
+      if (inside) group.canonical = canonical;
+      else if (compareStrings(canonical, group.canonical) < 0) group.canonical = canonical;
+      internalGroups.set(real, group);
     }
   }
+  const categoryForPath = (file) => structure
+    .filter((entry) => SUBJECT_TYPES.has(entry.type) && typeof entry.folder === 'string')
+    .map((entry) => ({ entry, folder: path.posix.normalize(entry.folder).replace(/\/+$/, '') }))
+    .filter(({ folder }) => file.startsWith(`${folder}/`) || file === folder)
+    .sort((a, b) => b.folder.length - a.folder.length)[0]?.entry ?? null;
+  for (const { canonical: sheet, paths: accessPaths, category: accessCategory, inside } of [...internalGroups.values()].sort((a, b) => compareStrings(a.canonical, b.canonical))) {
+    const category = categoryForPath(sheet) ?? (inside ? null : accessCategory);
+    if (category === null) continue;
+    const text = fs.readFileSync(path.join(campaignRoot, sheet), 'utf8');
+    const { data, body, bodyStartLine } = parseFrontmatter(text);
 
+    if (!data || typeof data.id !== 'string' || data.id === '') {
+      indexErrors.push({ file: sheet, message: 'missing id' });
+      continue;
+    }
+
+    const title = firstTitle(analyzeMarkdown(body, bodyStartLine).lines);
+    if (title === null) {
+      indexErrors.push({ file: sheet, message: 'missing title' });
+      continue;
+    }
+
+    let aliases = [];
+    if (data.aliases !== undefined) {
+      if (Array.isArray(data.aliases)) {
+        aliases = data.aliases.map(String);
+      } else {
+        indexErrors.push({ file: sheet, message: 'aliases must be a list' });
+      }
+    }
+
+    if (bySubjectId.has(data.id)) {
+      indexErrors.push({
+        file: sheet,
+        message: `duplicate id ${data.id} (also in ${bySubjectId.get(data.id)})`,
+      });
+      continue;
+    }
+    bySubjectId.set(data.id, sheet);
+
+    subjects.push({
+      id: data.id,
+      category: category.id,
+      type: category.type,
+      sheet,
+      ...(accessPaths.size > 1 ? { paths: [...accessPaths].sort(compareStrings) } : {}),
+      forms: buildForms(title, aliases),
+    });
+  }
   subjects.sort((a, b) => compareStrings(a.id, b.id));
 
   const byFolded = new Map(); // folded -> Set of subject ids

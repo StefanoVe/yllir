@@ -1,12 +1,30 @@
 # Post-update process
 
-This process is read only by `yllir:process-runner`. It converts legacy statistics blocks in campaign sheets after the framework version has been aligned. It never speaks to the master directly.
+This process is read only by `yllir:process-runner`. It adapts existing item descriptions and converts legacy statistics blocks after framework alignment. It never speaks to the master directly.
 
-The resumable migration identifier is `statistics-tables-v1`; it is separate from the session-layout migration recorded by `migrated`.
+The identifiers `category-first-geography-v1`, `item-descriptions-v1` and `statistics-tables-v1` have separate state and completion. They are separate from the session-layout migration recorded by `migrated`.
 
 Never put `PLUGIN_ROOT=...` or `CLAUDE_PLUGIN_ROOT=...` before a command that references that same variable: the shell expands the argument before applying the assignment. Use the existing fallback command below when either variable is present. In Codex, if both variables are absent, derive the absolute plugin root from the registered `yllir:update` skill path shown in context (remove `/skills/core/update/SKILL.md`) and run the allowed script by its absolute path. If no reliable path is available, stop before running a migration command and finish FAILED using the lexicon’s fixed sentence for an operation that could not be completed. Do not give the master the technical reason or claim the sheets were checked or changed. Use the campaign language from `campaign.yaml`. Keep all campaign document writes inside the existing write sequence. An ambiguous prose table is interpreted by Luna; preserve its meaning and every value, and ask the master through the runner result if the interpretation cannot be made safely.
 
 ## Steps
+
+### Geographic layout
+
+Read `.campaign/state/update.yaml` with the Read tool. If it contains the line `geography_migration: pending`, read `"${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/post-geography.md"` with the Read tool (same plugin-root rules as the rest of this file) and follow its steps first. If that finishes with QUESTION or FAILED, stop here and finish with that same outcome: do not start the other two migrations in this run, because their files may still move. If it finishes DONE, or the line is absent, continue with "Existing item descriptions", then "Statistics tables".
+
+### Existing item descriptions
+
+Run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/item-descriptions.mjs" . --prepare` (or the absolute installed plugin path in Codex). If status is `pending`, process each listed item whose status is `pending`. Do not process an item marked `changed`; tell the master that this sheet changed during the migration and leave it pending for a fresh review. If there are no items, this migration is complete without writes.
+
+For each pending item, read its full source, campaign configuration, `.campaign/customizations.md` if it exists, and representative item descriptions. Use the established canon and public material only. Never reveal or use the master-only block to draft public text. Preserve established appearance/function in `## In brief` / `## In breve` (add the missing section for legacy sheets); make `## Description` / `## Descrizione` add established context rather than repeat the brief. Do not invent context, function, effects, provenance, or tone. If relevant public context is insufficient or ambiguous, return QUESTION and keep the item pending.
+
+Have Luna return either a complete draft or an explicit `REVIEWED_UNCHANGED` with a short evidence-based reason when the existing descriptions already meet both requirements. On the complete-draft path, place the full text in an ignored draft file under `.campaign/state/write/draft/<SOURCE_FILE>` and run `item-descriptions.mjs . --stage <SOURCE_FILE> <draft-relative-path>`. Stage unchanged text the same way for explicit reviewed-unchanged. Run `--verify <comma-separated source paths>`; this checks source hashes, unchanged bytes outside the two description sections, the master block and required nonempty public sections. Any failure stops before write-sequence.
+
+If staged text is byte-identical to source, record that this item was reviewed and accepted without a campaign write. Otherwise invoke `yllir:write-sequence` for the changed item paths with the intent to adapt existing item descriptions, `NEW_SUBJECTS` empty, and a campaign-language version message. Pass canon context to the independent reviewer. Never expose master-only notes to that reviewer; the revised text is public. Follow write-sequence fully. Then run `--complete <comma-separated reviewed paths>`; completion is allowed only when published bytes match the verified draft hashes. Resume from the saved per-item hashes after interruption. Continue until the inventory reports complete; on QUESTION, source change, missing context, or verification failure leave the migration pending.
+
+Do not mark completion from section headings or other structural heuristics alone. The model's explicit review plus verified draft/published hashes is required. An unchanged item is marked complete only through the same verify-and-complete steps.
+
+### Statistics tables
 
 1. From the campaign root, run `node "${PLUGIN_ROOT:-${CLAUDE_PLUGIN_ROOT}}/skills/core/update/scripts/post-update.mjs" . --prepare` when either variable is present. In Codex, if both are absent, run this script by the absolute path derived from this skill's installed location in context. Read the JSON result and its `exit:` line.
    - `status: complete`: no legacy statistics remain. Run the same script path with `. --complete`, read the result, then finish DONE only if its status is `complete`.
@@ -42,3 +60,7 @@ Never put `PLUGIN_ROOT=...` or `CLAUDE_PLUGIN_ROOT=...` before a command that re
 ## Result
 
 Write `.campaign/state/runner/result.txt` using the exact `RUNNER RESULT` format in `yllir/agents/process-runner.md`. For DONE, state whether old Statistics tables were converted or no work was needed. For QUESTION, ask only the unresolved interpretation question. For FAILED, say that the format update could not be completed. Mention format changes truthfully; do not say that nothing of the master's changed when a conversion was written.
+
+### Result of the whole process
+
+The whole process finishes DONE only when every migration it ran finished DONE, or was not needed. The first QUESTION or FAILED decides the outcome: stop there and report it as described above, without starting the migrations that follow.

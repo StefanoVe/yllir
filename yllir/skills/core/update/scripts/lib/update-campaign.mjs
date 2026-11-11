@@ -20,6 +20,8 @@ import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { listVersions, restore, saveManualChanges, saveVersion, status } from '../../../../../scripts/lib/versions.mjs';
 import { migrateSessions } from './migrate-sessions.mjs';
 import { completePostUpdate, preparePostUpdate } from './post-update.mjs';
+import { prepareItemDescriptions } from './item-descriptions.mjs';
+import { planGeographicLayout } from '../../../../../scripts/lib/geographic-layout.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../../../../.claude-plugin/plugin.json');
 const CONFIG_PATH = 'campaign.yaml';
@@ -28,10 +30,11 @@ const CUSTOMIZATIONS_PATH = '.campaign/customizations.md';
 const UPDATE_PATH = '.campaign/state/update.yaml';
 const NOTICE_PATH = '.campaign/state/update-notice.yaml';
 const SHEET_MIGRATION_ID = 'statistics-tables-v1';
+const GEOGRAPHY_MIGRATION_ID = 'category-first-geography-v1';
 
 // Keys written without quotes: their values never need escaping.
-const UNQUOTED_KEYS = new Set(['status', 'started_on', 'completed_on', 'last_notified_on', 'snoozed_until', 'sheet_migration']);
-const UPDATE_KEYS = ['status', 'from_version', 'to_version', 'restore_point', 'started_on', 'completed_on', 'sheet_migration_id', 'sheet_migration'];
+const UNQUOTED_KEYS = new Set(['status', 'started_on', 'completed_on', 'last_notified_on', 'snoozed_until', 'sheet_migration', 'geography_migration']);
+const UPDATE_KEYS = ['status', 'from_version', 'to_version', 'restore_point', 'started_on', 'completed_on', 'sheet_migration_id', 'sheet_migration', 'geography_migration_id', 'geography_migration'];
 const DAY_MS = 86_400_000;
 
 /**
@@ -48,6 +51,8 @@ const DAY_MS = 86_400_000;
  *   sheet_migration_drafted: string[],
  *   sheet_migration_pending: string[],
  *   sheet_migration_errors: Array<{code: string, message: string}>,
+ *   geography_migration: 'pending' | 'complete' | null,
+ *   geography_migration_errors: Array<{file?: string, message: string}>,
  *   errors: Array<{ code: string, message: string, file?: string, line?: number | null }>,
  * }} UpdateResult
  */
@@ -109,6 +114,7 @@ export function cancelInterruptedUpdate(campaignRoot) {
       to_version: out.to,
       restore_point: out.restore_point,
       started_on: stringOrNull(saved.started_on) ?? undefined,
+      ...migrationMarkers(saved),
     };
     if (rollBack(root, state, out)) {
       out.status = 'cancelled';
@@ -151,6 +157,31 @@ export function postponeNotice(campaignRoot, { today = utcToday(), days = 1 } = 
   };
 }
 
+/** Mark geographic migration complete only when a fresh plan finds no work. */
+export function completeGeographicMigration(campaignRoot) {
+  const root = path.resolve(campaignRoot);
+  const out = { status: 'failed', geography_migration: 'pending', errors: [] };
+  const saved = readUpdateState(root);
+  if (!saved || saved.geography_migration !== 'pending') {
+    out.errors.push({ code: 'no-pending-geography-migration', message: 'there is no pending geographic migration' });
+    return out;
+  }
+  const plan = planGeographicLayout(root);
+  if (plan.status !== 'ready' || plan.migrationRequired === true) {
+    out.errors.push({ code: 'geography-migration-incomplete', message: 'the geographic layout still has pending work or errors' });
+    out.geography_migration_errors = plan.errors ?? [];
+    return out;
+  }
+  writeUpdateState(root, {
+    ...saved,
+    geography_migration_id: GEOGRAPHY_MIGRATION_ID,
+    geography_migration: 'complete',
+  });
+  out.status = 'complete';
+  out.geography_migration = 'complete';
+  return out;
+}
+
 // ---------------------------------------------------------------- update steps
 
 function runUpdate(root, out, { dryRun, resume, today }) {
@@ -190,6 +221,8 @@ function runUpdate(root, out, { dryRun, resume, today }) {
   // Step 2: nothing to do when the versions match and no generated file was changed by hand.
   const fingerprints = checkFingerprints(root);
   if (!resuming && out.from === to && fingerprints.ok) {
+    const geography = geographyState(root);
+    setGeographyResult(out, geography);
     if (saved?.sheet_migration === 'pending') {
       const migration = preparePostUpdate(root);
       if (migration.status === 'failed') return failWith(out, 'sheet-migration-scan-failed', migration.errors[0]?.message ?? 'sheet scan failed');
@@ -202,6 +235,18 @@ function runUpdate(root, out, { dryRun, resume, today }) {
         const completed = completePostUpdate(root);
         if (completed.status === 'failed') return failWith(out, 'sheet-migration-state-failed', completed.errors[0]?.message ?? 'could not update migration state');
       }
+    }
+    const itemScan = prepareItemDescriptions(root, { persist: !dryRun });
+    if (itemScan.status === 'failed') return failWith(out, 'item-description-scan-failed', itemScan.errors[0]?.message ?? 'item scan failed');
+    out.item_description_migration = itemScan.status;
+    out.item_description_files = itemScan.items.filter((item) => item.status !== 'complete').map((item) => item.file);
+    if (!dryRun && (geography.status === 'pending' || saved?.geography_migration !== undefined)) {
+      const current = readUpdateState(root);
+      writeUpdateState(root, {
+        ...current,
+        geography_migration_id: GEOGRAPHY_MIGRATION_ID,
+        geography_migration: geography.status,
+      });
     }
     out.status = 'up-to-date';
     return out;
@@ -236,6 +281,11 @@ function runUpdate(root, out, { dryRun, resume, today }) {
     out.sheet_migration_drafted = sheetDry.drafted;
     out.sheet_migration_pending = sheetDry.pending.map((item) => item.file);
     out.sheet_migration_errors = sheetDry.errors;
+    const itemDry = prepareItemDescriptions(root, { persist: false });
+    if (itemDry.status === 'failed') { out.errors = itemDry.errors; return out; }
+    out.item_description_migration = itemDry.status;
+    out.item_description_files = itemDry.items.filter((item) => item.status !== 'complete').map((item) => item.file);
+    setGeographyResult(out, geographyState(root));
     out.errors = dry.errors;
     return out;
   }
@@ -252,6 +302,7 @@ function runUpdate(root, out, { dryRun, resume, today }) {
       to_version: to,
       restore_point: saved.restore_point,
       started_on: stringOrNull(saved.started_on) ?? today,
+      ...migrationMarkers(saved),
     };
   } else {
     if (!status(root).clean) {
@@ -267,6 +318,7 @@ function runUpdate(root, out, { dryRun, resume, today }) {
       to_version: to,
       restore_point: head.hash,
       started_on: today,
+      ...migrationMarkers(saved),
     };
   }
   out.restore_point = state.restore_point;
@@ -291,8 +343,22 @@ function runUpdate(root, out, { dryRun, resume, today }) {
         out.sheet_migration_drafted = sheetScan.drafted;
         out.sheet_migration_pending = sheetScan.pending.map((item) => item.file);
         out.sheet_migration_errors = sheetScan.errors;
+        const itemScan = prepareItemDescriptions(root);
+        if (itemScan.status === 'failed') throw new Error(itemScan.errors[0]?.message ?? 'item scan failed');
+        out.item_description_migration = itemScan.status;
+        out.item_description_files = itemScan.items.filter((item) => item.status !== 'complete').map((item) => item.file);
+        const geography = geographyState(root);
+        setGeographyResult(out, geography);
         saveVersion(root, { message: `Updated Yllir to ${to}`, kind: 'framework' });
-        writeUpdateState(root, { ...state, status: 'completed', completed_on: today, sheet_migration_id: SHEET_MIGRATION_ID, sheet_migration: out.sheet_migration });
+        writeUpdateState(root, {
+          ...state,
+          status: 'completed',
+          completed_on: today,
+          sheet_migration_id: SHEET_MIGRATION_ID,
+          sheet_migration: out.sheet_migration,
+          geography_migration_id: GEOGRAPHY_MIGRATION_ID,
+          geography_migration: geography.status,
+        });
         out.status = 'updated';
         return out;
       }
@@ -366,6 +432,28 @@ function writeUpdateState(root, fields) {
   fs.writeFileSync(file, formatYaml(pairs), 'utf8');
 }
 
+function geographyState(root) {
+  const plan = planGeographicLayout(root);
+  return {
+    status: plan.status === 'blocked' || plan.migrationRequired === true ? 'pending' : 'complete',
+    errors: plan.errors ?? [],
+  };
+}
+
+function setGeographyResult(out, geography) {
+  out.geography_migration = geography.status;
+  out.geography_migration_errors = geography.errors;
+}
+
+function migrationMarkers(saved) {
+  if (!saved || typeof saved !== 'object') return {};
+  return Object.fromEntries(
+    ['sheet_migration_id', 'sheet_migration', 'geography_migration_id', 'geography_migration']
+      .filter((key) => saved[key] !== undefined)
+      .map((key) => [key, saved[key]]),
+  );
+}
+
 /** Hand-built YAML in the style of the framework's other state files. */
 function formatYaml(pairs) {
   const lines = pairs.map(([key, value]) => `${key}: ${yamlScalar(key, value)}`);
@@ -405,7 +493,7 @@ function readInstalledVersion() {
 // ---------------------------------------------------------------- helpers
 
 function newResult(from, to) {
-  return { status: 'failed', from, to, restore_point: null, rewritten: [], restored_by_hand: [], migrated: [], sheet_migration: null, sheet_migration_files: [], sheet_migration_drafted: [], sheet_migration_pending: [], sheet_migration_errors: [], errors: [] };
+  return { status: 'failed', from, to, restore_point: null, rewritten: [], restored_by_hand: [], migrated: [], sheet_migration: null, sheet_migration_files: [], sheet_migration_drafted: [], sheet_migration_pending: [], sheet_migration_errors: [], geography_migration: null, geography_migration_errors: [], item_description_migration: null, item_description_files: [], errors: [] };
 }
 
 function failWith(out, code, message) {

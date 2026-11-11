@@ -4,7 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildSubjectIndex, compareStrings, readStructure } from '../../../../../scripts/lib/subjects.mjs';
+import { buildSubjectIndex, canonicalInternalPath, compareStrings, readStructure } from '../../../../../scripts/lib/subjects.mjs';
 import { scanMentions } from '../../../../../scripts/lib/mentions.mjs';
 
 /**
@@ -44,7 +44,8 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
   } else {
     const given = new Set();
     for (const raw of files) {
-      const document = normalizeDocument(raw);
+      const normalized = normalizeDocument(raw);
+      const document = normalized === null ? null : canonicalInternalPath(campaignRoot, normalized);
       if (document === null) {
         errors.push({ file: raw, message: 'file outside campaign' });
       } else if (isExternalFile(document)) {
@@ -60,7 +61,7 @@ export function computeScope(campaignRoot, { mode, files = [], subjects = [] } =
     // given sheet, and every subject mentioned (any state) in a given file.
     const selected = new Set(subjects);
     for (const subject of index.subjects) {
-      if (given.has(subject.sheet)) selected.add(subject.id);
+      if (given.has(subject.sheet) || subject.paths?.some((alias) => given.has(alias))) selected.add(subject.id);
     }
     for (const occurrence of scan.occurrences) {
       if (given.has(occurrence.file)) {

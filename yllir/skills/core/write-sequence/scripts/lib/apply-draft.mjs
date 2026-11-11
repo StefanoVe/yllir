@@ -34,6 +34,8 @@ export function applyDraft(root, { draftDir, files } = {}) {
   }
 
   const draftRoot = path.resolve(dir, draftDir);
+  if (!isInside(dir, draftRoot)) problem('bad-draft-dir', draftDir, 'draftDir must be inside the campaign folder');
+  else if (hasSymlinkOnPath(dir, draftRoot)) problem('symlink-draft-dir', draftDir, 'draftDir must not pass through a symbolic link');
   const plan = [];
   const seen = new Set();
 
@@ -53,6 +55,15 @@ export function applyDraft(root, { draftDir, files } = {}) {
 
     const draft = path.join(draftRoot, rel);
     const target = path.join(dir, rel);
+
+    if (hasSymlinkOnPath(dir, draft)) {
+      problem('symlink-draft', rel, `draft ${rel} must not be a symbolic link or pass through one`);
+      continue;
+    }
+    if (hasSymlinkOnPath(dir, target)) {
+      problem('symlink-target', rel, `target ${rel} must not be a symbolic link or pass through one`);
+      continue;
+    }
 
     let draftStat;
     try {
@@ -146,4 +157,30 @@ function isDirectory(target) {
   } catch {
     return false;
   }
+}
+
+function isInside(root, target) {
+  const relative = path.relative(path.resolve(root), path.resolve(target));
+  return relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative);
+}
+
+function hasSymlinkOnPath(root, target) {
+  const base = path.resolve(root);
+  const full = path.resolve(target);
+  if (!isInside(base, full)) return true;
+  let current = base;
+  const relative = path.relative(base, full);
+  try {
+    if (fs.lstatSync(current).isSymbolicLink()) return true;
+  } catch { return true; }
+  for (const part of relative.split(path.sep).filter(Boolean)) {
+    current = path.join(current, part);
+    try {
+      if (fs.lstatSync(current).isSymbolicLink()) return true;
+    } catch (error) {
+      if (error.code === 'ENOENT') return false;
+      return true;
+    }
+  }
+  return false;
 }

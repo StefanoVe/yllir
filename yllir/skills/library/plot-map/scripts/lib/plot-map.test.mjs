@@ -280,6 +280,18 @@ test('events in an Events folder belong to their session too', (t) => {
   );
 });
 
+test('geographic event symlink aliases are not counted as extra malformed events', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/S1/S1.md': plot('s-1', []),
+    'Trama/S1/Eventi/e.md': event('e', 's-1', []),
+  });
+  fs.mkdirSync(path.join(root, 'Trama', 'By location', 'Porto'), { recursive: true });
+  fs.symlinkSync('../../S1/Eventi/e.md', path.join(root, 'Trama', 'By location', 'Porto', 'e.md'));
+  const result = plotMap(root);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.sessions[0].events.map((item) => item.id), ['e']);
+});
+
 test('event whose session field names another session is an error and is not listed', (t) => {
   const root = makeCampaign(t, {
     'Trama/S1/S1.md': plot('s-1', []),

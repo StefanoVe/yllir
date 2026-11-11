@@ -239,6 +239,12 @@ Regole aggiuntive:
 
 ## Changelog leggibile
 
+### Adattamento delle descrizioni degli oggetti
+
+L'aggiornamento che introduce la distinzione fra `## In breve` e `## Descrizione` include anche le schede di oggetti già esistenti. L'inventario riprendibile vive separatamente dallo stato delle tabelle delle statistiche e dalla migrazione geografica: una campagna già allineata a una versione precedente avvia comunque questo controllo. Le schede vengono esaminate da Luna usando solo il canone pubblico, le personalizzazioni e il registro di prosa; le note del master non entrano nelle descrizioni né nel contesto del revisore di testo pubblico.
+
+Ogni bozza può cambiare solo le due sezioni descrittive. Le impronte della fonte impediscono di pubblicare una bozza preparata su una scheda nel frattempo modificata; le verifiche preservano byte per byte effetti, sezioni facoltative e blocco riservato. `write-sequence` applica la revisione indipendente e salva la versione. Se il contesto è insufficiente, la scheda resta in sospeso finché il master non chiarisce; se la descrizione esistente è già adeguata, la revisione viene registrata senza riscrivere il file. La migrazione si chiude soltanto quando ogni bozza verificata corrisponde al testo pubblicato.
+
 Proposta: due documenti distinti, scritti per pubblici diversi.
 
 - **Changelog tecnico** (`CHANGELOG.md` del framework): per chi sviluppa il framework. Elenca script, skill, schemi e migrazioni, con i riferimenti ai test.

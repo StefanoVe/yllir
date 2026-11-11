@@ -30,10 +30,15 @@ function write(dir, file, content) {
   fs.writeFileSync(full, content);
 }
 
+/** Root entries except the campaign state folder that holds the draft folder. */
+function visibleEntries(root) {
+  return fs.readdirSync(root).filter((name) => name !== '.campaign');
+}
+
 /** A campaign folder and a separate draft folder with two good drafts and one empty draft. */
 function setup() {
   const root = tmp();
-  const drafts = tmp();
+  const drafts = path.join(root, '.campaign', 'state', 'write', 'draft');
   write(drafts, 'Trama/Capitolo 1.md', Buffer.from('# Capitolo 1\r\n\r\nLa cenere «cade» piano.\n'));
   write(drafts, 'Mondo/Lago.md', '# Lago grigio\n');
   write(drafts, 'vuoto.md', '');
@@ -97,12 +102,31 @@ test('a campaign folder that is in the way of a file is refused', () => {
   assert.equal(fs.existsSync(path.join(root, 'Trama')), false);
 });
 
+test('drafts and destinations may not pass through symbolic links', () => {
+  const { root, drafts } = setup();
+  const external = tmp();
+  write(drafts, 'World/Harbor.md', '# Harbor\n');
+  fs.symlinkSync(external, path.join(root, 'World'));
+  const linkedParent = applyDraft(root, { draftDir: drafts, files: ['World/Harbor.md'] });
+  assert.equal(linkedParent.errors[0].code, 'symlink-target');
+  assert.equal(fs.existsSync(path.join(external, 'Harbor.md')), false);
+
+  fs.rmSync(path.join(root, 'World'));
+  fs.mkdirSync(path.join(root, 'World'), { recursive: true });
+  const outsideDraft = path.join(external, 'outside.md');
+  write(external, 'outside.md', '# Outside\n');
+  fs.symlinkSync(outsideDraft, path.join(drafts, 'World', 'Link.md'));
+  const linkedDraft = applyDraft(root, { draftDir: drafts, files: ['World/Link.md'] });
+  assert.equal(linkedDraft.errors[0].code, 'symlink-draft');
+  assert.equal(fs.existsSync(path.join(root, 'World', 'Link.md')), false);
+});
+
 test('missing arguments are refused without touching the campaign', () => {
   const { root, drafts } = setup();
   assert.equal(applyDraft(root, { draftDir: drafts, files: [] }).errors[0].code, 'bad-input');
   assert.equal(applyDraft(root, { draftDir: '', files: ['Mondo/Lago.md'] }).errors[0].code, 'bad-input');
   assert.equal(applyDraft(path.join(root, 'nope'), { draftDir: drafts, files: ['a.md'] }).errors[0].code, 'bad-root');
-  assert.deepEqual(fs.readdirSync(root), []);
+  assert.deepEqual(visibleEntries(root), []);
 });
 
 test('apply-draft CLI prints JSON and uses exit codes 0, 1 and 2', () => {
@@ -161,7 +185,7 @@ const PLOT_CAMPAIGN = [
 
 test('a session draft with two events applies the generated main file', () => {
   const root = tmp();
-  const drafts = tmp();
+  const drafts = path.join(root, '.campaign', 'state', 'write', 'draft');
   write(root, 'campaign.yaml', PLOT_CAMPAIGN);
   write(drafts, 'Trama/Il faro/Il faro.md', [
     '---',
@@ -213,10 +237,10 @@ test('a session draft with two events applies the generated main file', () => {
 
 test('a campaign with no plot documents in the written files behaves as before', () => {
   const root = tmp();
-  const drafts = tmp();
+  const drafts = path.join(root, '.campaign', 'state', 'write', 'draft');
   write(root, 'campaign.yaml', PLOT_CAMPAIGN);
   write(drafts, 'Mondo/Lago.md', '# Lago grigio\n');
   const result = applyDraft(root, { draftDir: drafts, files: ['Mondo/Lago.md'] });
   assert.deepEqual(result, { written: ['Mondo/Lago.md'], errors: [] });
-  assert.deepEqual(fs.readdirSync(root).sort(), ['Mondo', 'campaign.yaml']);
+  assert.deepEqual(visibleEntries(root).sort(), ['Mondo', 'campaign.yaml']);
 });

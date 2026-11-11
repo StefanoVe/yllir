@@ -11,7 +11,7 @@ import { analyzeMarkdown } from '../../../../../scripts/lib/zones.mjs';
 import { validateStatisticsTables } from '../../../../../scripts/lib/statistics-tables.mjs';
 import {
   readStructure,
-  listSheets,
+  listCanonicalSheets,
   buildSubjectIndex,
   compareStrings,
 } from '../../../../../scripts/lib/subjects.mjs';
@@ -123,7 +123,7 @@ export function checkSheets(campaignRoot, { files = null } = {}) {
   const candidates = new Set();
   for (const category of structure) {
     if (category.type !== 'subjects' || typeof category.folder !== 'string') continue;
-    for (const rel of listSheets(campaignRoot, category.folder)) candidates.add(rel);
+    for (const rel of listCanonicalSheets(campaignRoot, category.folder)) candidates.add(rel);
   }
 
   const filter = Array.isArray(files) ? new Set(files.map(normalizeRel)) : null;

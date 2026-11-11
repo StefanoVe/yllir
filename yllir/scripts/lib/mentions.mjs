@@ -7,7 +7,7 @@ import path from 'node:path';
 import { parseFrontmatter } from './frontmatter.mjs';
 import { analyzeMarkdown } from './zones.mjs';
 import { foldText } from './fold.mjs';
-import { readStructure, listSheets, compareStrings } from './subjects.mjs';
+import { readStructure, listCanonicalSheets, compareStrings } from './subjects.mjs';
 
 const SKIPPED_BLOCKS = new Set([
   'blank',
@@ -47,7 +47,7 @@ export function scanMentions(campaignRoot, index, { includeNotes = false } = {})
     if (category.type === 'sources') continue;
     if (category.type === 'external') continue; // read-only originals: link targets, never scanned
     if (category.type === 'notes' && !includeNotes) continue;
-    for (const sheet of listSheets(campaignRoot, category.folder)) scanned.add(sheet);
+    for (const sheet of listCanonicalSheets(campaignRoot, category.folder)) scanned.add(sheet);
   }
   const files = [...scanned].sort(compareStrings);
 
@@ -208,7 +208,7 @@ function classifyGroup(group, line, map, file, campaignRoot, index) {
   if (line.block === 'paragraph' && line.italic) return finish('excluded-italic');
 
   // Rule 8: the subject's own sheet (single subjects only).
-  if (!isHomonym && member.subject.sheet === file) return finish('self');
+  if (!isHomonym && (member.subject.sheet === file || member.subject.paths?.includes(file))) return finish('self');
 
   // Rule 9: homonyms.
   if (isHomonym) return finish('ambiguous', { candidates: memberIds });
@@ -231,14 +231,12 @@ function subjectOf(index, id) {
 }
 
 /**
- * True when a link target is the subject's sheet. Internal subjects are compared
- * as written. For an external subject (reached through a symlink) a target that
- * reaches the same file by another path, such as the real path of the original,
- * is the same sheet too.
+ * True when a link target reaches the subject's original document. Internal
+ * geographic aliases and external ingest symlinks both resolve to that file.
  */
 function isSameSheet(target, subject, campaignRoot) {
   const sheet = subject.sheet;
-  if (target === sheet) return true;
+  if (target === sheet || subject.paths?.includes(target)) return true;
   if (!subject.external) return false;
   if (/^[a-z][a-z0-9+.-]*:/i.test(target)) return false; // external URL
   const real = realpathOrNull(path.join(campaignRoot, target));

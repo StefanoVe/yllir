@@ -10,7 +10,7 @@ import { analyzeMarkdown } from '../../../../../scripts/lib/zones.mjs';
 import { foldForm } from '../../../../../scripts/lib/fold.mjs';
 import {
   readStructure,
-  listSheets,
+  listCanonicalSheets,
   buildSubjectIndex,
   compareStrings,
 } from '../../../../../scripts/lib/subjects.mjs';
@@ -52,7 +52,7 @@ export function plotCast(campaignRoot, { files = null } = {}) {
   const seenFiles = new Set();
   for (const category of structure) {
     if (category.type !== 'plot' || typeof category.folder !== 'string') continue;
-    for (const file of listSheets(campaignRoot, category.folder)) {
+    for (const file of listCanonicalSheets(campaignRoot, category.folder)) {
       if (seenFiles.has(file)) continue;
       seenFiles.add(file);
       if (wanted !== null && !wanted.has(file)) continue;
