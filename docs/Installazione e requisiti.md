@@ -1,6 +1,7 @@
 # Installazione e requisiti
 
 **Stato:** Bozza di progetto
+Riscritto dopo la [Riprogettazione](Riprogettazione.md) (2026-11-11).
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
 
 Questo documento stabilisce che cosa serve per usare il framework, come si installa per chi non ha mai aperto un terminale, come si verifica che l'installazione funzioni, che cosa succede quando qualcosa manca o si rompe, e come si disinstalla. Sviluppa la sezione «Installazione per chi non ha mai aperto un terminale» di [Esperienza utente](Esperienza%20utente.md) e non la contraddice; dove la contraddizione è inevitabile, è segnalata nelle questioni aperte.
@@ -11,9 +12,9 @@ Convenzioni: **Deciso** indica ciò che è nell'indice o è una decisione dell'a
 
 ### 1.1 Da dove si lavora
 
-**Deciso.** La prima versione gira nel terminale o nell'app di Claude. Non esiste ancora un'interfaccia dedicata: il [master screen](Master%20screen.md) è un passo successivo.
+**Deciso.** La prima versione gira nel terminale o nell'app di Claude. Non esiste ancora un'interfaccia dedicata: il [master screen](Master%20screen.md) è un passo successivo. Dalla [Riprogettazione](Riprogettazione.md) (decisione 11, 2026-11-11), il framework si distribuisce solo come plugin per Claude Code. Non esiste più un pacchetto per Codex, né per altri assistenti: Codex, se usato, è al più un fornitore di immagini facoltativo. La prima versione gira in Claude Code, nel terminale. Non esiste ancora un'interfaccia dedicata: il [master screen](Master%20screen.md) è un passo successivo.
 
-**Proposta.** Il percorso principale passa dallo strumento da terminale di Claude, installato e avviato dall'installatore. Il master non digita comandi: apre il collegamento che l'installatore crea e indica la cartella della campagna, come al passo 7 della sezione 3.2. L'app di Claude è un percorso alternativo solo se si verifica che esegue i controlli automatici, gli script e i sub-agent del framework (**da verificare**; vedi questioni aperte). Per le funzioni che richiedono hook e sub-agent, come descritte in [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md), il percorso principale è quello che le supporta tutte.
+**Proposta.** Il percorso principale passa da Claude Code, installato e avviato dall'installatore. Il master non digita comandi: apre il collegamento che l'installatore crea e indica la cartella della campagna, come al passo 7 della sezione 3.2. L'app di Claude è un percorso alternativo solo se si verifica che esegue i controlli automatici, gli script e i sub-agent del framework (**da verificare**; vedi questioni aperte). Per le funzioni che richiedono hook e sub-agent, come descritte in [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md), il percorso principale è quello che le supporta tutte.
 
 ### 1.2 Computer e sistemi operativi
 
@@ -21,20 +22,20 @@ Convenzioni: **Deciso** indica ciò che è nell'indice o è una decisione dell'a
 
 | Sistema | Proposta per la prima versione | Note |
 |---|---|---|
-| macOS (ultime due versioni principali) | Supportato | La versione minima esatta è **da verificare** sulle versioni rilasciate dallo strumento di Claude. Le istruzioni per aprire il terminale in [Esperienza utente](Esperienza%20utente.md) restano valide come alternativa. |
+| macOS (ultime due versioni principali) | Supportato | La versione minima esatta è **da verificare** sulle versioni rilasciate da Claude Code. Le istruzioni per aprire il terminale in [Esperienza utente](Esperienza%20utente.md) restano valide come alternativa. |
 | Windows 11 | Supportato, da confermare | Richiede Git e Node installati dall'installatore; le istruzioni per il terminale puntano a PowerShell, come in [Esperienza utente](Esperienza%20utente.md). |
-| Windows 10 | Da decidere | Dipende dal supporto che lo strumento di Claude offre a quel sistema (**da verificare**). |
+| Windows 10 | Da decidere | Dipende dal supporto che Claude Code offre a quel sistema (**da verificare**). |
 | Linux | Fuori dalla prima versione | Non è il pubblico previsto dalla specifica. Lo stesso installatore può essere esteso in seguito. |
 | Tablet e telefoni | Non supportati | Il framework scrive file nella cartella del computer. |
 
-**Hardware.** Nessun minimo fissato. La prima versione non esegue modelli in locale: il computer deve poter far girare lo strumento di Claude, Git, Node e un editor di testo. Il minimo reale va misurato sulle versioni rilasciate (**da verificare**).
+**Hardware.** Nessun minimo fissato. La prima versione non esegue modelli in locale: il computer deve poter far girare Claude Code, Git, Node e un editor di testo. Il minimo reale va misurato sulle versioni rilasciate (**da verificare**).
 
 ### 1.3 Account e abbonamento
 
 | Servizio | Serve per | Obbligatorio |
 |---|---|---|
-| Account Claude con un piano che consente l'uso dello strumento scelto | L'assistente, che esegue quasi tutto il lavoro sulla campagna | Sì. Il piano minimo è **da verificare** sul sito del fornitore. |
-| Account OpenAI con accesso a Codex e a ImageGen | Illustrazioni e alcune revisioni con Codex | No. Requisiti di accesso **da verificare**. |
+| Account Claude con un piano che consente l'uso di Claude Code | L'assistente, che esegue quasi tutto il lavoro sulla campagna | Sì. Il piano minimo è **da verificare** sul sito del fornitore. |
+| Account OpenAI con accesso a ImageGen | Illustrazioni, se si sceglie questo fornitore di immagini. Codex non è più un plugin (**Deciso**, decisione 11) | No. Requisiti di accesso **da verificare**. |
 | Account Adobe con Photoshop | Carte a livelli, rifiniture generative, anteprime | No. Le funzioni generative dipendono dal piano Adobe (**da verificare**). |
 | Account presso un fornitore di immagini via API, con chiave | Generazione di immagini alternativa | No. Il fornitore va scelto e verificato al momento dell'adozione. |
 | Account di hosting e dominio | Pubblicazione dell'enciclopedia | No. Nessun servizio è ancora scelto. |
@@ -48,7 +49,7 @@ Regole:
 
 | Strumento | A che cosa serve | Stato | Come arriva sul computer |
 |---|---|---|---|
-| Strumento di Claude (terminale o app) | L'assistente | Obbligatorio | Scaricato dal sito ufficiale; l'installatore lo propone e lo avvia se manca. |
+| Claude Code, con il plugin di Yllir | L'assistente | Obbligatorio | Scaricato dal sito ufficiale; l'installatore lo propone e lo avvia se manca. |
 | Git | Conserva le versioni salvate della campagna. Il master non lo vede mai. | Obbligatorio (**Deciso**): senza, il framework non scrive | Installato dall'installatore se manca. |
 | Node.js, versione LTS | Esegue gli script deterministici: controllo dei collegamenti, validazione, indici, controllo dell'installazione | Obbligatorio (**Proposta**) | Installato dall'installatore se manca. |
 | Editor di testo | Il master può leggere e correggere le schede a mano | Facoltativo | Non serve: va bene qualunque editor di Markdown o di testo. |
@@ -66,7 +67,7 @@ La versione minima di Node non si fissa qui: si sceglie al momento del rilascio,
 
 ### 1.5 Spazio su disco e connessione
 
-**Spazio su disco.** Proposta, stima prudenziale da verificare: almeno 5 GB liberi per lo strumento di Claude, Git, Node e il pacchetto del framework. La campagna in sé, cioè testi e schede, occupa poco; lo spazio cresce con le immagini, le fonti scansionate e la storia delle versioni salvate. Lo spazio per Photoshop o per una generazione locale è dichiarato dal modulo (sezione 2) e va verificato.
+**Spazio su disco.** Proposta, stima prudenziale da verificare: almeno 5 GB liberi per Claude Code, Git, Node e il pacchetto del framework. La campagna in sé, cioè testi e schede, occupa poco; lo spazio cresce con le immagini, le fonti scansionate e la storia delle versioni salvate. Lo spazio per Photoshop o per una generazione locale è dichiarato dal modulo (sezione 2) e va verificato.
 
 **Connessione.**
 
@@ -83,7 +84,7 @@ La versione minima di Node non si fissa qui: si sceglie al momento del rilascio,
 
 | Modulo | Che cosa serve | Che cosa succede se manca |
 |---|---|---|
-| **Codex** (illustrazioni con ImageGen, alcune revisioni) | Codex installato; accesso con un account che ha ImageGen (**da verificare**). Quando si usa Codex, l'installatore deve consentirgli di scrivere nella cartella `.git` della campagna (impostazione `sandbox_workspace_write.writable_roots`), altrimenti le versioni salvate falliscono. *Verificato con una prova, da inserire nell'installatore.* | **Deciso** in [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md#fallback): se Codex manca, la generazione passa al fornitore successivo nell'ordine configurato; se nessuno è disponibile, si ferma e il framework lo dice. Le revisioni affidate a Codex passano a un revisore dell'altra famiglia o a un revisore Haiku (**Proposta**, stessa sezione). |
+| **Generazione di immagini** con un fornitore facoltativo (per esempio ImageGen, con un account OpenAI) | Account e accesso del fornitore scelto (**da verificare**). Codex non è più un plugin del framework: al più è un fornitore di immagini, come dice la decisione 4 della [Riprogettazione](Riprogettazione.md) | Le illustrazioni non si generano; il resto prosegue, e il framework lo dice una volta sola (**Proposta**). |
 | **Photoshop e il suo server MCP** (carte a livelli, rifiniture generative) | Photoshop installato; server MCP collegato; funzioni generative attive con il piano Adobe (**da verificare**) | Le carte si producono senza PSD a livelli, oppure non si producono (da decidere, vedi [Integrazioni esterne](Integrazioni%20esterne.md)). Le rifiniture generative non sono disponibili. Il framework lo dichiara sulla carta. |
 | **Chiavi API dei fornitori di immagini** | Account presso il fornitore e chiave, conservata sul computer e mai nei file della campagna ([Integrazioni esterne](Integrazioni%20esterne.md), sezione 6) | Il fornitore resta spento; gli altri fornitori attivi restano disponibili. |
 | **Generazione locale di immagini** | Computer con scheda grafica adeguata, spazio su disco, installazione guidata (requisiti **da verificare**) | Non attiva. Nessuna conseguenza sul resto. |
@@ -92,7 +93,7 @@ La versione minima di Node non si fissa qui: si sceglie al momento del rilascio,
 | **Pubblicazione dell'enciclopedia** | Account di hosting, programma a riga di comando del servizio scelto, dominio (**da verificare**) | L'enciclopedia resta una raccolta di pagine locali, consultabile sul computer. Nulla viene pubblicato. |
 | **Browser di verifica** (controllo visivo dell'enciclopedia) | Un browser e gli strumenti di verifica (**da verificare**) | Il controllo dei collegamenti resta, perché è deterministico. Manca il controllo visivo, e il framework dichiara che non è stato fatto. |
 | **Lettura di PDF scansionati** (importazione di appunti) | Uno strumento di riconoscimento del testo (**da verificare**) | I PDF scansionati non si leggono come testo. Le foto restano leggibili dall'assistente, se il servizio lo consente (**da verificare**). |
-| **Master screen** | **Deciso:** non è nella prima versione. In seguito, un'app locale senza servizi esterni | Nessun master screen: si lavora dal terminale o dall'app di Claude. Nulla cambia nel resto. |
+| **Master screen** | **Deciso:** non è nella prima versione. In seguito, un'app locale senza servizi esterni | Nessun master screen: si lavora dal terminale di Claude Code. Nulla cambia nel resto. |
 | **Skill documentali** (PDF, Word, presentazioni) | Disponibili nell'ambiente di Claude, non nel pacchetto | Dispense e schede stampabili restano in formato Markdown o si producono con i fogli di stampa. |
 
 ## 3. Percorso di installazione per chi non ha mai aperto un terminale
@@ -110,10 +111,10 @@ Il percorso principale non richiede di aprire il terminale. Se un passo chiede u
 ### 3.2 I passi
 
 1. **Controlla il computer.** Verifica che il sistema sia tra quelli supportati e che ci sia spazio. Se il computer è di lavoro, controlla con chi lo gestisce che l'installazione di programmi sia consentita.
-2. **Crea l'account Claude.** Dal sito ufficiale del fornitore, crea l'account e controlla il piano necessario allo strumento scelto (**da verificare**, nessun prezzo qui).
+2. **Crea l'account Claude.** Dal sito ufficiale del fornitore, crea l'account e controlla il piano necessario a Claude Code (**da verificare**, nessun prezzo qui).
 3. **Scarica l'installatore.** Dalla pagina ufficiale del framework (nome e indirizzo da decidere). Controlla che sia la pagina giusta: l'installatore si scarica solo da lì, e la pagina riporta l'impronta di controllo del file (**Proposta**).
-4. **Apri il file e segui le finestre.** L'installatore verifica il file, installa i componenti di base che mancano (sezione 1.4), installa o collega l'assistente, copia il pacchetto del framework in una posizione del sistema e crea il collegamento per avviarlo. Può chiedere la password del computer. Non installa moduli opzionali.
-5. **Accedi a Claude.** Quando lo strumento lo chiede, si apre la finestra di accesso dell'account creato al passo 2.
+4. **Apri il file e segui le finestre.** L'installatore verifica il file, installa i componenti di base che mancano (sezione 1.4), installa Claude Code se manca, registra il plugin di Yllir, copia il pacchetto del framework in una posizione del sistema e crea il collegamento per avviarlo. Può chiedere la password del computer. Non installa moduli opzionali.
+5. **Accedi a Claude.** Quando Claude Code lo chiede, si apre la finestra di accesso dell'account creato al passo 2.
 6. **Attendi il controllo dell'installazione** (sezione 3.4). Alla fine mostra l'esito in linguaggio semplice.
 7. **Crea la prima campagna.** Crea una cartella vuota, con il nome della campagna, in un percorso locale e non sincronizzato (sezione 1.5). Apri il collegamento creato dall'installatore, indica la cartella e scrivi una frase: per esempio «voglio creare una nuova campagna». Il framework propone la creazione, come descritto in [Esperienza utente](Esperienza%20utente.md), e inizializza subito il repository delle versioni salvate.
 
@@ -130,7 +131,7 @@ Alla fine dell'installazione, e ogni volta che il master lo chiede con una frase
 | Controllo | Come si verifica | Esito se fallisce |
 |---|---|---|
 | Sistema supportato | Versione del sistema operativo | Non pronto: sistema non supportato. |
-| Strumento di Claude presente e accesso attivo | Presenza dello strumento e prova di accesso leggera (**da verificare** che non consumi risorse) | Non pronto: accesso da completare. |
+| Claude Code presente e accesso attivo | Presenza di Claude Code e prova di accesso leggera (**da verificare** che non consumi risorse) | Non pronto: accesso da completare. |
 | Git presente e configurato | Presenza e versione minima; identità locale impostata una volta dall'installatore con un nome generico | Non pronto: manca lo strumento delle versioni salvate. Nessuna scrittura è possibile (sezione 4). |
 | Node presente, versione minima | Presenza e versione | Non pronto: manca il componente di controllo. |
 | Pacchetto integro | Impronte dei file del framework (vedi [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md)) | Avviso: alcuni file sono cambiati. |
@@ -146,6 +147,18 @@ Alla fine dell'installazione, e ogni volta che il master lo chiede con una frase
 - **Non ancora pronto.** «Non posso ancora lavorare sulla campagna perché [motivo in una frase]. Per risolvere: [azione]. Nulla nella tua cartella è stato cambiato.»
 
 Un controllo che non ha potuto girare è dichiarato «non verificato», mai «riuscito». Il dettaglio tecnico resta nel registro, come in [Esperienza utente](Esperienza%20utente.md).
+
+### 3.5 Permessi del progetto
+
+**Implementato in 0.30.0.** Ogni campagna contiene un file `.claude/settings.json`, scritto dal generatore delle istruzioni (vedi [Configurazione](Configurazione.md), sezione «Da configurazione a istruzioni») e mai a mano. Dà all'assistente il permesso di eseguire senza conferma queste sole operazioni:
+
+- invocare le istruzioni del framework (`Skill(yllir:*)`);
+- scrivere nella cartella di stato della campagna (`Edit(.campaign/state/**)`) e nella cartella delle bozze (`Edit(.campaign/drafts/**)`);
+- eseguire il motore (`Bash(node "*/scripts/engine.mjs" *)`), che è l'unico modo di scrivere i documenti della campagna.
+
+Nessuna regola dà permessi sui documenti della campagna fuori dal motore. Le regole aggiunte dal master vanno in `.claude/settings.local.json`, che il generatore non tocca.
+
+**Proposta.** L'installatore non scrive questi permessi: li scrive la campagna, al momento della sua creazione o della sua rigenerazione.
 
 ## 4. Rilevamento di ciò che manca o si è rotto
 
@@ -166,13 +179,13 @@ Ogni messaggio dice tre cose: che cosa non funziona, che cosa non è cambiato, c
 | Che cosa si rileva | Messaggio al master (esempio) | Azione proposta | Effetto sul lavoro |
 |---|---|---|---|
 | Accesso a Claude scaduto o non attivo | «Non riesco a collegarmi all'assistente: l'accesso sembra scaduto. Accedi di nuovo all'assistente, poi riprendiamo.» | Accedi di nuovo; se il piano non basta, controlla sul sito del fornitore. | Nessuna richiesta all'assistente finché non si accede. La lettura resta possibile. |
-| Strumento di Claude disinstallato | «Non trovo più lo strumento con cui lavoriamo. Rilancia l'installatore: ritrovo la campagna com'è.» | Rilancia l'installatore, che ripara l'installazione (sezione 5). | Nessuna richiesta all'assistente. La campagna non cambia. |
+| Claude Code disinstallato | «Non trovo più lo strumento con cui lavoriamo. Rilancia l'installatore: ritrovo la campagna com'è.» | Rilancia l'installatore, che ripara l'installazione (sezione 5). | Nessuna richiesta all'assistente. La campagna non cambia. |
 | Git mancante | «Non trovo lo strumento che conserva le versioni salvate. Finché non lo reinstalli non modifico nulla: ogni modifica deve poter tornare indietro.» | Rilancia l'installatore: installa il componente delle versioni salvate. | **Blocco delle scritture**: nessun file della campagna viene modificato senza una versione salvata a cui tornare. |
 | Node mancante o troppo vecchio | «Un componente necessario per i controlli è mancante o troppo vecchio. Rilancia l'installatore per ripararlo.» | Rilancia l'installatore. | Blocco dei controlli deterministici; le scritture restano bloccate fino al controllo riuscito. |
 | Strumento più vecchio del minimo richiesto dal framework | «Lo strumento X è troppo vecchio per questa versione del framework. Aggiornalo dal suo sito; il framework non lo aggiorna da solo.» | Aggiornare lo strumento (sezione 5). | Solo il modulo che usa X resta spento. |
 | Versione della campagna più nuova del framework installato | «Questa campagna è stata creata con una versione più recente del framework. Aggiorna il framework prima di continuare.» | Aggiornare il framework (vedi [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md)). | Blocco delle scritture: la campagna non viene modificata da una versione più vecchia. |
 | Chiave di un fornitore di immagini scaduta o revocata | «La chiave del servizio X non funziona più. Inseriscine una nuova, oppure continuiamo senza quel servizio.» | Inserire una nuova chiave o disattivare il fornitore. | Il fornitore resta spento. |
-| Generatore di immagini non collegato all'account | «Il generatore di immagini non è collegato al tuo account, quindi non posso creare illustrazioni. Accedi al servizio, oppure continuiamo senza.» | Accedere al servizio di immagini. | Solo le illustrazioni con Codex; il resto prosegue. |
+| Generatore di immagini non collegato all'account | «Il generatore di immagini non è collegato al tuo account, quindi non posso creare illustrazioni. Accedi al servizio, oppure continuiamo senza.» | Accedere al servizio di immagini. | Solo le illustrazioni; il resto prosegue. |
 | Programma di grafica chiuso | «Per fare le carte devi aprire il programma di grafica con il documento della carta.» | Aprire il programma di grafica. | Le carte attendono; nessun file viene toccato. |
 | Connessione assente | «Non riesco a raggiungere l'assistente: controlla la connessione. Le schede restano leggibili.» | Ristabilire la connessione. | Solo le funzioni online sono ferme. |
 | Disco pieno o cartella non scrivibile | «Non posso salvare: il computer non ha più spazio, oppure la cartella è protetta. Nessuna modifica è stata fatta.» | Liberare spazio, o scegliere un'altra cartella. | Blocco delle scritture. |
@@ -197,8 +210,8 @@ Sono due aggiornamenti diversi, con chi li fa e quando.
 | Che cosa | Chi lo aggiorna | Quando | Dove |
 |---|---|---|---|
 | Framework | Il framework stesso, con la procedura di [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md) | Su richiesta del master, dopo l'avviso di aggiornamento disponibile | Nella sezione dedicata di quel documento |
-| Strumento di Claude | Il suo fornitore, con il proprio meccanismo | Quando il fornitore lo chiede o quando il framework rileva una versione sotto il minimo | Sito del fornitore; il framework dà solo il link |
-| Codex, Photoshop, Git, Node | Ciascun fornitore | Come sopra | Sito o meccanismo del fornitore |
+| Claude Code | Anthropic, con il proprio meccanismo | Quando il fornitore lo chiede o quando il framework rileva una versione sotto il minimo | Sito del fornitore; il framework dà solo il link |
+| Fornitore di immagini, Photoshop, Git, Node | Ciascun fornitore | Come sopra | Sito o meccanismo del fornitore |
 | Pacchetto installato, con gli strumenti di base | L'installatore, rilanciato (ripara e aggiorna) | Quando il master lo sceglie o quando il controllo lo chiede | Stesso file dell'installazione |
 
 Regole (**Proposta**):
@@ -221,7 +234,7 @@ Regole (**Proposta**):
 | Uscite (enciclopedia, fogli di stampa, mappe derivate) | **Restano** come file statici, che si possono consultare o cancellare. Non sono canone. |
 | Istruzioni generate per gli agenti (`.campaign/instructions/`) | **Restano** ma sono inutili senza il framework. Si possono cancellare. |
 | Pacchetto del framework, collegamento di avvio, comandi aggiunti | **Vengono rimossi** dal disinstallatore. |
-| Git, Node, lo strumento di Claude, Codex, Photoshop | **Non vengono rimossi** per impostazione predefinita: sono programmi usati anche da altro. Il disinstallatore li elenca e chiede se rimuoverli. |
+| Git, Node, Claude Code, il fornitore di immagini, Photoshop | **Non vengono rimossi** per impostazione predefinita: sono programmi usati anche da altro. Il disinstallatore li elenca e chiede se rimuoverli. |
 | Chiavi API dei fornitori di immagini | Vengono rimosse dal computer solo su richiesta. **Vanno revocate sul sito del fornitore**: il framework non può farlo, e una chiave resta valida finché non la si revoca. |
 | Account Claude, Adobe, OpenAI, hosting | Non vengono toccati. Gli abbonamenti si disdicono sui siti dei fornitori. |
 
@@ -232,7 +245,7 @@ Regole (**Proposta**):
 ## 7. Questioni aperte
 
 1. **Sistemi operativi.** Confermare macOS e Windows 11 come obiettivi della prima versione; decidere se Windows 10 entra e a quali condizioni. Le versioni minime vanno misurate sulle versioni rilasciate (**da verificare**).
-2. **Piano Claude.** Quale piano consente l'uso dello strumento scelto, e il framework deve dichiararlo come requisito o limitarsi a un rimando al sito (**da verificare**).
+2. **Piano Claude.** Quale piano consente l'uso di Claude Code, e il framework deve dichiararlo come requisito o limitarsi a un rimando al sito (**da verificare**).
 3. **App di Claude come percorso.** Verificare se l'app esegue hook, script e sub-agent del framework. Se no, l'app non è un percorso supportato nella prima versione, e questo va scritto in [Esperienza utente](Esperienza%20utente.md).
 4. **Librerie di composizione.** Va decisa se le librerie di composizione (stampa, QR) sono incluse nel pacchetto, con verifica delle licenze, o restano dipendenze esterne come ImageMagick e qrencode, che [Integrazioni esterne](Integrazioni%20esterne.md) elenca fra i requisiti di stampa.
 5. **Installatore e fiducia.** Scegliere la forma dell'installatore per macOS e per Windows. Va verificato se serve una firma del programma e che costo comporta (**da verificare**). Va deciso dove vive la pagina ufficiale. Questo risponde in parte alla domanda di [Esperienza utente](Esperienza%20utente.md) sulla provenienza del pacchetto.
@@ -242,6 +255,6 @@ Regole (**Proposta**):
 9. **Spazio e consumo.** Le stime della sezione 1.5 vanno misurate. Va deciso se il framework avverte quando la storia delle versioni supera una soglia, come chiede [Architettura](Architettura.md) in questioni aperte.
 10. **Cartelle sincronizzate.** Il controllo le segnala e non blocca. Va confermato che un avviso basta, o se la sincronizzazione deve impedire la scrittura.
 11. **Chiavi e loro posto.** Va scelto dove si conservano le chiavi API sul computer, fuori dalla campagna: portachiavi di sistema, file personale o variabile d'ambiente. [Integrazioni esterne](Integrazioni%20esterne.md) fissa solo che non stanno nella campagna.
-12. **Disinstallatore e strumenti condivisi.** Va confermato che Git, Node e lo strumento di Claude non vengono rimossi per impostazione predefinita, e che la storia delle versioni può restare dopo la disinstallazione.
+12. **Disinstallatore e strumenti condivisi.** Va confermato che Git, Node e Claude Code non vengono rimossi per impostazione predefinita, e che la storia delle versioni può restare dopo la disinstallazione.
 13. **Connessione e lavoro offline.** La sezione 1.5 elenca cosa resta disponibile senza rete. Va verificato con l'esperienza reale, soprattutto per la stampa e per la lettura dei controlli.
-14. **Permesso di scrittura di Codex sul Git.** Va deciso come l'installatore imposta il permesso di scrittura di Codex sulla cartella `.git` di ciascuna campagna: una regola globale valida per tutte le cartelle, oppure una regola per ogni campagna. Non deciso.
+14. **Permesso di scrittura di Codex sul Git.** **Superata dalla Riprogettazione (decisione 11, 2026-11-11):** Codex non è più un plugin del framework e non scrive nella cartella `.git`; le versioni salvate le scrive solo il motore.
