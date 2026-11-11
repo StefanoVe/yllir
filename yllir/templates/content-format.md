@@ -234,9 +234,9 @@ Validated: the sections and their order, the no-statistics sentence for `creatur
 ### 4.6 Item (`template: item`)
 
 - Category: `Oggetti/`; produces cards when its `structure` entry sets `cards: true`. Metadata block: `id`, `kind: item`, `template: item`, `provenance`, `location` (where it is now), `print` for objects with a card.
-- Required, in order: the title; `## In breve` (English: `## In brief`), a public summary; `## Descrizione` (English: `## Description`); `## Effetti` (English: `## Effects`), in the adapter's format, or the sentence `Nessun effetto di gioco` (English: `No game effect`) when a source establishes there is none.
+- Required, in order: the title; `## In breve` (English: `## In brief`), a public summary of the item as the players know it; `## Descrizione` (English: `## Description`); `## Effetti` (English: `## Effects`), with only the effects known to the players, in the adapter's format, or the sentence `Nessun effetto di gioco` (English: `No game effect`) when no effect is known to the players.
 - Optional, in order after Effects: `## Origine` (English: `## Origin`); `## Ritrovamento` (English: `## Finding`); `## Testo` (English: `## Text`), full text of a letter or book, ordinary prose; `## Valore` (English: `## Value`).
-- Master block: `### Indicazioni per il master` (English: `### Master notes`), with the true origin and secrets.
+- Master block: `### Indicazioni per il master` (English: `### Master notes`), with the full context of the item: what it really is, its true origin, its complete real effects, its secrets, its plot uses, and what the players do not know yet. Public sections never state or hint at these.
 - Card image, if planned, follows the title: `img/<base-name>.png` with the `.psd` source beside it. A printed card keeps its file name (QR codes point to the `id`).
 
 Validated: exactly one public level-1 title; `In breve`, `Descrizione`, `Effetti` in this order and non-empty; optional sections in order without duplicates; master block.

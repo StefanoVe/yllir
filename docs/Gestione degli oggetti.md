@@ -63,11 +63,11 @@ Le prime tre sono la parte pubblica. Le note del master stanno nel blocco riserv
 | Sezione | Pubblica | Contenuto |
 | --- | --- | --- |
 | titolo `#` | sì | il nome dell'oggetto |
-| `## In breve` | sì | una o due frasi su aspetto fisico e funzione essenziale stabilita; è il testo che le uscite brevi (carta, tooltip, elenchi) possono riusare. |
-| `## Descrizione` | sì | descrizione completa: aggiunge contesto stabilito sull'oggetto, come provenienza, materiali o usi, quando disponibile, in prosa nel registro della campagna; non si limita a ripetere la breve. |
-| `## Effetti` | sì | tutti i dettagli meccanici, nel formato dell'adattatore del sistema; senza effetti, «Nessun effetto di gioco». |
+| `## In breve` | sì | una o due frasi su aspetto fisico e funzione essenziale, come li conoscono i giocatori; è il testo che le uscite brevi (carta, tooltip, elenchi) possono riusare. |
+| `## Descrizione` | sì | descrizione completa: aggiunge il contesto che i giocatori conoscono o possono cogliere, come provenienza apparente, materiali o usi, quando disponibile, in prosa nel registro della campagna; non si limita a ripetere la breve. |
+| `## Effetti` | sì | gli effetti noti ai giocatori, nel formato dell'adattatore del sistema; senza effetti noti, «Nessun effetto di gioco». |
 | sezioni facoltative | sì | `## Origine`, `## Ritrovamento`, `## Testo`, `## Valore`, in quest’ordine; ciascuna può essere omessa. |
-| blocco riservato `### Indicazioni per il master` | no | note del master: origine vera, segreti, usi in trama. Ultimo contenuto del file. |
+| blocco riservato `### Indicazioni per il master` | no | il contesto pieno dell'oggetto: che cosa è davvero, origine vera, effetti reali completi, segreti, usi in trama, e che cosa i giocatori non sanno ancora. Ultimo contenuto del file. |
 
 La presenza di una sezione facoltativa non rende pubblica un’informazione riservata: i fatti non noti ai personaggi stanno soltanto nel blocco master. La breve e la completa devono essere coerenti e non contraddirsi; ciascuna include i fatti stabiliti pertinenti al proprio scopo, ma la breve non deve riassumere ogni fatto della completa. Il framework può inventare ciò che le fonti non danno, ma lo dichiara al master e non lo presenta come fonte (Riprogettazione, decisione 7, che sostituisce la regola sull’immaginazione).
 
@@ -112,6 +112,7 @@ La sigla è quella della nave scomparsa. Chi la riconosce sa dove è stata fabbr
 - **Posizione.** `location` è il luogo attuale, aggiornato dopo la sessione da `after-session` su dichiarazione del master.
 - **Riservato.** Le note del master non compaiono mai nelle descrizioni, nelle carte, nelle ricerche web, nei prompt per le immagini né nei revisori di testi destinati ai giocatori. Il passaggio da riservato a pubblico avviene solo per azione esplicita del master. Un rimando a una nota riservata usa l'ancora `#master`.
 - **Descrizioni brevi e complete (Deciso, 2026-11-10).** La breve descrive concisamente l’aspetto fisico e la funzione essenziale stabilita. La completa aggiunge il contesto stabilito disponibile, come provenienza, materiali e usi, invece di ripetere soltanto la breve. Entrambe restano coerenti con i fatti noti ai personaggi; non si inventano fatti salvo l’immaginazione descrittiva autorizzata nella richiesta. **Superata dalla Riprogettazione (2026-11-11), decisione 7:** il framework può inventare ciò che le fonti non danno, ma lo dichiara al master.
+- **Conoscenza dei giocatori (Deciso, dall'autore, 2026-11-11).** La descrizione breve e quella completa descrivono l'oggetto come lo conoscono i giocatori: ciò che vedono, ciò che è stato detto o identificato al tavolo, ciò che chiunque nel mondo saprebbe. Non anticipano ciò che non sanno (natura nascosta, maledizioni, effetti non identificati, origine vera) e non lo lasciano intuire. Le note del master contengono invece il contesto pieno dell'oggetto, non solo i segreti: che cosa è davvero, origine vera, effetti reali completi, usi in trama e la differenza fra ciò che i giocatori sanno e la verità, così che il master non debba ricostruirlo dalla parte pubblica. Quando i giocatori scoprono qualcosa, il passaggio alla parte pubblica avviene solo per azione esplicita del master (vedi «Riservato»).
 - **Tono delle descrizioni (Deciso, 2026-11-10).** Sia la descrizione breve sia quella completa seguono, nell’ordine, le regole del master in `.campaign/customizations.md`, il registro `prose.register` di `campaign.yaml`, e gli esempi già scritti nella campagna per ciò che le prime due fonti non specificano. Il framework non ha un tono suo e non ne inventa uno. Il revisore giudica la coerenza; un tono dubbio è una domanda per il master.
 - **Effetti (Deciso, 2026-11-10).** La parte pubblica riporta soltanto gli effetti noti ai personaggi. Gli effetti reali non noti restano nel blocco master. Non si scrivono a mano fuori dal formato dell’adattatore; la validazione è obbligatoria prima della scrittura (Riprogettazione, sezione 7). Senza adattatore (`system.adapter: none`) la sezione `## Effetti` resta in testo libero e il controllo dell'adattatore è saltato, dichiarandolo nel rapporto.
 - **Collegamenti.** Ogni menzione dell'oggetto in altri documenti diventa un link alla scheda dopo la scrittura, come per ogni soggetto; la scheda è inclusa nell'indice dei soggetti con i suoi alias.
@@ -150,4 +151,5 @@ Gli eventi possono dichiarare gli oggetti con `items: [id, ...]`. Il controllo v
 
 ## Questioni aperte
 
-- Per oggetti magici non identificati, quale contenuto pubblico mostrare dipende dall’adattatore e dai fatti confermati dal master.
+- Per oggetti magici non identificati, il principio è fissato («Conoscenza dei giocatori», 2026-11-11): la parte pubblica mostra solo ciò che è noto, il resto sta nelle note del master. Resta aperto se l'adattatore debba fornire un formato per gli effetti parzialmente noti.
+- Le schede esistenti scritte prima di «Conoscenza dei giocatori» vanno riesaminate con una migrazione (spostando nel blocco master ciò che i giocatori non sanno), oppure la regola vale solo per le schede nuove?
