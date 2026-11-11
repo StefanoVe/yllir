@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Inventories the files given to document-ingest and writes inventory.json.
+// Inventories the files given to import and writes inventory.json.
 // Usage: node ingest-inventory.mjs <campaignRoot> --inputs "<p1>,<p2>" --out <inventory.json>
 // Exit codes: 0 no errors, 1 errors, 2 usage error.
 

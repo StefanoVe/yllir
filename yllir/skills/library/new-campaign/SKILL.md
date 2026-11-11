@@ -1,8 +1,8 @@
 ---
 name: new-campaign
-description: Core process. Creates a new Yllir campaign in an empty folder with a short interview (four questions, then a name and premise if missing, then one confirmation), and writes its first documents: the world seed and the world description.
+description: Library skill. Creates a new Yllir campaign in an empty folder with a short interview (four questions, then a name and premise if missing, then one confirmation), and writes its first documents: the world seed and the world description.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/new-campaign/scripts/init-campaign.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/new-campaign/scripts/add-category.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/new-campaign/scripts/set-system.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Edit, Agent, Skill, Glob, Grep
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/new-campaign/scripts/init-campaign.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/new-campaign/scripts/set-system.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Edit, Agent, Skill, Glob, Grep
 ---
 
 # New campaign
@@ -22,7 +22,7 @@ Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" .` and read its `fol
 
 Skip any question the master's message already answers. Ask the rest in ONE numbered message, in plain words, saying the master can answer with numbers or in their own words:
 1. **Language**: the language to write the campaign in. Offer the language the master writes in (with its name in that language) and one other common language. Default: the language the master writes in.
-2. **Game**: the game the campaign is played with. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/new-campaign/scripts/set-system.mjs" . --list`. It prints `{"adapters":[{"id","name"}]}`. Offer those names and «my own system / other». Default: none. A game matches only when it is the same edition (for example «D&D 2024» or «DnD 2024» match `dnd-2024`; «D&D 5e» without 2024 does not). Keep the matched `id`, or none.
+2. **Game**: the game the campaign is played with. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/new-campaign/scripts/set-system.mjs" . --list`. It prints `{"adapters":[{"id","name"}]}`. Offer those names and «my own system / other». Default: none. A game matches only when it is the same edition (for example «D&D 2024» or «DnD 2024» match `dnd-2024`; «D&D 5e» without 2024 does not). Keep the matched `id`, or none.
 3. **Tone**: evocative, plain or colloquial. Default: plain. Map to `--register`: evocative → `elevated`; plain → `plain`; colloquial → `colloquial`; mixed → `mixed`.
 4. **Shared material**: is there a folder of another world to connect? Default: no. If yes, the full path of the folder is needed (ask for it in Step 3).
 
@@ -47,15 +47,15 @@ Ask for one confirmation. If the master's message already confirms, go on withou
 
 Run, after the confirmation (skip this step on `unfinished`, where the files exist):
 
-`node "${CLAUDE_PLUGIN_ROOT}/skills/core/new-campaign/scripts/init-campaign.mjs" . --name "<campaign name>" --language <language code> --register <elevated|plain|colloquial|mixed> --world "<world name>" --seed "<seed file name>"`
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/new-campaign/scripts/init-campaign.mjs" . --name "<campaign name>" --language <language code> --register <elevated|plain|colloquial|mixed> --world "<world name>" --seed "<seed file name>"`
 
 - Add ` --adapter <id>` only when the game matched. Language code: lowercase ISO 639-1 (`it`, `en`).
 - Do not pass `--description`: the seed replaces the one-sentence description.
 - Exit code not 0: tell the master «Non sono riuscito a completare questa operazione. Non è stato perso nulla: possiamo riprovare.» and stop.
 
-Then run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/new-campaign/scripts/add-category.mjs" . --id <slug> --folder "<Folder>" --type places`. Exit code not 0: the same sentence as above, and stop.
+Then run `node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" . --id <slug> --folder "<Folder>" --type places`. Exit code not 0: the same sentence as above, and stop.
 
-If the master named a shared folder, run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/new-campaign/scripts/add-category.mjs" . --id <slug of the folder name> --folder "<folder name>" --type external --source "<absolute path>"`. If it fails, tell the master in one sentence that the shared material could not be connected, and go on: do not stop.
+If the master named a shared folder, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" . --id <slug of the folder name> --folder "<folder name>" --type external --source "<absolute path>"`. If it fails, tell the master in one sentence that the shared material could not be connected, and go on: do not stop.
 
 ## Step 6 — Draft the two documents
 

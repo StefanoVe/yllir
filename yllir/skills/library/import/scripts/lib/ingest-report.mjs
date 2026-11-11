@@ -1,11 +1,11 @@
-// Builds the INGEST REPORT of a document-ingest run from the checks of its
+// Builds the INGEST REPORT of an import run from the checks of its
 // acquisition folders. Pure: the CLI reads the write and audit reports and
 // writes the result. Deterministic.
 
 import { checkAcquisition } from './ingest-check.mjs';
 import { compareStrings } from '../../../../../scripts/lib/subjects.mjs';
 
-const DEFAULT_CONTINUE = 'the step of the invoking skill that called document-ingest';
+const DEFAULT_CONTINUE = 'the next step of the import process';
 
 /** Value of the first `status:` line of a report, or `unknown` when there is none. */
 export function statusValue(text) {

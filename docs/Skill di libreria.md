@@ -15,7 +15,7 @@ Convenzioni: ciò che è **Deciso** dall'autore è nell'indice o nella Riprogett
 
 Lo stato delle funzioni dopo la [Riprogettazione](Riprogettazione.md), secondo i fatti della versione 0.30.0 e le decisioni dell'autore:
 
-- **Restano skill di libreria implementate:** l'[ingest di documenti](#l1-ingest-di-documenti) (`document-ingest`) e l'[audit di continuità](#l2-audit-di-continuità) (`continuity-audit`), che ora gira solo su richiesta, fuori dal percorso di scrittura.
+- **Restano skill di libreria implementate:** l'[ingest di documenti](#l1-ingest-di-documenti) (`document-ingest`, unito a `import` il 2026-11-11) e l'[audit di continuità](#l2-audit-di-continuità) (`continuity-audit`), che ora gira solo su richiesta, fuori dal percorso di scrittura.
 - **Diventano funzioni del motore** (`yllir/scripts/engine.mjs`, implementate in 0.30.0): i [collegamenti](#l3-collegamenti) (dentro `commit`), la [mappa della trama](#l5-mappa-della-trama) con il file principale di ogni sessione, i controlli delle [schede](#l7-schede) e degli oggetti, la validazione dell'adattatore di sistema, l'indice dei soggetti e l'indice del mondo.
 - **Rimosse come skill:** la [ricerca nel canone](#l4-ricerca-nel-canone) (`canon-research`), il revisore dei collegamenti, `npc-manager` (vedi [gestione dei PNG](#l14-gestione-dei-png)), `item-manager` (i suoi controlli sono nel motore) e `system-adapter`.
 - **Non ancora implementate:** le altre funzioni del catalogo. L'indice le decide ancora, ma la Riprogettazione non stabilisce né la loro forma né il loro strato. Le loro schede conservano la forma precedente, e la questione è aperta (vedi [Questioni aperte](#questioni-aperte)).
@@ -53,7 +53,7 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 
 | Funzione | Strato | Motivazione | Stato |
 |---|---|---|---|
-| [Ingest di documenti](#l1-ingest-di-documenti) (`document-ingest`) | Libreria, avviata dal processo di importazione | Portare in digitale appunti, lettere, mappe, scansioni e PDF già esistenti, e integrarli nelle schede della campagna. | Deciso. Implementato in 0.30.0. L'avvio in autorun è da confermare (vedi Questioni aperte) |
+| [Ingest di documenti](#l1-ingest-di-documenti) (`document-ingest`, parte di `import`) | Libreria, avviata dal processo di importazione | Portare in digitale appunti, lettere, mappe, scansioni e PDF già esistenti, e integrarli nelle schede della campagna. | Deciso. Implementato in 0.30.0. Unito a import (2026-11-11). L'avvio in autorun è da confermare (vedi Questioni aperte) |
 | [Audit di continuità](#l2-audit-di-continuità) (`continuity-audit`) | Libreria, solo su richiesta, fuori dal percorso di scrittura | Individuare contraddizioni e lacune nel perimetro scelto, senza modificare i documenti. | Deciso. Implementato in 0.30.0 |
 | [Collegamenti](#l3-collegamenti) (`linker`) | Motore, dentro `commit` | Collegare ogni menzione sicura di un soggetto alla sua scheda o fonte, senza alterare testo, fatti o regole. | Deciso. Implementato nel motore in 0.30.0; skill e revisore rimossi |
 | [Ricerca nel canone](#l4-ricerca-nel-canone) (`canon-research`) | Rimossa | Rispondere a domande sul mondo, con prove e limiti. | Rimossa dalla Riprogettazione (2026-11-11): la risposta è dell'autore, con `query` e `context` del motore |
@@ -99,6 +99,7 @@ Le schede delle funzioni non ancora implementate conservano la forma del documen
 
 - **Scopo:** portare in digitale materiale esistente (appunti, lettere, mappe, scansioni, PDF, trascrizioni), conservando l'originale, trascrivendolo, verificando ogni affermazione e integrandola nelle schede esistenti senza duplicati.
 - **Stato:** libreria `document-ingest`, implementata in 0.30.0 (**Deciso** per la funzione). È chiamata dal processo di importazione quando il master consegna file.
+- **Unita a import (2026-11-11).** I passi di questa libreria sono ora nella skill di libreria `import` (`skills/library/import/`), senza una skill separata.
 - **Avvio:** l'indice decide l'autorun, quando l'utente condivide foto, scansioni o documenti. Nella 0.30.0 l'avvio passa dal processo di importazione. Quale delle due regole vale è da confermare (vedi Questioni aperte, domanda aggiunta).
 - **Input → output:** file originali → conservati come fonti (registrati nel commit con `--sources`), con trascrizione con localizzatori, elenco delle affermazioni con stato, domande aperte, pagine aggiornate, esito.
 - **Deterministico:** inventario dei file e dei duplicati (hash); identificativi stabili; confronto fra trascrizione e testo finale (diff) per rilevare omissioni; controllo del modello di acquisizione (campi obbligatori); conteggio dei dubbi aperti; scrittura delle pagine attraverso il motore.
@@ -458,6 +459,25 @@ Non ancora implementata in 0.30.0. La Riprogettazione non la tocca: la decisione
 - **Rischi da evitare:**
   - riferimenti dimenticati perché cercati a memoria invece che dall'indice dei soggetti;
   - un retcon applicato come rinomina meccanica, che cambia anche ciò che i giocatori hanno già vissuto.
+
+## Skill di avvio, aggiornamento e importazione
+
+Le tre skill seguenti sono **Deciso (2026-11-11)** come skill di libreria. Sono processi che il master vive o che l'ingresso legge, descritti nel documento dei [processi del core](Processi%20di%20core.md), spostati in libreria.
+
+### L20. Avvio della campagna
+
+- **Scopo:** creare una campagna nuova in una cartella vuota, con una breve intervista e i primi file core.
+- **Stato:** libreria `new-campaign`, **Deciso** (2026-11-11). Avviata dal processo di ingresso.
+
+### L21. Aggiornamento
+
+- **Scopo:** allineare la campagna dopo un aggiornamento del framework, con l'avviso e il sì o no del master, e riprendere un aggiornamento interrotto.
+- **Stato:** libreria `update`, **Deciso** (2026-11-11). Letta dall'ingresso, mai chiamata dal master.
+
+### L22. Importazione
+
+- **Scopo:** portare materiale esistente nella campagna: originali conservati come fonti, trascrizione, verifica e integrazione. Include l'[ingest di documenti](#l1-ingest-di-documenti).
+- **Stato:** libreria `import`, **Deciso** (2026-11-11). Avviata dall'ingresso quando il master consegna file.
 
 ## Questioni aperte
 

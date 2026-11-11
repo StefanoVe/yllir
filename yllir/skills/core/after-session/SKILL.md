@@ -2,7 +2,7 @@
 name: after-session
 description: Core process. Records one evening that was played as a chronicle page, faithful only to what the master says, then applies the consequences the master stated on the sheets, statuses and timeline and proposes the rest, all in one batch.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/after-session/scripts/today.mjs" *), Bash(node */skills/core/after-session/scripts/today.mjs *), Read, Write, Edit, Agent, Skill, Glob, Grep
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/today.mjs" *), Bash(node */scripts/today.mjs *), Read, Write, Edit, Agent, Skill, Glob, Grep
 ---
 
 # After session
@@ -19,7 +19,7 @@ You are the AUTHOR. Record the evening in two phases, and write both in one batc
 
 **Step 1 — Settings and date.**
 1. Read `campaign.yaml` with the Read tool. Keep `language.main` (the CAMPAIGN LANGUAGE), the `folder` of the entry of type `chronicle` (the CHRONICLE FOLDER) and the `folder` of the entry of type `plot` (the PLOT FOLDER).
-2. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/core/after-session/scripts/today.mjs"`. Its first line is today's date, `YYYY-MM-DD` (TODAY). If the exit code is not 0, use the Failures sentence above, and stop.
+2. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/today.mjs"`. Its first line is today's date, `YYYY-MM-DD` (TODAY). If the exit code is not 0, use the Failures sentence above, and stop.
 3. If the master named a date, use it, converted to `YYYY-MM-DD`. A day and month without a year means the year of TODAY. Otherwise DATE is TODAY.
 4. The page is `<CHRONICLE FOLDER>/<DATE>.md`. If that file already exists (check with Read), use `<DATE>-b`, then `<DATE>-c`, and so on. Never open or change an old page: if the master asks to change an earlier page, use the Failures sentence and stop. The id is `cronaca-<DATE>` with the same suffix.
 

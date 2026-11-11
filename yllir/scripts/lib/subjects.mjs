@@ -73,7 +73,7 @@ export function masterOnlyChecker(structure) {
 /**
  * Lists the Markdown files under `<campaignRoot>/<folder>`, recursively, skipping
  * directories named `img`. A symlink counts as a file when it points to a regular
- * file (document-ingest links original documents this way); its path stays the
+ * file (import links original documents this way); its path stays the
  * path of the symlink. Symlinks to directories, broken symlinks and loops are
  * ignored. A missing folder gives an empty list.
  * @returns {string[]} relative paths with `/` separators, sorted
@@ -105,7 +105,7 @@ export function listSheets(campaignRoot, folder) {
 /**
  * Lists campaign documents once per original file. Internal symlink aliases
  * resolve to the original campaign path; links whose target is outside the
- * campaign keep their access path (document-ingest originals).
+ * campaign keep their access path (import originals).
  */
 export function listCanonicalSheets(campaignRoot, folder) {
   const root = path.resolve(campaignRoot);

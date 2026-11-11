@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## How to answer the author
+
+Always answer in TLDR mode: lead with the outcome in a few short lines, no preamble or recap. Add detail only when asked, or when a decision, blocker or failure needs it.
+
 ## What this is
 
 Yllir is a framework of agent skills, distributed as a Claude Code plugin (Codex at most as an optional image provider), for creating and maintaining tabletop RPG campaigns. It is system-agnostic: D&D 2024 is only the first adapter. The target user is a game master who has never used AI or a terminal: they talk in natural language, and everything else (git, sub-agents, reviews, linking) stays hidden.
@@ -18,7 +22,7 @@ Yllir is a framework of agent skills, distributed as a Claude Code plugin (Codex
 
 - **Language split.** Everything in `yllir/` (skills, instructions, code, internal names, framework docs) is in English. Campaigns, generated documents and messages to the master use the language set in the campaign config. The spec in `docs/` is in Italian, so keep editing it in Italian.
 - **YAGNI and a single source of truth.** Each piece of information has one home, and everything else is derived and regenerable. Agent instructions are generated from templates plus `campaign.yaml`, not hand-written.
-- **Three layers:** core processes (what the master experiences), library skills (called by core, never by the user), and optional modules (system adapters, style profiles, outputs). Dependencies point downward only, and core knows nothing about any specific world or game system. Write-time wiring (audit before a change, linking after it, plot-map update) lives in core and is not left for the agent to remember.
+- **Three layers (author decision, 2026-11-11):** core = what makes Yllir work day by day (entry, build-world, write-document, prepare-session, after-session); library = support and adapting skills, reached through the entry (new-campaign, update, import, continuity-audit); modules = game-system adapters, style profiles, outputs. Dependencies point downward only, and core knows nothing about any specific world or game system. Write-time wiring (checks, links, layout, indexes, saved version) lives in the engine (`yllir/scripts/engine.mjs`) and is not left for the agent to remember.
 - **Deterministic scripts do the mechanics, the agent judges.** Mention finding, link checking, validation of the master-only block, and index regeneration go in Node.js scripts (`.mjs`). The known failure modes to design against are a linker that misses mentions and an audit that never reports anything (see `docs/Robustezza e test.md`).
 - **Skill scripts live with their skill.** A script that a skill runs lives in the same folder as that skill's `SKILL.md` (for example `yllir/skills/library/linker/`), not in a shared `scripts/` folder. Only code used by several skills or by the framework itself stays outside a skill folder.
 - **Creative writing is the main agent's; cheap models get precise orders.** Since the 2026-11-11 redesign (`docs/Riprogettazione.md`), the high-level main agent writes world, sheets and scenes; cheap models (Haiku) execute bounded orders from it. Deterministic checks always run; a separate reviewer sub-agent runs only on batches that add facts to the canon. Orders to cheap executors must still be explicit enough for the weakest one.

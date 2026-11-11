@@ -1,4 +1,4 @@
-// Inventory of the files given to document-ingest: sha256 of each file, its id,
+// Inventory of the files given to import: sha256 of each file, its id,
 // and its status (new, duplicate of an earlier input, or already acquired).
 // Reads only; it writes nothing. Deterministic: no clock, no network.
 

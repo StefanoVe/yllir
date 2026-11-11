@@ -8,7 +8,7 @@ import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { listAdapters, loadAdapter, pluginRootFromHere } from '../../../../../scripts/lib/adapter.mjs';
 import { validateConfig } from '../../../../../scripts/lib/config.mjs';
 import { generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
-import { stringifyConfig } from './config-write.mjs';
+import { stringifyConfig } from '../../../../../scripts/lib/config-write.mjs';
 
 const FILE = 'campaign.yaml';
 

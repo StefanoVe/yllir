@@ -69,9 +69,9 @@ describe('project allow rules', () => {
       assert.ok(allow.includes(rule), rule);
     }
     assert.ok(allow.includes('Bash(node "*/scripts/engine.mjs" *)'));
-    assert.ok(allow.includes('Bash(node "*/skills/core/update/scripts/item-descriptions.mjs" *)'));
-    assert.ok(allow.includes('Bash(node "*/skills/core/update/scripts/post-update.mjs" *)'));
-    assert.ok(allow.includes('Bash(node "*/skills/library/document-ingest/scripts/ingest-check.mjs" *)'));
+    assert.ok(allow.includes('Bash(node "*/skills/library/update/scripts/item-descriptions.mjs" *)'));
+    assert.ok(allow.includes('Bash(node "*/skills/library/update/scripts/post-update.mjs" *)'));
+    assert.ok(allow.includes('Bash(node "*/skills/library/import/scripts/ingest-check.mjs" *)'));
     assert.ok(!allow.some((rule) => rule.includes('CLAUDE_PLUGIN_ROOT')), 'no unexpanded variable');
     assert.ok(!allow.some((rule) => /Bash\(node \*\//.test(rule)), 'unrooted forms are not repeated');
   });

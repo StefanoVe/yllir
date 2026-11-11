@@ -91,6 +91,8 @@ Le parole mostrate al master sono nel lessico della skill di ingresso (`yllir/sk
 
 **Prerequisiti:** la cartella è vuota. Se contiene già una campagna, il processo lo dice in una frase e si ferma. Se una creazione precedente si è interrotta, riprende dai file già scritti, senza rifare l'inizializzazione.
 
+**Spostato in libreria (2026-11-11):** la skill è in `skills/library/new-campaign/`; il processo resta descritto qui, invariato.
+
 **Passi** (`yllir:new-campaign`, *implementato in 0.30.0*):
 
 1. **Primo giro di domande, a scelta.** Lingua; gioco di ruolo (se corrisponde a un adattatore installato, oggi `dnd-2024`, le sue regole si applicano da subito; se non c'è un adattatore, la campagna funziona lo stesso e il master lo sente in una frase); tono (evocativo, asciutto o colloquiale); materiale di un mondo condiviso, sì o no. Le domande già risposte nel primo messaggio non si ripetono.
@@ -251,13 +253,15 @@ Le parole mostrate al master sono nel lessico della skill di ingresso (`yllir/sk
 
 **Avvio.** Quando il master condivide file, il processo parte subito, senza chiedere. *Implementato in 0.30.0.*
 
-**Passi** (`yllir:import`, con la libreria `document-ingest`, *implementato in 0.30.0*):
+**Spostato in libreria (2026-11-11):** la skill è in `skills/library/import/`, con l'ingest di documenti incluso; il processo resta descritto qui, invariato.
+
+**Passi** (`yllir:import`, con l'ingest di documenti incluso, *implementato in 0.30.0*):
 
 1. **Impostazioni.** Lingua della campagna e cartella delle fonti (`Fonti/` in italiano, `Sources/` in inglese). Se la cartella non esiste, si crea.
 2. **Risposta in sospeso.** Se la nota sul lavoro in corso dice che un import attende la risposta del master, la risposta si applica prima di tutto il resto.
 3. **File.** I percorsi condivisi dal master si controllano uno per uno: se mancano, si dice quale.
 4. **Data e provenienza.** La data è quella di oggi. La provenienza è ciò che il master ha detto sull'origine del materiale, in poche parole; altrimenti `unknown`.
-5. **Acquisizione.** La skill `document-ingest` conserva gli originali senza modificarli, ne fa la trascrizione fedele, la scompone in affermazioni verificabili, le fa controllare dal revisore della trascrizione (`ingest-reviewer`, riga per riga) e le integra nei documenti esistenti senza duplicarli. Quando una lettura è dubbia, pone una domanda alla volta e riprende quando il master risponde.
+5. **Acquisizione.** La parte di ingest della skill `import` conserva gli originali senza modificarli, ne fa la trascrizione fedele, la scompone in affermazioni verificabili, le fa controllare dal revisore della trascrizione (`ingest-reviewer`, riga per riga) e le integra nei documenti esistenti senza duplicarli. Quando una lettura è dubbia, pone una domanda alla volta e riprende quando il master risponde.
 6. **Messaggio.** Dalla relazione della skill: stato, fonti acquisite, pagine integrate, duplicati, invenzioni, e la domanda aperta, se c'è, in una sola frase.
 
 **Deciso, 2026-11-11** (decisione 7): la trascrizione del materiale importato resta fedele alla fonte e non si inventa nulla in essa. Le invenzioni del processo, quando la scheda integrata manca di un dato, si dichiarano nel messaggio.
@@ -307,7 +311,7 @@ Non compare tra gli otto processi: l'aggiornamento del framework lo gestisce la 
 | Preparare la sessione | `yllir:prepare-session` | Stub della sessione, scene, soggetti nuovi, eventuale seme | Controllo del motore, grafo della trama; revisione del lotto |
 | Dopo la sessione | `yllir:after-session` | Cronaca, cambiamenti dichiarati | Controllo del motore; revisione del lotto |
 | Domanda sul mondo | `yllir:yllir` (risposta diretta) | Nulla | Nessuno: lettura |
-| Portare dentro materiale | `yllir:import`, `document-ingest` | Fonti, trascrizioni, documenti integrati | Revisione della trascrizione; controllo del motore; revisione del lotto |
+| Portare dentro materiale | `yllir:import` (con l'ingest di documenti) | Fonti, trascrizioni, documenti integrati | Revisione della trascrizione; controllo del motore; revisione del lotto |
 | Tornare a una versione | `yllir:yllir`, `versions.mjs` | Ritorno a una versione, con la versione del ritorno | Conferma; nessuna revisione |
 
 ## Questioni aperte

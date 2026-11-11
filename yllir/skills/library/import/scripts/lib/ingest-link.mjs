@@ -1,4 +1,4 @@
-// Link sidestep of document-ingest: a file that is already a complete campaign
+// Link sidestep of import: a file that is already a complete campaign
 // document is not copied or transcribed. Instead a symlink to its original is
 // created in the canon category folder, and its inventory entry becomes `linked`.
 // Never modifies, moves or deletes the original; never overwrites anything.

@@ -1,4 +1,4 @@
-// Validates an acquisition folder of document-ingest: card.md, transcription.md
+// Validates an acquisition folder of import: card.md, transcription.md
 // and the claim, question and review lines. Reads only. Deterministic.
 
 import fs from 'node:fs';

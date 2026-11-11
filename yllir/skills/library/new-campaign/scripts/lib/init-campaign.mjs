@@ -4,7 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { stringifyConfig } from './config-write.mjs';
+import { stringifyConfig } from '../../../../../scripts/lib/config-write.mjs';
 import { ensureRepo } from '../../../../../scripts/lib/versions.mjs';
 import { generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
 import { validateConfig } from '../../../../../scripts/lib/config.mjs';

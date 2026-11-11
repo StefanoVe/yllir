@@ -19,6 +19,13 @@ Il framework è diviso in tre strati. Ogni strato ha responsabilità precise. Lo
 
 **Deciso** nella suddivisione (indice, «Architettura»). La Riprogettazione lascia i tre strati e cambia il loro contenuto (sezioni 1 e 2).
 
+**Deciso (2026-11-11).** I due strati di Yllir, come vivono nel lavoro di ogni giorno. Lo strato dei moduli resta com'è (adattatori di sistema di gioco e profili di stile, sotto).
+
+- **core** = ciò che rende Yllir operativo giorno per giorno: `yllir` (ingresso), `build-world`, `write-document`, `prepare-session`, `after-session` (in `skills/core/`).
+- **libreria** = skill di supporto e di adattamento: `new-campaign` (avvio), `update` (manutenzione e migrazioni), `import` (portare materiale esistente, con l'ingest di documenti), `continuity-audit` (su richiesta). Sono in `skills/library/`.
+
+**Superata (2026-11-11).** La definizione precedente, «core = ciò che vive il master / libreria = chiamata dal core, mai dal master», non vale più: `new-campaign` e `import` sono processi che il master vive e stanno nella libreria. Il testo degli strati qui sotto descrive la versione 0.30.0 e cede alla decisione del 2026-11-11 dove si contraddicono.
+
 ### Strato 1: core
 
 **Responsabilità.**
@@ -37,7 +44,7 @@ Il framework è diviso in tre strati. Ogni strato ha responsabilità precise. Lo
 
 ### Strato 2: libreria
 
-**Responsabilità.** Operazioni specialistiche richiamate dal core. Sono **Implementate in 0.30.0** due skill di libreria: `document-ingest` (acquisizione e trascrizione di materiale esistente) e `continuity-audit` (verifica di contraddizioni, su richiesta e fuori dalla scrittura).
+**Responsabilità.** Operazioni specialistiche richiamate dal core. Sono **Implementate in 0.30.0** due skill di libreria: `document-ingest` (acquisizione e trascrizione di materiale esistente; **unito a `import` il 2026-11-11**) e `continuity-audit` (verifica di contraddizioni, su richiesta e fuori dalla scrittura).
 
 Le operazioni che nel progetto precedente erano skill di libreria sono diventate librerie di script usate dal motore o dal core: collegamenti (`scripts/lib/links/`), mappa della trama (`scripts/lib/plot/`), schede (`scripts/lib/sheets/`), oggetti (`scripts/lib/items/`). Sono superate come skill separate la ricerca nel canone, che l'autore fa con il motore e la lettura dei documenti, e la gestione dei personaggi (**Implementato in 0.30.0**; Riprogettazione, sezione 9).
 
@@ -47,7 +54,7 @@ Le altre skill di libreria del progetto precedente (intrecci dei personaggi, art
 
 - Ogni skill di libreria dichiara i file che legge, i file che può scrivere, il contenuto che può produrre e gli strumenti che richiede.
 - Una skill di libreria non richiama mai il core. Riceve un compito dal core e restituisce un esito.
-- Una skill di libreria può richiamare un'altra skill di libreria solo se la dipendenza è dichiarata, e non può formare cicli. Esempio: `document-ingest` richiama `continuity-audit` su richiesta, e il motore per collegamenti e controlli.
+- Una skill di libreria può richiamare un'altra skill di libreria solo se la dipendenza è dichiarata, e non può formare cicli. Esempio: `import` richiama `continuity-audit` su richiesta, e il motore per collegamenti e controlli.
 - Le skill di libreria non parlano con il master. Restituiscono un esito tecnico che il core traduce in linguaggio semplice.
 
 ### Strato 3: moduli opzionali
@@ -94,9 +101,9 @@ yllir/                               Repository del framework
   .claude-plugin/plugin.json         Unico punto di distribuzione: plugin per Claude Code
   agents/                            Sub-agent: sheet-expander, batch-reviewer, ingest-reviewer,
                                      audit-extractor, audit-judge, audit-coverage-reviewer
-  skills/core/                       Processi: yllir, new-campaign, build-world, write-document,
-                                     prepare-session, after-session, import, update
-  skills/library/                    document-ingest, continuity-audit
+  skills/core/                       Processi del core: yllir, build-world, write-document,
+                                     prepare-session, after-session
+  skills/library/                    Librerie: new-campaign, update, import, continuity-audit
   modules/systems/dnd-2024/          Primo adattatore: adapter.yaml, checks.mjs
   scripts/engine.mjs                 Motore: context, check, commit, query, index
   scripts/lib/engine/                Implementazione del motore
@@ -115,7 +122,7 @@ Note sulla struttura:
 
 - **Distribuzione.** Il framework si distribuisce solo come plugin per Claude Code (**Deciso, 2026-11-11**, Riprogettazione, decisione 11, che supera «Il pacchetto è un plugin per Claude Code e per Codex»). Il file `plugin.json` ne dichiara il contenuto e la versione. Un `manifest.yaml` del pacchetto è **Proposta**.
 - **Processi.** Ogni processo sta in `skills/core/<nome>/`, con il suo `SKILL.md`. Il contratto condiviso dai processi è in `skills/core/yllir/authoring.md` (**Implementato in 0.30.0**). La cartella `core/processes/` del progetto precedente è superata.
-- **Script di una skill.** **Deciso (2026-11-07):** gli script propri di una skill stanno nella cartella della skill, accanto a `SKILL.md`, in `scripts/`; per esempio la migrazione `world-graph-v1` sta in `skills/core/update/scripts/`. Il codice usato da più skill o dal motore sta in `scripts/lib/` (**Implementato in 0.30.0**: `links`, `plot`, `sheets`, `items`). Il motore non è una skill ed è in `scripts/engine.mjs`.
+- **Script di una skill.** **Deciso (2026-11-07):** gli script propri di una skill stanno nella cartella della skill, accanto a `SKILL.md`, in `scripts/`; per esempio la migrazione `world-graph-v1` sta in `skills/library/update/scripts/`. Il codice usato da più skill o dal motore sta in `scripts/lib/` (**Implementato in 0.30.0**: `links`, `plot`, `sheets`, `items`). Il motore non è una skill ed è in `scripts/engine.mjs`.
 - **Il motore.** Un solo programma a riga di comando sostituisce il cablaggio di scrittura, il collegamento come skill e i controlli sparsi (Riprogettazione, sezione 2). Le sue operazioni sono `context` (pacchetto di contesto), `check` (controlli senza scrittura), `commit` (scrittura transazionale), `query` (domande strutturate sul mondo) e `index` (indici derivati). Ogni comando stampa JSON e termina con un codice di uscita (**Implementato in 0.30.0**).
 - **`templates/`** contiene il riferimento delle regole di formato per gli agenti (`content-format.md`) e i modelli delle schede. Il template delle istruzioni generate è trattato in «Generazione delle istruzioni».
 - **`hooks/`** contiene controlli che partono da soli, per esempio il riepilogo della nota sul lavoro in corso all'avvio (**Implementato in 0.30.0**). Il controllo di versione all'avvio è **Proposta**.

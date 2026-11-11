@@ -14,6 +14,6 @@ test('strict-settings.json is byte-equal to the generated project settings', () 
 
 test('strict-settings.json allows the skills scripts, not only the engine', () => {
   const allow = JSON.parse(fs.readFileSync(STRICT_SETTINGS_PATH, 'utf8')).permissions.allow;
-  assert.ok(allow.includes('Bash(node "*/skills/core/update/scripts/item-descriptions.mjs" *)'));
+  assert.ok(allow.includes('Bash(node "*/skills/library/update/scripts/item-descriptions.mjs" *)'));
   assert.ok(allow.includes('Bash(node "*/scripts/engine.mjs" *)'));
 });

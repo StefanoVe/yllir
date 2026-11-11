@@ -28,7 +28,7 @@ import {
   toLegacyLayout,
   withIsolatedGit,
 } from './run-update-case.mjs';
-import { updateCampaign } from '../../yllir/skills/core/update/scripts/lib/update-campaign.mjs';
+import { updateCampaign } from '../../yllir/skills/library/update/scripts/lib/update-campaign.mjs';
 import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 

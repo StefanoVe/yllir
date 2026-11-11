@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Checks one acquisition folder of document-ingest.
+// Checks one acquisition folder of import.
 // Usage: node ingest-check.mjs <campaignRoot> --id <id> [--final] [--out <check.json>]
 // Exit codes: 0 no errors, 1 errors, 2 usage error (or no folder for the id).
 

@@ -99,7 +99,7 @@ test('DONE: every claim verified, no open question, write not run and nothing in
         'audit: not run',
         'open questions for the master:',
         '- none',
-        'continue with: the step of the invoking skill that called document-ingest',
+        'continue with: the next step of the import process',
         '',
       ].join('\n'),
     );
@@ -271,7 +271,7 @@ test('links: the linked line follows duplicates, and external links get a warnin
         '- none',
         'link warnings:',
         '- warning: no git backup for external link Trama/cronaca.md',
-        'continue with: the step of the invoking skill that called document-ingest',
+        'continue with: the next step of the import process',
         '',
       ].join('\n'),
     );
