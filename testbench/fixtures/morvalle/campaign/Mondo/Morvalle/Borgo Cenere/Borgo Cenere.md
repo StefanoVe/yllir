@@ -1,5 +1,7 @@
 ---
 id: borgo-cenere
+kind: place
+provenance: master
 ---
 # Borgo Cenere
 

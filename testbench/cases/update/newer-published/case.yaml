@@ -2,3 +2,6 @@ case: update-newer-published
 scenario: newer-published
 prompt: |
   Chi è Teodo Marr?
+limits:
+  max_minutes: 5
+  max_tool_calls: 60

@@ -1,5 +1,7 @@
 ---
 id: pozzo-di-narem
+kind: place
+provenance: master
 ---
 # Pozzo di Nàrem
 

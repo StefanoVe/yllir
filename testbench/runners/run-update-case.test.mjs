@@ -33,7 +33,7 @@ import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 
 const LEXICON = path.resolve(import.meta.dirname, '..', '..', 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
-const FIXTURE = path.resolve(import.meta.dirname, '..', 'fixtures', 'morvalle', 'campaign');
+const FIXTURE = path.resolve(import.meta.dirname, '..', 'fixtures', 'morvalle-legacy', 'campaign');
 const LEGACY_SESSIONS = ['Sessione 1', 'Sessione 2', 'Sessione 3'];
 const LEGACY_REPORT = 'Ciao! La campagna è pronta a ripartire.';
 const TODAY = '2026-11-09';
@@ -84,7 +84,7 @@ function addCommit(dir) {
 const failing = (results) => results.filter(([, ok]) => !ok).map(([id]) => id);
 
 const FIXTURE_CONFIG = fs.readFileSync(
-  path.resolve(import.meta.dirname, '..', '..', 'testbench', 'fixtures', 'morvalle', 'campaign', 'campaign.yaml'),
+  path.resolve(import.meta.dirname, '..', '..', 'testbench', 'fixtures', 'morvalle-legacy', 'campaign', 'campaign.yaml'),
   'utf8',
 );
 

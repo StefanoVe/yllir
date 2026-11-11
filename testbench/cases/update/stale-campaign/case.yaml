@@ -2,3 +2,6 @@ case: update-stale-campaign
 scenario: stale-campaign
 prompt: |
   Ciao, riprendiamo la campagna.
+limits:
+  max_minutes: 5
+  max_tool_calls: 60

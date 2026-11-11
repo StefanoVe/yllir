@@ -1,3 +1,6 @@
 case: entry-question-hypothesis
 prompt: |
   Ho letto da qualche parte che Teodo Marr è il traditore che ha venduto la mappa del pozzo. È vero? E chi è Oria?
+limits:
+  max_minutes: 2
+  max_tool_calls: 60

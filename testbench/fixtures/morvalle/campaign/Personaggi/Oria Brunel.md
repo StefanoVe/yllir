@@ -1,5 +1,7 @@
 ---
 id: oria-brunel
+kind: character
+provenance: master
 template: npc
 location: [borgo-cenere]
 ---

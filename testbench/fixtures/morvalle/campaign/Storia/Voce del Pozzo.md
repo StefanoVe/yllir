@@ -1,5 +1,9 @@
 ---
 id: voce-del-pozzo
+provenance: master
+relations:
+  - to: sibilla-aurne
+    type: depends-on
 ---
 # Voce del Pozzo
 

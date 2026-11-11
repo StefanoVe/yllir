@@ -32,7 +32,6 @@ function makeCases(layout) {
 const LAYOUT = {
   'new-campaign/all-answers': 'case: x\n',
   'entry/after-proceed': 'case: x\n',
-  'linker/session-3': 'case: x\n',
   'audit/full': 'case: x\n',
   'entry/no-yaml': null,
   'misc/stray': 'case: x\n',
@@ -42,10 +41,10 @@ test('planJobs skips the audit kind by default and includes it with withAudit', 
   const root = makeCases(LAYOUT);
   const without = planJobs({ casesRoot: root });
   assert.ok(!without.some((job) => job.kind === 'audit'));
-  assert.equal(without.length, 3);
+  assert.equal(without.length, 2);
   const withAudit = planJobs({ casesRoot: root, withAudit: true });
   assert.ok(withAudit.some((job) => job.kind === 'audit' && job.name === 'full'));
-  assert.equal(withAudit.length, 4);
+  assert.equal(withAudit.length, 3);
 });
 
 test('planJobs ignores folders without case.yaml and kinds without a runner', () => {
@@ -68,7 +67,7 @@ test('planJobs gives each job its case, runner, agent and run index', () => {
 });
 
 test('planJobs multiplies by agents and runs', () => {
-  const root = makeCases({ 'entry/a': 'case: x\n', 'linker/b': 'case: x\n' });
+  const root = makeCases({ 'entry/a': 'case: x\n', 'new-campaign/b': 'case: x\n' });
   const jobs = planJobs({ casesRoot: root, agents: ['claude'], runs: 3 });
   assert.equal(jobs.length, 2 * 1 * 3);
   const claudeRuns = jobs.filter((job) => job.agent === 'claude' && job.name === 'a').map((job) => job.run);
@@ -77,16 +76,16 @@ test('planJobs multiplies by agents and runs', () => {
 
 test('planJobs honours only as a substring of kind/name', () => {
   const root = makeCases(LAYOUT);
-  const linkerOnly = planJobs({ casesRoot: root, only: 'linker' });
-  assert.deepEqual(linkerOnly.map((job) => `${job.kind}/${job.name}`), ['linker/session-3']);
+  const newOnly = planJobs({ casesRoot: root, only: 'new-campaign' });
+  assert.deepEqual(newOnly.map((job) => `${job.kind}/${job.name}`), ['new-campaign/all-answers']);
   const entryOne = planJobs({ casesRoot: root, only: 'entry/after' });
   assert.deepEqual(entryOne.map((job) => `${job.kind}/${job.name}`), ['entry/after-proceed']);
   assert.equal(planJobs({ casesRoot: root, only: 'nothing-matches' }).length, 0);
 });
 
 test('childArgs passes the case, agent, one run and the model when given', () => {
-  const job = { runner: '/r/run-linker-case.mjs', caseDir: '/c/linker/x', agent: 'claude', run: 2 };
-  assert.deepEqual(childArgs(job), ['/r/run-linker-case.mjs', '/c/linker/x', '--agent', 'claude', '--runs', '1']);
+  const job = { runner: '/r/run-entry-case.mjs', caseDir: '/c/entry/x', agent: 'claude', run: 2 };
+  assert.deepEqual(childArgs(job), ['/r/run-entry-case.mjs', '/c/entry/x', '--agent', 'claude', '--runs', '1']);
   assert.deepEqual(childArgs(job, { model: 'haiku' }).slice(-2), ['--model', 'haiku']);
 });
 
@@ -134,19 +133,19 @@ test('runJob resolves a fake child that prints a record', async () => {
     child.stdout.setEncoding = () => {};
     child.stderr.setEncoding = () => {};
     queueMicrotask(() => {
-      child.stdout.emit('data', '{"case":"linker/x","pass":true,"failures":[]}\n');
+      child.stdout.emit('data', '{"case":"entry/x","pass":true,"failures":[]}\n');
       child.emit('close', 0);
     });
     return child;
   };
-  const job = { kind: 'linker', name: 'x', caseDir: '/c', runner: '/r.mjs', agent: 'claude', run: 1 };
+  const job = { kind: 'entry', name: 'x', caseDir: '/c', runner: '/r.mjs', agent: 'claude', run: 1 };
   const result = await runJob(job, { spawnFn: fakeSpawn });
   assert.equal(result.pass, true);
   assert.equal(result.error, null);
 });
 
 test('runJob turns a spawn that throws into an error result', async () => {
-  const job = { kind: 'linker', name: 'x', caseDir: '/c', runner: '/r.mjs', agent: 'claude', run: 1 };
+  const job = { kind: 'entry', name: 'x', caseDir: '/c', runner: '/r.mjs', agent: 'claude', run: 1 };
   const result = await runJob(job, { spawnFn: () => { throw new Error('no node'); } });
   assert.equal(result.pass, false);
   assert.match(result.error, /spawn failed: no node/);
@@ -182,12 +181,12 @@ test('summarize counts pass, fail and error per case and agent', () => {
     jobResult('entry', 'a', 'claude', 1, { pass: true }),
     jobResult('entry', 'a', 'claude', 2, { pass: false, failures: ['T1 missed'] }),
     jobResult('entry', 'a', 'claude', 3, { error: 'exit code 2: crash' }),
-    jobResult('linker', 'b', 'claude', 1, { pass: true }),
+    jobResult('new-campaign', 'b', 'claude', 1, { pass: true }),
   ];
   const summary = summarize(results);
   assert.deepEqual(summary.rows, [
     { case: 'entry/a', agent: 'claude', pass: 1, fail: 1, error: 1, n: 3 },
-    { case: 'linker/b', agent: 'claude', pass: 1, fail: 0, error: 0, n: 1 },
+    { case: 'new-campaign/b', agent: 'claude', pass: 1, fail: 0, error: 0, n: 1 },
   ]);
   assert.deepEqual(summary.totals.get('claude'), { pass: 2, n: 4 });
   assert.equal(summary.allPassed, false);

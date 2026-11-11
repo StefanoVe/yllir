@@ -93,12 +93,6 @@ mentions:
     subject: verme-di-brace
     context: bare
     expected: link
-  - id: M05
-    file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
-    snippet: "# L'arrivo a Borgo Cenere"
-    subject: borgo-cenere
-    context: title
-    expected: no-link
   - id: M06
     file: "Trama/Sessione 3/Eventi/L'arrivo a Borgo Cenere.md"
     snippet: "_Il vento porta la cenere dal Pozzo di Nàrem fino alle finestre._"

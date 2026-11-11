@@ -1,7 +1,12 @@
 ---
 id: oria-valdes
+kind: character
+provenance: master
 template: npc
 location: [lago-grigio]
+relations:
+  - to: lino-valdes
+    type: kin-of
 aliases: [Oria]
 ---
 # Oria Valdes

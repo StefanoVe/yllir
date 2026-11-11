@@ -3,7 +3,7 @@ schema: 1
 campaign:
   name: "Le ceneri della valle"
   slug: ceneri-della-valle
-  description: "Una valle coperta di cenere vulcanica, dove un pozzo antico parla a chi sa ascoltare."
+  seed: Seme del mondo.md
   created: 2026-11-07
 
 language:

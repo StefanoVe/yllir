@@ -1,3 +1,6 @@
 case: entry-go-back
 prompt: |
   Annulla l'ultima modifica che hai fatto alla campagna. Confermo già da ora: procedi pure senza chiedermi altro.
+limits:
+  max_minutes: 2
+  max_tool_calls: 60

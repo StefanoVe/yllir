@@ -291,6 +291,15 @@ test('includeNotes option scans the notes folder', () => {
   assert.equal(occ.state, 'bare');
 });
 
+test('a generated document (generated: true) is never scanned', () => {
+  const generated = '---\nid: session-x\ngenerated: true\n---\n\n> Generated file.\n\nOria Valdes ne parla.\n';
+  const { result } = scan({ 'Plot/Sessione X.md': generated, 'Plot/Sessione Y.md': generated.replace('generated: true\n', '') });
+  assert.equal(result.files.includes('Plot/Sessione X.md'), false);
+  assert.equal(inFile(result, 'Plot/Sessione X.md').length, 0);
+  assert.equal(result.files.includes('Plot/Sessione Y.md'), true, 'the control document without the flag is scanned');
+  assert.equal(inFile(result, 'Plot/Sessione Y.md').length, 1);
+});
+
 test('sources folder is never scanned, with or without includeNotes', () => {
   for (const options of [{ includeNotes: false }, { includeNotes: true }]) {
     const { result } = scan({ 'Fonti/Foto.md': 'Oria Valdes\n' }, options);

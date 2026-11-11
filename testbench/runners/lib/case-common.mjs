@@ -23,6 +23,8 @@ function git(cwd, args) {
 }
 
 const AGENTS = ['claude'];
+// The author is the main agent and runs on a strong model; the executors are not tested here.
+export const DEFAULT_MODEL = 'sonnet';
 
 /**
  * Parses --agent, --runs, --model and --keep, plus the extra value options listed in
@@ -31,7 +33,7 @@ const AGENTS = ['claude'];
  * the command line. opts.modelLabel is the model name for records and the summary.
  */
 export function parseCommonArgs(argv, usage, { valueOptions = [] } = {}) {
-  const opts = { caseDir: null, runs: 3, model: 'haiku', modelGiven: false, agent: 'claude', keep: false, values: {} };
+  const opts = { caseDir: null, runs: 3, model: DEFAULT_MODEL, modelGiven: false, agent: 'claude', keep: false, values: {} };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--agent') {
@@ -71,6 +73,63 @@ export function parseCommonArgs(argv, usage, { valueOptions = [] } = {}) {
   if (opts.caseDir === null) throw new Error(usage);
   opts.modelLabel = opts.model;
   return opts;
+}
+
+/**
+ * The optional `limits` mapping of a case.yaml: { max_minutes, max_tool_calls }. Each key is
+ * optional; a key that is given must be a positive number. Returns null when the case declares
+ * no limits, else the mapping with only the given keys. Throws on any other value.
+ */
+export function parseLimits(data) {
+  if (data.limits === undefined) return null;
+  const limits = data.limits;
+  if (limits === null || typeof limits !== 'object' || Array.isArray(limits)) {
+    throw new Error('case.yaml: limits must be a mapping');
+  }
+  const out = {};
+  for (const key of ['max_minutes', 'max_tool_calls']) {
+    if (limits[key] === undefined) continue;
+    if (typeof limits[key] !== 'number' || !(limits[key] > 0)) {
+      throw new Error(`case.yaml: limits.${key} must be a positive number`);
+    }
+    out[key] = limits[key];
+  }
+  return out;
+}
+
+/**
+ * The one limit grader of every runner. It turns the run result into the checks L-time (the
+ * duration_ms of the run against max_minutes) and L-calls (tool_calls against max_tool_calls),
+ * and merges them into a graded result from gradeCase, gradeScenario or gradeCopy: the checks
+ * gain the two ids, the reasons of a failed limit join failures, and pass also needs both.
+ * limits is the result of parseLimits; null or undefined means the case has no limits and graded
+ * is returned as it is. run is { duration_ms, tool_calls }; a value that was not measured (null)
+ * fails its check. A check that the case does not declare is not added.
+ */
+export function applyLimits(graded, limits, run) {
+  if (limits === null || limits === undefined) return graded;
+  const checks = { ...graded.checks };
+  const failures = [...graded.failures];
+  let ok = true;
+  if (limits.max_minutes !== undefined) {
+    const minutes = typeof run.duration_ms === 'number' ? run.duration_ms / 60000 : null;
+    const pass = minutes !== null && minutes <= limits.max_minutes;
+    checks['L-time'] = pass;
+    if (!pass) {
+      failures.push(`L-time ${minutes === null ? 'duration not measured' : `${minutes.toFixed(1)} min`} (limit ${limits.max_minutes} min)`);
+    }
+    ok = ok && pass;
+  }
+  if (limits.max_tool_calls !== undefined) {
+    const calls = typeof run.tool_calls === 'number' ? run.tool_calls : null;
+    const pass = calls !== null && calls <= limits.max_tool_calls;
+    checks['L-calls'] = pass;
+    if (!pass) {
+      failures.push(`L-calls ${calls === null ? 'tool calls not measured' : `${calls} tool calls`} (limit ${limits.max_tool_calls})`);
+    }
+    ok = ok && pass;
+  }
+  return { ...graded, checks, failures, pass: graded.pass && ok };
 }
 
 /** Reads a YAML file that must hold a mapping. Throws on syntax errors. */

@@ -1,5 +1,7 @@
 ---
 id: fosco-il-ramaio
+kind: character
+provenance: master
 template: vendor
 location: [borgo-cenere]
 ---

@@ -4,7 +4,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseStream, parseCommonArgs, recordHeader, printSummary } from './case-common.mjs';
+import { parseStream, parseCommonArgs, recordHeader, printSummary, parseLimits, applyLimits } from './case-common.mjs';
 
 const USAGE = 'usage: test <caseDir>';
 const CASE = ['case-dir'];
@@ -106,12 +106,18 @@ test('skips lines that are not JSON and reports no result when absent', () => {
   assert.deepEqual(parsed.denied, []);
 });
 
-test('parseCommonArgs defaults to claude with haiku', () => {
+test('parseCommonArgs defaults to claude with sonnet', () => {
   const opts = parseCommonArgs(CASE, USAGE);
   assert.equal(opts.agent, 'claude');
-  assert.equal(opts.model, 'haiku');
+  assert.equal(opts.model, 'sonnet');
   assert.equal(opts.modelGiven, false);
-  assert.equal(opts.modelLabel, 'haiku');
+  assert.equal(opts.modelLabel, 'sonnet');
+});
+
+test('parseCommonArgs --model overrides the sonnet default', () => {
+  const opts = parseCommonArgs([...CASE, '--model', 'haiku'], USAGE);
+  assert.equal(opts.model, 'haiku');
+  assert.equal(opts.modelGiven, true);
 });
 
 test('parseCommonArgs labels a claude run with its model', () => {
@@ -124,7 +130,7 @@ test('parseCommonArgs labels a claude run with its model', () => {
 test('parseCommonArgs accepts an explicit --agent claude', () => {
   const opts = parseCommonArgs([...CASE, '--agent', 'claude'], USAGE);
   assert.equal(opts.agent, 'claude');
-  assert.equal(opts.modelLabel, 'haiku');
+  assert.equal(opts.modelLabel, 'sonnet');
 });
 
 test('parseCommonArgs rejects codex with a message that names claude', () => {
@@ -147,6 +153,46 @@ test('recordHeader returns the agent and the model label', () => {
     agent: 'claude',
     model: 'haiku',
   });
+});
+
+test('parseLimits returns null without limits and keeps only the given keys', () => {
+  assert.equal(parseLimits({ case: 'x' }), null);
+  assert.deepEqual(parseLimits({ limits: { max_minutes: 4, max_tool_calls: 60 } }), { max_minutes: 4, max_tool_calls: 60 });
+  assert.deepEqual(parseLimits({ limits: { max_minutes: 2.5 } }), { max_minutes: 2.5 });
+});
+
+test('parseLimits rejects a value that is not a positive number or a mapping', () => {
+  assert.throws(() => parseLimits({ limits: { max_minutes: 'four' } }), /limits.max_minutes must be a positive number/);
+  assert.throws(() => parseLimits({ limits: { max_tool_calls: 0 } }), /limits.max_tool_calls must be a positive number/);
+  assert.throws(() => parseLimits({ limits: [4] }), /limits must be a mapping/);
+});
+
+test('applyLimits adds L-time and L-calls, and fails the run when a limit is exceeded', () => {
+  const graded = { checks: { B1: true }, failures: [], pass: true };
+  const limits = { max_minutes: 4, max_tool_calls: 60 };
+  const inside = applyLimits(graded, limits, { duration_ms: 3 * 60000, tool_calls: 60 });
+  assert.deepEqual(inside.checks, { B1: true, 'L-time': true, 'L-calls': true });
+  assert.equal(inside.pass, true);
+  assert.deepEqual(inside.failures, []);
+
+  const slow = applyLimits(graded, limits, { duration_ms: 5 * 60000, tool_calls: 10 });
+  assert.equal(slow.checks['L-time'], false);
+  assert.equal(slow.checks['L-calls'], true);
+  assert.equal(slow.pass, false);
+  assert.match(slow.failures[0], /^L-time 5\.0 min \(limit 4 min\)$/);
+
+  const many = applyLimits(graded, limits, { duration_ms: 60000, tool_calls: 61 });
+  assert.equal(many.checks['L-calls'], false);
+  assert.match(many.failures[0], /^L-calls 61 tool calls \(limit 60\)$/);
+});
+
+test('applyLimits fails a limit whose value was not measured, and skips limits the case does not declare', () => {
+  const graded = { checks: {}, failures: [], pass: true };
+  const unmeasured = applyLimits(graded, { max_minutes: 4 }, { duration_ms: null, tool_calls: null });
+  assert.equal(unmeasured.checks['L-time'], false);
+  assert.equal(unmeasured.checks['L-calls'], undefined);
+  assert.equal(unmeasured.failures[0], 'L-time duration not measured (limit 4 min)');
+  assert.equal(applyLimits(graded, null, { duration_ms: 1, tool_calls: 1 }), graded);
 });
 
 test('printSummary names the agent only when it is given', () => {

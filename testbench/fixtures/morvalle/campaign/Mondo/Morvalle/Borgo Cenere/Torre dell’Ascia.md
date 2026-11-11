@@ -1,5 +1,7 @@
 ---
 id: torre-dell-ascia
+kind: place
+provenance: master
 ---
 # Torre dell’Ascia
 

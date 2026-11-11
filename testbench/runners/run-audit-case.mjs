@@ -3,7 +3,7 @@
 // temporary git repository, runs the audit skill with `claude -p`, grades what it left in .campaign/state/audit/ against the
 // answer key, and appends one JSON line per run to testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude]
+// Usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model sonnet] [--keep] [--agent claude]
 //        node testbench/runners/run-audit-case.mjs <caseDir> --grade-only <copyPath>
 // --grade-only grades an existing copy (kept with --keep) without running the agent,
 // prints the record and does not append it to the results file.
@@ -14,12 +14,14 @@ import path from 'node:path';
 import {
   REPO_ROOT,
   appendResult,
+  applyLimits,
   changedFiles,
   instructionsHash,
   listFiles,
   loadYamlMapping,
   locateSnippet,
   parseCommonArgs,
+  parseLimits,
   prepareCopy,
   printSummary,
   recordHeader,
@@ -28,7 +30,7 @@ import {
 } from './lib/case-common.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude] [--grade-only <copyPath>]';
+  'usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model sonnet] [--keep] [--agent claude] [--grade-only <copyPath>]';
 const AGENT_TIMEOUT_MS = 1800000;
 const AUDIT_DIR = path.join('.campaign', 'state', 'audit');
 
@@ -37,7 +39,7 @@ function loadCase(caseDir) {
   for (const field of ['case', 'fixture', 'skill', 'prompt']) {
     if (typeof data[field] !== 'string') throw new Error(`case.yaml: ${field} missing`);
   }
-  return data;
+  return { ...data, limits: parseLimits(data) };
 }
 
 function loadKey(fixtureDir) {
@@ -277,7 +279,7 @@ function gradeCopy({ key, fixtureCampaign, copy }) {
 }
 
 /** Builds the JSONL record of one run from the grading result. */
-function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFailure, agent, graded, copy }) {
+function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFailure, agent, graded, copy, limits }) {
   const failures = [...(agentFailure ? [`agent error: ${agentFailure}`] : []), ...graded.failures];
   const record = {
     case: caseName,
@@ -303,6 +305,7 @@ function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFa
     coverage: graded.coverage,
     key_locators: graded.key_locators,
     key_unlocated: graded.key_unlocated,
+    limits: limits ?? null,
   };
   if (copy !== undefined) record.copy = copy;
   return record;
@@ -339,8 +342,11 @@ function main() {
       agent: { report: readText(path.join(copy, AUDIT_DIR, 'report.txt')), cost_usd: null, duration_ms: null, num_turns: null },
       graded,
       copy,
+      limits: null,
     });
     record.grade_only = true;
+    // The duration and the tool calls of the run are not kept, so the limits are not graded here.
+    record.limits_note = 'grade-only: L-time and L-calls are not graded (the run was not kept)';
     console.log(JSON.stringify(consoleView(record)));
     process.exitCode = printSummary([record], opts.modelLabel, hash, opts.agent) === 1 ? 0 : 1;
     return;
@@ -361,7 +367,7 @@ function main() {
         timeoutMs: AGENT_TIMEOUT_MS,
       });
       // The copy is graded even when the agent failed: a partial audit still shows what happened.
-      const graded = gradeCopy({ key, fixtureCampaign, copy: campaign });
+      const graded = applyLimits(gradeCopy({ key, fixtureCampaign, copy: campaign }), caseData.limits, agent);
       record = makeRecord({
         caseName: caseData.case,
         run: i,
@@ -373,6 +379,7 @@ function main() {
         agent: agent.ok ? agent : null,
         graded,
         copy: opts.keep ? campaign : undefined,
+        limits: caseData.limits,
       });
     } finally {
       if (opts.keep) {

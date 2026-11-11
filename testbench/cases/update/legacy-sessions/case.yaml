@@ -2,3 +2,6 @@ case: update-legacy-sessions
 scenario: legacy-sessions
 prompt: |
   Ciao, riprendiamo la campagna.
+limits:
+  max_minutes: 5
+  max_tool_calls: 60

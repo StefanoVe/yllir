@@ -33,10 +33,21 @@ const STATES = [
 
 const WORD_CHAR = /[\p{L}\p{N}]/u;
 
+/** True when the file frontmatter says generated: true. Unreadable files count as not generated. */
+function isGenerated(campaignRoot, file) {
+  try {
+    return parseFrontmatter(fs.readFileSync(path.join(campaignRoot, file), 'utf8')).data?.generated === 'true';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * @param {string} campaignRoot absolute path to the campaign folder
  * @param {{ subjects: object[] }} index result of buildSubjectIndex
  * @param {{ includeNotes?: boolean }} [options] includeNotes also scans the notes folders
+ * Files whose frontmatter says generated: true (session main files, rebuilt by the engine) are
+ * never scanned: the engine regenerates them, so a link added there would be lost.
  * @returns {{ files: string[], occurrences: object[], summary: Record<string, number> }}
  */
 export function scanMentions(campaignRoot, index, { includeNotes = false } = {}) {
@@ -49,7 +60,7 @@ export function scanMentions(campaignRoot, index, { includeNotes = false } = {})
     if (category.type === 'notes' && !includeNotes) continue;
     for (const sheet of listCanonicalSheets(campaignRoot, category.folder)) scanned.add(sheet);
   }
-  const files = [...scanned].sort(compareStrings);
+  const files = [...scanned].filter((file) => !isGenerated(campaignRoot, file)).sort(compareStrings);
 
   const forms = [];
   for (const subject of index.subjects) {

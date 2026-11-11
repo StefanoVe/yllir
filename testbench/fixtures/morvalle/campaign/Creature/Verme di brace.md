@@ -1,5 +1,7 @@
 ---
 id: verme-di-brace
+kind: creature
+provenance: master
 template: enemy
 location: [pozzo-di-narem]
 ---

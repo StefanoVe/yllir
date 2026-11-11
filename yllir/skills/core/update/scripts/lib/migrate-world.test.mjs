@@ -13,7 +13,7 @@ import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
 process.env.GIT_CONFIG_NOSYSTEM = '1';
 
-const FIXTURE = path.resolve(import.meta.dirname, '../../../../../../testbench/fixtures/morvalle/campaign');
+const FIXTURE = path.resolve(import.meta.dirname, '../../../../../../testbench/fixtures/morvalle-legacy/campaign');
 const tempDirs = [];
 after(() => {
   for (const dir of tempDirs) fs.rmSync(dir, { recursive: true, force: true });

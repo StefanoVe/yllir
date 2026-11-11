@@ -1,3 +1,6 @@
 case: entry-where-and-question
 prompt: |
   Ciao! Dove eravamo rimasti? E poi: dove si trova il Pozzo di Nàrem?
+limits:
+  max_minutes: 2
+  max_tool_calls: 60

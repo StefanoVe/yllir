@@ -1,106 +1,106 @@
 # Testbench
 
-The testbench holds synthetic campaigns, each with an answer key, and the runners that grade a framework component against them.
+The testbench holds synthetic campaigns, each with an answer key, and the runners that run the framework's Claude Code agent on them and grade what it does.
 
-- `fixtures/<name>/campaign/`: a synthetic campaign. It is the only part an agent under test works on.
-- `fixtures/<name>/key.yaml`: the answer key: what the component must find and what it must not.
-- `runners/`: scripts that run a component or grade its output against a key.
+- `fixtures/morvalle/campaign/`: a synthetic campaign in the current format (after the world-graph migration). It is the only part an agent under test works on.
+- `fixtures/morvalle/key.yaml`: the answer key for the mention scanner and the continuity audit: what must be found and what must not.
+- `fixtures/morvalle-legacy/campaign/`: a frozen copy of the same campaign before the world-graph migration (no `kind`, `provenance` or relations, and no seed). Only the update cases use it, because they need the old format.
+- `cases/<kind>/<name>/case.yaml`: one case: the master's message, the expected behaviour and its limits.
+- `runners/`: the scripts that run a case or grade a component against its key.
+- `results/<case>.jsonl`: one JSON line per run, appended by the runners.
 
-Rule: an agent under test receives only a COPY of `campaign/`. It never sees `key.yaml`, because an agent that can read the key measures copying, not finding. Runners read both files from the repository.
+Rule: an agent under test receives only a COPY of a campaign. It never sees `key.yaml`, because an agent that can read the key measures copying, not finding. Runners read the keys from the repository.
 
-Permissions: the case runners run the agent in strict mode, as a real master's campaign runs it: `claude -p` gets `--permission-mode manual --permission-prompts none` (anything that would prompt is refused, nothing is asked) and `--settings runners/lib/strict-settings.json`, which allows only `Skill(yllir:*)` and `Edit(.campaign/state/**)`. Each skill's own `allowed-tools` adds to these. The runners used to pass a broad `--allowedTools` list (shell, read, write, search), which granted far more than a master has. The explicit `--settings` file stands in for two things a real setup has and a test folder lacks: the project settings, which Claude Code ignores in an untrusted folder, and the rule the installer writes at user level in an empty folder. Each record stores `permission_mode: "strict"`, so results from older runs, which lack the field, can be told apart.
+## Agent and model
 
-Layout:
+Only Claude is tested. The case runners call `claude -p` with the plugin in `yllir/`.
 
-```text
-testbench/
-  fixtures/morvalle/campaign/   synthetic campaign (Italian)
-  fixtures/morvalle/key.yaml    answer key for the mention scanner
-  runners/check-scan.mjs        grades the deterministic mention scanner
+- Default model: `sonnet`. The author is the main agent and must be a strong model. `--model <name>` overrides it (for example `--model haiku` to measure an executor). Each record stores the model it ran with.
+- Permissions are strict, as in a real master's campaign: `claude -p` gets `--permission-mode manual --permission-prompts none` (anything that would prompt is refused, nothing is asked) and `--settings runners/lib/strict-settings.json`, which allows `Skill(yllir:*)`, `Edit(.campaign/state/**)`, `Edit(.campaign/drafts/**)` and the engine command `node "*/scripts/engine.mjs" *`. Nothing else is granted. Each record stores `permission_mode: "strict"`.
+
+## Limits
+
+A case may declare a `limits` mapping in `case.yaml`:
+
+```yaml
+limits:
+  max_minutes: 3
+  max_tool_calls: 126
 ```
 
-The item-manager fixtures live in `fixtures/item-manager/<mode>/campaign/`; the sibling `key.yaml` files are kept outside the agent-readable folder. Run a create or check trial with `node testbench/runners/run-item-manager-case.mjs testbench/cases/item-manager/create --agent codex --model gpt-6-luna --runs 2 --keep` (or replace `create` with `check`). Each JSONL record stores the agent, model, item-manager instruction hash, checks and pass result. Use only actual runner output as measured results; fixture keys are never placed in campaign copies.
+Both keys are optional; a key that is given must be a positive number. The shared functions in `runners/lib/case-common.mjs` do the work for every runner:
 
-When an isolated sub-agent runs the skill directly, grade and record that real copy with `node testbench/runners/run-item-manager-case.mjs testbench/cases/item-manager/create --agent codex --model gpt-6-luna --grade-only <campaignCopy> --record-grade --execution-source collaboration-subagent --run 1`. This records the explicitly stated execution source, current instruction hash and pass result; it does not rerun or claim that the local CLI ran the model.
+- `parseLimits(data)` reads the mapping (or returns `null` when the case has none).
+- `applyLimits(graded, limits, run)` turns the run result (`duration_ms` and `tool_calls` of `runClaude`) into the checks `L-time` and `L-calls`, adds their reasons to `failures` and requires them for `pass`. A value that was not measured fails its check. Each runner stores `limits` in its record.
 
-Grade the mention scanner:
+A run that exceeds a limit fails. The current values:
+
+| Case | max_minutes | max_tool_calls | Basis |
+|---|---|---|---|
+| `new-campaign/*` | 4 | 60 | target: new campaign |
+| `entry/prepare-proceed`, `entry/prepare-two-turns` | 3 | 126, 146 | target: prepare session; calls about 1.5x the median (84, 97) |
+| `entry/after-proceed` | 3 | 77 | target: after session; calls about 1.5x the median (51) |
+| `entry/after-too-thin` | 3 | 60 | target: after session |
+| `entry/go-back`, `entry/where-and-question`, `entry/not-available`, `entry/question-hypothesis` | 2 | 60 | target: entry questions |
+| `update/*` | 5 | 60 | target: update (no recorded runs yet, so the call limit is the default) |
+| `audit/full` | 10 | 140 | target: audit; calls about 1.5x the median (93) |
+
+The minute targets come from the redesign document («Tempi misurati»). Note that the medians recorded there for prepare-session (6.5 min) and after-session (3.4 min) are above the 3-minute targets, so those cases will fail on time until the framework is faster. The tool-call limits come from `results/*.jsonl` (haiku runs).
+
+## Cases
+
+| Runner | Cases | Checks |
+|---|---|---|
+| `run-new-campaign-case.mjs` | `new-campaign/all-answers`, `new-campaign/resume-after-stop` | B1 to B8 (settings, world document, instructions, saved version, links, plain words, no extra files, saved as a framework version) |
+| `run-entry-case.mjs` | `entry/go-back`, `entry/where-and-question`, `entry/not-available`, `entry/question-hypothesis`, `entry/prepare-proceed`, `entry/prepare-two-turns`, `entry/after-proceed`, `entry/after-too-thin` | E, W, N, Q, P, A and T checks, see the runner's header |
+| `run-update-case.mjs` | `update/stale-campaign`, `update/legacy-sessions`, `update/newer-published`, `update/declined` | S, L, N and D checks |
+| `run-audit-case.mjs` | `audit/full` | A1 to A8: recall of the contradictions, no problem for perspectives, hypotheses or recorded exclusions, no change to the documents |
+
+Every case also has `L-time` and `L-calls` when it declares limits.
+
+Entry cases (what the checks now read):
+
+- The work note `.campaign/state/work-note.md` is written at every commit. A case that saves (prepare, after-session) checks that it exists (P8). A case that stops before a commit (the two-turn first message, the too-thin evening, the conflict question) checks that it does not exist (Q2, C3, T3) and that the message asks exactly one question (Q2, T2).
+- The saved version count grows by exactly one and the newest version is a framework version (P9). The engine deletes its review file after the commit, so the version is the evidence.
+- The session main file is derived by the engine and must say `generated: true` (P1).
+
+Run one case (costs money, takes minutes per run):
+
+```sh
+node testbench/runners/run-new-campaign-case.mjs testbench/cases/new-campaign/all-answers [--runs N] [--model sonnet] [--keep]
+node testbench/runners/run-new-campaign-case.mjs testbench/cases/new-campaign/all-answers --grade-only <dir>
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/go-back [--runs N] [--model sonnet] [--keep]
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/go-back --setup-only
+node testbench/runners/run-entry-case.mjs testbench/cases/entry/go-back --grade-only <dir> --run-json <dir>.run.json
+node testbench/runners/run-update-case.mjs testbench/cases/update/legacy-sessions [--runs N] [--model sonnet] [--keep]
+node testbench/runners/run-audit-case.mjs testbench/cases/audit/full [--runs N] [--model sonnet] [--keep]
+node testbench/runners/run-audit-case.mjs testbench/cases/audit/full --grade-only <copyPath>
+```
+
+With `--keep` the folder is kept and the agent's final message, cost, duration and tool calls are saved beside it as `<dir>.run.json`, so `--grade-only` reproduces the record. A `--grade-only` record of the audit does not grade the limits, because the run was not kept.
+
+## Mention scanner
 
 ```sh
 node testbench/runners/check-scan.mjs [fixtureDir] [--json <file>]
 ```
 
-A mention may set `occurrence: N` (1-based) to pick the N-th scanner occurrence on its line for its subject, leftmost first; without it, the mention takes the leftmost occurrence no other mention has consumed.
-
-The default fixture is `fixtures/morvalle`. The campaign is scanned in memory; nothing is written into the fixture. The runner prints one `FAIL` line per failing mention, one `UNEXPECTED` line per unexplained occurrence, and a summary. `--json` also writes a machine-readable report.
-
-Exit codes: 0 when every mention passes and there are no unexpected occurrences; 1 otherwise; 2 when the key or the campaign cannot be read.
-
-Run a case of the continuity audit end to end (runs `claude -p` with the plugin, so it costs money and takes 10+ minutes per run):
-
-```sh
-node testbench/runners/run-audit-case.mjs testbench/cases/audit/full [--runs N] [--model haiku] [--keep]
-node testbench/runners/run-audit-case.mjs testbench/cases/audit/full --grade-only <copyPath>
-```
-
-The agent works on a temporary git copy of `fixtures/morvalle/campaign/`. The runner grades `.campaign/state/audit/report.json` and the other audit files left in the copy against `key.yaml`: recall of the contradictions, no problem for perspectives, hypotheses or recorded exclusions, no change to the documents, and one judgment per candidate. False alarms are reported and do not fail a run. `--keep` keeps the copy for inspection; `--grade-only` grades a kept copy again without running the agent and prints the record without appending it to the results.
-
-Each run appends one JSON line to `results/<case>.jsonl` with the model, the hash of the audit instructions, the checks, the report text, cost and duration. Shared helpers for the runners are in `runners/lib/case-common.mjs`.
-
-Run the new-campaign case end to end (the agent starts from an empty folder, answers the master's prompt from `cases/new-campaign/<case>/case.yaml`, and the runner grades the settings, the world document, the instructions, the saved version, the links, the plain words of the final message, the absence of extra files and the independent review; costs money and takes 10+ minutes per run):
-
-```sh
-node testbench/runners/run-new-campaign-case.mjs testbench/cases/new-campaign/all-answers [--runs N] [--model haiku] [--keep]
-node testbench/runners/run-new-campaign-case.mjs testbench/cases/new-campaign/all-answers --grade-only <dir>
-```
-
-With `--keep` the empty folder is kept and its final message and cost are saved beside it as `<dir>.run.json`, so `--grade-only` reproduces the record.
-
-Every runner takes the same `--agent claude|codex` option (default `claude`), handled in `parseCommonArgs` and run through `runAgent` in `runners/lib/case-common.mjs`, so Claude and Codex results are comparable. `--agent codex` runs the agent with `codex exec` (workspace-write sandbox) and gives it no model unless `--model` is passed; each record stores `agent` (`claude` or `codex`) and `model` (the model, or `codex-default`). The summary's last line names the agent too. A multi-turn case under Codex resumes the last session in the folder with `codex exec resume`. Codex reads the plugin through `yllir/.codex-plugin/plugin.json`, whose `skills` is the single folder `./skills/` (it holds both `core` and `library`). The runner only grants Codex writes to `.git` (which its workspace-write sandbox blocks by default) and tells Codex in the prompt where the plugin is, standing in for plugin discovery; the skills and generated instructions are expected to handle the rest. A real Codex install needs the same `.git` permission for the saved versions to work.
-
-Run the entry-point cases end to end (each case builds the morvalle fixture with two saved versions in a temporary folder, then runs the entry point on an existing campaign with the case prompt from `cases/entry/<case>/case.yaml`; costs money and takes a few minutes per run):
-
-```sh
-node testbench/runners/run-entry-case.mjs testbench/cases/entry/go-back [--runs N] [--model haiku] [--keep]
-node testbench/runners/run-entry-case.mjs testbench/cases/entry/where-and-question [--runs N] [--model haiku] [--keep]
-node testbench/runners/run-entry-case.mjs testbench/cases/entry/not-available [--runs N] [--model haiku] [--keep]
-node testbench/runners/run-entry-case.mjs testbench/cases/entry/go-back --setup-only
-node testbench/runners/run-entry-case.mjs testbench/cases/entry/go-back --grade-only <dir> --run-json <dir>.run.json
-```
-
-The checks are E1 to E5 (go back: card restored, history kept, nothing else changed, plain words, Italian), W1 to W4 (where we left off and a question: no writes, summary, answer, plain words) and N1 to N4 (not available: no writes, says it is not there yet, offers what exists, plain words). With `--keep` the folder and its final message, cost and setup values are saved beside it as `<dir>.run.json`, which `--grade-only` needs.
-
-Run the prepare-session cases end to end (each builds the morvalle fixture with two saved versions, then runs the entry point with the case prompt; `prepare-proceed` runs one message, `prepare-two-turns` runs a first message that must ask the master before writing and then a reply run in the same folder with `--continue`; the reply is in `case.yaml`; costs money and takes minutes per run):
-
-```sh
-node testbench/runners/run-entry-case.mjs testbench/cases/entry/prepare-proceed [--runs N] [--model haiku] [--keep]
-node testbench/runners/run-entry-case.mjs testbench/cases/entry/prepare-two-turns [--runs N] [--model haiku] [--keep]
-```
-
-The checks are P1 to P9 (the new session file, its format, nothing else created, links, saved as one commit, the prerequisites are said, plain words, one closed topic, the review said APPLY); the two-turn case also checks Q1 and Q2 after the first message (a question is asked and nothing is written; the topic stays active with its question). P10 is informational: capitalised words in the session that no source names are recorded as `possible_invented_names` and never fail a run. With `--grade-only`, a two-turn case grades the final state, and the first-turn checks only when the run was kept with `--keep`.
-
-Run the after-session cases end to end (same setup; costs money and takes minutes per run):
-
-```sh
-node testbench/runners/run-entry-case.mjs testbench/cases/entry/after-proceed [--runs N] [--model haiku] [--keep]
-node testbench/runners/run-entry-case.mjs testbench/cases/entry/after-too-thin [--runs N] [--model haiku] [--keep]
-```
-
-The checks are A1 to A7 (one new chronicle page with its id and the played session, the old page unchanged, nothing else changed, the plot map has no errors and the session is played, an Accaduto section of prose with no master block, every capitalised name is in the prompt or the subjects, saved as one commit, plain Italian words) and T1 to T3 (nothing written, one question asking for the evening in scenes, one open after-session topic with its question).
-
-The question-hypothesis case (`cases/entry/question-hypothesis`, run with `node testbench/runners/run-entry-case.mjs testbench/cases/entry/question-hypothesis [--runs N] [--model haiku] [--keep]`) asks about an accusation that exists only as a hypothesis in the notes file `Appunti/Idee.md`, and asks who Oria is, where two characters share that name. The checks are Q1 to Q5: no writes, the canon research report exists in `.campaign/state/research/`, the accusation is not stated as fact and the message says it is a hypothesis or not in the documents, both Valdes and Brunel are named, and plain words.
-
-Run the update cases end to end (`cases/update/<case>`; the copy is built deterministically, the agent answers the case prompt, costs money and takes minutes per run): `node testbench/runners/run-update-case.mjs testbench/cases/update/legacy-sessions [--runs N] [--model haiku] [--keep]`, and `--setup-only` to print the folders. `legacy-sessions` starts from a campaign whose sessions are in the old layout (`Trama/<Arc>/<N>.md`) and checks S1 to S6 (the stale-campaign checks) plus L1 to L4: the new layout on disk, the plot map without errors and with the same sessions, the text of every event kept, and the links and `generated: true` in each main file.
+The scanner is graded against `fixtures/morvalle/key.yaml`. A mention may set `occurrence: N` to pick the N-th scanner occurrence on its line. The scanner itself skips files whose frontmatter says `generated: true` (session main files, rebuilt by the engine), so the grader does not see them. The campaign is scanned in memory; nothing is written into the fixture. Exit codes: 0 when every mention passes and there are no unexpected occurrences; 1 otherwise; 2 when the key or the campaign cannot be read.
 
 ## Running the suite
 
-`runners/run-suite.mjs` runs every case under `cases/` through its runner, one child process per (case, agent, run), at most `--parallel` at a time (default 8). Each child appends its own record to `results/`. The suite prints a table of `p/n` per case and agent, a TOTAL line and the reasons of the failed jobs. It exits 0 only when every job passes.
+`runners/run-suite.mjs` runs every case under `cases/` through its runner, one child process per (case, run), at most `--parallel` at a time (default 8). The child uses the runner's default model (`sonnet`) unless `--model` is given. Each child appends its own record to `results/`. The suite prints a table of `p/n` per case, a TOTAL line and the reasons of the failed jobs, and exits 0 only when every job passes.
 
 ```sh
-node testbench/runners/run-suite.mjs                                  # quick: claude, 1 run, no audit
-node testbench/runners/run-suite.mjs --runs 3 --agent both --with-audit   # release measurement
-node testbench/runners/run-suite.mjs --only entry/ --agent codex          # a subset
+node testbench/runners/run-suite.mjs                                  # quick: one run per case, audit skipped
+node testbench/runners/run-suite.mjs --runs 3 --with-audit           # release measurement
+node testbench/runners/run-suite.mjs --only entry/                   # a subset
 ```
 
-- quick (default): one run per case with claude, audit skipped. Use it while developing.
-- release: `--runs 3 --agent both --with-audit`. Includes the audit cases, which take 10+ minutes per run, so expect a long run.
-- runs are parallel: jobs share the machine and the agent quota, so lower `--parallel` if the agent rate-limits.
+## Unit tests
+
+```sh
+cd testbench && node --test runners/*.test.mjs runners/lib/*.test.mjs
+```
+
+These cover the grading helpers, the limits, the suite and the update runner's grading. They run offline.

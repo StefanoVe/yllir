@@ -1,5 +1,6 @@
 ---
 id: la-cenere-che-canta-01
+provenance: master
 depends_on: []
 location: [borgo-cenere]
 arc: "La cenere che canta"

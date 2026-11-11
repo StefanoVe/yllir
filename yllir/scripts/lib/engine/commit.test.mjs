@@ -10,7 +10,7 @@ import { DRAFT_DIR, checkBatch, commitBatch } from './commit.mjs';
 import { ensureRepo } from '../versions.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const FIXTURE = path.resolve(here, '../../../../testbench/fixtures/morvalle/campaign');
+const FIXTURE = path.resolve(here, '../../../../testbench/fixtures/morvalle-legacy/campaign');
 
 const MIRA_PATH = 'Personaggi/Mira Sanna.md';
 const MIRA = `---

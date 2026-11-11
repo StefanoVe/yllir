@@ -1,5 +1,7 @@
 ---
 id: taglia-sul-verme-di-brace
+kind: item
+provenance: master
 template: notice
 location: [borgo-cenere]
 ---

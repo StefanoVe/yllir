@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Runs one framework-update case end to end on an existing campaign. The setup is
-// deterministic: it copies the morvalle fixture into a temporary folder, generates the
+// deterministic: it copies the morvalle-legacy fixture (the campaign before the world-graph migration) into a temporary folder, generates the
 // instructions and saves version 1. Then, per scenario:
 //   stale-campaign   the campaign was made with an older version (version.yaml is rewound to 0.0.1),
 //                    the master has a line in customizations.md and a hand-added line in agent.md,
@@ -16,7 +16,7 @@
 // message), and the runner grades what the agent left in the folder. One JSON line per run is appended
 // to testbench/results/<case>.jsonl. The grading helpers are exported and tested offline.
 //
-// Usage: node testbench/runners/run-update-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude] [--keep]
+// Usage: node testbench/runners/run-update-case.mjs <caseDir> [--runs N] [--model sonnet] [--agent claude] [--keep]
 //        node testbench/runners/run-update-case.mjs <caseDir> --setup-only
 //        node testbench/runners/run-update-case.mjs <caseDir> --grade-only <dir> --run-json <file>
 // --setup-only runs the setup, prints the folders and the git log, and keeps them.
@@ -36,7 +36,9 @@ import {
   instructionsHash,
   listFiles,
   loadYamlMapping,
+  applyLimits,
   parseCommonArgs,
+  parseLimits,
   printSummary,
   recordHeader,
   runAgent,
@@ -49,9 +51,10 @@ import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { plotMap } from '../../yllir/scripts/lib/plot/plot-map.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-update-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
+  'usage: node testbench/runners/run-update-case.mjs <caseDir> [--runs N] [--model sonnet] [--agent claude] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
 const AGENT_TIMEOUT_MS = 1800000;
-const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle', 'campaign');
+// The legacy copy: the morvalle campaign before the world-graph migration (format of 0.29 and older).
+const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle-legacy', 'campaign');
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
 const PLUGIN_JSON = path.join(REPO_ROOT, 'yllir', '.claude-plugin', 'plugin.json');
 const VERSION_PATH = '.campaign/version.yaml';
@@ -598,7 +601,7 @@ function makePublishedSource(installed) {
 }
 
 /**
- * Builds the morvalle campaign with instructions and one saved version, then the scenario's
+ * Builds the morvalle-legacy campaign with instructions and one saved version, then the scenario's
  * changes. Returns { tmp, dir, setup, publishedDir }; setup holds what the grading compares with.
  * Throws when the setup cannot be made; the temporary folders are removed in that case.
  */
@@ -670,7 +673,8 @@ function withPublishedSource(dir, fn) {
 // ---------------------------------------------------------------- case files
 
 function loadCase(caseDir) {
-  return parseCaseData(loadYamlMapping(path.join(caseDir, 'case.yaml')));
+  const raw = loadYamlMapping(path.join(caseDir, 'case.yaml'));
+  return { ...parseCaseData(raw), limits: parseLimits(raw) };
 }
 
 /** The files that define the process under test (same set as the other runners). */
@@ -683,7 +687,7 @@ function instructionFiles() {
 
 // ---------------------------------------------------------------- records and main
 
-function makeRecord({ caseName, scenario, run, date, header, hash, agent, graded, setup, copy, gradeOnly }) {
+function makeRecord({ caseName, scenario, run, date, header, hash, agent, graded, setup, copy, gradeOnly, limits }) {
   const agentFailure = agent && !agent.ok ? agent.error : null;
   const record = {
     case: caseName,
@@ -708,6 +712,7 @@ function makeRecord({ caseName, scenario, run, date, header, hash, agent, graded
   };
   if (copy !== undefined) record.copy = copy;
   if (gradeOnly) record.grade_only = true;
+  record.limits = limits ?? null;
   return record;
 }
 
@@ -748,13 +753,17 @@ function main() {
     const dir = path.resolve(gradeOnly);
     if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new Error(`--grade-only: ${dir} is not a folder`);
     const saved = JSON.parse(fs.readFileSync(path.resolve(runJson), 'utf8'));
-    const graded = gradeScenario({
-      scenario,
-      dir,
-      setup: saved.setup,
-      report: saved.report ?? null,
-      todays: todayDates(),
-    });
+    const graded = applyLimits(
+      gradeScenario({
+        scenario,
+        dir,
+        setup: saved.setup,
+        report: saved.report ?? null,
+        todays: todayDates(),
+      }),
+      caseData.limits,
+      saved,
+    );
     const agent = saved.report === null || saved.report === undefined ? { ok: false, error: saved.error ?? 'no report' } : saved;
     const record = makeRecord({
       caseName: caseData.case,
@@ -768,6 +777,7 @@ function main() {
       setup: saved.setup,
       copy: dir,
       gradeOnly: true,
+      limits: caseData.limits,
     });
     console.log(JSON.stringify(consoleView(record)));
     process.exitCode = printSummary([record], opts.modelLabel, hash, opts.agent) === 1 ? 0 : 1;
@@ -791,13 +801,17 @@ function main() {
           timeoutMs: AGENT_TIMEOUT_MS,
         }),
       );
-      const graded = gradeScenario({
-        scenario,
-        dir,
-        setup,
-        report: agent.ok ? agent.report : null,
-        todays: todayDates(),
-      });
+      const graded = applyLimits(
+        gradeScenario({
+          scenario,
+          dir,
+          setup,
+          report: agent.ok ? agent.report : null,
+          todays: todayDates(),
+        }),
+        caseData.limits,
+        agent,
+      );
       record = makeRecord({
         caseName: caseData.case,
         scenario,
@@ -809,6 +823,7 @@ function main() {
         graded,
         setup,
         copy: opts.keep ? dir : undefined,
+        limits: caseData.limits,
       });
       if (opts.keep) {
         fs.writeFileSync(

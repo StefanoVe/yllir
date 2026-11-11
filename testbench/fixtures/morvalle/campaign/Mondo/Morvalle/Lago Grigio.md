@@ -1,5 +1,7 @@
 ---
 id: lago-grigio
+kind: place
+provenance: master
 ---
 # Lago Grigio
 

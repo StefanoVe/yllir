@@ -15,3 +15,6 @@ expected:
   premise_words: [arcipelago, vetro, tempeste, contrabbandieri, faro]
   allowed_proper_nouns: [Selvaria, Le, I]
   version_message: "Creata la campagna «Le isole di vetro»"
+limits:
+  max_minutes: 4
+  max_tool_calls: 60

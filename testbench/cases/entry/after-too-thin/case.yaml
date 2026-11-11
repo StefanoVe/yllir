@@ -1,3 +1,6 @@
 case: entry-after-too-thin
 prompt: |
   Abbiamo finito la serata.
+limits:
+  max_minutes: 3
+  max_tool_calls: 60

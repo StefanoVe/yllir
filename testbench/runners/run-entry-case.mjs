@@ -6,7 +6,7 @@
 // the entry point with the case prompt (the master's message), and the runner grades what
 // the agent left in the folder. One JSON line per run is appended to testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude] [--keep]
+// Usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model sonnet] [--agent claude] [--keep]
 //        node testbench/runners/run-entry-case.mjs <caseDir> --setup-only
 //        node testbench/runners/run-entry-case.mjs <caseDir> --grade-only <dir> --run-json <file>
 // --setup-only runs the setup, prints the folder, the two versions and the git log,
@@ -22,11 +22,13 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   REPO_ROOT,
+  applyLimits,
   appendResult,
   instructionsHash,
   listFiles,
   loadYamlMapping,
   parseCommonArgs,
+  parseLimits,
   printSummary,
   recordHeader,
   runAgent,
@@ -34,7 +36,6 @@ import {
 import { generateInstructions } from '../../yllir/scripts/lib/instructions.mjs';
 import { ensureRepo, listVersions, saveVersion } from '../../yllir/scripts/lib/versions.mjs';
 import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
-import { listTopics, readSection } from '../../yllir/scripts/lib/topics.mjs';
 import { buildSubjectIndex, compareStrings } from '../../yllir/scripts/lib/subjects.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../yllir/scripts/lib/zones.mjs';
@@ -42,7 +43,7 @@ import { foldForm } from '../../yllir/scripts/lib/fold.mjs';
 import { plotMap } from '../../yllir/scripts/lib/plot/plot-map.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
+  'usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model sonnet] [--agent claude] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
 const AGENT_TIMEOUT_MS = 1800000;
 const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle', 'campaign');
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
@@ -131,7 +132,7 @@ function loadCase(caseDir) {
   }
   if (data.reply !== undefined && typeof data.reply !== 'string') throw new Error('case.yaml: reply must be a string');
   if (!CASES.includes(data.case)) throw new Error(`case.yaml: unknown case ${data.case}`);
-  return data;
+  return { ...data, limits: parseLimits(data) };
 }
 
 /** The files that define the process under test (same set as the new-campaign runner). */
@@ -234,7 +235,6 @@ const PREPARE_DEPENDS = ['la-cenere-che-canta-03'];
 const PREPARE_LOCATION = 'lago-grigio';
 const PREPARE_SUBJECT = 'Preparata la sessione «Sessione 4»';
 const PREPARE_PROTECTED = ['Personaggi/', 'Creature/', 'Oggetti/', 'Mondo/', 'Storia/'];
-const PREPARE_QUESTIONS = 'Questions for the master';
 const NOT_INVENTED = ['Successo', 'Fallimento', 'Nota'];
 
 /** A check result as the tuple [id, ok, reasons]. */
@@ -250,19 +250,24 @@ function commitCount(dir) {
   return Number(tryGit(dir, ['rev-list', '--count', 'HEAD'])?.trim());
 }
 
-/** Reasons from the topic handoffs: exactly one topic, the given process (prepare-session by default), the given status. */
-function topicReasons(dir, status, topicProcess = 'prepare-session') {
-  let topics;
-  try {
-    topics = listTopics(dir);
-  } catch (err) {
-    return [`listTopics: ${err.message}`];
-  }
-  if (topics.length !== 1) return [`${topics.length} topics (want 1)`];
-  const reasons = [];
-  if (topics[0].process !== topicProcess) reasons.push(`process is ${topics[0].process}`);
-  if (topics[0].status !== status) reasons.push(`status is ${topics[0].status} (want ${status})`);
-  return reasons;
+/** The work note the engine writes at every commit (.campaign/state/work-note.md). */
+const WORK_NOTE = path.join('.campaign', 'state', 'work-note.md');
+
+/** Reasons why the work note is missing: it exists after a commit (P8). */
+function workNoteReasons(dir) {
+  return fs.existsSync(path.join(dir, WORK_NOTE)) ? [] : [`${WORK_NOTE} does not exist`];
+}
+
+/** Reasons why the work note was written: nothing is written when the case stops before a commit (Q2, C3, T3). */
+function noWorkNoteReasons(dir) {
+  return fs.existsSync(path.join(dir, WORK_NOTE)) ? [`${WORK_NOTE} was written although nothing was saved`] : [];
+}
+
+/** Reasons why the message does not ask exactly one question (Q2, T2). */
+function oneQuestionReasons(report) {
+  if (report === null || report === undefined) return ['no final message'];
+  const marks = (report.match(/\?/g) ?? []).length;
+  return marks === 1 ? [] : [`${marks} question marks (want 1)`];
 }
 
 /** The scene files of the new session (Eventi/*.md), as paths relative to the campaign root. */
@@ -289,6 +294,8 @@ function sessionFileResults(dir) {
     p1.push('no frontmatter');
   } else {
     for (const e of errors) p1.push(`frontmatter line ${e.line}: ${e.message}`);
+    // The main file is derived by the engine at commit: it must say so.
+    if (String(data.generated) !== 'true') p1.push(`generated is ${JSON.stringify(data.generated)} (want true)`);
     if (data.id !== PREPARE_ID) p1.push(`id is ${JSON.stringify(data.id)}`);
     if (JSON.stringify(data.depends_on) !== JSON.stringify(PREPARE_DEPENDS)) {
       p1.push(`depends_on is ${JSON.stringify(data.depends_on)}`);
@@ -366,30 +373,20 @@ function repoResults(dir, v2) {
   return [result('P3', p3), result('P4', p4), result('P5', p5)];
 }
 
-/** P9: the write review of the session says APPLY. */
-function reviewResult(dir) {
-  const file = path.join(dir, '.campaign', 'state', 'write', 'review.json');
-  try {
-    const review = JSON.parse(fs.readFileSync(file, 'utf8'));
-    const reasons = review.outcome === 'APPLY' ? [] : [`review outcome is ${JSON.stringify(review.outcome)}`];
-    return result('P9', reasons);
-  } catch (err) {
-    return result('P9', [`review.json: ${err.message}`]);
+/**
+ * P9: the saved versions grew by exactly one (the setup saved REQUIRED_VERSIONS), and the newest one is a
+ * framework version. The engine deletes its review file after the commit, so the version is the evidence.
+ */
+function versionResult(dir) {
+  const versions = listVersions(dir, { limit: REQUIRED_VERSIONS + 5 });
+  const reasons = [];
+  if (versions.length !== REQUIRED_VERSIONS + 1) {
+    reasons.push(`${versions.length} saved versions (want ${REQUIRED_VERSIONS + 1})`);
   }
-}
-
-/** Reasons why the topic does not hold an open question: one current topic with a non-empty, not "none", question section. */
-function openQuestionReasons(dir, topicProcess = 'prepare-session') {
-  const reasons = topicReasons(dir, 'active', topicProcess);
-  if (reasons.length === 0) {
-    try {
-      const section = readSection(dir, { id: listTopics(dir)[0].id, section: PREPARE_QUESTIONS }).trim();
-      if (section === '' || section.toLowerCase() === 'none') reasons.push('Questions for the master is empty or none');
-    } catch (err) {
-      reasons.push(`readSection: ${err.message}`);
-    }
+  if (versions.length === 0 || versions[0].kind !== 'framework') {
+    reasons.push(`newest version kind is ${versions.length === 0 ? 'none' : versions[0].kind} (want framework)`);
   }
-  return reasons;
+  return result('P9', reasons);
 }
 
 /**
@@ -408,7 +405,7 @@ function conflictAskedResults(dir, report) {
   } else if (!report.includes('?')) {
     c2.push('no question mark in the message');
   }
-  return [result('C1', c1), result('C2', c2), result('C3', openQuestionReasons(dir))];
+  return [result('C1', c1), result('C2', c2), result('C3', noWorkNoteReasons(dir))];
 }
 
 /** The question the master is asked: the last sentence of the message that contains a question mark, or null. */
@@ -433,7 +430,9 @@ function gradeTurnOne(dir, report) {
     if (!normalized(report).includes('giocat')) q1.push('the message does not say that the sessions are not played');
   }
 
-  return [result('Q1', q1), result('Q2', openQuestionReasons(dir))];
+  // Q2: nothing is written (no work note) and the message asks exactly one question.
+  const q2 = [...noWorkNoteReasons(dir), ...oneQuestionReasons(report)];
+  return [result('Q1', q1), result('Q2', q2)];
 }
 
 /**
@@ -481,7 +480,6 @@ const AFTER_PAGE_ID = 'cronaca-2026-11-05';
 const AFTER_PLAYED = 'la-cenere-che-canta-02';
 const AFTER_OLD_PAGE = 'Cronaca/2026-10-03.md';
 const AFTER_MIN_PROSE = 200;
-const AFTER_TOPIC_PROCESS = 'after-session';
 
 /** Raw bytes of a file at a given version (git show), or null. */
 function gitShow(dir, rev, relPath) {
@@ -650,13 +648,12 @@ function afterTooThinResults({ dir, report }) {
   if (report === null || report === undefined) {
     t2.push('no final message');
   } else {
-    const marks = (report.match(/\?/g) ?? []).length;
-    if (marks !== 1) t2.push(`${marks} question marks (want 1)`);
+    t2.push(...oneQuestionReasons(report));
     if (!normalized(report).includes('scen')) t2.push('the message does not ask for the evening in scenes');
     t2.push(...plainWords(report).reasons);
   }
 
-  const t3 = openQuestionReasons(dir, AFTER_TOPIC_PROCESS);
+  const t3 = noWorkNoteReasons(dir);
   return [result('T1', t1), result('T2', t2), result('T3', t3)];
 }
 
@@ -741,22 +738,10 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
     // W4 plain words.
     finalPlainWords('W4');
   } else if (caseName === 'entry-question-hypothesis') {
-    // Q1 no writes (.campaign/state/ is git-ignored, so the research report does not count).
+    // Q1 no writes.
     {
       const reasons = noWriteCheck(dir);
       record('Q1', reasons.length === 0, reasons);
-    }
-    // Q2 the research step ran: its report is in the folder.
-    {
-      const file = path.join(dir, '.campaign', 'state', 'research', 'report.txt');
-      const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n') : [];
-      const reasons = [];
-      if (lines.length === 0) reasons.push('.campaign/state/research/report.txt does not exist');
-      else {
-        if (!lines.some((line) => line.includes('RESEARCH REPORT'))) reasons.push('no RESEARCH REPORT line');
-        if (!lines.some((line) => line.includes('covered:'))) reasons.push('no covered: line');
-      }
-      record('Q2', reasons.length === 0, reasons);
     }
     // Q3 the accusation is not stated as fact: the message says where it comes from, and does not affirm it.
     if (report === null || report === undefined) noReport('Q3');
@@ -807,8 +792,8 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
     if (pathTaken === 'saved') {
       results.push(...sessionFileResults(dir));
       results.push(...repoResults(dir, setup?.v2 ?? null));
-      results.push(result('P8', topicReasons(dir, 'closed')));
-      results.push(reviewResult(dir));
+      results.push(result('P8', workNoteReasons(dir)));
+      results.push(versionResult(dir));
       if (caseName === 'entry-prepare-proceed') {
         const reasons =
           report === null || report === undefined
@@ -855,7 +840,7 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
 // ---------------------------------------------------------------- records
 
 /** Builds the JSONL record of one run. */
-function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFailure, agent, graded, copy, gradeOnly }) {
+function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFailure, agent, graded, copy, gradeOnly, limits }) {
   const failures = [...(agentFailure ? [`agent error: ${agentFailure}`] : []), ...graded.failures];
   const record = {
     case: caseName,
@@ -878,6 +863,7 @@ function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFa
   };
   if (copy !== undefined) record.copy = copy;
   if (gradeOnly) record.grade_only = true;
+  record.limits = limits ?? null;
   if (graded.possibleInventedNames) record.possible_invented_names = graded.possibleInventedNames;
   if (graded.path) record.path = graded.path;
   if (graded.question) record.question = graded.question;
@@ -953,15 +939,19 @@ function main() {
     if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new Error(`--grade-only: ${dir} is not a folder`);
     const saved = JSON.parse(fs.readFileSync(path.resolve(runJson), 'utf8'));
     const turnOne = Array.isArray(saved.turn_one_results) ? { results: saved.turn_one_results } : null;
-    const graded = gradeCase({
-      caseName: caseData.case,
-      dir,
-      setup: saved.setup ?? null,
-      report: saved.report ?? null,
-      prompt: caseData.prompt,
-      turnOne,
-      turn1Report: saved.turn1_report ?? null,
-    });
+    const graded = applyLimits(
+      gradeCase({
+        caseName: caseData.case,
+        dir,
+        setup: saved.setup ?? null,
+        report: saved.report ?? null,
+        prompt: caseData.prompt,
+        turnOne,
+        turn1Report: saved.turn1_report ?? null,
+      }),
+      caseData.limits,
+      saved,
+    );
     const record = makeRecord({
       caseName: caseData.case,
       run: 1,
@@ -974,6 +964,7 @@ function main() {
       graded,
       copy: dir,
       gradeOnly: true,
+      limits: caseData.limits,
     });
     if (caseData.reply !== undefined && turnOne === null) {
       record.note = 'grade-only: the checks of the first turn (Q1, Q2) were not run; they need a run kept with --keep';
@@ -997,15 +988,19 @@ function main() {
         agent: opts.agent,
         modelGiven: opts.modelGiven,
       });
-      const graded = gradeCase({
-        caseName: caseData.case,
-        dir,
-        setup: { v1: setup.v1, v2: setup.v2, teodo_v1_text: setup.teodoV1Text },
-        report: agent.ok ? agent.report : null,
-        prompt: caseData.prompt,
-        turnOne,
-        turn1Report: agent.turn1_report ?? null,
-      });
+      const graded = applyLimits(
+        gradeCase({
+          caseName: caseData.case,
+          dir,
+          setup: { v1: setup.v1, v2: setup.v2, teodo_v1_text: setup.teodoV1Text },
+          report: agent.ok ? agent.report : null,
+          prompt: caseData.prompt,
+          turnOne,
+          turn1Report: agent.turn1_report ?? null,
+        }),
+        caseData.limits,
+        agent,
+      );
       record = makeRecord({
         caseName: caseData.case,
         run: i,
@@ -1017,6 +1012,7 @@ function main() {
         agent,
         graded,
         copy: opts.keep ? dir : undefined,
+        limits: caseData.limits,
       });
       if (opts.keep) {
         fs.writeFileSync(

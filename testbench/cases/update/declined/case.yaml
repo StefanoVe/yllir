@@ -2,3 +2,6 @@ case: update-declined
 scenario: declined
 prompt: |
   Riprendiamo. Se c'è un aggiornamento, ora non lo voglio: ricordamelo domani.
+limits:
+  max_minutes: 5
+  max_tool_calls: 60

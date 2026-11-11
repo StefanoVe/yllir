@@ -1,5 +1,7 @@
 ---
 id: teodo-marr
+kind: character
+provenance: master
 template: npc
 location: [lago-grigio]
 aliases: [Mastro Teodo]

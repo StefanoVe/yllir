@@ -5,7 +5,7 @@
 // expected values, and appends one JSON line per run to
 // testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude]
+// Usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model sonnet] [--keep] [--agent claude]
 //        node testbench/runners/run-new-campaign-case.mjs <caseDir> --grade-only <dir>
 // --grade-only grades a kept folder again without running the agent, prints the
 // record and does not append it to the results file. With --keep, the agent's
@@ -20,11 +20,13 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import {
   REPO_ROOT,
+  applyLimits,
   appendResult,
   instructionsHash,
   listFiles,
   loadYamlMapping,
   parseCommonArgs,
+  parseLimits,
   prepareEmpty,
   printSummary,
   recordHeader,
@@ -33,16 +35,16 @@ import {
 import { validateConfig } from '../../yllir/scripts/lib/config.mjs';
 import { checkFingerprints } from '../../yllir/scripts/lib/instructions.mjs';
 import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
+import { listVersions } from '../../yllir/scripts/lib/versions.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../yllir/scripts/lib/zones.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude] [--grade-only <dir>]';
+  'usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model sonnet] [--keep] [--agent claude] [--grade-only <dir>]';
 const AGENT_TIMEOUT_MS = 1800000;
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
 const AGENT_FILE = '.campaign/instructions/agent.md';
 const CUSTOMIZATIONS_FILE = '.campaign/customizations.md';
-const REVIEW_FILE = '.campaign/state/write/review.json';
 const TOP_LEVEL_FIXED = ['campaign.yaml', 'CLAUDE.md', 'AGENTS.md'];
 // Non-line blocks whose text is not prose: never scanned for proper nouns.
 const NON_PROSE_BLOCKS = new Set(['fence-open', 'fence-close', 'code', 'mermaid', 'comment', 'master-open', 'master-close']);
@@ -70,7 +72,7 @@ function loadCase(caseDir) {
       if (typeof value !== 'string') throw new Error(`case.yaml: seed.${key} must be a string`);
     }
   }
-  return data;
+  return { ...data, limits: parseLimits(data) };
 }
 
 /** The init-campaign.mjs flags for the seed values that are present, in a fixed order. */
@@ -345,20 +347,13 @@ function gradeCase({ caseData, dir, report }) {
     record('B7', reasons.length === 0, reasons);
   }
 
-  // B8 independent review.
+  // B8 the saved version is a framework version (the engine deletes its review file at commit,
+  // so the version kind is the evidence that the commit went through the review gate).
   {
     const reasons = [];
-    const text = readText(path.join(dir, REVIEW_FILE));
-    if (text === null) {
-      reasons.push(`${REVIEW_FILE} missing`);
-    } else {
-      try {
-        const outcome = JSON.parse(text).outcome;
-        if (outcome !== 'APPLY') reasons.push(`review outcome is ${outcome}`);
-      } catch {
-        reasons.push(`${REVIEW_FILE} is not JSON`);
-      }
-    }
+    const versions = listVersions(dir, { limit: 5 });
+    if (versions.length === 0) reasons.push('no saved version');
+    else if (versions[0].kind !== 'framework') reasons.push(`newest version kind is ${versions[0].kind} (want framework)`);
     record('B8', reasons.length === 0, reasons);
   }
 
@@ -366,7 +361,7 @@ function gradeCase({ caseData, dir, report }) {
 }
 
 /** Builds the JSONL record of one run. header is recordHeader(opts): the agent and the model. */
-function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFailure, agent, graded, copy }) {
+function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFailure, agent, graded, copy, limits }) {
   const failures = [...(agentFailure ? [`agent error: ${agentFailure}`] : []), ...graded.failures];
   const record = {
     case: caseName,
@@ -386,6 +381,7 @@ function makeRecord({ caseName, run, date, header, hash, permissionMode, agentFa
     num_turns: agent ? agent.num_turns : null,
     denied: agent?.denied ?? [],
     tool_calls: agent?.tool_calls ?? null,
+    limits: limits ?? null,
   };
   if (copy !== undefined) record.copy = copy;
   return record;
@@ -410,7 +406,7 @@ function main() {
     if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new Error(`--grade-only: ${dir} is not a folder`);
     const saved = readText(`${dir}.run.json`);
     const agent = saved === null ? null : JSON.parse(saved);
-    const graded = gradeCase({ caseData, dir, report: agent ? agent.report : null });
+    const graded = applyLimits(gradeCase({ caseData, dir, report: agent ? agent.report : null }), caseData.limits, agent ?? {});
     const record = makeRecord({
       caseName: caseData.case,
       run: 1,
@@ -422,6 +418,7 @@ function main() {
       agent,
       graded,
       copy: dir,
+      limits: caseData.limits,
     });
     record.grade_only = true;
     console.log(JSON.stringify(consoleView(record)));
@@ -444,7 +441,7 @@ function main() {
         modelGiven: opts.modelGiven,
         timeoutMs: AGENT_TIMEOUT_MS,
       });
-      const graded = gradeCase({ caseData, dir, report: agent.ok ? agent.report : null });
+      const graded = applyLimits(gradeCase({ caseData, dir, report: agent.ok ? agent.report : null }), caseData.limits, agent);
       record = makeRecord({
         caseName: caseData.case,
         run: i,
@@ -456,6 +453,7 @@ function main() {
         agent: agent.ok ? agent : null,
         graded,
         copy: opts.keep ? dir : undefined,
+        limits: caseData.limits,
       });
       if (opts.keep) {
         fs.writeFileSync(

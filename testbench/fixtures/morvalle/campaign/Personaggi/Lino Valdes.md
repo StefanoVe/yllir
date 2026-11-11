@@ -1,7 +1,12 @@
 ---
 id: lino-valdes
+kind: character
+provenance: master
 template: npc
 location: [lago-grigio]
+relations:
+  - to: oria-valdes
+    type: kin-of
 ---
 # Lino Valdes
 

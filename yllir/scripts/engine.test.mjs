@@ -9,7 +9,7 @@ import { ensureRepo } from './lib/versions.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.join(here, 'engine.mjs');
-const FIXTURE = path.resolve(here, '../../testbench/fixtures/morvalle/campaign');
+const FIXTURE = path.resolve(here, '../../testbench/fixtures/morvalle-legacy/campaign');
 const MIRA_PATH = 'Personaggi/Mira Sanna.md';
 const MIRA = `---
 id: mira-sanna

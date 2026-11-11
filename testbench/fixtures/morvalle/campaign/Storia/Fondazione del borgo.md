@@ -1,5 +1,8 @@
 ---
 id: fondazione-del-borgo
+kind: event
+provenance: master
+when: 312
 ---
 # Fondazione del borgo
 

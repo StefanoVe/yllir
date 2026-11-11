@@ -20,7 +20,6 @@ const CASES_ROOT = path.resolve(RUNNERS_DIR, '..', 'cases');
 const KIND_RUNNERS = new Map([
   ['new-campaign', 'run-new-campaign-case.mjs'],
   ['entry', 'run-entry-case.mjs'],
-  ['linker', 'run-linker-case.mjs'],
   ['audit', 'run-audit-case.mjs'],
 ]);
 const AGENT_SETS = new Map([['claude', ['claude']]]);

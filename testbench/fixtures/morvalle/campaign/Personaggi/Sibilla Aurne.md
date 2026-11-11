@@ -1,7 +1,12 @@
 ---
 id: sibilla-aurne
+kind: character
+provenance: master
 template: npc
 location: [pozzo-di-narem]
+relations:
+  - to: pozzo-di-narem
+    type: depends-on
 ---
 # Sibilla Aurne
 

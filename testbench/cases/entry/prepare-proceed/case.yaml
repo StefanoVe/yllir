@@ -1,3 +1,6 @@
 case: entry-prepare-proceed
 prompt: |
   Prepariamo la sessione 4 della Cenere che canta: il gruppo va al Lago Grigio a cercare Lino Valdes. Anche se le sessioni prima non sono state giocate, procedi senza chiedermi altro.
+limits:
+  max_minutes: 3
+  max_tool_calls: 126

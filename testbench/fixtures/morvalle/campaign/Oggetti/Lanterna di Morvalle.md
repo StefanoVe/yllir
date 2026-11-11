@@ -1,5 +1,7 @@
 ---
 id: lanterna-di-morvalle
+kind: item
+provenance: master
 template: item
 location: [torre-dell-ascia]
 ---

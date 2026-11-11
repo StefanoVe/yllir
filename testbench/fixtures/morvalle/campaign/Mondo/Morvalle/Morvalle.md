@@ -1,5 +1,7 @@
 ---
 id: morvalle
+kind: place
+provenance: master
 ---
 # Morvalle
 

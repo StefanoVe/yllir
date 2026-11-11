@@ -1,5 +1,7 @@
 ---
 id: capra-cinerina
+kind: creature
+provenance: master
 template: creature
 location: [morvalle]
 ---
