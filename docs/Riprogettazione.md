@@ -32,9 +32,14 @@ Il framework attuale è lento e non usa la capacità creativa del modello.
 1. **Obiettivo.** Il framework crea mondi narrativi coerenti con se stessi, completi di luoghi, personaggi ed eventi, partendo dagli adattatori dei sistemi di gioco e da descrizioni più o meno vaghe date dal master.
 2. **Modifiche sostanziali ammesse.** Il framework è ancora embrionale: la struttura attuale si può sostituire, senza l'obbligo di un adattamento progressivo.
 3. **Tutto il più automatico possibile.** Chi non sa nulla di intelligenza artificiale deve poterlo usare. Il master non sceglie modelli, livelli di costo o modalità: le scelte tecniche le fa il framework.
-4. **La creatività è di Claude.** La scrittura creativa spetta a Claude. Codex, se presente, serve al più come adattatore per la generazione di immagini. I modelli economici restano, per contenere il costo, ed eseguono ordini precisi dell'agente principale.
+4. **La creatività è di Claude.** La scrittura creativa spetta a Claude. Codex, se presente, serve al più come fornitore di immagini. I modelli economici restano, per contenere il costo, ed eseguono ordini precisi dell'agente principale.
 5. **Revisione proporzionata.** I controlli deterministici girano sempre. La revisione di un modello distinto avviene solo sui lotti che aggiungono fatti al canone. Questa decisione supera «Revisione indipendente sempre» dell'indice.
 6. **Migrazione dopo l'aggiornamento.** Le campagne esistenti passano al nuovo formato con una migrazione post-update, reversibile con git e riprendibile.
+7. **Fantasia sbloccata per default.** Il framework inventa ciò che le fonti non danno e dichiara al master che cosa ha inventato. La regola di provenienza (proposta 6) sostituisce il blocco della fantasia, i valori `IMAGINATION` e `PROPOSE`, la chiave `allow_model_imagination` e la domanda a quattro risposte. Restano fermi: la cronaca della serata riporta solo ciò che il master racconta, e la trascrizione del materiale importato è fedele alla fonte. Supera «Fantasia del modello, bloccata per default» dell'indice.
+8. **L'intervista iniziale crea solo i file core.** La decisione dell'indice resta: l'intervista non genera un mondo iniziale. Il mondo si costruisce quando il master lo chiede.
+9. **Organizzazione geografica confermata.** Resta la decisione del 2026-11-10: i documenti canonici stanno prima per categoria e poi per geografia.
+10. **Dati delle regole dalla conoscenza del modello.** Statistiche, difficoltà, prezzi ed effetti si scrivono con la conoscenza del modello o con una sua ricerca, e lo schema dell'adattatore li valida. L'adattatore non contiene le tabelle delle regole del gioco. Una ricerca non riceve mai il blocco riservato del master.
+11. **Il plugin per Codex si rimuove.** Il framework si distribuisce solo come plugin per Claude Code. Codex resta al più un fornitore di immagini, come dice la decisione 4.
 
 ## Proposta di architettura
 
@@ -47,14 +52,16 @@ Il framework attuale è lento e non usa la capacità creativa del modello.
 
 ### 2. Il motore
 
-Un solo programma a riga di comando sostituisce il cablaggio di scrittura, il linker come skill, il piano geografico e i controlli sparsi. L'autore lo chiama con una chiamata per operazione.
+Un solo programma a riga di comando sostituisce il cablaggio di scrittura, il linker come skill e i controlli sparsi. L'autore lo chiama con una chiamata per operazione.
 
 - `context`: dato ciò che si sta per scrivere (soggetti, luogo, sessione), restituisce un pacchetto di contesto compatto: il seme del mondo, i soggetti vicini nel grafo, la cronologia pertinente, i fili aperti.
-- `commit`: prende un lotto di bozze e, in un'unica transazione, valida formato e schema dell'adattatore, controlla il grafo, risolve i link, aggiorna gli indici e salva la versione. Se qualcosa non va, non scrive nulla e restituisce gli errori in JSON.
+- `commit`: prende un lotto di bozze e, in un'unica transazione, valida formato e schema dell'adattatore, controlla il grafo, calcola e applica la collocazione geografica, risolve i link, aggiorna gli indici e salva la versione. Se qualcosa non va, non scrive nulla e restituisce gli errori in JSON.
 - `check`: gli stessi controlli, senza scrivere.
 - `query`: domande strutturate sul mondo (chi sta dove, chi è legato a chi, che cosa è successo prima di una data).
 
-Gli errori meccanici (campo mancante, tabella malformata, link rotto) tornano all'autore dal motore, prima di ogni revisione. Il revisore non controlla il formato.
+Gli errori meccanici (campo mancante, tabella malformata, link rotto, percorso geografico in conflitto) tornano all'autore dal motore, prima di ogni revisione. Il revisore non controlla il formato.
+
+**Organizzazione geografica.** Resta la posizione canonica dei file (decisione 9). Il piano geografico è calcolato e verificato dal motore dentro `commit`, non più da una catena di passi eseguiti dal modello. Quando un lotto ha la revisione di un modello, il revisore riceve anche il piano.
 
 ### 3. Il mondo come grafo
 
@@ -63,7 +70,8 @@ Il Markdown resta l'unica fonte di verità. I metadati in testa a ogni documento
 - il tipo del soggetto (luogo, personaggio, creatura, oggetto, fazione, evento);
 - le relazioni con altri soggetti, con un tipo (appartenenza, parentela, alleanza, rivalità, dipendenza);
 - il luogo e, per gli eventi, la data o la posizione nella cronologia;
-- lo stato (per esempio vivo o morto, attivo o distrutto).
+- lo stato (per esempio vivo o morto, attivo o distrutto);
+- la provenienza (proposta 6).
 
 Dai documenti si deriva un indice con soggetti, relazioni, cronologia e fatti. È un derivato: si rigenera e non si modifica a mano. Su questo indice il motore controlla, senza alcun modello, i riferimenti a soggetti inesistenti, le date impossibili, un soggetto morto che agisce dopo la morte, un personaggio in due luoghi nello stesso momento.
 
@@ -71,27 +79,35 @@ I modelli di scheda si arricchiscono: motivazioni, legami, segreti e agganci di 
 
 ### 4. Il seme del mondo
 
-Un documento sempre presente nel contesto dell'autore: genere, temi, conflitti centrali, fazioni, culture, convenzioni dei nomi, livello di potere, cose da evitare. Nasce dall'intervista iniziale, che chiede queste cose in poche domande, e il master lo può correggere in qualunque momento parlando. Sostituisce la frase unica di descrizione in `campaign.yaml`.
+Un documento sempre presente nel contesto dell'autore: genere, temi, conflitti centrali, fazioni, culture, convenzioni dei nomi, livello di potere, cose da evitare.
+
+L'intervista resta quella dei soli file core (decisione 8), quindi il seme nasce piccolo: la premessa del master, il tono e il sistema di gioco. Cresce da solo. Ogni volta che il master aggiunge un'informazione sul mondo, o che il framework genera un pezzo di mondo, l'autore aggiorna il seme con ciò che vale per tutto il mondo (una nuova fazione, una convenzione dei nomi, un tema). Il master lo può correggere in qualunque momento parlando. Sostituisce la frase unica di descrizione in `campaign.yaml`.
 
 ### 5. Generazione a passate e abbozzi
 
-1. **Scaletta.** Dal seme l'autore produce una scaletta di abbozzi: una riga per soggetto, con le relazioni già dichiarate. Regioni, luoghi, fazioni, figure chiave, eventi della storia.
-2. **Espansione.** Gli abbozzi che servono subito diventano schede complete, in parallelo, ciascuna con il proprio pacchetto di contesto.
+Quando il master chiede molti contenuti insieme («crea la regione intorno al lago», «riempi il villaggio di personaggi»), l'autore lavora in tre passate:
+
+1. **Scaletta.** Prima di scrivere le schede, l'autore scrive un elenco breve di tutto ciò che creerà: una riga per soggetto, con i legami già decisi. Per esempio: «Borgo Cenere: villaggio di minatori, lo governa Teodo Marr, è in lite con i pescatori del Lago Grigio»; «Teodo Marr: capo del borgo, debitore della gilda del sale». Decidere tutti i legami in un solo passaggio, su poche righe, è ciò che rende il lotto coerente.
+2. **Espansione.** Ogni riga della scaletta diventa una scheda completa. Le schede si scrivono in parallelo, anche da esecutori economici, ciascuna con la propria riga e il proprio pacchetto di contesto: nessuno deve inventare un legame, perché sono già tutti nella scaletta.
 3. **Coerenza.** Un `commit` unico per il lotto: controlli del grafo, poi la revisione di un modello.
 
-Un abbozzo è un documento valido del canone. Resta tale finché non serve: quando il master lo nomina o una sessione lo usa, viene espanso. Così il mondo iniziale è ampio ma poco costoso, e il dettaglio arriva dove si gioca.
+**Senza conferma.** In linea con la decisione 3, il master non approva la scaletta: il framework genera tutto, poi dice in poche frasi che cosa ha creato, e il master corregge parlando.
 
-Lo stesso percorso serve le richieste singole: «crea un oste burbero al Vecchio Mulino» è un lotto di un documento.
+**Abbozzi.** Una riga della scaletta che non serve subito si può salvare come abbozzo: un documento valido del canone, con nome, tipo, legami e una frase. Quando il master lo nomina o una sessione lo usa, viene espanso. Così un mondo può essere ampio ma poco costoso, e il dettaglio arriva dove si gioca.
+
+Lo stesso percorso serve le richieste singole: «crea un oste burbero al Vecchio Mulino» è un lotto di un documento, senza scaletta.
 
 ### 6. Provenienza al posto del divieto
 
 Ogni contenuto porta la sua provenienza: detto dal master, giocato al tavolo, generato dal framework. La regola è una sola: ciò che il master ha detto o che è stato giocato non si sovrascrive e non si contraddice; ciò che è generato si può rigenerare o cambiare liberamente, e il master viene avvisato in una frase di che cosa è nuovo.
 
-Questa regola sostituirebbe il blocco della fantasia per default, i valori `IMAGINATION` e `PROPOSE` e la domanda a quattro risposte. Restano fermi: la cronaca della serata riporta solo ciò che il master racconta, e la trascrizione del materiale importato è fedele alla fonte.
+Un'invenzione non si presenta mai come citazione di una fonte, e un segreto inventato sta solo nel blocco riservato.
 
-### 7. Adattatori generativi
+### 7. Adattatori come schema
 
-Oltre allo schema delle schede, un adattatore dichiara ciò che serve per costruire contenuti giocabili: il budget di una creatura per livello di sfida, le difficoltà per fascia, le fasce di prezzo, le ricompense. Il motore valida ogni scheda generata contro queste tabelle. Una descrizione vaga («un capo bandito tosto per un gruppo di terzo livello») diventa una scheda completa e verificata.
+L'adattatore dichiara la forma delle schede del suo sistema: campi obbligatori e facoltativi delle creature, campi meccanici degli oggetti, scala delle difficoltà, risorse, condizioni, ciò che l'agente non decide al posto del master. Non contiene le tabelle delle regole del gioco (decisione 10).
+
+L'autore scrive statistiche, difficoltà, prezzi ed effetti con la propria conoscenza del sistema o con una ricerca, e il motore li valida contro lo schema: campi presenti, valori nel formato giusto, aritmetica coerente (per esempio modificatori ricavati dai punteggi). Una descrizione vaga («un capo bandito tosto per un gruppo di terzo livello») diventa così una scheda completa e verificata nella forma.
 
 Senza adattatore, le difficoltà e i valori restano in parole, come oggi.
 
@@ -99,7 +115,8 @@ Senza adattatore, le difficoltà e i valori restano in parole, come oggi.
 
 I processi diventano intenti riconosciuti dall'autore, descritti da skill brevi (obiettivo, vincoli, contratto di formato) e non da procedure passo per passo:
 
-- costruire o ampliare il mondo;
+- creare la campagna (intervista dei soli file core);
+- costruire o ampliare il mondo, su richiesta del master;
 - creare o cambiare qualunque documento da una descrizione;
 - preparare una sessione;
 - dopo la sessione: scrivere la cronaca e proporre e applicare le conseguenze su schede, fazioni e cronologia;
@@ -115,54 +132,56 @@ I processi diventano intenti riconosciuti dall'autore, descritti da skill brevi 
 | Il cablaggio di scrittura come skill, i rapporti di testo fra skill | L'indice dei soggetti, le librerie per metadati e YAML |
 | Il protocollo di feedback per skill nel percorso normale | Le versioni con git e il «torna a com'era» |
 | Il revisore dei link su ogni proposta | Il blocco riservato al master e i suoi controlli |
-| Lo spostamento geografico dei file a ogni scrittura | L'estrazione dei fatti dell'audit, che alimenta l'indice |
-| Le skill procedurali di centinaia di righe | Il caricamento dell'adattatore, le campagne di prova |
+| La catena di passi del piano geografico eseguita dal modello | Il calcolo della collocazione geografica, dentro `commit` |
+| Le skill procedurali di centinaia di righe | L'estrazione dei fatti dell'audit, che alimenta l'indice |
+| Il plugin per Codex e le istruzioni di ripiego per Codex | Il caricamento dell'adattatore, le campagne di prova |
 
 ### 10. Migrazione
 
-Una migrazione post-update porta le campagne esistenti al nuovo formato: aggiunge ai documenti i metadati di tipo e provenienza (tutto il contenuto esistente è «detto dal master»), ricava le relazioni che si possono leggere con certezza e lascia in sospeso le altre, costruisce l'indice. Non riscrive la prosa. È reversibile con git e si può riprendere dopo un'interruzione.
+Una migrazione post-update porta le campagne esistenti al nuovo formato: aggiunge ai documenti i metadati di tipo e provenienza (tutto il contenuto esistente è «detto dal master»), ricava le relazioni che si possono leggere con certezza e lascia in sospeso le altre, costruisce l'indice e il primo seme del mondo dalla configurazione e dal documento del mondo. Toglie da `campaign.yaml` la chiave `allow_model_imagination`. Non riscrive la prosa. È reversibile con git e si può riprendere dopo un'interruzione.
 
 ### 11. Misura
 
-- **Tempo come criterio.** Ogni caso di prova ha un tempo massimo e un numero massimo di chiamate; superarli è un fallimento. Obiettivi iniziali, da verificare: una scheda sotto il minuto, una sessione in due o tre minuti, un mondo iniziale di una trentina di soggetti in cinque-dieci minuti.
+- **Tempo come criterio.** Ogni caso di prova ha un tempo massimo e un numero massimo di chiamate; superarli è un fallimento. Obiettivi iniziali, da verificare: una scheda sotto il minuto, una sessione in due o tre minuti, una regione di una trentina di soggetti in cinque-dieci minuti.
 - **Casi di generazione.** Da un seme con vincoli seminati, il mondo generato deve rispettarli: si verifica sul grafo, senza leggere la chiave.
 - **Qualità.** Una griglia per il contenuto creativo (specifico, giocabile, coerente con il seme), giudicata da un modello distinto.
+- **Solo Claude.** Con la rimozione del plugin per Codex, il testbench misura solo Claude.
 
 ## Decisioni dell'indice toccate
 
 | Decisione dell'indice | Effetto |
 |---|---|
 | Revisione indipendente sempre | Superata dalla decisione 5 |
+| Fantasia del modello, bloccata per default | Superata dalla decisione 7 |
 | Più agenti, con ruoli distinti (esecuzione a modelli economici) | Modificata dalla decisione 4: la scrittura creativa è dell'agente principale |
-| Skill robuste (istruzioni che funzionano anche con Codex) | Modificata dalla decisione 4: Codex esce dal percorso creativo |
-| Fantasia del modello, bloccata per default | Da confermare: la proposta 6 la sostituisce |
-| L'intervista iniziale crea solo i file core | Da confermare: le proposte 4 e 5 generano un mondo iniziale |
-| Organizzazione geografica | Da confermare: la proposta 2 la riduce a vista derivata |
+| Skill robuste (istruzioni che funzionano anche con Codex) | Modificata dalle decisioni 4 e 11: Codex esce dal framework |
+| Il pacchetto è un plugin per Claude Code e per Codex | Superata dalla decisione 11 |
+| Codex è facoltativo | Ridotta dalla decisione 11 a fornitore di immagini facoltativo |
+| L'intervista iniziale crea solo i file core | Confermata dalla decisione 8 |
+| Organizzazione geografica | Confermata dalla decisione 9; il piano passa nel motore (proposta 2) |
 | Trascrizioni locali del feedback | Da confermare: fuori dal percorso normale, attive solo in sviluppo |
 | Sessioni gestite dal framework | L'obiettivo resta; il meccanismo di argomenti e handoff va riprogettato |
 
 ## Documenti da riscrivere
 
-Principi, Architettura, Orchestrazione degli agenti, Processi di core, Skill di libreria, Formato dei contenuti, Sistemi di gioco e stili, Configurazione, Robustezza e test, Gestione delle sessioni. Fino alla riscrittura restano come descrizione del framework attuale.
+Principi, Architettura, Orchestrazione degli agenti, Processi di core, Skill di libreria, Formato dei contenuti, Sistemi di gioco e stili, Configurazione, Robustezza e test, Gestione delle sessioni, Installazione e requisiti, Integrazioni esterne. Fino alla riscrittura restano come descrizione del framework attuale.
 
 ## Piano di lavoro
 
 1. **Formato e indice.** Metadati di tipo, relazioni, cronologia e provenienza; indice derivato; controlli del grafo.
-2. **Motore.** `context`, `commit`, `check`, `query`, con i loro test.
-3. **Seme e generazione.** Intervista, seme del mondo, scaletta, espansione in lotto, revisione di coerenza.
-4. **Adattatore generativo.** Tabelle di costruzione e validazione per D&D 2024.
-5. **Processi.** Sessione, dopo la sessione con le conseguenze, domande, import.
+2. **Motore.** `context`, `commit` (con la collocazione geografica), `check`, `query`, con i loro test.
+3. **Seme e generazione.** Seme del mondo che cresce, scaletta, espansione in lotto, abbozzi, revisione di coerenza.
+4. **Adattatore come schema.** Validazione di forma e aritmetica per D&D 2024.
+5. **Processi.** Campagna, mondo, documento singolo, sessione, dopo la sessione con le conseguenze, domande, import.
 6. **Migrazione** delle campagne esistenti.
-7. **Testbench.** Tempi massimi, casi di generazione, griglia di qualità.
+7. **Rimozione di Codex.** Plugin, istruzioni di ripiego, opzioni del testbench.
+8. **Testbench.** Tempi massimi, casi di generazione, griglia di qualità.
 
 ## Questioni aperte
 
-- **Fantasia.** L'autore conferma che il default diventa «inventa e dichiara», con la regola di provenienza della proposta 6?
 - **Grana della provenienza.** Per documento, per sezione o per singolo fatto? Per documento è semplice ma grossolano: una scheda generata in cui il master corregge una frase diventa mista.
-- **Scaletta.** Il master la conferma prima dell'espansione, oppure il framework genera tutto e il master corregge dopo? La decisione 3 spinge verso la seconda.
-- **Dimensione del mondo iniziale.** Quanti soggetti genera l'intervista, e chi lo decide.
-- **Dati delle regole.** Le tabelle di costruzione stanno nell'adattatore (va verificata la licenza dei testi del gioco) oppure il modello usa la propria conoscenza, validata dallo schema?
-- **Organizzazione geografica.** Resta la posizione canonica dei file o diventa una vista derivata?
+- **Quando salvare gli abbozzi.** Una riga della scaletta che non serve subito diventa sempre un abbozzo nel canone, o solo quando il master la nomina?
+- **Revisione del piano geografico.** La decisione del 2026-11-10 chiede la revisione indipendente del piano prima di ogni scrittura. Con la decisione 5, un lotto che non aggiunge fatti (per esempio solo uno spostamento) passerebbe con i soli controlli del motore. Va bene?
 - **Sessioni lunghe.** Che cosa sostituisce argomenti e handoff: il pacchetto di contesto del motore basta a riprendere il lavoro?
 - **Soglie di delega.** Da quale dimensione del lotto conviene delegare l'espansione ai modelli economici.
-- **Codex.** Con Codex ridotto ad adattatore di immagini, il plugin per Codex resta?
+- **Trascrizioni del feedback.** Restano attive solo in sviluppo?
