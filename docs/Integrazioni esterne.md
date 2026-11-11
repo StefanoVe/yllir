@@ -1,11 +1,13 @@
 # Integrazioni esterne
 
-**Stato:** Bozza di progetto
+**Stato:** Bozza di progetto. Riscritto dopo la [Riprogettazione](Riprogettazione.md) (2026-11-11).
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
 
 Questo file descrive i servizi e gli strumenti che il framework può usare oltre al proprio core: generazione e modifica di immagini, Photoshop, documenti, browser, pubblicazione, musica. Descrive anche come il framework capisce cosa è disponibile nella macchina del master e come lo spiega senza gergo. Non stabilisce dettagli di configurazione (vedi [Configurazione](Configurazione.md)) né l'orchestrazione dei modelli (vedi [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md)).
 
-Convenzioni di questo file: ciò che l'autore ha deciso è indicato come **Decisione dell'autore**; le scelte di questo documento sono **Proposta**; le informazioni sui servizi di terze parti che non sono verificate sono marcate **DA VERIFICARE**. Non compaiono prezzi né nomi di modelli: non sono stati verificati.
+Convenzioni di questo file: ciò che l'autore ha deciso è indicato come **Deciso**, con la data; le scelte di questo documento sono **Proposta**; le informazioni sui servizi di terze parti che non sono verificate sono marcate **DA VERIFICARE**. Non compaiono prezzi né nomi di modelli: non sono stati verificati.
+
+Dalla Riprogettazione Codex non è più parte del framework: resta al più un fornitore di immagini facoltativo, e nulla di ciò che lo riguarda è stato costruito (**Deciso**, 2026-11-11, decisioni 4 e 11). Le sezioni sotto che lo citano lo trattano come uno dei fornitori possibili.
 
 ## 1. Principio
 
@@ -13,6 +15,7 @@ Convenzioni di questo file: ciò che l'autore ha deciso è indicato come **Decis
 - **Il core non dipende da nessuna integrazione.** Il core chiede una capacità («ho bisogno di un'illustrazione con queste proporzioni») e il registro delle integrazioni risponde con il fornitore disponibile. Se non ce n'è nessuno, il core dice che cosa manca e propone l'alternativa.
 - **La campagna resta utilizzabile senza integrazioni.** Senza alcun servizio si scrivono schede, si collegano, si controllano, si impaginano le immagini caricate dall'utente e si stampano i fogli. Quello che manca è la generazione di immagini, la composizione in Photoshop e i servizi di riproduzione.
 - **Claude, da solo, non genera immagini.** Ogni immagine nasce da un servizio esterno (Photoshop, Codex, un'API, un programma locale) o da un file caricato dall'utente. Questo è un fatto del progetto, non una scelta di comodo.
+- **La scrittura creativa non passa da un fornitore di immagini.** Un fornitore riceve solo ciò che il core gli passa (regola 1 della sezione 2) e non partecipa alla scrittura di schede o scene (**Deciso**, 2026-11-11, decisione 4).
 - **Richiesta dell'autore.** Il framework deve includere, oltre alle skill nate nel progetto, altre skill e integrazioni utili (per esempio l'MCP di Photoshop) e un modo per generare immagini senza dipendere per forza da Codex.
 
 **Punto di partenza.** Negli strumenti iniziali la generazione di illustrazioni dipende in modo fisso da un solo fornitore (Codex con ImageGen), e alcuni processi vietano di ripiegare su altri generatori; la composizione delle carte dipende anche da Photoshop. Un'impostazione così rende il framework fragile quando il fornitore non è disponibile. Con questo principio quelle dipendenze diventano configurazione, e il divieto diventa una scelta dell'utente (vedi la sezione 2).
@@ -88,7 +91,7 @@ Tutti i candidati sono opzioni. Nessuno è obbligatorio, e l'ordine sopra è una
 | Fornitore | Operazioni | Pro | Contro | Requisiti | Difficoltà |
 |---|---|---|---|---|---|
 | **Photoshop MCP** | `genera`, `modifica_zona`, `espandi`, `ingrandisci`, `togli_sfondo`, più la composizione a livelli | Unico candidato che unisce generazione, testo su livelli e PSD a livelli; anteprima per la revisione; ottimo per carte e ritocchi | Richiede Photoshop aperto; le funzioni generative dipendono dalla versione e dall'abbonamento Adobe; costo dell'abbonamento da verificare | Photoshop installato e in esecuzione; MCP di Photoshop collegato; `photoshop_get_capabilities` per sapere quali funzioni sono attive | Media |
-| **Codex con ImageGen** (già sperimentato) | `genera`; `modifica_zona` solo con ritaglio e ricomposizione del core | Già usato nelle prove; il processo può essere sorvegliato con controlli su blocchi e tempi | Richiede istruzioni molto esplicite; nessuna maschera; comportamento interattivo da sorvegliare; limiti d'uso da verificare | Codex installato e autenticato con un account che ha accesso a ImageGen (DA VERIFICARE) | Media |
+| **Codex con ImageGen** (già sperimentato; fornitore facoltativo, nulla costruito) | `genera`; `modifica_zona` solo con ritaglio e ricomposizione del core | Già usato nelle prove; il processo può essere sorvegliato con controlli su blocchi e tempi | Richiede istruzioni molto esplicite; nessuna maschera; comportamento interattivo da sorvegliare; limiti d'uso da verificare | Codex installato e autenticato con un account che ha accesso a ImageGen (DA VERIFICARE) | Media |
 | **Server MCP verso API di terzi** (OpenAI, Google, Replicate, fal: DA VERIFICARE) | `genera`; altre operazioni a seconda del servizio (DA VERIFICARE) | Indipendente da Codex e da Photoshop; si sceglie il servizio; automatizzabile | Le operazioni variano da servizio a servizio (DA VERIFICARE); costi a consumo; le immagini e i prompt escono dal computer; la chiave va custodita | Account presso il servizio, chiave API, server MCP da scegliere o scrivere | Media-alta |
 | **Generazione locale** (ComfyUI o simili via MCP: DA VERIFICARE) | `genera`, `modifica_zona` a seconda del flusso (DA VERIFICARE) | Nessun costo per immagine; i dati restano sul computer; utilizzabile senza rete dopo l'installazione | Installazione complessa; tempi lunghi; scelta dei modelli difficile; scheda grafica adeguata (requisiti DA VERIFICARE) | Computer con scheda grafica adeguata, spazio su disco, installazione guidata | Alta |
 | **Nessun fornitore** (caricamento manuale) | Nessuna generazione: l'utente porta le proprie immagini; il core ritaglia, impagina e stampa | Nessuna dipendenza né costo; piena libertà dell'autore sulle illustrazioni | L'utente fornisce tutte le immagini; senza Photoshop, il PSD a livelli non è disponibile (da decidere); nessuna espansione o rimozione dello sfondo automatica | Solo gli strumenti di impaginazione del core (oggi ImageMagick, da verificare come requisito minimo) | Bassa |
@@ -97,7 +100,7 @@ Tutti i candidati sono opzioni. Nessuno è obbligatorio, e l'ordine sopra è una
 
 **Photoshop MCP.** Il server espone, tra gli altri: `photoshop_generate_image`, `photoshop_generative_fill`, `photoshop_generative_expand`, `photoshop_generative_upscale`, `photoshop_generative_remove`, `photoshop_create_text_layer`, `photoshop_create_layer`, `photoshop_place_image`, `photoshop_apply_layer_style`, `photoshop_export_as`, `photoshop_save_document`, `photoshop_get_preview`, e le ricette `photoshop_recipe_csv_to_cards`, `photoshop_recipe_remove_background`, `photoshop_recipe_apply_color_grade`, `photoshop_recipe_prepare_for_web`. Richiede Photoshop installato e in esecuzione. Le funzioni generative dipendono dalla versione e dall'abbonamento Adobe: prima di proporle si chiama `photoshop_get_capabilities`. Le funzioni generative non sono un generatore indipendente: producono l'immagine con il servizio di Adobe, quindi il costo e i termini sono quelli dell'abbonamento.
 
-**Codex con ImageGen.** Fornitore già sperimentato per la generazione di artwork e di carte. Il problema emerso nelle prove è l'affidabilità del processo, non la qualità: per questo il processo chiude lo standard input, sorveglia il log e impone un timeout. Il framework dovrà conservare questi controlli, anche quando Codex è un fornitore tra gli altri. Osservazione dell'autore: Codex ha bisogno di istruzioni molto più esplicite di Claude (vedi la [specifica principale](Framework%20per%20campagne%20di%20GDR.md)): ogni fornitore va trattato come un caso a sé nel contratto.
+**Codex con ImageGen.** Fornitore già sperimentato per la generazione di artwork e di carte. È un fornitore facoltativo, al più: il framework non dipende da lui e il plugin per Codex è stato rimosso (**Deciso**, 2026-11-11, decisione 11). Il problema emerso nelle prove è l'affidabilità del processo, non la qualità: per questo il processo chiude lo standard input, sorveglia il log e impone un timeout. Il framework dovrà conservare questi controlli, anche quando Codex è un fornitore tra gli altri. Osservazione dell'autore: Codex ha bisogno di istruzioni molto più esplicite di Claude (vedi la [specifica principale](Framework%20per%20campagne%20di%20GDR.md)): ogni fornitore va trattato come un caso a sé nel contratto.
 
 **Server MCP verso API di terzi.** Una strada indipendente dagli altri due. Il framework non dovrebbe includere un fornitore specifico: dovrebbe definire il contratto e lasciare la scelta del servizio all'utente. Ogni servizio ha un proprio elenco di operazioni, di modelli e di condizioni d'uso, che vanno verificati al momento dell'adozione (DA VERIFICARE). Il punto critico per un master è la chiave API: va inserita una volta, conservata fuori dal progetto e mai copiata nei file della campagna.
 
@@ -105,7 +108,7 @@ Tutti i candidati sono opzioni. Nessuno è obbligatorio, e l'ordine sopra è una
 
 **Nessun fornitore.** È la soluzione di base: tutto ciò che il framework fa deve funzionare anche così. Per le carte, senza Photoshop, il PSD a livelli non si produce. Resta da decidere se la carta si costruisca con un compositore a livelli libero, con un file di livelli esportato in altro formato o se il PSD diventi una funzione solo per chi ha Photoshop (vedi [Questioni aperte](#7-questioni-aperte)).
 
-**Scelta predefinita (proposta).** Per il master che non ha un'opinione, l'ordine più sensato è: Photoshop se presente e con funzioni generative attive; altrimenti Codex se installato; altrimenti il caricamento manuale. Le API e la generazione locale restano opzioni esplicite. Questa proposta dipende dalle risposte alle questioni aperte su costi e dati.
+**Scelta predefinita (proposta).** Per il master che non ha un'opinione, l'ordine più sensato è: Photoshop se presente e con funzioni generative attive; altrimenti Codex se installato (fornitore facoltativo); altrimenti il caricamento manuale. Le API e la generazione locale restano opzioni esplicite. Questa proposta dipende dalle risposte alle questioni aperte su costi e dati.
 
 ## 4. Photoshop MCP come pilastro della pipeline delle carte
 
@@ -145,6 +148,8 @@ Ogni voce indica a cosa serve al master, se è un modulo (un pezzo che si attiva
 | **Pubblicazione dell'enciclopedia** (con la CLI del servizio di hosting scelto) | Mettere online le voci per i giocatori o per sé stessi, da un solo comando | Modulo (pubblicazione) | Account di hosting, CLI installata, dominio | Opzionale. Richiede un controllo esplicito sulle parti riservate prima di ogni invio |
 | **Musica** (riproduzione con un programma come mpv; yt-dlp solo per ottenere il flusso da riprodurre, mai per scaricare o conservare file) | Sottofondo e cue musicali collegati alle sessioni | Modulo (audio) | Strumenti di riproduzione; per i flussi online, termini d'uso e diritti da verificare (DA VERIFICARE) | Proposta da valutare (questione aperta 6). Un'integrazione che usa flussi di YouTube va verificata prima di essere adottata: la sua liceità dipende dai termini del servizio |
 
+**Ricerca web per i dati delle regole (Deciso, 2026-11-11, decisione 10).** Statistiche, difficoltà, prezzi ed effetti si scrivono con la conoscenza del modello o con una sua ricerca web, e lo schema dell'adattatore li valida. Una ricerca web non riceve mai il blocco riservato del master: riceve solo la domanda sulla regola, formulata senza nomi, luoghi o segreti della campagna. Il controllo sta nel core, come per i fornitori di immagini (sezione 2, regola 1).
+
 Due osservazioni dalle prove. Primo: le integrazioni più utili sono quelle che fanno un passaggio che il master farebbe a mano, come verificare una pagina o impaginare un foglio, e non quelle che aggiungono funzioni nuove. Secondo: nessuna integrazione deve poter cambiare un contenuto della campagna senza passare dai processi del core (audit, collegamenti, separazione pubblico/riservato).
 
 ### Fuori dalla prima versione (YAGNI)
@@ -160,7 +165,7 @@ All'apertura di una campagna, e alla prima richiesta che ha bisogno di un'integr
 | Capacità | Come si verifica (proposta) | Stati possibili |
 |---|---|---|
 | Illustrazioni da Photoshop | Ping del server MCP; poi `photoshop_get_capabilities` per le funzioni generative | Pronto / Photoshop chiuso / funzioni generative non disponibili |
-| Illustrazioni da Codex | Presenza del comando e della sua versione; l'autenticazione si verifica con una prova o con un comando di stato (DA VERIFICARE) | Pronto / non installato / non autenticato |
+| Illustrazioni da Codex (facoltativo) | Presenza del comando e della sua versione; l'autenticazione si verifica con una prova o con un comando di stato (DA VERIFICARE) | Pronto / non installato / non autenticato |
 | Illustrazioni da un servizio API | Presenza della chiave nell'ambiente o nel file locale personale, senza mai stamparla; una prova minima solo con consenso, perché può avere un costo | Pronto / chiave assente / non verificato |
 | Generazione locale | Raggiungibilità del servizio sulla macchina (DA VERIFICARE) | Pronto / non avviato / non installato |
 | Impaginazione e stampa | Presenza degli strumenti usati dal core (ImageMagick, qrencode, Node) | Pronto / mancante |

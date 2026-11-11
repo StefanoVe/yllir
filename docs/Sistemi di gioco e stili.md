@@ -1,23 +1,24 @@
 # Sistemi di gioco e stili
 
-**Stato:** Bozza di progetto
+**Stato:** Bozza di progetto. Riscritto dopo la [Riprogettazione](Riprogettazione.md) (2026-11-11).
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
 
 ## Scopo
 
 Due moduli opzionali dicono al framework come si comporta una campagna sul piano del gioco e su quello visivo:
 
-- l'**adattatore di sistema** descrive le regole di gioco di un sistema: se ci sono scontri, quali risorse esistono, come si misura la difficoltà, come avanza la campagna, quale forma hanno le schede;
+- l'**adattatore di sistema** descrive la forma delle schede di un sistema di gioco: quali campi hanno le creature e gli oggetti, quali risorse esistono, quali condizioni e durate, come si esprime una difficoltà, come avanza la campagna. Non contiene le tabelle delle regole;
 - il **profilo di stile** descrive l'aspetto visivo di artwork e carte: prompt, palette, cornici, formato, impaginazione.
 
 Entrambi sono dichiarati in `campaign.yaml` (`system.adapter` per l'adattatore; lo stile per categoria sta in `structure[].style`, vedi [Configurazione](Configurazione.md)). Il core non conosce né D&D né uno stile specifico: li legge attraverso il contratto descritto qui.
 
 Decisioni già prese dall'autore:
 
-- D&D 2024 è il primo adattatore; il core non ne contiene nulla;
-- le scelte dell'esempio (progressione, difficoltà, statistiche e stili) non sono decisioni dell'autore: sono descritte in [Scelte di esempio](#scelte-di-esempio).
+- D&D 2024 è il primo adattatore; il core non ne contiene nulla (decisione dell'indice);
+- l'adattatore è uno **schema**: dichiara la forma delle schede, le scale e ciò che l'agente non decide. Non contiene le tabelle delle regole del gioco. Le statistiche, le difficoltà, i prezzi e gli effetti si scrivono con la conoscenza del modello o con una sua ricerca, senza il blocco riservato del master, e lo schema li valida (**Deciso, 2026-11-11**, decisione 10 e architettura 7 della [Riprogettazione](Riprogettazione.md));
+- il modulo di sistema può contenere un file `checks.mjs` con l'aritmetica del sistema (modificatori dai punteggi, punti ferita medi dai dadi, valori di grado di sfida) (**Implementato in 0.30.0**).
 
-La scelta fra adattatori per sistemi noti e modello generico resta aperta: vedi la sezione dedicata.
+Le scelte dell'esempio (progressione, difficoltà, statistiche e stili) non sono decisioni dell'autore: sono descritte in [Scelte di esempio](#scelte-di-esempio). La scelta fra adattatori per sistemi noti e modello generico resta aperta: vedi la sezione dedicata.
 
 ## Scelte di esempio
 
@@ -30,7 +31,9 @@ Le scelte seguenti appartengono all'esempio D&D 2024 e ai profili di esempio. No
 
 ## Contratto dell'adattatore di sistema
 
-Un adattatore è un pacchetto dichiarativo: un manifest con i campi descritti sotto, più le tabelle o i testi che il manifest richiama. L'adattatore non contiene codice: dichiara, e gli script del core leggono le sue dichiarazioni. Un calcolo che non si può esprimere come tabella (per esempio una conversione da punteggio a fascia) è un'operazione del core, con i suoi test.
+Un adattatore è uno schema dichiarativo: un manifest YAML con i campi descritti sotto, che il motore valida. Il manifest non contiene le tabelle delle regole (decisione 10 della Riprogettazione). Un modulo di sistema può aggiungere un file `checks.mjs` con i calcoli che non sono tabelle, per esempio la conversione da punteggio a modificatore (**Implementato in 0.30.0**). Il file deve restare puro aritmetico: non tira dadi e non decide esiti.
+
+Superata: la regola precedente «l'adattatore non contiene codice, e un calcolo che non si può esprimere come tabella è un'operazione del core». Ora i calcoli di un sistema stanno in `checks.mjs` del suo modulo, e il core resta senza nomi di sistema.
 
 ### Cosa dichiara il manifest
 
@@ -40,29 +43,35 @@ Un adattatore è un pacchetto dichiarativo: un manifest con i campi descritti so
 | `encounters` | se e come il sistema ha combattimenti | `turn-based`: round, iniziativa, azioni |
 | `resources` | tipi di risorsa per entità, con massimo e recupero | PF, PF temporanei, slot, usi limitati, ricariche |
 | `conditions` | etichette con durata | prono, incapacitato; durata «fino a fine turno», «fino a salvezza» |
+| `condition_durations` | durate ammesse per le condizioni | fine turno, fino a salvezza, fino a riposo, fino a rimozione, round |
 | `difficulty` | scala e metodo per misurare un incontro | fasce più GS per incontro |
 | `progression` | come avanza la campagna e quali eventi la attivano | `milestone`: nessun punto esperienza |
-| `creature_sheet` | campi obbligatori e facoltativi della scheda | statistiche 2024, capacità, fasi, azioni leggendarie |
+| `creature_sheet` | campi obbligatori e facoltativi della scheda, con etichette in italiano e in inglese | statistiche 2024, capacità, fasi, azioni leggendarie |
 | `item_sheet` | campi meccanici e quali di essi sono stampabili sulla carta | effetti, CD, durate; sulla carta solo la narrazione |
 | `tracking` | quali strutture usa il tracker degli scontri | ordine di iniziativa, fasi con soglie, ricariche, reazioni |
+| `headings` | intestazioni delle sezioni della scheda, in italiano e in inglese | Statistiche, Descrizione, In breve, Effetti |
+| `checks` | file facoltativo con l'aritmetica del sistema | `checks.mjs` (modificatori, PF medi, GS, competenza) |
 | `do_not` | ciò che l'agente non decide né tira al posto del master | vedi regole comuni |
 
-### Operazioni che il core chiede
+### Operazioni
 
-Il core usa l'adattatore attraverso poche operazioni astratte. Non le implementa l'adattatore: le eseguono gli script del core, che leggono le dichiarazioni dell'adattatore.
+Il motore valida la forma delle schede e la loro aritmetica (`check`), e l'adattatore è caricato dalla libreria condivisa (`yllir/scripts/lib/adapter.mjs`). Le operazioni sono in `yllir/scripts/lib/adapter-ops.mjs`, senza più una skill `system-adapter` che le esponga (rimossa dalla Riprogettazione):
 
-- `validate_sheet(creatura | oggetto)`: verifica che la scheda abbia i campi richiesti;
+- **Implementate in 0.30.0:** `validateSheet` (verifica i campi di una scheda di creatura o di oggetto), `cardFields` (restituisce solo i campi che la carta può stampare), `progressionEvent` (dice se un evento è una milestone dichiarata dal master).
+
+Operazioni previste ma non implementate (**Proposta**):
+
 - `init_encounter(schede, iniziative)`: crea lo stato di partenza con l'iniziativa comunicata dal master;
 - `record_event(scontro, evento)`: applica un aggiornamento dichiarato dal master;
 - `advance_turn(scontro)`: passa al partecipante successivo dopo conferma;
-- `rate_encounter(gruppo)`: restituisce fascia e GS, se il sistema li prevede;
-- `progression_event(evento)`: dice se un evento è una milestone;
-- `card_fields(oggetto)`: restituisce solo i campi che la carta può stampare.
+- `rate_encounter(gruppo)`: restituisce fascia e GS, se il sistema li prevede. Non è implementata perché la tabella fascia-GS manca.
+
+Le ultime tre appartengono al tracker degli scontri, che non esiste ancora nella 0.30.0.
 
 ### Regole comuni a ogni adattatore
 
 - **Il master decide.** L'adattatore non tira dadi, non sceglie bersagli, non decide l'esito di attacchi, salvezze o prove. Può ricordare un tiro che la scheda prescrive (esempio di adattatore: una ricarica su 5–6 con un d6), senza eseguirlo.
-- **La regola è la fonte.** Resistenze, immunità e riduzioni valgono solo se documentate dalla scheda o dichiarate dal master. L'agente non integra regole non dichiarate.
+- **La regola è la fonte.** Resistenze, immunità e riduzioni valgono solo se documentate dalla scheda o dichiarate dal master. L'agente non integra effetti di combattimento non dichiarati. I valori di regola (statistiche, difficoltà, prezzi) si ricavano dalla conoscenza del modello o da una ricerca, e lo schema li valida (decisione 10 della Riprogettazione).
 - **Le schede restano dati.** Un adattatore non riscrive la scheda di un personaggio giocante: per i PG registra al più nome, iniziativa e ordine di turno.
 
 ## Confronto fra approcci
@@ -77,9 +86,11 @@ Tre strade sono possibili. Nessuna è scelta.
 
 Sistemi citati nel confronto: D&D 2024 (primo adattatore), Pathfinder 2e, Blades in the Dark, Powered by the Apocalypse e Call of Cthulhu. Le loro regole non sono descritte qui: vanno verificate sul testo del gioco prima di scrivere un adattatore.
 
+La Riprogettazione (decisione 10 e architettura 7) tiene l'adattatore come schema per sistema, ma non sceglie fra A, B e C: la scelta resta aperta.
+
 | Approccio | Pro | Contro |
 | --- | --- | --- |
-| A | Ogni sistema è fedele alle proprie regole; il master vede termini familiari; i test sono semplici da scrivere per singolo sistema | Il lavoro si moltiplica; le funzioni comuni si duplicano; un sistema nuovo richiede codice nuovo; i giochi narrativi restano fuori o vengono forzati nelle categorie del combattimento |
+| A | Ogni sistema è fedele alle proprie regole; il master vede termini familiari; i test sono semplici da scrivere per singolo sistema | Il lavoro si moltiplica; le funzioni comuni si duplicano; un sistema nuovo richiede schema e aritmetica nuovi; i giochi narrativi restano fuori o vengono forzati nelle categorie del combattimento |
 | B | Copre subito i giochi narrativi (orologi, tracce, esiti su scala); un solo motore da provare; le campagne ibride sono naturali | Le capacità ricaricabili, le azioni e le reazioni di D&D diventano una lista di eccezioni; il rischio di una astrazione che nessun sistema usa davvero; le regole reali restano difficili da verificare |
 | C | Il motore è uno solo, ma il master lavora con i termini del suo gioco; i preset di D&D 2024 restano dettagliati; un sistema narrativo richiede solo un preset | Richiede disciplina nel definire le primitive; il confine fra primitiva generica ed eccezione va deciso caso per caso; più lavoro iniziale |
 
@@ -99,7 +110,7 @@ Pro del modello generico: basta una campagna narrativa a usarlo, senza nuovo cod
 
 ## D&D 2024 come primo adattatore
 
-L'adattatore `dnd-2024` è il primo adattatore del framework e descrive un sistema di gioco completo: scontri a turni, risorse, schede di creature e di oggetti, difficoltà e progressione secondo D&D 2024. Le regole di scrittura delle schede (formato dei testi, separazione fra lore, indicazioni per il master e regole) sono operative nel core e vengono richiamate qui solo per il loro effetto sull'adattatore.
+L'adattatore `dnd-2024` è il primo adattatore del framework e descrive la forma di un sistema di gioco completo: scontri a turni, risorse, schede di creature e di oggetti, difficoltà e progressione secondo D&D 2024. Le regole di scrittura delle schede (formato dei testi, separazione fra lore, indicazioni per il master e regole) sono operative nel core e vengono richiamate qui solo per il loro effetto sull'adattatore.
 
 ### Manifest
 
@@ -107,8 +118,8 @@ Nel manifest reale sono presenti anche le intestazioni delle sezioni delle sched
 
 - `encounters: turn-based`, con round, iniziativa dichiarata dal master e turni per combattente.
 - `resources`: PF e PF temporanei per creature; fasi con soglie; capacità con ricarica; usi limitati; punti per azioni leggendarie; reazioni per turno.
-- `conditions`: quelle del sistema, ciascuna con durata dichiarata.
-- `difficulty`: fascia più GS per incontro. La tabella fascia → GS dipende dal numero e dal livello dei PG e sta nell'adattatore, non nel core.
+- `conditions`: le quindici condizioni dell'edizione 2024, ciascuna con durata dichiarata.
+- `difficulty`: fascia più GS per incontro. La tabella fascia → GS dipende dal numero e dal livello dei PG e sta nell'adattatore, non nel core. Non è ancora presente nel manifest.
 - `progression: milestone`. Nessun punto esperienza: un evento di milestone è dichiarato dal master e registrato nella cronaca.
 
 ### Scheda creatura
@@ -131,9 +142,11 @@ Campi della parte regole:
 
 Quando un nemico compare più volte, lo stato è per esemplare (nome o identificativo), mentre la scheda è una sola.
 
+L'aritmetica di questi campi è in `checks.mjs` (**Implementato in 0.30.0**): il modificatore di ogni punteggio, i PF medi rispetto alla formula dei dadi, il grado di sfida e il bonus di competenza che ne deriva. Un valore che non torna è un errore del motore, non un'interpretazione dell'agente.
+
 ### Tracking dello scontro
 
-Il tracker degli scontri è la skill `combat-tracker` della libreria: usa l'adattatore per le regole, non è un modulo dell'adattatore. Le regole che l'adattatore dichiara e il core fa rispettare sono:
+Il tracker degli scontri sarebbe la skill `combat-tracker`, che usa l'adattatore per le regole. Non esiste nella 0.30.0 (vedi Stato). Le regole che l'adattatore dichiara e il core dovrebbe far rispettare sono (**Proposta**):
 
 - **Avvio solo quando il combattimento inizia.** Il file dello scontro nasce con lo scontro, non con la preparazione; se esiste già, si riprende senza azzerarlo.
 - **Stato per esemplare.** Ogni nemico ha PF attuali e massimi, PF temporanei, fase, condizioni con scadenza, capacità consumate o ricaricabili, azioni e reazioni usate nel turno.
@@ -159,13 +172,17 @@ Il tracker degli scontri è la skill `combat-tracker` della libreria: usa l'adat
 
 ### Stato dell'implementazione
 
-L'adattatore è implementato in `yllir/modules/systems/dnd-2024/adapter.yaml`, in YAML ristretto. Dichiara `id`, `name`, `version`, `encounters`, `progression`, `difficulty`, `resources`, `conditions`, `condition_durations`, `creature_sheet`, `item_sheet`, `tracking`, `do_not` e `headings`. `difficulty` usa il metodo `band-and-cr`, con fasce e GS (`low`, `moderate`, `high`), ma la tabella fascia-GS non è ancora presente. `conditions` comprende le 15 condizioni dell'edizione 2024. `creature_sheet` distingue campi obbligatori, con etichette in italiano e inglese, e campi facoltativi; `item_sheet` dichiara i campi meccanici, mentre la carta stampabile contiene solo titolo e descrizione. `headings` definisce le intestazioni delle sezioni statistiche, descrizione ed effetti in italiano e inglese.
+Stato nella versione 0.30.0 (**Implementato in 0.30.0**, salvo dove è indicato altrimenti):
 
-Il caricamento e la validazione sono in `yllir/scripts/lib/adapter.mjs`, condiviso perché usato anche da `config.mjs`; le operazioni sono in `yllir/skills/library/system-adapter/scripts/lib/adapter-ops.mjs`. La skill di libreria `system-adapter`, in `yllir/skills/library/system-adapter/`, le espone tramite `adapter-run.mjs`, che legge adattatore e lingua da `campaign.yaml` e scrive un rapporto. Le operazioni disponibili sono `validate-sheet`, `card-fields`, `progression-event`, `info` e `check-drafts`. `config.mjs` accetta l'id di un adattatore installato oppure `none`. `validate_sheet` richiede nella scheda di una creatura la sezione delle statistiche e ciascuna etichetta obbligatoria come token intero; per un oggetto richiede le sezioni descrizione ed effetti. `card_fields` restituisce solo titolo e descrizione, mai effetti o blocco riservato. `progression_event` registra una milestone solo se dichiarata dal master.
+- L'adattatore è in `yllir/modules/systems/dnd-2024/adapter.yaml`, in YAML ristretto. Dichiara `id`, `name`, `version`, `encounters`, `progression`, `difficulty`, `resources`, `conditions`, `condition_durations`, `creature_sheet`, `item_sheet`, `tracking`, `do_not`, `headings` e `checks`.
+- `difficulty` usa il metodo `band-and-cr`, con fasce (`low`, `moderate`, `high`), ma la tabella fascia-GS non è ancora presente.
+- `conditions` comprende le 15 condizioni dell'edizione 2024. `creature_sheet` distingue campi obbligatori, con etichette in italiano e inglese, e campi facoltativi; `item_sheet` dichiara i campi meccanici, mentre la carta stampabile contiene solo titolo e descrizione. `headings` definisce le intestazioni delle sezioni statistiche, descrizione ed effetti in italiano e inglese.
+- `checks.mjs` nella cartella del modulo contiene solo l'aritmetica: modificatori dei punteggi, PF medi dalla formula dei dadi, valori di grado di sfida e bonus di competenza che ne deriva.
+- Il caricamento è in `yllir/scripts/lib/adapter.mjs`, condiviso con la configurazione. Le operazioni sono in `yllir/scripts/lib/adapter-ops.mjs`. Il motore (`commit` e `check`) valida lo schema e le schede di creatura e di oggetto, incluse le verifiche aritmetiche del modulo di sistema; il core non contiene nomi di campi o di regole di un sistema.
+- La skill `system-adapter` è rimossa dalla Riprogettazione: il suo compito è passato al motore e alla libreria condivisa.
+- `config.mjs` accetta l'id di un adattatore installato oppure `none`.
 
-Collegamenti nel core: al passo 3b di `write-sequence`, le bozze di creature (template `enemy` o `creature`) e oggetti (template `item`) passano da `check-drafts` prima della revisione indipendente; se manca qualcosa, il processo si ferma e chiede una correzione. `after-session` registra una milestone nella cronaca solo quando il master la dichiara e l'adattatore la conferma. Le istruzioni generate della campagna rimandano alla skill.
-
-`init_encounter`, `record_event` e `advance_turn` non sono implementate: appartengono alla skill `combat-tracker`, che ancora non esiste. `rate_encounter` non è implementata perché la tabella che associa le fasce ai GS deve essere verificata sul testo ufficiale 2024. Il metodo è dichiarato, ma la tabella manca.
+Non implementato (**Proposta**): le operazioni del tracker degli scontri (`init_encounter`, `record_event`, `advance_turn`) e `rate_encounter`. Il tracker non esiste, e la tabella che associa le fasce ai GS deve essere verificata sul testo ufficiale 2024 prima di essere scritta nell'adattatore. Il metodo è dichiarato, ma la tabella manca.
 
 ## Esempio: sistema narrativo senza combattimento a turni
 
@@ -231,7 +248,7 @@ Ogni profilo è una cartella: `profile.yaml` con i campi sopra, `prompt.md` con 
 
 - Un profilo non viene riscritto da un'immagine. Se cambia, si rigenerano solo le immagini richieste; le versioni precedenti restano.
 - Non si mescolano profili nella stessa categoria, né si adattano alla preferenza del momento: un soggetto diverso dallo stile si gestisce con una richiesta esplicita per quel soggetto.
-- Il profilo non sceglie il motore di generazione. Quello è deciso dall'orchestrazione (vedi [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md)).
+- Il profilo non sceglie il motore di generazione. Quello lo sceglie il framework (Riprogettazione, decisioni 3 e 4); Codex, se presente, è al più fornitore di immagini facoltativo (decisione 11).
 
 ### Esempio 1: dark fantasy dipinto (creature e oggetti)
 
@@ -253,13 +270,14 @@ Profilo per i personaggi.
 
 ### Verifica comune
 
-Ogni profilo elenca le voci da controllare sull'immagine generata. Le voci dei due esempi sono: abiti e loro stato, copricapi, oggetti in mano, numero e ruolo delle figure, ambiente, presenza di testo o sigilli. Dopo ogni correzione si controllano di nuovo tutte le voci, non solo quelle corrette. Il numero dei tentativi correttivi e la regola sulla revisione indipendente del testo appartengono alla procedura di generazione, non al profilo.
+Ogni profilo elenca le voci da controllare sull'immagine generata. Le voci dei due esempi sono: abiti e loro stato, copricapi, oggetti in mano, numero e ruolo delle figure, ambiente, presenza di testo o sigilli. Dopo ogni correzione si controllano di nuovo tutte le voci, non solo quelle corrette. Il numero dei tentativi correttivi appartiene alla procedura di generazione, non al profilo. La regola sulla revisione indipendente è limitata dalla decisione 5 della Riprogettazione: un revisore distinto interviene solo sui lotti che aggiungono fatti al canone, e una verifica d'immagine non ne aggiunge.
 
 ## Questioni aperte
 
-- **Approccio per gli adattatori.** A, B o C: il confronto sopra non sceglie. Serve un secondo sistema reale per mettere alla prova il modello generico.
+- **Approccio per gli adattatori.** A, B o C: il confronto sopra non sceglie. Serve un secondo sistema reale per mettere alla prova il modello generico. La Riprogettazione tiene l'adattatore come schema per sistema, senza decidere questa scelta.
 - **Ruolo di D&D 2024.** Adattatore autonomo o preset di un modello generico? Dipende dalla scelta precedente.
-- **Formato del manifest.** Proposta: YAML con tabelle per le liste. Da decidere se il master debba poterlo leggere senza strumenti.
-- **Chi scrive un nuovo adattatore.** Proposta: l'agente, a partire dallo schema e da casi di prova; il master lo conferma con una descrizione del sistema. Da verificare con un sistema non noto.
-- **Fasce di difficoltà.** Tabella fascia → GS nell'adattatore o nella campagna? La proposta è nell'adattatore, con possibilità di personalizzazione per campagna.
+- **Formato del manifest.** YAML è implementato nella 0.30.0 (`adapter.yaml`, con `checks.mjs` per l'aritmetica). Resta da decidere se il master debba poterlo leggere senza strumenti.
+- **Chi scrive un nuovo adattatore.** Proposta: l'agente, a partire dallo schema e da casi di prova; il master lo conferma con una descrizione del sistema. Da verificare con un sistema non noto. Ora che l'adattatore è uno schema, la domanda riguarda anche la forma dei valori di regola (statistiche, difficoltà, prezzi) che il modello scrive e lo schema valida.
+- **Fasce di difficoltà.** Tabella fascia → GS nell'adattatore o nella campagna? La proposta è nell'adattatore, con possibilità di personalizzazione per campagna. Finché la tabella manca, `rate_encounter` non è implementata.
 - **Procedura di generazione.** Quali parti del processo di artwork appartengono al profilo e quali alla funzione di libreria? Oggi la procedura è tutta in un unico documento di istruzioni.
+- **Aritmetica di un secondo sistema (domanda aggiunta dalla riscrittura del 2026-11-11).** `checks.mjs`, con funzioni nominate per il sistema, è il formato definitivo per l'aritmetica, o serve un modo dichiarativo per le formule più semplici?
