@@ -1,6 +1,6 @@
 id: metadata-comment-v1
 after: [category-first-geography-v1, item-descriptions-v1, session-layout-v1, statistics-tables-v1, world-graph-v1]
-introduced_in: 0.35.0
+introduced_in: 0.36.0
 needed: detect
 deterministic: deterministic.mjs
 guided: null

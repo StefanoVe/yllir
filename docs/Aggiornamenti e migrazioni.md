@@ -310,7 +310,7 @@ La migrazione non ricava relazioni, perché nessuna si può leggere con certezza
 
 ## Migrazione metadata-comment-v1 (Deciso, 2026-11-11)
 
-Migrazione post-aggiornamento, introdotta nella versione 0.35.0. Porta le schede delle campagne esistenti al blocco dei metadati scritto come commento HTML (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md), 1.2). Fa questi passi:
+Migrazione post-aggiornamento, introdotta nella versione 0.36.0. Porta le schede delle campagne esistenti al blocco dei metadati scritto come commento HTML (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md), 1.2). Fa questi passi:
 
 - sostituisce le due righe `---` che delimitano il blocco dei metadati con `<!-- yllir` e `-->`, e non tocca il resto del file, né i metadati né la prosa;
 - è deterministica e non chiede decisioni al master;
