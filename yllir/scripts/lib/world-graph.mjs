@@ -1,7 +1,7 @@
 // World graph of a campaign: the metadata of every document that describes the
 // world (places, subjects, objects, free notes, plot and chronicle), read into
 // one derived index, plus deterministic graph checks over it. No model is used.
-// The index is written to .campaign/index/world.json and can always be rebuilt.
+// The index is written to .campaign/cache/world.json and can always be rebuilt.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -163,11 +163,11 @@ export function checkWorldGraph(index) {
 }
 
 /**
- * Writes the index to <root>/.campaign/index/world.json.
+ * Writes the index to <root>/.campaign/cache/world.json (git-ignored, derived).
  * @returns {string} the absolute path of the written file
  */
 export function writeWorldIndex(root, index) {
-  const dir = path.join(root, '.campaign', 'index');
+  const dir = path.join(root, '.campaign', 'cache');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'world.json');
   const data = {

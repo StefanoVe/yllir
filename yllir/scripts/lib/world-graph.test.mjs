@@ -320,7 +320,7 @@ test('writeWorldIndex writes byte-identical output on repeated runs', (t) => {
   const overlayA = { path: 'Personaggi/nuovo.md', content: doc(['id: nuovo', 'kind: character', 'provenance: master'], 'Nuovo') };
   const overlayB = { path: 'Storia/altro.md', content: doc(['id: altro', 'kind: event', 'provenance: played', 'when: 1'], 'Altro') };
 
-  const target = path.join(root, '.campaign', 'index', 'world.json');
+  const target = path.join(root, '.campaign', 'cache', 'world.json');
   const written = writeWorldIndex(root, buildWorldIndex(root, { overlayFiles: [overlayA, overlayB] }));
   assert.equal(written, target);
   const first = fs.readFileSync(target);
