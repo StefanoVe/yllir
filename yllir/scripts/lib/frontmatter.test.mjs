@@ -35,6 +35,61 @@ test('appearances accepts a block list of mappings', () => {
   assert.equal(result.bodyStartLine, 7);
 });
 
+test('relations accepts a block list of mappings', () => {
+  const result = parseFrontmatter('---\nid: a\nrelations:\n  - to: gilda-del-sale\n    type: ally-of\n  - to: b\n    type: kin-of\n---\nBody\n');
+  assert.deepEqual(result.data, {
+    id: 'a',
+    relations: [
+      { to: 'gilda-del-sale', type: 'ally-of' },
+      { to: 'b', type: 'kin-of' },
+    ],
+  });
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.bodyStartLine, 9);
+});
+
+test('appearances and relations blocks work in the same frontmatter', () => {
+  const text = [
+    '---',
+    'id: teodo-marr',
+    'kind: character',
+    'location: [borgo-cenere]',
+    'appearances:',
+    '  - subject: ferry',
+    '    location: [harbor]',
+    'relations:',
+    '  - to: gilda-del-sale',
+    '    type: depends-on',
+    '  - to: borgo-cenere',
+    '    type: member-of',
+    '---',
+    'Body',
+  ].join('\n');
+  const result = parseFrontmatter(text);
+  assert.deepEqual(result.data, {
+    id: 'teodo-marr',
+    kind: 'character',
+    location: ['borgo-cenere'],
+    appearances: [{ subject: 'ferry', location: ['harbor'] }],
+    relations: [
+      { to: 'gilda-del-sale', type: 'depends-on' },
+      { to: 'borgo-cenere', type: 'member-of' },
+    ],
+  });
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.body, 'Body');
+});
+
+test('relations block syntax reports malformed YAML with its source line', () => {
+  const result = parseFrontmatter('---\nid: a\nrelations:\n  - to: b\n    type: [x,, y]\n---\n');
+  assert.deepEqual(result.errors, [{ line: 5, message: 'empty list item' }]);
+});
+
+test('a duplicate relations key is reported', () => {
+  const result = parseFrontmatter('---\nrelations:\n  - to: b\n    type: ally-of\nrelations: []\n---\n');
+  assert.deepEqual(result.errors, [{ line: 5, message: 'duplicate key relations' }]);
+});
+
 test('appearances block syntax reports malformed YAML with its source line', () => {
   const result = parseFrontmatter('---\nid: evento\nappearances:\n  - subject: ferry\n    location: [harbor,, north]\n---\n');
   assert.deepEqual(result.errors, [{ line: 5, message: 'empty list item' }]);

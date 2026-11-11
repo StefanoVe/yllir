@@ -1,10 +1,12 @@
 // Minimal parser for the YAML-like frontmatter used in Yllir Markdown files.
 // Supports `key: value` scalars and flow lists `[a, b]`, plus block YAML for
-// the structured `appearances` field. Other keys retain string semantics.
+// the structured `appearances` and `relations` fields. Other keys retain
+// string semantics.
 
 import { parseYamlLite } from './yaml-lite.mjs';
 
 const KEY_LINE = /^([a-z][a-z0-9_]*):(?: (.*)|)$/;
+const BLOCK_KEYS = ['appearances', 'relations'];
 
 // Double-quoted: outer quotes removed, no escape processing.
 // Single-quoted: outer quotes removed, `''` means one literal `'` (YAML style).
@@ -93,22 +95,30 @@ export function parseFrontmatter(text) {
 
   const data = {};
   const errors = [];
-  const appearanceStart = lines.findIndex((line, i) => i > 0 && i < close && /^appearances:\s*$/.test(line));
-  let appearanceEnd = -1;
-  if (appearanceStart >= 0) {
-    appearanceEnd = appearanceStart + 1;
-    while (appearanceEnd < close && (/^\s/.test(lines[appearanceEnd]) || /^ *$/.test(lines[appearanceEnd]) || /^ *#/.test(lines[appearanceEnd]))) appearanceEnd++;
-    const block = ['appearances:', ...lines.slice(appearanceStart + 1, appearanceEnd)].join('\n');
+  // Keys whose value is a block list of mappings, parsed with parseYamlLite.
+  // Only the first occurrence of each key is a block; a repeated key goes
+  // through the ordinary path and is reported as a duplicate.
+  const blocks = [];
+  for (const key of BLOCK_KEYS) {
+    const keyLine = new RegExp(`^${key}:\\s*$`);
+    const start = lines.findIndex((line, i) => i > 0 && i < close && keyLine.test(line));
+    if (start < 0) continue;
+    let end = start + 1;
+    while (end < close && (/^\s/.test(lines[end]) || /^ *$/.test(lines[end]) || /^ *#/.test(lines[end]))) end++;
+    blocks.push({ key, start, end });
+  }
+  for (const { key, start, end } of blocks) {
+    const block = [`${key}:`, ...lines.slice(start + 1, end)].join('\n');
     const parsed = parseYamlLite(block);
     if (parsed.errors.length) {
-      errors.push({ line: appearanceStart + parsed.errors[0].line, message: parsed.errors[0].message });
+      errors.push({ line: start + parsed.errors[0].line, message: parsed.errors[0].message });
     } else {
-      data.appearances = parsed.data.appearances;
+      data[key] = parsed.data[key];
     }
   }
 
   for (let i = 1; i < close; i++) {
-    if (appearanceStart >= 0 && i >= appearanceStart && i < appearanceEnd) continue;
+    if (blocks.some((block) => i >= block.start && i < block.end)) continue;
     const line = lines[i];
     const lineNo = i + 1;
 
