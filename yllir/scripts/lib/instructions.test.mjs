@@ -133,15 +133,16 @@ describe('generateInstructions', () => {
     assert.match(instructions, /Never write a game rule from memory\./);
   });
 
-  test('creates the six files with the exact wrapper texts', () => {
+  test('creates the five files with the exact wrapper text and no AGENTS.md', () => {
     const root = campaignWith(MINIMAL_CONFIG);
     const result = generateInstructions(root);
     assert.deepEqual(result.errors, []);
-    assert.equal(result.written.length, 6);
+    assert.equal(result.written.length, 5);
+    assert.ok(!result.written.includes('AGENTS.md'));
+    assert.ok(!fs.existsSync(path.join(root, 'AGENTS.md')));
     for (const file of [
       '.campaign/instructions/agent.md',
       'CLAUDE.md',
-      'AGENTS.md',
       '.claude/settings.json',
       '.campaign/customizations.md',
       '.campaign/version.yaml',
@@ -154,10 +155,6 @@ describe('generateInstructions', () => {
     assert.equal(
       fs.readFileSync(path.join(root, 'CLAUDE.md'), 'utf8'),
       `${notice}\n@.campaign/instructions/agent.md\n@.campaign/customizations.md\n`,
-    );
-    assert.equal(
-      fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'),
-      `${notice}\nBefore doing anything, read \`.campaign/instructions/agent.md\` and \`.campaign/customizations.md\` and follow them.\n`,
     );
   });
 
@@ -216,7 +213,7 @@ describe('generateInstructions', () => {
     assert.ok(!data.generated.some((entry) => entry.path.includes('settings.local.json')));
   });
 
-  test('writes version.yaml that parses, lists four sorted fingerprints and the framework version', () => {
+  test('writes version.yaml that parses, lists three sorted fingerprints and the framework version', () => {
     const root = campaignWith(MINIMAL_CONFIG);
     generateInstructions(root);
     const { data, errors } = parseYamlLite(fs.readFileSync(path.join(root, '.campaign/version.yaml'), 'utf8'));
@@ -225,7 +222,7 @@ describe('generateInstructions', () => {
     assert.equal(data.schema, 1);
     assert.deepEqual(
       data.generated.map((entry) => entry.path),
-      ['.campaign/instructions/agent.md', '.claude/settings.json', 'AGENTS.md', 'CLAUDE.md'],
+      ['.campaign/instructions/agent.md', '.claude/settings.json', 'CLAUDE.md'],
     );
     for (const entry of data.generated) {
       assert.match(entry.sha256, /^[0-9a-f]{64}$/);
@@ -240,7 +237,6 @@ describe('generateInstructions', () => {
     for (const file of [
       '.campaign/instructions/agent.md',
       'CLAUDE.md',
-      'AGENTS.md',
       '.claude/settings.json',
       '.campaign/version.yaml',
     ]) {

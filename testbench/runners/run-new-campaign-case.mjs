@@ -45,7 +45,7 @@ const AGENT_TIMEOUT_MS = 1800000;
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
 const AGENT_FILE = '.campaign/instructions/agent.md';
 const CUSTOMIZATIONS_FILE = '.campaign/customizations.md';
-const TOP_LEVEL_FIXED = ['campaign.yaml', 'CLAUDE.md', 'AGENTS.md'];
+const TOP_LEVEL_FIXED = ['campaign.yaml', 'CLAUDE.md'];
 // Non-line blocks whose text is not prose: never scanned for proper nouns.
 const NON_PROSE_BLOCKS = new Set(['fence-open', 'fence-close', 'code', 'mermaid', 'comment', 'master-open', 'master-close']);
 
@@ -258,11 +258,9 @@ function gradeCase({ caseData, dir, report }) {
   // B3 instructions.
   {
     const reasons = [];
-    for (const file of ['CLAUDE.md', 'AGENTS.md']) {
-      const text = readText(path.join(dir, file));
-      if (text === null) reasons.push(`${file} missing`);
-      else if (!text.includes(AGENT_FILE)) reasons.push(`${file} does not contain ${AGENT_FILE}`);
-    }
+    const claudeText = readText(path.join(dir, 'CLAUDE.md'));
+    if (claudeText === null) reasons.push('CLAUDE.md missing');
+    else if (!claudeText.includes(AGENT_FILE)) reasons.push(`CLAUDE.md does not contain ${AGENT_FILE}`);
     if (readText(path.join(dir, AGENT_FILE)) === null) reasons.push(`${AGENT_FILE} missing`);
     try {
       const fingerprints = checkFingerprints(dir);

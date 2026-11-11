@@ -22,7 +22,7 @@ const UPDATE_STATE_PATH = '.campaign/state/update.yaml';
 const IGNORED_PREFIXES = ['.campaign/state', '.campaign/cache'];
 const VERSION_LIMIT = 1000000;
 // Root-level notes that are not world cards.
-const ROOT_NOTES = ['CLAUDE.md', 'AGENTS.md', 'README.md'];
+const ROOT_NOTES = ['CLAUDE.md', 'README.md'];
 const HEADER = 'YLLIR SESSION CHECK (for the assistant, not for the master)';
 const NEXT_STEP = 'next: invoke the skill yllir:yllir before answering the master.';
 

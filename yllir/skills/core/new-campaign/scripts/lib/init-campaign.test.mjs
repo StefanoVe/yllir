@@ -46,10 +46,10 @@ test('creates a campaign in an empty folder with a git repository and no commit 
   const result = initCampaign(dir, GOOD);
   assert.deepEqual(result.errors, []);
   assert.equal(result.slug, 'le-isole-d-ambra');
-  for (const item of ['campaign.yaml', '.gitignore', 'CLAUDE.md', 'AGENTS.md', '.campaign/version.yaml', '.git']) {
+  for (const item of ['campaign.yaml', '.gitignore', 'CLAUDE.md', '.campaign/version.yaml', '.git']) {
     assert.ok(result.created.includes(item), `${item} is reported as created`);
   }
-  for (const file of ['campaign.yaml', '.gitignore', 'CLAUDE.md', 'AGENTS.md', '.campaign/version.yaml']) {
+  for (const file of ['campaign.yaml', '.gitignore', 'CLAUDE.md', '.campaign/version.yaml']) {
     assert.ok(fs.existsSync(path.join(dir, file)), `${file} exists`);
   }
   assert.equal(git(dir, 'rev-parse', '--is-inside-work-tree'), 'true');

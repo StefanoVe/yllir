@@ -118,7 +118,7 @@ Modello di riferimento: Baltimora, il framework di skill usato al lavoro dall’
 ## Domande aperte
 
 - Quali altre funzioni confluiscono nel master screen oltre a consultazione, sessione live, musica e stampa (enciclopedia pubblica, atlante, vedute illustrate dei luoghi, carte nautiche)? Ancora da vedere.
-- **Fantasia del modello senza lo strumento di domanda.** La decisione del 2026-11-10 dice che, se l'agente non ha lo strumento di domanda interattivo (per esempio in Codex, se non lo espone), il valore resta `no` e nulla viene chiesto in testo. Resta da decidere se il master debba essere avvisato in una frase che la fantasia è bloccata, o se il silenzio va bene.
+- ~~**Fantasia del modello senza lo strumento di domanda.** La decisione del 2026-11-10 dice che, se l'agente non ha lo strumento di domanda interattivo (per esempio in Codex, se non lo espone), il valore resta `no` e nulla viene chiesto in testo. Resta da decidere se il master debba essere avvisato in una frase che la fantasia è bloccata, o se il silenzio va bene.~~ **Superata dalla Riprogettazione, decisione 7 (2026-11-11):** la fantasia è sbloccata per default e non esistono più il valore `no` né la domanda a quattro risposte, quindi il caso non si presenta.
 
 ## Criteri di completamento
 

@@ -129,8 +129,8 @@ describe('campaign checks', () => {
     const result = sessionCheck(root);
     assert.equal(result.folder, 'campaign');
     assert.deepEqual(result.versions, { count: 0, last: null });
-    // Scena di apertura.md, campaign.yaml, CLAUDE.md, AGENTS.md, agent.md, customizations.md, version.yaml, settings.json
-    assert.equal(result.unsaved, 8);
+    // Scena di apertura.md, campaign.yaml, CLAUDE.md, agent.md, customizations.md, version.yaml, settings.json
+    assert.equal(result.unsaved, 7);
     assert.equal(result.settings.ok, true);
     assert.equal(result.instructions, 'up-to-date');
     assert.equal(result.campaign_framework_version, FRAMEWORK_VERSION);

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Generates a campaign's agent instructions (.campaign/instructions/agent.md,
-// CLAUDE.md, AGENTS.md) and records their fingerprints, or checks those files
+// Generates a campaign's agent instructions (.campaign/instructions/agent.md
+// and CLAUDE.md) and records their fingerprints, or checks those files
 // for hand edits with --check.
 // Usage: node generate-instructions.mjs <campaignRoot> [--check]
 // Exit codes: 0 written or fingerprints ok, 1 errors or changed files, 2 usage error.
