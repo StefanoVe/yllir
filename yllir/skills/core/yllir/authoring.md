@@ -165,6 +165,7 @@ Every document says where it comes from: `master`, `played` or `generated`.
 
 - Stats, difficulty classes, prices and effects come from your knowledge of the game system, or from a web search that never receives master-only text. The engine checks their shape and arithmetic against the game system's adapter.
 - Without an adapter, difficulties and values stay in words.
+- Checks in plot event files follow section 2.2 of `${CLAUDE_PLUGIN_ROOT}/templates/content-format.md`: a heading `### Prova: <value>` (`### Check: <value>` in English), then `#### Successo` and `#### Fallimento` (`#### Success` and `#### Failure`), each with a paragraph of consequences. The value is in the adapter's format, or in words without an adapter.
 
 ## 11. Messages to the master
 

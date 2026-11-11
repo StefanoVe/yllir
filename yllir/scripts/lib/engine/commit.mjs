@@ -18,8 +18,9 @@ import { loadAdapter, pluginRootFromHere } from '../adapter.mjs';
 import { parseYamlLite } from '../yaml-lite.mjs';
 import { findMetadataBlock, parseFrontmatter, toCommentMetadata } from '../frontmatter.mjs';
 import { status, saveVersion, saveManualChanges, listVersions, ensureRepo } from '../versions.mjs';
-import { validateSheet } from '../adapter-ops.mjs';
+import { validateSheet, loadSceneValueCheck } from '../adapter-ops.mjs';
 import { plotMap } from '../plot/plot-map.mjs';
+import { checkScene } from '../plot/scene-checks.mjs';
 import { writeSessionMaps } from '../plot/session-map.mjs';
 import { planLinks } from '../links/link-plan.mjs';
 import { autoOutcomes } from '../links/auto-outcomes.mjs';
@@ -429,7 +430,52 @@ async function validate(dir, { files, checkFiles, planFiles }) {
   run('plot', () => plotMap(dir).errors);
   run('geographic-layout', () => planGeographicLayout(dir).errors);
   out.push(...(await adapterErrors(dir, files)));
+  if (files.length > 0) {
+    try {
+      out.push(...(await sceneErrors(dir, files)));
+    } catch (error) {
+      out.push(normalize('scene-checks', { message: error.message }));
+    }
+  }
   return out;
+}
+
+/** Errors of the plot event files in the batch (see plot/scene-checks.mjs). */
+async function sceneErrors(dir, files) {
+  const structure = readStructure(dir).structure ?? [];
+  const plotFolders = folderPaths(structure, (type) => type === 'plot');
+  const eventFiles = files.filter((rel) => isSceneEventFile(rel, plotFolders));
+  if (eventFiles.length === 0) return [];
+
+  const config = readConfig(dir);
+  const lang = typeof config?.language?.main === 'string' ? config.language.main : 'en';
+  const checkValue = await sceneValueCheck(config);
+  const out = [];
+  for (const file of eventFiles) {
+    const text = readText(path.join(dir, file));
+    if (text === null) continue;
+    for (const entry of checkScene(text, lang, { checkValue })) {
+      out.push(normalize('scene-checks', { file, message: `line ${entry.line}: ${entry.message}` }, file));
+    }
+  }
+  return out;
+}
+
+/** An event file: inside a plot folder, in an Eventi or Events folder, and not a session main file. */
+function isSceneEventFile(rel, plotFolders) {
+  if (!rel.endsWith('.md') || !plotFolders.some((folder) => isInside(rel, folder))) return false;
+  const parent = path.posix.basename(path.posix.dirname(rel));
+  if (parent !== 'Eventi' && parent !== 'Events') return false;
+  return path.posix.basename(rel, '.md') !== parent;
+}
+
+/** The adapter's scene check of check values, or undefined when no game-rules adapter loads. */
+async function sceneValueCheck(config) {
+  const adapterId = config?.system?.adapter;
+  if (typeof adapterId !== 'string' || adapterId === '' || adapterId === 'none') return undefined;
+  const loaded = loadAdapter(pluginRootFromHere(), adapterId);
+  if (!loaded.ok || !loaded.adapter) return undefined;
+  return (await loadSceneValueCheck(loaded.adapter)) ?? undefined;
 }
 
 /** Errors of the system adapter: its own load errors, and each sheet of a kind it checks. */

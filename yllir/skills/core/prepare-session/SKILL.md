@@ -18,6 +18,7 @@ You are the AUTHOR: you write the session yourself. Run commands from the campai
 **Step 1 — Where the story stands.**
 1. Read `campaign.yaml` with the Read tool. Keep:
    - `language.main`: the CAMPAIGN LANGUAGE;
+   - `system.adapter`: the SYSTEM ADAPTER, the name of the game-system adapter, or `none`;
    - the `folder` of the entry of type `plot`: the PLOT FOLDER;
    - the `folder` of the entry of type `chronicle`: the CHRONICLE FOLDER.
 2. Glob `<CHRONICLE FOLDER>/*.md`. File names start with the date, so the last one in sorted order is the newest page. Read the newest pages with the Read tool and keep their `played` lists. LAST_PLAYED is the first id of the newest non-empty `played` list, or none.
@@ -29,7 +30,7 @@ You are the AUTHOR: you write the session yourself. Run commands from the campai
 
 A session's name is the name of its folder, and a scene's name is the name of its file: the engine uses them as the titles.
 
-Output: CAMPAIGN LANGUAGE, PLOT FOLDER, CHRONICLE FOLDER, LAST_PLAYED, TARGET (id, name, folder).
+Output: CAMPAIGN LANGUAGE, SYSTEM ADAPTER, PLOT FOLDER, CHRONICLE FOLDER, LAST_PLAYED, TARGET (id, name, folder).
 
 **Step 2 — Context pack.** Get the ids of the places, characters and items the master named: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . find "<name>"` for each name whose id you do not know. Then run:
 
@@ -73,13 +74,32 @@ Output: the scene plan.
          location: [porto-di-selce]
      ```
 5. Invention is free. Whatever the sources do not give, you invent: a name, a place, a relation, a past. Each invention is declared to the master in Step 6. A secret (what someone hides, the true cause of an event) goes only into the reserved master block of its document, never into scene text.
-6. Stats, difficulties, prices and effects come from your knowledge of the game system, or from a web search that never receives master-only text. The engine checks their shape. Without a system adapter, values stay in words.
+6. Stats, difficulties, prices and effects come from your knowledge of the game system, or from a web search that never receives master-only text. The engine checks their shape. Without a system adapter, values stay in words. The value of a check follows the adapter's format too (Step 5).
 
 Output: the list of new and expanded subjects, and the list of invented facts.
 
 **Step 5 — Write the batch.** Write every file of the session as drafts, then run the write cycle once for the whole batch:
 - the session's main file, `<PLOT FOLDER>/<Session folder>/<Session folder>.md`, as a STUB: metadata block with only `id`, `depends_on` (the session prerequisites from Step 3) and `provenance: generated`, and no body. Do not draft its body or its scene list: the engine derives them at the commit. The stub is still needed, because the plot map ignores every scene file whose session has no main file (it reports `event-session-mismatch`), and the engine rebuilds the stub's metadata block and body from the scene files.
 - one file per scene: `<PLOT FOLDER>/<Session folder>/Eventi/<Scene>.md`. Metadata block: `id`, `session` (the id of the session), `depends_on` (from Step 3, a list of scene ids; `[]` for the first scenes), `location` when the scene has one, `characters` and `items` when they matter, `appearances` (the block form of Step 4) only where the scene explicitly places a subject in a place, and `provenance: generated`. Body: the scene in the campaign language, with links to the subjects it names.
+  - Checks. When a scene has an attempt whose result is uncertain, write it as a check, in exactly this form (in the campaign language: Italian `Prova`, `Successo`, `Fallimento`; English `Check`, `Success`, `Failure`):
+
+    ```markdown
+    ### Prova: Carisma (Persuasione) CD 13
+
+    Chi parla con Sibilla tira.
+
+    #### Successo
+
+    Il gruppo ottiene un consiglio sulla strada per il bosco.
+
+    #### Fallimento
+
+    Il gruppo riceve soltanto un invito a tornare il giorno dopo.
+    ```
+
+    - Read the adapter file `${CLAUDE_PLUGIN_ROOT}/modules/systems/<SYSTEM ADAPTER>/adapter.yaml` (SYSTEM ADAPTER from Step 1). Write the check value in its format. For D&D 2024 the value is `Carisma (Persuasione) CD 13`, `Carisma CD 13` or `Tiro salvezza su Saggezza CD 15`. If SYSTEM ADAPTER is `none`, write the value in words, with the difficulty in words, for example `### Prova: convincere Sibilla (difficile)`.
+    - Write both outcomes as paragraphs that say what happens and what the players learn or get. Never write "succeeds" or "fails", and never a single word.
+    - Never write "ask the players for a check" in prose. The check is its heading, not a sentence.
 - the new and expanded subject files, with `provenance: generated`.
 - the world seed (the file named by the `campaign.seed` key of `campaign.yaml`), only when the session adds something that holds for the whole world, such as a faction or a naming convention.
 
@@ -101,3 +121,5 @@ Correct: the master writes «prepara la sessione del faro». The target is «Il 
 Wrong: writing the scenes with the dependencies of the file list (each scene after the previous one). The order of the list is not a dependency; only `depends_on` is.
 
 Wrong: putting the keeper's secret in the scene text. It goes into the master block of the keeper's sheet, and the scene only shows what the characters do.
+
+Wrong: `Chiedete ai giocatori una prova di Saggezza: se riescono notano la porta.` A check written in prose is never accepted. It must be a `### Prova:` heading with the value from the adapter, then `#### Successo` (the players notice the door) and `#### Fallimento` (the door stays unnoticed), each with its own paragraph.

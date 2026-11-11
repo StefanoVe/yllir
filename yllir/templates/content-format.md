@@ -134,13 +134,32 @@ The engine regenerates the main file from the event files at every commit. It ho
 - Metadata block: `id`, `session` (the id of its session), `depends_on` (required; `[]` when none), and optionally `location`, `characters`, `items`, `appearances`.
 - `characters`: the characters the event names and makes act or speak; each must have a sheet. `items`: relevant items used in the event, when they have value, effects, secrets or a plot role; each id must have an item sheet.
 - `appearances`: a list of `subject` and `location` pairs (`subject: <id>`, `location: [<place ids>]`), only for presences the text states. Presence is never inferred from `characters`, `items`, names or mentions.
-- `##` is a minor action inside the event; `###` is a check or single attempt, followed by a result list with `Successo` and `Fallimento` (English: `Success`, `Failure`).
+- `##` is a minor action inside the event.
+- `###` is used only for checks. A check is a heading `### Check: <value>` (Italian: `### Prova: <value>`), an optional line under it that says who rolls or when, then two headings `#### Success` and `#### Failure` (Italian: `#### Successo` and `#### Fallimento`), each followed by a paragraph that says what happens and what the players learn or get. An outcome is never a single word, and never "succeeds" or "fails".
+- The value is in the adapter's format: for D&D 2024, `<Ability> (<Skill>) DC <n>`, `<Ability> DC <n>` or `<Ability> saving throw DC <n>` (Italian: `<Caratteristica> (<Abilità>) CD <n>`, `<Caratteristica> CD <n>` or `Tiro salvezza su <Caratteristica> CD <n>`). Without an adapter (`system.adapter: none`), the value is in words, with the difficulty in words: `### Prova: convincere Sibilla (difficile)` (English: `### Check: persuade Sibilla (hard)`).
+- A check is never asked in prose. Do not write "ask the players for a Wisdom check" in the text of a scene: write the check as its own heading.
 - Dependencies come only from `depends_on`, never from the text.
 - A scene never states who a character is; that belongs to the sheet. A scene that makes a character act against its sheet is a question for the master.
 
 A direct address to the players is a quote block (`>`). It defines no identity.
 
-**Not yet validated:** plot event checks are in the spec; the scripts do not check the event body yet.
+Example of a check in an Italian campaign:
+
+```markdown
+### Prova: Carisma (Persuasione) CD 13
+
+Chi parla con Sibilla tira.
+
+#### Successo
+
+Il gruppo ottiene un consiglio sulla strada per il bosco.
+
+#### Fallimento
+
+Il gruppo riceve soltanto un invito a tornare il giorno dopo.
+```
+
+**Validated:** the engine checks, at commit, that every `###` heading of an event file is a check; that each check has both `#### Successo` (`#### Success`) and `#### Fallimento` (`#### Failure`), each with a non-empty paragraph; that no event uses the old list form `- **Successo:**`; and that no check is asked in prose outside a check heading (for example "ask the players for a Wisdom check", or "CD 15" in running text).
 
 ## 3. Chronicle page
 

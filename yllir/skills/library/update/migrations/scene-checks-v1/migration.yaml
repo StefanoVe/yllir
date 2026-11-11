@@ -1,0 +1,7 @@
+id: scene-checks-v1
+after: [metadata-comment-v1]
+introduced_in: 0.39.0
+needed: detect
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs

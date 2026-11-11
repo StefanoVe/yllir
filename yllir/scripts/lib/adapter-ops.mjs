@@ -157,3 +157,20 @@ export function progressionEvent(adapter, event) {
   }
   return { ok: true, milestone: true };
 }
+
+/**
+ * The scene check of the adapter (checkSceneCheck from its checks module), or null when the adapter
+ * is missing, declares no checks file, the file cannot be imported, or it does not export the function.
+ * @param {object|null} adapter loaded adapter (its checksPath is set by loadAdapter)
+ * @returns {Promise<Function|null>}
+ */
+export async function loadSceneValueCheck(adapter) {
+  if (!adapter || typeof adapter.checksPath !== 'string') return null;
+  let checks;
+  try {
+    checks = await import(pathToFileURL(adapter.checksPath).href);
+  } catch {
+    return null;
+  }
+  return typeof checks.checkSceneCheck === 'function' ? checks.checkSceneCheck : null;
+}

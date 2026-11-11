@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { applyMetadataMigration, listMetadataFiles, planMetadataMigration } from './migrate-metadata.mjs';
-import { loadRegistry } from './registry.mjs';
+import { compareVersions, loadRegistry } from './registry.mjs';
 import { detect, apply } from '../../migrations/metadata-comment-v1/deterministic.mjs';
 
 const tempDirs = [];
@@ -220,15 +220,20 @@ test('apply with dryRun reports the pending files and writes nothing; apply conv
 
 // ---------------------------------------------------------------- registry
 
-test('the migration is registered last, after every other migration of the folder', () => {
+test('the migration runs after every migration introduced before it, and every later one after it depends on it', () => {
   const registry = loadRegistry();
   assert.deepEqual(registry.errors, []);
-  const last = registry.migrations.at(-1);
-  assert.equal(last.id, 'metadata-comment-v1');
-  assert.equal(last.needed, 'detect');
-  assert.equal(last.version_record_before, false);
-  assert.deepEqual(
-    [...last.after].sort(),
-    registry.migrations.slice(0, -1).map((m) => m.id).sort(),
-  );
+  const meta = registry.migrations.find((m) => m.id === 'metadata-comment-v1');
+  assert.equal(meta.needed, 'detect');
+  assert.equal(meta.version_record_before, false);
+  const earlier = registry.migrations
+    .filter((m) => m.id !== meta.id && compareVersions(m.introduced_in, meta.introduced_in) < 0)
+    .map((m) => m.id)
+    .sort();
+  // item-knowledge-v1 is introduced after this migration (0.37.0), and it must run before it.
+  assert.deepEqual([...meta.after].sort(), [...earlier, 'item-knowledge-v1'].sort());
+  const index = registry.migrations.indexOf(meta);
+  for (const later of registry.migrations.slice(index + 1)) {
+    assert.ok(later.after.includes(meta.id), `${later.id} runs after ${meta.id} and must list it`);
+  }
 });

@@ -77,7 +77,7 @@ test('the registry of the framework lists the six migrations in their order', ()
   assert.equal(registry.supported_from, '0.0.0');
   assert.deepEqual(
     registry.migrations.map((m) => m.id),
-    ['session-layout-v1', 'category-first-geography-v1', 'item-descriptions-v1', 'item-knowledge-v1', 'statistics-tables-v1', 'world-graph-v1', 'metadata-comment-v1'],
+    ['session-layout-v1', 'category-first-geography-v1', 'item-descriptions-v1', 'item-knowledge-v1', 'statistics-tables-v1', 'world-graph-v1', 'metadata-comment-v1', 'scene-checks-v1'],
   );
   const world = registry.migrations.find((m) => m.id === 'world-graph-v1');
   assert.equal(world.needed, 'detect');
@@ -212,6 +212,22 @@ test('a needed migration is applied and its status is kept; a pending state runs
   assert.deepEqual(run.details.a.changed, ['x.md']);
   assert.deepEqual(run.details.b.changed, ['y.md']);
   assert.ok(globalThis.__log.includes('apply:a') && globalThis.__log.includes('apply:b') && globalThis.__log.includes('apply:c'));
+});
+
+test('an async detect that resolves true makes the migration needed', async () => {
+  globalThis.__log = [];
+  const dir = registryDir();
+  const folder = migration(dir, 'a', {}, { detect: true, apply: { status: 'complete' } });
+  write(path.join(folder, 'deterministic.mjs'), [
+    'export async function detect(root) { await null; globalThis.__log.push("detect:a"); return true; }',
+    'export function apply() { globalThis.__log.push("apply:a"); return { status: "complete" }; }',
+    '',
+  ].join('\n'));
+  const registry = loadRegistry(dir);
+  const run = await runRegistry(tmp(), { registry, state: new Map(), from: '0.1.0' });
+  assert.deepEqual([...run.statuses], [['a', 'complete']]);
+  assert.equal(run.details.a.needed, true);
+  assert.deepEqual(globalThis.__log, ['detect:a', 'apply:a']);
 });
 
 test('from_version_below runs the migration for an older campaign and not for a current one; an unknown version counts as older', async () => {

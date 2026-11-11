@@ -718,3 +718,83 @@ test('a draft under .campaign/styles is still refused as a file to write', async
   assert.equal(check.ok, false);
   assert.deepEqual(check.errors.map((e) => e.code), ['bad-path']);
 });
+
+const SESSION_PATH = 'Trama/Sessione Prova/Sessione Prova.md';
+const SCENE_PATH = 'Trama/Sessione Prova/Eventi/Il benvenuto.md';
+const SESSION = `---\nid: sessione-uno\ndepends_on: []\nprovenance: master\n---\n\n# Sessione 1\n\nTesto.\n`;
+
+/** An event file of the session above, with the given public body. */
+function scene(body) {
+  return `---\nid: scena-benvenuto\nsession: sessione-uno\ndepends_on: []\nprovenance: master\n---\n\n${body}`;
+}
+
+const SCENE_OK = scene(`## Il benvenuto
+
+Sibilla chiede un'offerta.
+
+### Prova: Carisma (Persuasione) CD 13
+
+Chi parla con Sibilla tira.
+
+#### Successo
+
+Il gruppo ottiene un consiglio sulla strada per il bosco.
+
+#### Fallimento
+
+Il gruppo riceve soltanto un invito a tornare il giorno dopo.
+`);
+
+const SCENE_LEGACY = scene(`## Il benvenuto
+
+### Prova: Carisma (Persuasione) CD 13
+
+Chi parla con Sibilla tira.
+
+- **Successo:** Il gruppo ottiene un consiglio.
+- **Fallimento:** Il gruppo riceve un invito.
+`);
+
+test('an event file with outcome lists is rejected with scene-checks and nothing is written', async (t) => {
+  const dir = makeCampaign(t);
+  const commitBefore = head(dir);
+  writeDraft(dir, SESSION_PATH, SESSION);
+  writeDraft(dir, SCENE_PATH, SCENE_LEGACY);
+
+  const check = await checkBatch(dir, { files: [SESSION_PATH, SCENE_PATH] });
+  assert.equal(check.ok, false);
+  const errors = check.errors.filter((e) => e.code === 'scene-checks');
+  assert.ok(errors.length >= 2, JSON.stringify(check.errors));
+  assert.ok(errors.every((e) => e.file === SCENE_PATH), JSON.stringify(errors));
+  assert.ok(errors.some((e) => e.message.startsWith('line 10: ')), JSON.stringify(errors));
+  assert.ok(errors.some((e) => e.message.startsWith('line 14: ')), JSON.stringify(errors));
+
+  assert.equal(head(dir), commitBefore);
+  assert.equal(fs.existsSync(path.join(dir, SCENE_PATH)), false);
+});
+
+test('a correct event file passes the scene checks', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, SESSION_PATH, SESSION);
+  writeDraft(dir, SCENE_PATH, SCENE_OK);
+
+  const check = await checkBatch(dir, { files: [SESSION_PATH, SCENE_PATH] });
+  assert.deepEqual(check.errors.filter((e) => e.code === 'scene-checks'), [], JSON.stringify(check.errors));
+});
+
+test('with the dnd-2024 adapter, a check value that is not a D&D 2024 check is rejected', async (t) => {
+  const dir = makeCampaign(t);
+  const config = fs.readFileSync(path.join(dir, 'campaign.yaml'), 'utf8').replace('adapter: none', 'adapter: dnd-2024');
+  fs.writeFileSync(path.join(dir, 'campaign.yaml'), config);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'use dnd-2024']);
+
+  writeDraft(dir, SESSION_PATH, SESSION);
+  writeDraft(dir, SCENE_PATH, SCENE_OK.replace('Carisma (Persuasione) CD 13', 'Persuasione CD 13'));
+  const check = await checkBatch(dir, { files: [SESSION_PATH, SCENE_PATH] });
+  const errors = check.errors.filter((e) => e.code === 'scene-checks');
+  assert.equal(check.ok, false);
+  assert.equal(errors.length, 1, JSON.stringify(check.errors));
+  assert.ok(errors[0].message.startsWith('line 12: '), errors[0].message);
+  assert.ok(errors[0].message.includes('"Persuasione CD 13" is not a D&D 2024 check'), errors[0].message);
+});

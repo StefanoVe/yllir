@@ -252,13 +252,22 @@ Un file evento non ha un titolo di documento separato: il nome del file è il ti
 
 ### 2.3 Prove ed esiti
 
-**Proposta.** Il titolo `###` di una prova riporta abilità e difficoltà nel formato dell'adattatore di sistema (vedi [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md)). Sotto il titolo, gli esiti sono una lista con le parole chiave `Successo` e `Fallimento`. Nell'esempio, valori e testi sono fittizi: il formato reale lo fornisce l'adattatore.
+**Decisione dell'autore (2026-11-11).** Ogni prova che i giocatori tirano è una sezione propria del file evento, non una frase che la chiede. Il titolo `### Prova: <valore>` riporta la prova: il valore sta nel formato dell'adattatore di sistema (vedi [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md)) oppure, senza adattatore, a parole, con la difficoltà a parole. Sotto il titolo, una riga facoltativa dice chi tira o quando. Seguono `#### Successo` e `#### Fallimento`, ciascuno con un paragrafo che dice che cosa accade e che cosa il gruppo sa o ottiene: mai una parola sola, mai «riesce» o «fallisce». Una prova non si chiede mai in prosa. Il motore lo controlla al salvataggio. Le schede nel vecchio formato a lista (`- **Successo:**`) si convertono con la migrazione `scene-checks-v1`.
+
+Esempio, con dati fittizi:
 
 ```markdown
-### Prova di abilità, difficoltà 13
+### Prova: Carisma (Persuasione) CD 13
 
-- **Successo:** la figura raggiunge il muro senza essere vista.
-- **Fallimento:** la guardia si volta e blocca il passaggio.
+Chi parla con Sibilla tira.
+
+#### Successo
+
+Il gruppo ottiene un consiglio sulla strada per il bosco.
+
+#### Fallimento
+
+Il gruppo riceve soltanto un invito a tornare il giorno dopo.
 ```
 
 Il core non fissa né i valori né gli effetti delle prove: li fornisce l'adattatore. Senza adattatore il campo della difficoltà resta testo libero da definire.

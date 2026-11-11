@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkCreature } from './checks.mjs';
+import { checkCreature, checkSceneCheck } from './checks.mjs';
 
 function codes(fields) {
   return checkCreature(fields).map((entry) => entry.code);
@@ -71,4 +71,47 @@ test('proficiency bonus without a valid challenge rating is only format-checked'
 
 test('fields not listed by the checks are not checked', () => {
   assert.deepEqual(checkCreature({ speed: 'anything at all', initiative: '99', saves: 'x' }), []);
+});
+
+test('scene check: Italian forms are accepted, with skills in any case and a skill paired with another ability', () => {
+  for (const value of ['Carisma (Persuasione) CD 13', 'Carisma CD 13', 'Tiro salvezza su Saggezza CD 13',
+    'carisma (persuasione) cd 5', '  Destrezza  (Rapidità di Mano)  CD   30 ', 'Forza (Persuasione) CD 10']) {
+    assert.deepEqual(checkSceneCheck(value, 'it'), [], value);
+  }
+});
+
+test('scene check: English forms are accepted', () => {
+  for (const value of ['Charisma (Persuasion) DC 13', 'Charisma DC 13', 'Wisdom saving throw DC 13',
+    'dexterity (sleight of hand) dc 9']) {
+    assert.deepEqual(checkSceneCheck(value, 'en'), [], value);
+  }
+});
+
+test('scene check: the attack form and the Italian names of the English forms are rejected', () => {
+  assert.deepEqual(checkSceneCheck('Attacco CD 13', 'it').map((e) => e.code), ['bad-check']);
+  assert.deepEqual(checkSceneCheck('Carisma (Persuasione) DC 13', 'it').map((e) => e.code), ['bad-check']);
+  assert.deepEqual(checkSceneCheck('Charisma DC 13', 'it').map((e) => e.code), ['bad-check']);
+  assert.deepEqual(checkSceneCheck('Persuasion DC 13', 'en').map((e) => e.code), ['bad-check']);
+});
+
+test('scene check: an unknown form, ability or skill is rejected with the expected forms', () => {
+  const [error] = checkSceneCheck('Persuasione CD 13', 'it');
+  assert.equal(error.code, 'bad-check');
+  assert.equal(error.message, '"Persuasione CD 13" is not a D&D 2024 check; write "Carisma (Persuasione) CD 13" or "Tiro salvezza su Saggezza CD 13"');
+  assert.deepEqual(checkSceneCheck('Carisma (Foo) CD 13', 'it').map((e) => e.code), ['bad-check']);
+  assert.deepEqual(checkSceneCheck('Carisma CD tredici', 'it').map((e) => e.code), ['bad-check']);
+  assert.deepEqual(checkSceneCheck('Carisma (Persuasione) CD', 'it').map((e) => e.code), ['bad-check']);
+  assert.deepEqual(checkSceneCheck('Ignoto (Persuasione) CD 13', 'it').map((e) => e.code), ['bad-check']);
+  assert.deepEqual(checkSceneCheck('Wisdom (Insight) DC 12', 'en').map((e) => e.code), []);
+  assert.deepEqual(checkSceneCheck('Wisdom (Acrobatics) DC 12', 'en').map((e) => e.code), []);
+  assert.deepEqual(checkSceneCheck('Wisdom (Juggling) DC 12', 'en').map((e) => e.code), ['bad-check']);
+});
+
+test('scene check: a DC outside 5..30 is rejected', () => {
+  for (const value of ['Carisma CD 4', 'Carisma CD 31']) {
+    const errors = checkSceneCheck(value, 'it');
+    assert.deepEqual(errors.map((e) => e.code), ['bad-check'], value);
+    assert.ok(errors[0].message.includes('from 5 to 30'), errors[0].message);
+  }
+  assert.deepEqual(checkSceneCheck('Strength saving throw DC 30', 'en'), []);
 });

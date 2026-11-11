@@ -169,7 +169,7 @@ export async function runComplete(root, migration) {
 async function isNeeded(root, migration, from) {
   if (migration.needed === 'detect') {
     const module = await loadModule(migration, migration.deterministic, ['detect']);
-    return module.detect(root) === true;
+    return (await module.detect(root)) === true;
   }
   // An unknown campaign version is treated as the oldest one.
   if (from === null) return true;
