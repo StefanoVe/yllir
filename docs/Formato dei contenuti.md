@@ -5,6 +5,8 @@
 
 Questo documento definisce la forma dei file che il framework produce e legge: le regole comuni a ogni documento, le convenzioni dei testi di trama, la forma della cronaca, un modello per ogni tipo di scheda, e la divisione fra ciò che controlla uno script e ciò che resta al giudizio dell'agente. Il controllo meccanico è descritto qui in termini di regole; i casi di prova che lo verificano stanno in [Robustezza e test](Robustezza%20e%20test.md).
 
+**Deciso, 2026-11-11.** Aggiornato alla [Riprogettazione](Riprogettazione.md): dove questo documento e la riprogettazione divergono, vale la riprogettazione.
+
 Convenzione dei marcatori: **Deciso** indica ciò che è fissato dall'indice; tutto il resto è **Proposta** da approvare. Gli esempi sono fittizi. Chiude il documento la sezione [Questioni aperte](#7-questioni-aperte).
 
 ## 1. Regole comuni a ogni documento
@@ -41,6 +43,24 @@ Sono ammessi solo i campi della tabella. Ogni altro campo è un errore: un campo
 | `template` | categorie con più modelli: Personaggi (`npc`, `vendor`), Creature (`enemy`, `creature`), Oggetti (`item`, `notice`) | uno dei valori indicati | modello della scheda, da cui il validatore ricava le sezioni obbligatorie |
 | `aliases` | facoltativo, per ogni scheda | lista di nomi alternativi | forme alternative del nome; fonte unica per l'indice dei soggetti |
 | `merged_ids` | solo dopo un'unione di schede (vedi [Skill di libreria](Skill%20di%20libreria.md#l19-manutenzione-della-continuità)) | lista di `id` | identità assorbite: route e QR già stampati restano validi |
+| `kind` | ogni documento delle categorie `places`, `subjects`, `objects`, `free` | uno fra `place`, `character`, `creature`, `item`, `faction`, `event` | **Deciso, 2026-11-11.** Il tipo del soggetto, usato dagli script del grafo. Un `kind: place` sta solo nella categoria dei luoghi. |
+| `provenance` | ogni documento delle categorie `places`, `subjects`, `objects`, `free`, `plot`, `chronicle` | `master` (detto dal master), `played` (giocato al tavolo) o `generated` (generato dal framework) | **Deciso, 2026-11-11.** La provenienza dell'intero documento (decisione 12 della riprogettazione). Quando il master modifica a mano un documento `generated`, il motore lo salva come modifica manuale e lo segna `master`. |
+| `sketch` | facoltativo | solo il valore `true` | **Deciso, 2026-11-11.** Segna un abbozzo (vedi 4.12). |
+| `status` | facoltativo | `alive`, `dead`, `missing`, `active`, `destroyed` o `unknown` | **Deciso, 2026-11-11.** Stato del soggetto nella cronologia. |
+| `ended` | facoltativo, solo con `status: dead` o `destroyed` | un numero, come `when` | **Deciso, 2026-11-11.** Posizione nella cronologia in cui il soggetto è morto o è stato distrutto. |
+| `when` | obbligatorio per `kind: event`, vietato per gli altri | un numero intero o decimale, anche negativo | **Deciso, 2026-11-11.** La posizione dell'evento sulla cronologia del mondo. La convenzione del calendario (per esempio «anno 312 dell'Ascia» diventa `312`) sta nel seme del mondo. |
+| `participants` | facoltativo, solo per `kind: event` | lista di `id` dei soggetti | **Deciso, 2026-11-11.** I soggetti che prendono parte all'evento. |
+| `relations` | facoltativo | lista in blocco di voci con `to` (un `id`) e `type` | **Deciso, 2026-11-11.** `type` è fra `member-of` (appartenenza), `kin-of` (parentela), `ally-of` (alleanza), `rival-of` (rivalità) e `depends-on` (dipendenza: debito, servizio, bisogno). |
+
+**Deciso, 2026-11-11.** Esempio per `relations`, fittizio:
+
+```yaml
+relations:
+  - to: gilda-del-sale
+    type: depends-on
+  - to: borgo-cenere
+    type: member-of
+```
 
 **Chi li scrive.** Solo il framework, nei propri processi. Il master non li modifica a mano; se li apre, li trova leggibili. Il validatore li legge e li verifica, e le risposte al master non li mostrano.
 
@@ -50,8 +70,10 @@ Sono ammessi solo i campi della tabella. Ogni altro campo è un errore: un campo
 - Un `id` è uno slug: solo minuscole, cifre e trattini. Si assegna alla creazione e non cambia mai, neppure quando il titolo cambia.
 - I riferimenti (`location`, `depends_on`, `characters`) puntano sempre a `id`, mai a nomi di file o a link. Così una rinomina non rompe nulla.
 - `appearances[].subject` e `appearances[].location` puntano sempre agli `id` delle schede del soggetto e dei luoghi.
-- Il nome del soggetto, il tipo e la categoria non si ripetono nei metadati.
+- Il nome del soggetto e la categoria non si ripetono nei metadati. Il tipo si dichiara con `kind`, perché gli script del grafo ne hanno bisogno.
 - I metadati non contengono nulla di riservato: sono dati di sistema, non contenuto.
+
+**Deciso, 2026-11-11. Controlli del grafo.** Il motore controlla, senza alcun modello, i riferimenti a soggetti inesistenti; un `location` che non è un luogo; un evento con un partecipante o con un luogo che cade dopo il `ended` di quel partecipante o di quel luogo; lo stesso partecipante in due luoghi diversi in due eventi con lo stesso `when`. L'indice derivato è `.campaign/cache/world.json`: lo rigenera il motore e non si modifica a mano.
 
 ### 1.3 Parte pubblica e blocco riservato
 
@@ -77,6 +99,8 @@ Regole:
 - Il passaggio di un contenuto da riservato a pubblico avviene solo per azione esplicita del master: il testo si sposta fuori dal blocco.
 - Le categorie di tipo `master-only` (vedi 4.8) non usano il blocco: l'intero file è riservato.
 - **Chi lo legge.** Gli agenti che lavorano sul canone (esecutori, audit di continuità, dottore della campagna, manutenzione della continuità, portineria e handoff) vedono anche il blocco riservato, perché devono controllarlo. Non lo ricevono mai i revisori di testi destinati ai giocatori (enciclopedia, carte, riepiloghi), i fornitori di immagini, le ricerche web e i servizi di pubblicazione.
+
+**Deciso, 2026-11-11.** Un'invenzione non si presenta mai come citazione di una fonte, e un segreto inventato sta solo nel blocco riservato.
 
 ### 1.4 Immagini sotto il titolo
 
@@ -318,8 +342,9 @@ Ogni modello indica la categoria, i metadati, le sezioni obbligatorie e facoltat
 **Categoria:** cartella a cascata in `Mondo/`, tipo `places`.
 **Metadati:** `id`.
 **Obbligatorie, in ordine:** titolo; `## Descrizione`, che si apre con un paragrafo in corsivo.
-**Facoltative, in ordine:** immagine sotto il titolo; `## Da definire` (obbligatoria se restano lacune).
-**Blocco riservato:** `### Indicazioni per il master`. Gli spunti non canonici non stanno nella scheda: stanno in `Appunti/`.
+**Facoltative, in ordine:** immagine sotto il titolo; `## Abitanti` e `## Punti d'interesse`, dopo `## Descrizione`; `## Da definire` (obbligatoria se restano lacune).
+**Blocco riservato:** `### Indicazioni per il master`, seguito da `### Agganci`. Gli spunti non canonici non stanno nella scheda: stanno in `Appunti/`.
+**Deciso, 2026-11-11.** `## Abitanti`, `## Punti d'interesse` e `### Agganci` sono facoltativi: le schede esistenti restano valide.
 
 Un luogo con sotto-luoghi è una cartella con la scheda omonima dentro. L'elenco dei sotto-luoghi non si scrive a mano: si ricava dalla posizione delle cartelle, come indice derivato.
 
@@ -351,7 +376,7 @@ Una boa segna un passaggio che sulle carte non esiste: lo conoscono solo i pesca
 **Metadati:** `id`; `template: npc`; `location` come lista dei luoghi in cui si trova di norma.
 **Obbligatorie, in ordine:** titolo; `## Ruolo`; `## Aspetto e modi`; `## Al tavolo`, con voce, modo di parlare e che cosa vuole.
 **Facoltative, in ordine:** immagine sotto il titolo (ritratto); `## Statistiche`, obbligatoria se il PNG può combattere; `## Assortimento`, per i venditori (4.4); `## Da definire`. Quando presente, `## Statistiche` usa le tabelle localizzate descritte in 4.3. Può comparire anche nella scheda di un venditore, se pertinente.
-**Blocco riservato:** `### Indicazioni per il master`, con motivazioni e segreti.
+**Blocco riservato:** `### Indicazioni per il master`; dopo di essa, tutti facoltativi, `### Motivazioni`, `### Segreti` e `### Agganci`. **Deciso, 2026-11-11.** I legami si dichiarano in `relations` (vedi 1.2); la prosa di `## Ruolo` può descriverli.
 
 Un PNG che svolge più ruoli usa il modello più ricco e dichiara le sezioni facoltative che usa. Non si crea una scheda per ciascun ruolo (L14 in [Skill di libreria](Skill%20di%20libreria.md#l14-gestione-dei-png)).
 
@@ -627,6 +652,116 @@ id: economia
 | Corda | 1 | 3 | scudo |
 | Pasto semplice | 0.5 | 1 | scudo |
 ```
+
+### 4.10 Fazione
+
+**Deciso, 2026-11-11.** Sezione nuova.
+
+**Categoria:** `Fazioni/`, tipo `subjects`. Una fazione è un soggetto con scheda, non un concetto di storia (4.7).
+**Metadati:** `id`; `kind: faction`; `template: faction`; `provenance` (vedi 1.2).
+**Obbligatorie, in ordine:** titolo; `## Chi sono`, che descrive ciò che i personaggi possono sapere della fazione.
+**Facoltative, in ordine:** immagine sotto il titolo; `## Obiettivi`; `## Membri`, l'elenco dei membri noti ai personaggi.
+**Blocco riservato:** `### Indicazioni per il master`, `### Segreti` e `### Agganci`.
+
+Un membro punta alla fazione con una voce `member-of` in `relations` della propria scheda. Il legame è dichiarato lì, e non soltanto nella lista di `## Membri`.
+
+```markdown
+---
+id: gilda-del-sale
+kind: faction
+template: faction
+provenance: master
+---
+
+# Gilda del sale
+
+## Chi sono
+
+Mercanti che controllano le saline della costa e fissano il prezzo del sale per tutto il porto.
+
+## Obiettivi
+
+- Tenere le saline sotto il proprio controllo.
+
+## Membri
+
+- Teodo Marr, capo del borgo.
+
+<!-- master -->
+## Master
+
+### Indicazioni per il master
+
+Il capo della gilda non sa che i registri del sale sono falsi.
+
+### Segreti
+
+Il sale del porto è stato venduto due volte allo stesso acquirente.
+
+### Agganci
+
+Chi trova i registri può ricattare il capo del borgo.
+<!-- /master -->
+```
+
+La scheda del membro dichiara il legame così (esempio fittizio):
+
+```yaml
+relations:
+  - to: gilda-del-sale
+    type: member-of
+```
+
+### 4.11 Evento storico
+
+**Deciso, 2026-11-11.** Sezione nuova.
+
+**Categoria:** `Storia/`, tipo `free`.
+**Metadati:** `id`; `kind: event`; `template: event`; `provenance` (vedi 1.2); `when`, obbligatorio: la posizione dell'evento sulla cronologia del mondo; `participants` e `location`, facoltativi.
+**Obbligatorie, in ordine:** titolo; `## Accaduto`, in prosa al passato.
+**Facoltative, in ordine:** `## Conseguenze`.
+**Blocco riservato:** `### Indicazioni per il master`.
+
+Un evento storico non è un evento di trama: non ha `depends_on` e non sta in `Trama/`.
+
+```markdown
+---
+id: incendio-della-torre
+kind: event
+template: event
+provenance: master
+when: 312
+participants: [gilda-del-sale]
+location: [costa-di-selce]
+---
+
+# Incendio della torre
+
+## Accaduto
+
+Nell'anno 312 dell'Ascia un incendio distrugge la torre del sale. La gilda accusa i pescatori, che non ne sono responsabili.
+
+## Conseguenze
+
+Le saline restano senza guardia per tutto l'inverno.
+
+<!-- master -->
+## Master
+
+### Indicazioni per il master
+
+Il fuoco è stato appiccato dal tesoriere della gilda.
+<!-- /master -->
+```
+
+### 4.12 Abbozzo
+
+**Deciso, 2026-11-11.** Sezione nuova. Un abbozzo può avere qualunque tipo.
+
+**Metadati:** `sketch: true`; `kind`; `provenance`; `relations`; `location`, se il soggetto ne ha uno; `template`, per sapere qual è la prima sezione obbligatoria del modello.
+**Contenuto:** il titolo e una sola frase sotto la prima sezione obbligatoria del suo modello. Le altre sezioni obbligatorie del modello non sono richieste.
+
+Quando il master nomina l'abbozzo o una sessione lo usa, il framework lo espande in scheda completa. Ogni riga della scaletta che non viene espansa subito si salva come abbozzo (decisione 13 della riprogettazione).
 
 ## 5. Controlli: script e giudizio
 
