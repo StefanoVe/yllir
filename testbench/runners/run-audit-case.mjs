@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 // Runs one continuity-audit case end to end: copies the fixture campaign into a
-// temporary git repository, runs the audit skill with `claude -p` (or `codex exec`
-// with --agent codex), grades what it left in .campaign/state/audit/ against the
+// temporary git repository, runs the audit skill with `claude -p`, grades what it left in .campaign/state/audit/ against the
 // answer key, and appends one JSON line per run to testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex]
+// Usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude]
 //        node testbench/runners/run-audit-case.mjs <caseDir> --grade-only <copyPath>
-// --agent codex runs the agent with `codex exec` instead of `claude -p`; codex gets
-// no model unless --model is given explicitly.
 // --grade-only grades an existing copy (kept with --keep) without running the agent,
 // prints the record and does not append it to the results file.
 // Exit codes: 0 every run passes; 1 some run fails; 2 the case or key cannot be used.
@@ -31,7 +28,7 @@ import {
 } from './lib/case-common.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex] [--grade-only <copyPath>]';
+  'usage: node testbench/runners/run-audit-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude] [--grade-only <copyPath>]';
 const AGENT_TIMEOUT_MS = 1800000;
 const AUDIT_DIR = path.join('.campaign', 'state', 'audit');
 

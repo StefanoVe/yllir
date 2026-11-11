@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Yllir is a framework of agent skills (Claude Code first, Codex optional) for creating and maintaining tabletop RPG campaigns. It is system-agnostic: D&D 2024 is only the first adapter. The target user is a game master who has never used AI or a terminal: they talk in natural language, and everything else (git, sub-agents, reviews, linking) stays hidden.
+Yllir is a framework of agent skills, distributed as a Claude Code plugin (Codex at most as an optional image provider), for creating and maintaining tabletop RPG campaigns. It is system-agnostic: D&D 2024 is only the first adapter. The target user is a game master who has never used AI or a terminal: they talk in natural language, and everything else (git, sub-agents, reviews, linking) stays hidden.
 
 **Current state: specification only.** No code, no build, no tests exist yet. `yllir/` and `testbench/` are empty.
 
@@ -21,7 +21,7 @@ Yllir is a framework of agent skills (Claude Code first, Codex optional) for cre
 - **Three layers:** core processes (what the master experiences), library skills (called by core, never by the user), and optional modules (system adapters, style profiles, outputs). Dependencies point downward only, and core knows nothing about any specific world or game system. Write-time wiring (audit before a change, linking after it, plot-map update) lives in core and is not left for the agent to remember.
 - **Deterministic scripts do the mechanics, the agent judges.** Mention finding, link checking, validation of the master-only block, and index regeneration go in Node.js scripts (`.mjs`). The known failure modes to design against are a linker that misses mentions and an audit that never reports anything (see `docs/Robustezza e test.md`).
 - **Skill scripts live with their skill.** A script that a skill runs lives in the same folder as that skill's `SKILL.md` (for example `yllir/skills/library/linker/`), not in a shared `scripts/` folder. Only code used by several skills or by the framework itself stays outside a skill folder.
-- **Instructions must work for weak models and for Codex.** Skills are executed by cheap models (Haiku, Luna) under a high-level supervising agent, and every write gets an independent review from a separate sub-agent. Write skill instructions explicitly enough for the weakest executor.
+- **Creative writing is the main agent's; cheap models get precise orders.** Since the 2026-11-11 redesign (`docs/Riprogettazione.md`), the high-level main agent writes world, sheets and scenes; cheap models (Haiku) execute bounded orders from it. Deterministic checks always run; a separate reviewer sub-agent runs only on batches that add facts to the canon. Orders to cheap executors must still be explicit enough for the weakest one.
 - **Master-only notes.** The reserved block is visible to agents that work on the canon. It never goes to reviewers of player-facing text, image providers, web searches or publishing services.
 - **Campaigns are always git repos.** Without git the framework does not write, and git history is the only backup. Migrations may touch user content only reversibly, and never the user's customizations.
 - **Design from scratch.** Existing tools (including Baltimora, the author's Angular skill framework at work, which is the reference model for the layers and updates) are inspiration only. Do not copy code or inherit their structure.
@@ -40,7 +40,7 @@ Every implementation is orchestrated through sub-agents running Haiku or Luna. T
 
 Do this at the end of every task that changes files under `yllir/`, `testbench/` or `docs/`, without waiting to be asked. The user does not need to request it.
 
-- **Version.** The framework version lives in two files that must always carry the same number: `yllir/.claude-plugin/plugin.json` and `yllir/.codex-plugin/plugin.json` (field `version`). Bump both in the same commit, using semver while on `0.x`:
+- **Version.** The framework version lives in `yllir/.claude-plugin/plugin.json` (field `version`). Bump it in the same commit as the change, using semver while on `0.x`:
   - **minor** (`0.8.0` → `0.9.0`) for a new or changed feature, skill, agent, script behavior or migration;
   - **patch** (`0.8.0` → `0.8.1`) for a fix, a wording change in instructions or a test-only change;
   - **no bump** when only `docs/`, `CLAUDE.md` or `testbench/` changed and `yllir/` is untouched. Never bump to `1.0.0` without the author's decision.

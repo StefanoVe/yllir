@@ -4,7 +4,7 @@
 // The child appends its own record to testbench/results; this script only reads
 // the JSON line the child prints and summarises it.
 //
-// Usage: node testbench/runners/run-suite.mjs [--agent claude|codex|both] [--runs N]
+// Usage: node testbench/runners/run-suite.mjs [--agent claude] [--runs N]
 //          [--parallel N] [--with-audit] [--only <substring>] [--model <m>]
 // Defaults: --agent claude, --runs 1 (quick), --parallel 8. The audit kind is skipped
 // unless --with-audit is given (each audit run takes 10+ minutes).
@@ -23,15 +23,11 @@ const KIND_RUNNERS = new Map([
   ['linker', 'run-linker-case.mjs'],
   ['audit', 'run-audit-case.mjs'],
 ]);
-const AGENT_SETS = new Map([
-  ['claude', ['claude']],
-  ['codex', ['codex']],
-  ['both', ['claude', 'codex']],
-]);
-const AGENT_ORDER = ['claude', 'codex'];
+const AGENT_SETS = new Map([['claude', ['claude']]]);
+const AGENT_ORDER = ['claude'];
 const REASON_WIDTH = 160;
 const USAGE =
-  'usage: node testbench/runners/run-suite.mjs [--agent claude|codex|both] [--runs N] [--parallel N] [--with-audit] [--only <substring>] [--model <m>]';
+  'usage: node testbench/runners/run-suite.mjs [--agent claude] [--runs N] [--parallel N] [--with-audit] [--only <substring>] [--model <m>]';
 
 class UsageError extends Error {}
 
@@ -243,7 +239,8 @@ export function parseArgs(argv) {
     };
     if (arg === '--agent') {
       opts.agent = value();
-      if (!AGENT_SETS.has(opts.agent)) throw new UsageError('--agent must be claude, codex or both');
+      if (opts.agent === 'codex') throw new UsageError('codex is no longer a test agent: use --agent claude');
+      if (!AGENT_SETS.has(opts.agent)) throw new UsageError('--agent must be claude');
     } else if (arg === '--runs') {
       opts.runs = positiveInt('--runs', value());
     } else if (arg === '--parallel') {

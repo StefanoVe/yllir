@@ -69,11 +69,10 @@ test('planJobs gives each job its case, runner, agent and run index', () => {
 
 test('planJobs multiplies by agents and runs', () => {
   const root = makeCases({ 'entry/a': 'case: x\n', 'linker/b': 'case: x\n' });
-  const jobs = planJobs({ casesRoot: root, agents: ['claude', 'codex'], runs: 3 });
-  assert.equal(jobs.length, 2 * 2 * 3);
+  const jobs = planJobs({ casesRoot: root, agents: ['claude'], runs: 3 });
+  assert.equal(jobs.length, 2 * 1 * 3);
   const claudeRuns = jobs.filter((job) => job.agent === 'claude' && job.name === 'a').map((job) => job.run);
   assert.deepEqual(claudeRuns, [1, 2, 3]);
-  assert.equal(jobs.filter((job) => job.agent === 'codex').length, 6);
 });
 
 test('planJobs honours only as a substring of kind/name', () => {
@@ -86,16 +85,18 @@ test('planJobs honours only as a substring of kind/name', () => {
 });
 
 test('childArgs passes the case, agent, one run and the model when given', () => {
-  const job = { runner: '/r/run-linker-case.mjs', caseDir: '/c/linker/x', agent: 'codex', run: 2 };
-  assert.deepEqual(childArgs(job), ['/r/run-linker-case.mjs', '/c/linker/x', '--agent', 'codex', '--runs', '1']);
+  const job = { runner: '/r/run-linker-case.mjs', caseDir: '/c/linker/x', agent: 'claude', run: 2 };
+  assert.deepEqual(childArgs(job), ['/r/run-linker-case.mjs', '/c/linker/x', '--agent', 'claude', '--runs', '1']);
   assert.deepEqual(childArgs(job, { model: 'haiku' }).slice(-2), ['--model', 'haiku']);
 });
 
 test('parseArgs reads the options and rejects bad values', () => {
-  const opts = parseArgs(['--agent', 'both', '--runs', '3', '--parallel', '4', '--with-audit', '--only', 'entry', '--model', 'haiku']);
-  assert.deepEqual(opts, { agent: 'both', runs: 3, parallel: 4, withAudit: true, only: 'entry', model: 'haiku' });
+  const opts = parseArgs(['--agent', 'claude', '--runs', '3', '--parallel', '4', '--with-audit', '--only', 'entry', '--model', 'haiku']);
+  assert.deepEqual(opts, { agent: 'claude', runs: 3, parallel: 4, withAudit: true, only: 'entry', model: 'haiku' });
   assert.equal(parseArgs([]).agent, 'claude');
-  assert.throws(() => parseArgs(['--agent', 'bogus']), /--agent must be/);
+  assert.throws(() => parseArgs(['--agent', 'bogus']), /--agent must be claude/);
+  assert.throws(() => parseArgs(['--agent', 'codex']), /codex is no longer a test agent/);
+  assert.throws(() => parseArgs(['--agent', 'both']), /--agent must be claude/);
   assert.throws(() => parseArgs(['--runs', '0']), /positive integer/);
   assert.throws(() => parseArgs(['--parallel']), /needs a value/);
   assert.throws(() => parseArgs(['--nope']), /unknown option/);
@@ -181,17 +182,14 @@ test('summarize counts pass, fail and error per case and agent', () => {
     jobResult('entry', 'a', 'claude', 1, { pass: true }),
     jobResult('entry', 'a', 'claude', 2, { pass: false, failures: ['T1 missed'] }),
     jobResult('entry', 'a', 'claude', 3, { error: 'exit code 2: crash' }),
-    jobResult('entry', 'a', 'codex', 1, { pass: true }),
     jobResult('linker', 'b', 'claude', 1, { pass: true }),
   ];
   const summary = summarize(results);
   assert.deepEqual(summary.rows, [
     { case: 'entry/a', agent: 'claude', pass: 1, fail: 1, error: 1, n: 3 },
-    { case: 'entry/a', agent: 'codex', pass: 1, fail: 0, error: 0, n: 1 },
     { case: 'linker/b', agent: 'claude', pass: 1, fail: 0, error: 0, n: 1 },
   ]);
   assert.deepEqual(summary.totals.get('claude'), { pass: 2, n: 4 });
-  assert.deepEqual(summary.totals.get('codex'), { pass: 1, n: 1 });
   assert.equal(summary.allPassed, false);
   assert.deepEqual(summary.failures, [
     { case: 'entry/a', agent: 'claude', run: 2, reason: 'T1 missed' },

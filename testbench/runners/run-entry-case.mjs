@@ -2,11 +2,11 @@
 // Runs one entry-point case end to end on an existing campaign. The setup is
 // deterministic: it copies the morvalle fixture campaign into a temporary folder,
 // generates the instructions, saves version 1, changes one card (Teodo Marr) and
-// saves version 2. Then the agent (`claude -p`, or `codex exec` with --agent codex) runs
+// saves version 2. Then the agent (`claude -p`) runs
 // the entry point with the case prompt (the master's message), and the runner grades what
 // the agent left in the folder. One JSON line per run is appended to testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude|codex] [--keep]
+// Usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude] [--keep]
 //        node testbench/runners/run-entry-case.mjs <caseDir> --setup-only
 //        node testbench/runners/run-entry-case.mjs <caseDir> --grade-only <dir> --run-json <file>
 // --setup-only runs the setup, prints the folder, the two versions and the git log,
@@ -42,7 +42,7 @@ import { foldForm } from '../../yllir/scripts/lib/fold.mjs';
 import { plotMap } from '../../yllir/skills/library/plot-map/scripts/lib/plot-map.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude|codex] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
+  'usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
 const AGENT_TIMEOUT_MS = 1800000;
 const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle', 'campaign');
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');

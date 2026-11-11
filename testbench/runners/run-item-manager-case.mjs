@@ -4,17 +4,15 @@
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   REPO_ROOT, appendResult, changedFiles, instructionsHash, listFiles,
   loadYamlMapping, parseCommonArgs, prepareCopy, printSummary, recordHeader,
-  removeCopy,
+  removeCopy, runClaude,
 } from './lib/case-common.mjs';
 
-const USAGE = 'usage: node testbench/runners/run-item-manager-case.mjs <caseDir> [--runs N] [--model gpt-6-luna] [--keep] [--agent claude|codex] [--setup-only] [--grade-only <campaignCopy>]';
+const USAGE = 'usage: node testbench/runners/run-item-manager-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude] [--setup-only] [--grade-only <campaignCopy>]';
 const TIMEOUT_MS = 900000;
-const CODEX = process.env.CODEX_BIN || 'codex';
 const SKILL_DIR = path.join(REPO_ROOT, 'yllir/skills/library/item-manager');
 const STATE = path.join('.campaign/state/item-manager');
 const DRAFT = path.join('.campaign/state/write/draft');
@@ -101,24 +99,16 @@ export function grade({ key, report, drafts, changed }) {
   return { checks, failures: Object.entries(checks).filter(([, value]) => !value).map(([name]) => name), pass: Object.values(checks).length > 0 && Object.values(checks).every(Boolean) };
 }
 
+// Runs the library skill with claude -p. The error text keeps no case input: the
+// command line that execFileSync puts in its message holds the prompt, so it is dropped.
 function runLibraryAgent({ cwd, prompt, model, timeoutMs, redactions = [] }) {
-  const writable = `${cwd}/.campaign/state`;
-  const args = ['exec', '--json', '--skip-git-repo-check', '--sandbox', 'workspace-write', '-c', `sandbox_workspace_write.writable_roots=[\"${writable}\"]`, '-C', cwd, '-m', model, prompt];
-  const started = Date.now();
-  try {
-    const stdout = execFileSync(CODEX, args, { cwd, encoding: 'utf8', timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
-    let report = null;
-    for (const raw of stdout.split('\n')) {
-      try { const event = JSON.parse(raw); if (event.type === 'item.completed' && event.item?.type === 'agent_message') report = event.item.text; } catch {}
-    }
-    if (report === null) throw new Error('Codex returned no final agent message');
-    return { ok: true, report, duration_ms: Date.now() - started, permission_mode: 'codex-library-state-only', error: null };
-  } catch (error) {
-    let detail = String(error.stderr ?? '').trim().split('\n')[0] || `exit=${error.status ?? 'unknown'} signal=${error.signal ?? 'none'}`;
-    for (const secret of [prompt, ...redactions].filter(Boolean)) detail = detail.split(secret).join('[omitted input]');
-    if (detail.length > 400) detail = `${detail.slice(0, 400)}…`;
-    return { ok: false, report: null, duration_ms: null, permission_mode: 'codex-library-state-only', error: detail, failure_type: 'infrastructure' };
-  }
+  const result = runClaude({ cwd, prompt, model, timeoutMs });
+  if (result.ok) return result;
+  let detail = result.error ?? 'claude failed';
+  if (detail.startsWith('Command failed:')) detail = 'claude exited with an error (command line omitted: it holds the case input)';
+  for (const secret of [prompt, ...redactions].filter(Boolean)) detail = detail.split(secret).join('[omitted input]');
+  if (detail.length > 400) detail = `${detail.slice(0, 400)}…`;
+  return { ...result, error: detail, failure_type: 'infrastructure' };
 }
 
 async function main() {
@@ -126,9 +116,6 @@ async function main() {
   const recordGrade = process.argv.includes('--record-grade');
   const args = process.argv.slice(2).filter((arg) => !['--setup-only', '--record-grade'].includes(arg));
   const opts = parseCommonArgs(args, USAGE, { valueOptions: ['--grade-only', '--run', '--execution-source'] });
-  if (opts.agent !== 'codex') throw new Error('This direct library-skill runner currently supports --agent codex only');
-  if (!opts.modelGiven) opts.model = 'gpt-6-luna';
-  opts.modelLabel = opts.model;
   const caseData = loadCase(opts.caseDir);
   const fixtureDir = path.join(REPO_ROOT, 'testbench/fixtures', caseData.fixture);
   const key = loadYamlMapping(path.join(fixtureDir, 'key.yaml'));

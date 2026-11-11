@@ -17,8 +17,8 @@ import { parseYamlLite } from './yaml-lite.mjs';
 
 const DEFAULT_TEMPLATE = path.resolve(import.meta.dirname, '../../templates/instructions.md');
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
-// The plugin folder: the parent of the scripts folder. Codex does not set
-// CLAUDE_PLUGIN_ROOT, so the generated instructions state this path.
+// The plugin folder: the parent of the scripts folder. The generated instructions
+// state this path for the case where CLAUDE_PLUGIN_ROOT is empty.
 export const PLUGIN_ROOT = path.resolve(import.meta.dirname, '../..');
 
 const CONFIG_PATH = 'campaign.yaml';

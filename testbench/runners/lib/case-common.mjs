@@ -22,14 +22,13 @@ function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
-const AGENTS = ['claude', 'codex'];
+const AGENTS = ['claude'];
 
 /**
  * Parses --agent, --runs, --model and --keep, plus the extra value options listed in
  * valueOptions (their values go to opts.values). Throws with the usage text.
- * opts.agent is 'claude' (default) or 'codex'. opts.modelGiven is true only when --model
- * is on the command line. opts.modelLabel is the model name for records and the summary:
- * opts.model for claude; for codex, opts.model when given, else 'codex-default'.
+ * opts.agent is 'claude' (the only agent). opts.modelGiven is true only when --model is on
+ * the command line. opts.modelLabel is the model name for records and the summary.
  */
 export function parseCommonArgs(argv, usage, { valueOptions = [] } = {}) {
   const opts = { caseDir: null, runs: 3, model: 'haiku', modelGiven: false, agent: 'claude', keep: false, values: {} };
@@ -37,7 +36,8 @@ export function parseCommonArgs(argv, usage, { valueOptions = [] } = {}) {
     const arg = argv[i];
     if (arg === '--agent') {
       const value = argv[++i];
-      if (!AGENTS.includes(value)) throw new Error(`--agent must be claude or codex\n${usage}`);
+      if (value === 'codex') throw new Error(`codex is no longer a test agent: use --agent claude\n${usage}`);
+      if (!AGENTS.includes(value)) throw new Error(`--agent must be claude\n${usage}`);
       opts.agent = value;
     } else if (arg === '--runs') {
       const value = argv[++i];
@@ -69,7 +69,7 @@ export function parseCommonArgs(argv, usage, { valueOptions = [] } = {}) {
     }
   }
   if (opts.caseDir === null) throw new Error(usage);
-  opts.modelLabel = opts.agent === 'codex' && !opts.modelGiven ? 'codex-default' : opts.model;
+  opts.modelLabel = opts.model;
   return opts;
 }
 
@@ -288,132 +288,12 @@ export function runClaude({
 }
 
 /**
- * Runs the agent under test with `codex exec` in cwd (workspace-write sandbox, no
- * approval prompts). Same result shape as runClaude, and never throws. The report is
- * the text of the last agent message; tool_calls counts the completed command
- * executions; denied is always empty; cost_usd and num_turns are null because the
- * JSON output does not give them. Without a model, codex uses its own default.
+ * Runs the agent under test with runClaude and returns its result shape. The only
+ * agent is 'claude'; the other options (modelGiven) are kept so every runner calls it alike.
  */
-export function runCodex({
-  cwd,
-  prompt,
-  model,
-  timeoutMs,
-  pluginDir = path.join(REPO_ROOT, 'yllir'),
-  continueConversation = false,
-}) {
-  // With continueConversation, the last session in cwd is resumed and the prompt is only
-  // the master's reply: the plugin sentence was already sent with the first message.
-  const fullPrompt = continueConversation
-    ? prompt
-    : `The Yllir plugin lives in ${pluginDir}. Treat CLAUDE_PLUGIN_ROOT as that path. ` +
-      `Start from ${pluginDir}/skills/core/yllir/SKILL.md and follow it. ` +
-      `Master message:\n${prompt}`;
-  const writableRoots = `sandbox_workspace_write.writable_roots=["${cwd}/.git"]`;
-  const modelArgs = model ? ['-m', model] : [];
-  // `codex exec resume` accepts neither --sandbox nor -C: the sandbox is set with -c, and
-  // resume --last looks for the session of the working directory, which is cwd.
-  const args = continueConversation
-    ? [
-        'exec',
-        'resume',
-        '--last',
-        '--json',
-        '--skip-git-repo-check',
-        '-c',
-        'sandbox_mode="workspace-write"',
-        '-c',
-        writableRoots,
-        ...modelArgs,
-        fullPrompt,
-      ]
-    : [
-        'exec',
-        '--json',
-        '--skip-git-repo-check',
-        '--sandbox',
-        'workspace-write',
-        '-c',
-        writableRoots,
-        '-C',
-        cwd,
-        ...modelArgs,
-        fullPrompt,
-      ];
-  const started = Date.now();
-  try {
-    const stdout = execFileSync('codex', args, {
-      cwd,
-      encoding: 'utf8',
-      timeout: timeoutMs,
-      maxBuffer: MAX_BUFFER,
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    const duration = Date.now() - started;
-    let report = null;
-    let toolCalls = 0;
-    for (const raw of stdout.split('\n')) {
-      const line = raw.trim();
-      if (line === '') continue;
-      let obj;
-      try {
-        obj = JSON.parse(line);
-      } catch {
-        continue;
-      }
-      if (obj === null || typeof obj !== 'object' || obj.type !== 'item.completed') continue;
-      const item = obj.item;
-      if (item === null || typeof item !== 'object') continue;
-      if (item.type === 'agent_message' && typeof item.text === 'string') report = item.text;
-      if (item.type === 'command_execution') toolCalls += 1;
-    }
-    if (report === null) throw new Error('no agent message in JSON output');
-    return {
-      ok: true,
-      report,
-      cost_usd: null,
-      duration_ms: duration,
-      num_turns: null,
-      denied: [],
-      tool_calls: toolCalls,
-      error: null,
-      permission_mode: 'codex-workspace-write',
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      report: null,
-      cost_usd: null,
-      duration_ms: null,
-      num_turns: null,
-      denied: [],
-      tool_calls: null,
-      error: err.message.split('\n')[0],
-      permission_mode: 'codex-workspace-write',
-    };
-  }
-}
-
-/**
- * Runs the agent under test with runClaude (agent 'claude') or runCodex (agent 'codex')
- * and returns the same result shape. Claude always gets the model; Codex gets it only
- * when modelGiven is true, otherwise codex uses its own default.
- */
-export function runAgent({ agent, cwd, prompt, model, modelGiven, timeoutMs, pluginDir, continueConversation = false }) {
-  if (agent === 'claude') {
-    return runClaude({ cwd, prompt, model, timeoutMs, pluginDir, continueConversation });
-  }
-  if (agent === 'codex') {
-    return runCodex({
-      cwd,
-      prompt,
-      model: modelGiven ? model : undefined,
-      timeoutMs,
-      pluginDir,
-      continueConversation,
-    });
-  }
-  throw new Error(`unknown agent ${agent}`);
+export function runAgent({ agent, cwd, prompt, model, timeoutMs, pluginDir, continueConversation = false }) {
+  if (agent !== 'claude') throw new Error(`unknown agent ${agent}`);
+  return runClaude({ cwd, prompt, model, timeoutMs, pluginDir, continueConversation });
 }
 
 /** The fields every JSONL record starts with, for the agent and model that ran it. */

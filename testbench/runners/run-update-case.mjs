@@ -12,11 +12,11 @@
 //                    YLLIR_PUBLISHED_SOURCE) with a newer version and its news. The master asks a
 //                    question; the answer must end with a question about updating and nothing is updated.
 //   declined         the same, but the master says «not now». Nothing is updated and the notice is postponed.
-// The agent (`claude -p`, or `codex exec` with --agent codex) runs with the case prompt (the master's
+// The agent (`claude -p`) runs with the case prompt (the master's
 // message), and the runner grades what the agent left in the folder. One JSON line per run is appended
 // to testbench/results/<case>.jsonl. The grading helpers are exported and tested offline.
 //
-// Usage: node testbench/runners/run-update-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude|codex] [--keep]
+// Usage: node testbench/runners/run-update-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude] [--keep]
 //        node testbench/runners/run-update-case.mjs <caseDir> --setup-only
 //        node testbench/runners/run-update-case.mjs <caseDir> --grade-only <dir> --run-json <file>
 // --setup-only runs the setup, prints the folders and the git log, and keeps them.
@@ -49,7 +49,7 @@ import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { plotMap } from '../../yllir/skills/library/plot-map/scripts/lib/plot-map.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-update-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude|codex] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
+  'usage: node testbench/runners/run-update-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
 const AGENT_TIMEOUT_MS = 1800000;
 const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle', 'campaign');
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');

@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 // Runs one linker case end to end: copies the fixture campaign into a temporary
-// git repository, runs the agent under test with `claude -p` (or `codex exec` with
-// --agent codex), grades the result deterministically against the answer key, and
+// git repository, runs the agent under test with `claude -p`, grades the result deterministically against the answer key, and
 // appends one JSON line per run to testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-linker-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex]
+// Usage: node testbench/runners/run-linker-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude]
 // Exit codes: 0 every run passes; 1 some run fails; 2 the case or key cannot be used.
 
 import fs from 'node:fs';
@@ -27,7 +26,7 @@ import {
 } from './lib/case-common.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-linker-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex]';
+  'usage: node testbench/runners/run-linker-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude]';
 const AGENT_TIMEOUT_MS = 900000;
 const LINK_RE = /\[([^\]]+)\]\(([^)]*)\)/g;
 

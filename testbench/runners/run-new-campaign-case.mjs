@@ -5,10 +5,8 @@
 // expected values, and appends one JSON line per run to
 // testbench/results/<case>.jsonl.
 //
-// Usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex]
+// Usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude]
 //        node testbench/runners/run-new-campaign-case.mjs <caseDir> --grade-only <dir>
-// --agent codex runs the agent with `codex exec` instead of `claude -p`; codex gets
-// no model unless --model is given explicitly.
 // --grade-only grades a kept folder again without running the agent, prints the
 // record and does not append it to the results file. With --keep, the agent's
 // final message and cost are saved beside the kept folder as <dir>.run.json so that
@@ -39,7 +37,7 @@ import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../yllir/scripts/lib/zones.mjs';
 
 const USAGE =
-  'usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude|codex] [--grade-only <dir>]';
+  'usage: node testbench/runners/run-new-campaign-case.mjs <caseDir> [--runs N] [--model haiku] [--keep] [--agent claude] [--grade-only <dir>]';
 const AGENT_TIMEOUT_MS = 1800000;
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
 const AGENT_FILE = '.campaign/instructions/agent.md';
