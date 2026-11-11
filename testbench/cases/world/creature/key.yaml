@@ -1,0 +1,12 @@
+# Answer key of world/creature. Never copied next to the campaign the agent works on.
+#
+# C1 exactly one new document, a creature (kind) with the enemy template.
+# C2 the sheet passes validateSheet of the adapter (shape and arithmetic) and the adapter loads.
+# C3 the Characteristics table has every ability in abilities with a score and its modifier, and the
+#    modifier is floor((score - 10) / 2).
+# C4 the creature's location includes location.
+# C5 the saved versions are the setup's version plus one.
+kind: creature
+template: enemy
+location: borgo-cenere
+abilities: [str, dex, con, int, wis, cha]

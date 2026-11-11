@@ -4,6 +4,7 @@ The testbench holds synthetic campaigns, each with an answer key, and the runner
 
 - `fixtures/morvalle/campaign/`: a synthetic campaign in the current format (after the world-graph migration). It is the only part an agent under test works on.
 - `fixtures/morvalle/key.yaml`: the answer key for the mention scanner and the continuity audit: what must be found and what must not.
+- `fixtures/morvalle-seeded/campaign/`: the same campaign with three constraints seeded in the world seed (a faction, a family naming rule and something to avoid). Only the `world/region` case uses it. Its answer key is `cases/world/region/key.yaml`.
 - `fixtures/morvalle-legacy/campaign/`: a frozen copy of the same campaign before the world-graph migration (no `kind`, `provenance` or relations, and no seed). Only the update cases use it, because they need the old format.
 - `cases/<kind>/<name>/case.yaml`: one case: the master's message, the expected behaviour and its limits.
 - `runners/`: the scripts that run a case or grade a component against its key.
@@ -44,6 +45,8 @@ A run that exceeds a limit fails. The current values:
 | `entry/go-back`, `entry/where-and-question`, `entry/not-available`, `entry/question-hypothesis` | 2 | 60 | target: entry questions |
 | `update/*` | 5 | 60 | target: update (no recorded runs yet, so the call limit is the default) |
 | `audit/full` | 10 | 140 | target: audit; calls about 1.5x the median (93) |
+| `world/region` | 10 | 200 | target: a region of about 30 subjects in 5 to 10 minutes (section 11, «Misura», of `docs/Riprogettazione.md`) |
+| `world/creature` | 3 | 60 | target: one enemy sheet, the same budget as the entry cases |
 
 The minute targets come from the redesign document («Tempi misurati»). Note that the medians recorded there for prepare-session (6.5 min) and after-session (3.4 min) are above the 3-minute targets, so those cases will fail on time until the framework is faster. The tool-call limits come from `results/*.jsonl` (haiku runs).
 
@@ -55,6 +58,7 @@ The minute targets come from the redesign document («Tempi misurati»). Note th
 | `run-entry-case.mjs` | `entry/go-back`, `entry/where-and-question`, `entry/not-available`, `entry/question-hypothesis`, `entry/prepare-proceed`, `entry/prepare-two-turns`, `entry/after-proceed`, `entry/after-too-thin` | E, W, N, Q, P, A and T checks, see the runner's header |
 | `run-update-case.mjs` | `update/stale-campaign`, `update/legacy-sessions`, `update/newer-published`, `update/declined` | S, L, N and D checks |
 | `run-audit-case.mjs` | `audit/full` | A1 to A8: recall of the contradictions, no problem for perspectives, hypotheses or recorded exclusions, no change to the documents |
+| `run-world-case.mjs` | `world/region`, `world/creature` | W1 to W10 (region: new subjects with provenance, kinds, sketches and full documents, no new world-graph error, the lake subtree, a faction with members, the family-name rule, the seed changed, one saved version, a final message that names a created subject and says it is invented). C1 to C5 (creature: one enemy sheet that the adapter validates, ability modifiers, location, one saved version). Optional `Q-grid` with `--judge` |
 
 Every case also has `L-time` and `L-calls` when it declares limits.
 
@@ -75,9 +79,26 @@ node testbench/runners/run-entry-case.mjs testbench/cases/entry/go-back --grade-
 node testbench/runners/run-update-case.mjs testbench/cases/update/legacy-sessions [--runs N] [--model sonnet] [--keep]
 node testbench/runners/run-audit-case.mjs testbench/cases/audit/full [--runs N] [--model sonnet] [--keep]
 node testbench/runners/run-audit-case.mjs testbench/cases/audit/full --grade-only <copyPath>
+node testbench/runners/run-world-case.mjs testbench/cases/world/region --setup-only
+node testbench/runners/run-world-case.mjs testbench/cases/world/region [--runs N] [--model sonnet] [--keep] [--judge]
+node testbench/runners/run-world-case.mjs testbench/cases/world/creature --delegation always --keep
+node testbench/runners/run-world-case.mjs testbench/cases/world/region --grade-only <dir> --run-json <dir>.run.json [--judge]
 ```
 
 With `--keep` the folder is kept and the agent's final message, cost, duration and tool calls are saved beside it as `<dir>.run.json`, so `--grade-only` reproduces the record. A `--grade-only` record of the audit does not grade the limits, because the run was not kept.
+
+## World cases
+
+A world case asks the agent for part of a world and grades the resulting world graph, not the text. The grading reads `buildWorldIndex` of the copy after the run, so no model takes part in it. The agent never sees the key: `cases/world/<name>/key.yaml` sits beside `case.yaml`, outside the fixture the runner copies. Each `key.yaml` comments its thresholds and the exact definition of every check (for example the family-name rule W7).
+
+- `world/region`: the request is «Crea i villaggi intorno al Lago Grigio, con i loro capi e una fazione di pescatori.» on `fixtures/morvalle-seeded`. The seed holds the constraints: the family names of the lake end in -ane (graded on the graph) and no new character is a noble (not checkable on the graph, so not graded).
+- `world/creature`: the request is «Mi serve un capo bandito tosto per un gruppo di terzo livello, al Borgo Cenere.» on `fixtures/morvalle` with `system.adapter: dnd-2024`. The sheet is checked with the adapter's own `validateSheet`, the function the engine uses.
+
+Delegation (decision 16). `--delegation auto` (default) runs the plugin as it is. `always` and `never` run a temporary copy of `yllir/` in which the thresholds of `skills/core/yllir/authoring.md` and `skills/core/build-world/SKILL.md` are 0 and 999: every document is then delegated, or none is. The mode is stored in each record as `delegation`, so `duration_ms` and `cost_usd` can be compared between modes.
+
+Quality (`--judge`). After the checks, a model distinct from the model under test (`opus` by default; `--judge-model` changes it, and an equal model is refused) reads the new documents and the seed, master-only block included, and scores specific, playable and coherent from 1 to 5. The judge gets the texts inline and no tools, because the strict permissions grant it none. `Q-grid` passes when the mean reaches `quality_min` (default 3.5). Without `--judge` there is no `Q-grid` check.
+
+The suite runs the world cases in its quick mode (one run each). They cost money like every agent case. The suite never passes `--judge`.
 
 ## Mention scanner
 
@@ -95,6 +116,7 @@ The scanner is graded against `fixtures/morvalle/key.yaml`. A mention may set `o
 node testbench/runners/run-suite.mjs                                  # quick: one run per case, audit skipped
 node testbench/runners/run-suite.mjs --runs 3 --with-audit           # release measurement
 node testbench/runners/run-suite.mjs --only entry/                   # a subset
+node testbench/runners/run-suite.mjs --only world/                   # the world cases
 ```
 
 ## Unit tests
@@ -103,4 +125,4 @@ node testbench/runners/run-suite.mjs --only entry/                   # a subset
 cd testbench && node --test runners/*.test.mjs runners/lib/*.test.mjs
 ```
 
-These cover the grading helpers, the limits, the suite and the update runner's grading. They run offline.
+These cover the grading helpers, the limits, the suite, the update runner's grading, the world grading (on temporary copies of the fixtures, with synthetic documents written in place of the agent), the judge's reply parser and prompt, and the delegation rewrite (on temporary copies of the plugin). They run offline.

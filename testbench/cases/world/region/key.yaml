@@ -1,0 +1,26 @@
+# Answer key of world/region. The runner reads it from the repository; it is never copied next to
+# the campaign the agent works on. The seeded constraints are in fixtures/morvalle-seeded (the seed
+# file), which the agent reads as part of the campaign.
+#
+# W1 at least min_new_subjects new subjects with provenance generated.
+# W2 every new subject has a kind.
+# W3 at least min_sketches new sketches (sketch: true) and at least min_full_documents full documents.
+# W4 no world-graph error that was not there before the run.
+# W5 at least min_new_places new places, and every new place is in the subtree of lake_id: its location
+#    is lake_id or a new place of the subtree (computed to a fixed point).
+# W6 a new faction (kind faction) with at least min_faction_members distinct member-of relations to it.
+# W7 at least min_checkable_characters new characters have a location in a new lake village (a new
+#    place of the subtree other than lake_id), and the last word of every such character's title, folded
+#    (no accents, lower case), ends with surname_suffix. Family names of the lake end in -ane.
+#    Only what is checkable by the graph: the constraint "no new noble" is not checked here.
+# W8 the seed changed, and it still has the master block.
+# W9 the saved versions are the setup's version plus one.
+# W10 the final message names a created subject (its title) and says it is invented («inventat»).
+lake_id: lago-grigio
+min_new_subjects: 6
+min_full_documents: 2
+min_sketches: 1
+min_new_places: 1
+min_faction_members: 2
+surname_suffix: ane
+min_checkable_characters: 1

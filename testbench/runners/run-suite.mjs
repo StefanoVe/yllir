@@ -21,6 +21,7 @@ const KIND_RUNNERS = new Map([
   ['new-campaign', 'run-new-campaign-case.mjs'],
   ['entry', 'run-entry-case.mjs'],
   ['audit', 'run-audit-case.mjs'],
+  ['world', 'run-world-case.mjs'],
 ]);
 const AGENT_SETS = new Map([['claude', ['claude']]]);
 const AGENT_ORDER = ['claude'];

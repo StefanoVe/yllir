@@ -1,0 +1,8 @@
+case: world-region
+fixture: morvalle-seeded
+prompt: |
+  Crea i villaggi intorno al Lago Grigio, con i loro capi e una fazione di pescatori.
+limits:
+  max_minutes: 10
+  max_tool_calls: 200
+quality_min: 3.5

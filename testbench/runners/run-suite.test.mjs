@@ -212,3 +212,15 @@ test('formatReport prints the table, the total and truncated failure reasons', (
   const reason = text.split('\n').find((line) => line.includes('run 2:'));
   assert.equal(reason.slice(reason.indexOf('run 2: ') + 'run 2: '.length).length, 160);
 });
+
+test('planJobs registers the world kind with run-world-case.mjs, without the audit flag', () => {
+  const root = makeCases({ 'world/region': 'case: world-region\n', 'world/creature': 'case: world-creature\n' });
+  const jobs = planJobs({ casesRoot: root });
+  assert.deepEqual(
+    jobs.map((job) => `${job.kind}/${job.name}`),
+    ['world/creature', 'world/region'],
+  );
+  assert.ok(jobs.every((job) => job.runner.endsWith('run-world-case.mjs')));
+  const [region] = planJobs({ casesRoot: root, only: 'region' });
+  assert.deepEqual(childArgs(region, { model: 'haiku' }).slice(1), [region.caseDir, '--agent', 'claude', '--runs', '1', '--model', 'haiku']);
+});
