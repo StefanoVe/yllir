@@ -1,0 +1,7 @@
+{
+  "name": "yllir-photoshop-mcp",
+  "private": true,
+  "dependencies": {
+    "@alisaitteke/photoshop-mcp": "1.7.37"
+  }
+}

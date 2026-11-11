@@ -1,0 +1,9 @@
+{
+  "id": "photoshop-mcp",
+  "package": "@alisaitteke/photoshop-mcp",
+  "version": "1.7.37",
+  "integrity": "sha512-sibpGz4r1XABJsvbzbJEpE1ly23cbTOSa/nvBDJb7S3/k0QLQ2TfjcuJ1wXduvvMAmgdCKH6LRoDMJYxJFwiGQ==",
+  "license": "MIT",
+  "bin": "dist/index.js",
+  "node": ">=18"
+}
