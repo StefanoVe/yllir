@@ -60,7 +60,7 @@ export function makeDraft(root, { name, location = '', details = '', requestedBy
   const loc = locations.length ? `[${locations.join(', ')}]` : '[]';
   const extra = details.trim() ? `\n${details.trim()}\n` : '\n';
   const headings = lang === 'en' ? ['In brief','Description','Effects','Master','Master notes'] : ['In breve','Descrizione','Effetti','Master','Indicazioni per il master'];
-  return { status: 'DRAFT', id, file, requestedBy, content: `---\nid: ${id}\ntemplate: item\nlocation: ${loc}\n---\n\n# ${name.trim()}\n\n## ${headings[0]}\n\n[Write a concise public summary.]\n\n## ${headings[1]}\n\n[Write the full public description.]${extra}\n## ${headings[2]}\n\n[Use the system adapter format, or state no game effect.]\n\n<!-- master -->\n## ${headings[3]}\n\n### ${headings[4]}\n\n<!-- /master -->\n` };
+  return { status: 'DRAFT', id, file, requestedBy, content: `<!-- yllir\nid: ${id}\ntemplate: item\nlocation: ${loc}\n-->\n\n# ${name.trim()}\n\n## ${headings[0]}\n\n[Write a concise public summary.]\n\n## ${headings[1]}\n\n[Write the full public description.]${extra}\n## ${headings[2]}\n\n[Use the system adapter format, or state no game effect.]\n\n<!-- master -->\n## ${headings[3]}\n\n### ${headings[4]}\n\n<!-- /master -->\n` };
 }
 
 export function checkItemSheets(root, { files = null, base = null } = {}) {

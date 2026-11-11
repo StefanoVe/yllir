@@ -19,13 +19,20 @@ Il titolo è l'unico posto in cui il nome compare come dato: il nome del file lo
 
 ### 1.2 Metadati in testa
 
-**Proposta.** I metadati sono un blocco YAML fra due righe `---`, che è il primo contenuto del file, prima del titolo.
+**Deciso, 2026-11-11.** Il blocco dei metadati è un blocco YAML dentro un commento HTML, ed è il primo contenuto del file, prima del titolo. Il commento è nascosto da ogni anteprima Markdown, quindi il blocco resta nel documento senza comparire come tabella. Regole:
+
+- la prima riga del file è esattamente `<!-- yllir`;
+- il blocco si chiude alla prima riga esattamente `-->`;
+- dentro valgono le stesse chiavi e la stessa sintassi di prima;
+- nessuna riga interna può contenere `-->`.
+
+Il framework scrive solo questa forma. Legge ancora la vecchia forma fra due righe `---`; il motore converte un blocco `---` quando salva, e la migrazione `metadata-comment-v1` converte i documenti delle campagne esistenti (vedi [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md)).
 
 ```yaml
----
+<!-- yllir
 id: porto-di-selce
 location: [costa-di-selce]
----
+-->
 ```
 
 Sono ammessi solo i campi della tabella. Ogni altro campo è un errore: un campo nuovo si aggiunge solo quando una campagna reale lo richiede.
@@ -198,28 +205,28 @@ Trama/
 - `appearances` (**Deciso**, 2026-11-10) è facoltativo nei file evento: elenca solo le presenze geografiche esplicitamente stabilite dal testo della scena, nella forma `- subject: ID` / `location: [PLACE_IDS]`. Non si inferisce la presenza da `characters`, `items`, link, nomi o menzioni. Ogni soggetto e luogo deve avere una scheda.
 
 ```yaml
----
+<!-- yllir
 id: il-faro-spento-02
 depends_on: [il-faro-spento-01]
 location: [porto-di-selce]
----
+-->
 ```
 
 Un file evento (`Trama/Il faro spento 2/Eventi/Arrivo al porto.md`), con i suoi dati fittizi:
 
 ```yaml
----
+<!-- yllir
 id: il-faro-spento-02-arrivo
 session: il-faro-spento-02
 depends_on: []
 location: [porto-di-selce]
----
+-->
 ```
 
 Un evento che fa agire o parlare dei personaggi li elenca in `characters` (esempio fittizio):
 
 ```yaml
----
+<!-- yllir
 id: il-faro-spento-02-consegna
 session: il-faro-spento-02
 depends_on: [il-faro-spento-02-arrivo]
@@ -228,7 +235,7 @@ characters: [ilde-varno, bruno-tesi]
 appearances:
   - subject: ilde-varno
     location: [porto-di-selce]
----
+-->
 ```
 
 ### 2.2 Gerarchia dei titoli
@@ -315,10 +322,10 @@ Regole per l'agente:
 **Proposta.** La cronaca racconta ciò che è accaduto al tavolo, ed è scritta dal processo «dopo la sessione» a partire dal registro di sessione (L18 in [Skill di libreria](Skill%20di%20libreria.md#l18-registro-di-sessione)). Sta nella categoria `Cronaca/`, con un file per serata chiamato con la data.
 
 ```markdown
----
+<!-- yllir
 id: cronaca-2026-11-14
 played: [il-faro-spento-01]
----
+-->
 
 # Il faro si spegne
 
@@ -349,9 +356,9 @@ Ogni modello indica la categoria, i metadati, le sezioni obbligatorie e facoltat
 Un luogo con sotto-luoghi è una cartella con la scheda omonima dentro. L'elenco dei sotto-luoghi non si scrive a mano: si ricava dalla posizione delle cartelle, come indice derivato.
 
 ```markdown
----
+<!-- yllir
 id: costa-di-selce
----
+-->
 
 # Costa di Selce
 
@@ -381,11 +388,11 @@ Una boa segna un passaggio che sulle carte non esiste: lo conoscono solo i pesca
 Un PNG che svolge più ruoli usa il modello più ricco e dichiara le sezioni facoltative che usa. Non si crea una scheda per ciascun ruolo (L14 in [Skill di libreria](Skill%20di%20libreria.md#l14-gestione-dei-png)).
 
 ```markdown
----
+<!-- yllir
 id: ilde-varno
 template: npc
 location: [porto-di-selce]
----
+-->
 
 # Ilde Varno
 
@@ -423,11 +430,11 @@ Un PNG nominato da un documento di trama ha la sua scheda prima del primo evento
 Il modello separa tre cose in tre posti: la lore sta nella parte pubblica (`## Natura`), le regole nella parte pubblica (`## Statistiche`, con il formato dell'adattatore), le indicazioni per il master solo nel blocco riservato. Un testo di condotta non sta mai fra le sezioni pubbliche. Le statistiche usano tabelle distinte per caratteristiche e valori, attacchi o capacità e dettagli, ed equipaggiamento e dettagli. Le intestazioni sono localizzate secondo la lingua della campagna.
 
 ```markdown
----
+<!-- yllir
 id: guardiano-di-sale
 template: enemy
 location: [costa-di-selce]
----
+-->
 
 # Guardiano di sale
 
@@ -503,12 +510,12 @@ Per una campagna in inglese, le intestazioni delle colonne sono `Characteristic`
 - Una carta già stampata mantiene il nome del file: i codici QR puntano all'`id`, quindi non si rinomina per non rompere la stampa.
 
 ```markdown
----
+<!-- yllir
 id: lanterna-da-bordo
 template: item
 location: [porto-di-selce]
 print: to-print
----
+-->
 
 # Lanterna da bordo
 
@@ -544,11 +551,11 @@ Non contiene segreti.
 **Blocco riservato:** `### Indicazioni per il master`, con il committente vero, le condizioni nascoste e l'esito reale.
 
 ```markdown
----
+<!-- yllir
 id: taglia-sul-falsario
 template: notice
 location: [porto-di-selce]
----
+-->
 
 # Taglia sul falsario
 
@@ -572,9 +579,9 @@ Trenta scudi, pagati alla Torre del porto.
 Lo stato di un concetto (canone, spunto o bozza, come chiede il principio 8 di [Principi](Principi.md)) non ha un campo in questo modello: è in questioni aperte.
 
 ```markdown
----
+<!-- yllir
 id: patto-del-faro
----
+-->
 
 # Patto del faro
 
@@ -602,9 +609,9 @@ Il patto è stato rotto da tre generazioni, ma nessuno lo ha ancora detto ad alt
 Un'integrazione che propone canone resta una proposta finché il master non la conferma. Il personaggio giocante non definisce l'identità di altri soggetti: quella sta nelle loro schede.
 
 ```markdown
----
+<!-- yllir
 id: pietro-sala
----
+-->
 
 # Pietro Sala
 
@@ -633,9 +640,9 @@ Mestiere: pilota di chiatte. Forza di volontà alta, forza fisica media.
 I numeri usano il punto come separatore decimale, così il controllo dei prezzi è sicuro.
 
 ```markdown
----
+<!-- yllir
 id: economia
----
+-->
 
 # Economia
 
@@ -666,12 +673,12 @@ id: economia
 Un membro punta alla fazione con una voce `member-of` in `relations` della propria scheda. Il legame è dichiarato lì, e non soltanto nella lista di `## Membri`.
 
 ```markdown
----
+<!-- yllir
 id: gilda-del-sale
 kind: faction
 template: faction
 provenance: master
----
+-->
 
 # Gilda del sale
 
@@ -725,7 +732,7 @@ relations:
 Un evento storico non è un evento di trama: non ha `depends_on` e non sta in `Trama/`.
 
 ```markdown
----
+<!-- yllir
 id: incendio-della-torre
 kind: event
 template: event
@@ -733,7 +740,7 @@ provenance: master
 when: 312
 participants: [gilda-del-sale]
 location: [costa-di-selce]
----
+-->
 
 # Incendio della torre
 

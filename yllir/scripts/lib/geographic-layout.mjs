@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { parseYamlLite } from './yaml-lite.mjs';
+import { findMetadataBlock } from './frontmatter.mjs';
 import { readStructure, listSheets, compareStrings } from './subjects.mjs';
 
 const MANIFEST = '.campaign/geographic-layout.json';
@@ -269,9 +270,10 @@ function safeFolder(folder) {
   return normalized;
 }
 function metadata(text) {
-  const match = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text);
-  if (!match) return {};
-  const { data, errors } = parseYamlLite(match[1]);
+  const lines = text.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
+  const block = findMetadataBlock(lines);
+  if (!block || block.close === -1) return {};
+  const { data, errors } = parseYamlLite(lines.slice(1, block.close).join('\n'));
   if (errors.length) throw new Error(`frontmatter line ${errors[0].line}: ${errors[0].message}`);
   return data ?? {};
 }

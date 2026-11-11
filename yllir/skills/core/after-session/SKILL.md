@@ -36,11 +36,11 @@ You are the AUTHOR. Record the evening in two phases, and write both in one batc
 **Step 4 — Phase 1: the chronicle page.** Write `<CHRONICLE FOLDER>/<DATE>.md` in the campaign language. Use Italian headings `## Accaduto` and `## Fili aperti` for `it`; `## What happened` and `## Open threads` for `en`; translate them for any other language.
 
 ```markdown
----
+<!-- yllir
 id: cronaca-<DATE>
 played: [<ids of PLAYED, or []>]
 provenance: played
----
+-->
 
 # <Title: 2 to 6 words naming what happened>
 

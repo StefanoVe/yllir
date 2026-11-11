@@ -42,7 +42,7 @@ Choose the `kind`, the `template` and the category folder:
 
 A faction whose category (`fazioni` / `factions`) is not yet in `campaign.yaml` also needs that entry, of type `subjects` and folder `Fazioni` or `Factions` at the root, in the same batch (as `build-world` Step 5 shows).
 
-Read the template for the sections, their order and their required content in `${CLAUDE_PLUGIN_ROOT}/templates/content-format.md` (the section of the template of that kind). Include every required section, in the order given there. A place has no `template` line in its frontmatter.
+Read the template for the sections, their order and their required content in `${CLAUDE_PLUGIN_ROOT}/templates/content-format.md` (the section of the template of that kind). Include every required section, in the order given there. A place has no `template` line in its metadata block.
 
 ## Step 4 — Rules values (only when the campaign has an adapter)
 
@@ -56,7 +56,7 @@ Use this step for a creature or an item that has game statistics.
 ## Step 5 — Write the draft
 
 **Create.** Write `.campaign/drafts/<folder>/<Title>.md` with the Write tool, in the shape of section 4 of `authoring.md`:
-- frontmatter: `id`, `kind`, `template` (not for a place), `provenance`, `location` as a flow list (`[borgo-cenere]`, or `[]` when it has no place), `relations` as a block list of entries with `to` (an `id`) and `type` (exactly `member-of`, `kin-of`, `ally-of`, `rival-of` or `depends-on`), with the key omitted when there are none, and `when` for an event (a number), as section 4 shows;
+- metadata block: `id`, `kind`, `template` (not for a place), `provenance`, `location` as a flow list (`[borgo-cenere]`, or `[]` when it has no place), `relations` as a block list of entries with `to` (an `id`) and `type` (exactly `member-of`, `kin-of`, `ally-of`, `rival-of` or `depends-on`), with the key omitted when there are none, and `when` for an event (a number), as section 4 shows;
 - `provenance`: `master` when the master gave the fact in this conversation; `generated` when you invented it;
 - the `#` title, the public sections, and the master block with the secrets and the notes for the master.
 

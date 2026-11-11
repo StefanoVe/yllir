@@ -8,7 +8,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
+import { METADATA_CLOSE, METADATA_OPEN, parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 import { compareStrings, listSheets, readStructure } from '../../../../../scripts/lib/subjects.mjs';
 
 const EVENT_FOLDERS = new Set(['Eventi', 'Events']);
@@ -279,14 +279,14 @@ function eventFileNames(titles) {
 // ---------------------------------------------------------------- text
 
 function eventText(plan, event) {
-  const header = ['---', `id: ${event.id}`, `session: ${plan.id}`, 'depends_on: []', 'location: []', '---'];
+  const header = [METADATA_OPEN, `id: ${event.id}`, `session: ${plan.id}`, 'depends_on: []', 'location: []', METADATA_CLOSE];
   return `${header.join('\n')}\n\n${event.content}`;
 }
 
 function mainText(plan) {
-  const lines = ['---', `id: ${plan.id}`, `depends_on: ${flowList(plan.dependsOn)}`, `location: ${flowList(plan.location)}`];
+  const lines = [METADATA_OPEN, `id: ${plan.id}`, `depends_on: ${flowList(plan.dependsOn)}`, `location: ${flowList(plan.location)}`];
   if (plan.arc !== '') lines.push(`arc: "${plan.arc}"`);
-  lines.push('generated: true', '---', '', 'Generated file. Do not edit by hand.', '');
+  lines.push('generated: true', METADATA_CLOSE, '', 'Generated file. Do not edit by hand.', '');
   return lines.join('\n');
 }
 

@@ -24,7 +24,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
+import { METADATA_CLOSE, METADATA_OPEN, findMetadataBlock, parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { buildSubjectIndex, listCanonicalSheets, readStructure } from '../../../../../scripts/lib/subjects.mjs';
 import { buildWorldIndex, writeWorldIndex } from '../../../../../scripts/lib/world-graph.mjs';
@@ -218,18 +218,16 @@ function kindFor(type, template) {
   return null; // free, plot, chronicle
 }
 
-/** Inserts `key: value` lines right after the `id:` line of the frontmatter. Null when there is no such line. */
+/**
+ * Inserts `key: value` lines right after the `id:` line of the metadata block, in either form.
+ * The delimiters are not touched, so the form the file already has is kept.
+ * Null when there is no closed block or no `id:` line.
+ */
 function insertAfterId(text, additions) {
   const lines = text.split('\n');
-  if (stripCr(lines[0]) !== '---') return null;
-  let close = -1;
-  for (let i = 1; i < lines.length; i++) {
-    if (stripCr(lines[i]) === '---') {
-      close = i;
-      break;
-    }
-  }
-  if (close === -1) return null;
+  const block = findMetadataBlock(lines.map(stripCr));
+  if (block === null || block.close === -1) return null;
+  const close = block.close;
   let idLine = -1;
   for (let i = 1; i < close; i++) {
     if (/^id:/.test(stripCr(lines[i]))) {
@@ -304,10 +302,10 @@ function buildSeed(lang, description) {
   const headings = SEED_HEADINGS[lang];
   const name = lang === 'it' ? 'Seme del mondo' : 'World seed';
   const lines = [
-    '---',
+    METADATA_OPEN,
     `id: ${SEED_ID[lang]}`,
     'provenance: master',
-    '---',
+    METADATA_CLOSE,
     `# ${name}`,
     '',
     '<!-- master -->',

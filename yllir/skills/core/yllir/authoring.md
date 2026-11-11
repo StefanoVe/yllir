@@ -34,7 +34,7 @@ Every path in `--files`, `--deletes`, `--sources` and `--out` is campaign-relati
 Read `${CLAUDE_PLUGIN_ROOT}/templates/content-format.md` before writing a kind of document you have not written in this conversation. It holds the required sections of every template, in both languages, and the rules of every field. The shape below is the common skeleton.
 
 ```markdown
----
+<!-- yllir
 id: borgo-cenere
 kind: place
 provenance: generated
@@ -42,7 +42,7 @@ location: [lago-grigio]
 relations:
   - to: pescatori-lago-grigio
     type: rival-of
----
+-->
 
 # Borgo Cenere
 
@@ -98,7 +98,7 @@ Examples:
 Use passes when the master asks for many contents together ("crea la regione intorno al lago", "riempi il villaggio di personaggi"). A single request ("un oste burbero al Vecchio Mulino") is a batch of one: no outline.
 
 1. **Outline.** Write one line per subject in `.campaign/drafts/outline.md`. Decide every relation here, in one place: this is what keeps the batch coherent.
-2. **Expansion.** Every outline line becomes a document. Lines needed now become full documents. Every other line becomes a sketch: the same document with `sketch: true` in the frontmatter, a title, one sentence, kind, provenance, relations, location and, for an event, `when`. Nothing from the outline is skipped.
+2. **Expansion.** Every outline line becomes a document. Lines needed now become full documents. Every other line becomes a sketch: the same document with `sketch: true` in the metadata block, a title, one sentence, kind, provenance, relations, location and, for an event, `when`. Nothing from the outline is skipped.
    - Up to 3 full documents: write them yourself with the Write tool.
    - More than 3: launch one `yllir:sheet-expander` per full document, all in one message, through the Agent tool.
    - Sketches: write them yourself.
@@ -158,7 +158,7 @@ Every document says where it comes from: `master`, `played` or `generated`.
 
 - The seed is the document named by the key `campaign.seed` in `campaign.yaml`. Its whole content is inside the master block: the title is `# <seed name>`, then `<!-- master -->`, `## Master`, and the seed sections as `###` headings, then `<!-- /master -->`. No public output can ever show it. Never send it to an image provider, a web search or a publishing service.
 - Sections, localized: Genre and tone, Themes, Central conflicts, Factions, Cultures, Naming conventions, Power level, Calendar, To avoid. The Calendar section holds the convention that turns a date into a `when` number.
-- Frontmatter: `id` is the slug of the seed name; `provenance: master` for what the master said; `generated` only when the whole seed was invented.
+- Metadata block: `id` is the slug of the seed name; `provenance: master` for what the master said; `generated` only when the whole seed was invented.
 - It is always in the context pack. It grows by itself: when the master adds world-wide information, or you generate a piece of the world, update the seed in the same batch with what holds for the whole world (a new faction, a naming convention, a theme). The master corrects it by talking.
 
 ## 10. Game rules data

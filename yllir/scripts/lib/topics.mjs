@@ -8,7 +8,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
-import { parseFrontmatter } from './frontmatter.mjs';
+import { METADATA_CLOSE, METADATA_OPEN, findMetadataBlock, parseFrontmatter } from './frontmatter.mjs';
 import { slugify } from './normalize.mjs';
 
 export const STATUSES = ['active', 'paused', 'closed'];
@@ -104,13 +104,10 @@ function stripCr(line) {
   return line.endsWith('\r') ? line.slice(0, -1) : line;
 }
 
-/** Index of the closing `---` line of the frontmatter, or -1. */
+/** Index of the closing line of the metadata block (either form), or -1. */
 function findClose(lines) {
-  if (stripCr(lines[0]) !== '---') return -1;
-  for (let i = 1; i < lines.length; i++) {
-    if (stripCr(lines[i]) === '---') return i;
-  }
-  return -1;
+  const block = findMetadataBlock(lines.map(stripCr));
+  return block ? block.close : -1;
 }
 
 /** Headings of level 1 or 2 found outside fenced code, from line index `from`. */
@@ -310,12 +307,12 @@ function writeIndex(root) {
 
 function renderNewHandoff({ id, process, goal, updated }) {
   const lines = [
-    '---',
+    METADATA_OPEN,
     `id: ${id}`,
     'status: active',
     `process: ${process}`,
     `updated: ${updated}`,
-    '---',
+    METADATA_CLOSE,
     '',
     `# ${goal}`,
     '',

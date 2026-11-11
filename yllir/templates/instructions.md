@@ -19,7 +19,7 @@ Yllir plugin root: {{plugin.root}}. Wherever a skill or agent file mentions `${C
 
 ## Words the master sees
 
-Use only the master-facing words listed in the lexicon of the `yllir` skill. Never say: skill, script, git, commit, repository, YAML, frontmatter, sub-agent, model, hook, MCP, template.
+Use only the master-facing words listed in the lexicon of the `yllir` skill. Never say: skill, script, git, commit, repository, YAML, frontmatter, metadata block, sub-agent, model, hook, MCP, template.
 
 ## Writing
 

@@ -42,7 +42,7 @@ Write `.campaign/drafts/outline.md` with the Write tool. It is not a campaign do
 
 Every line becomes a document. Nothing from the outline is dropped.
 - **Full document now**: the subjects the master asked about directly, and the places and characters a session will need soon (the master said so, or a session that is being prepared names them).
-- **Sketch**: every other line. A sketch is a document with `sketch: true` in its frontmatter, a title, one sentence, and the frontmatter fields (kind, provenance, relations, location). It is expanded later, when the master names it or a session uses it.
+- **Sketch**: every other line. A sketch is a document with `sketch: true` in its metadata block, a title, one sentence, and the metadata block fields (kind, provenance, relations, location). It is expanded later, when the master names it or a session uses it.
 
 Write the list of full documents and the list of sketches in your notes, before you write any file.
 
@@ -71,9 +71,9 @@ Choose the folder of each draft from `campaign.yaml` (Step 1):
 - `CAMPAIGN_ROOT`, `LINE` (the outline line, unchanged), `TARGET` (the draft path), `CONTEXT` (the saved context pack path), `TEMPLATE` (one of the values listed in Step 5), `FORMAT` (`${CLAUDE_PLUGIN_ROOT}/templates/content-format.md`), `LANGUAGE` (`language.main`), `PROVENANCE: generated`.
 If an expander does not write its draft, write that document yourself.
 
-**Sketches.** Write every sketch yourself, to the same folder rules. A sketch has only its frontmatter, a title, and one sentence under the first section its template requires.
+**Sketches.** Write every sketch yourself, to the same folder rules. A sketch has only its metadata block, a title, and one sentence under the first section its template requires.
 
-**Seed.** Write `.campaign/drafts/<seed file name>`: the whole current seed, in its own format (frontmatter, `# <Seed name>`, then ALL its content inside the master block, with each section as a `###` heading). Add each bullet of `## Seed` under the `###` section it belongs to (for example `### Fazioni` / `### Factions`). Replace a `Da definire.` line only in a section you now fill. Change nothing else in the seed. If `## Seed` says `- none`, do not write the seed.
+**Seed.** Write `.campaign/drafts/<seed file name>`: the whole current seed, in its own format (metadata block, `# <Seed name>`, then ALL its content inside the master block, with each section as a `###` heading). Add each bullet of `## Seed` under the `###` section it belongs to (for example `### Fazioni` / `### Factions`). Replace a `Da definire.` line only in a section you now fill. Change nothing else in the seed. If `## Seed` says `- none`, do not write the seed.
 
 ## Step 6 — Save the batch
 

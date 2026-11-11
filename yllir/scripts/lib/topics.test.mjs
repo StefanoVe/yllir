@@ -80,12 +80,12 @@ test('new creates the handoff with the expected id, fields and sections', () => 
   assert.equal(
     readHandoff(root, r.id),
     [
-      '---',
+      '<!-- yllir',
       'id: 2026-11-07-prepare-session-4',
       'status: active',
       'process: prepare-session',
       'updated: 2026-11-07T16:00:00.000Z',
-      '---',
+      '-->',
       '',
       '# Prepare session 4',
       '',
@@ -277,6 +277,25 @@ test('checkTopic reports files edited, deleted or created since the handoff', ()
   assert.deepEqual(checkTopic(root, { id: r.id }).changed, []);
   fs.writeFileSync(path.join(root, 'Trama', 'never.md'), 'new');
   assert.deepEqual(checkTopic(root, { id: r.id }).changed, ['Trama/never.md']);
+});
+
+test('a handoff in the comment form is read back by list, section and touch', () => {
+  const root = tmp();
+  const r = newTopic(root, { process: 'scene', goal: 'Docks', now: T1 });
+  const text = readHandoff(root, r.id);
+  assert.ok(text.startsWith('<!-- yllir\n'), text.slice(0, 20));
+  assert.equal(text.split('\n')[5], '-->');
+  // Hand-written comment form with a filled decision: the same reads must work on it.
+  fs.writeFileSync(handoffPath(root, r.id), text.replace('## Decisions\n\n', '## Decisions\n\n- Niente pioggia.\n\n'));
+  const [entry] = listTopics(root);
+  assert.equal(entry.goal, 'Docks');
+  assert.equal(entry.process, 'scene');
+  assert.equal(readSection(root, { id: r.id, section: 'Decisions' }), '- Niente pioggia.');
+  touchTopic(root, { id: r.id, files: [], now: T2 });
+  const touched = readHandoff(root, r.id);
+  assert.doesNotMatch(touched, /updated: 2026-11-07T16:00:00/, 'touch rewrites the updated field');
+  assert.ok(touched.startsWith('<!-- yllir\n'));
+  assert.equal(touched.split('\n')[5], '-->');
 });
 
 test('readSection returns the trimmed text of one section', () => {

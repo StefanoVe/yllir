@@ -36,17 +36,17 @@ const THREE_EVENTS = session({
   ],
 });
 
-test('renders frontmatter, mermaid graph, and the three sections for 3 events and 2 edges', () => {
+test('renders metadata block, mermaid graph, and the three sections for 3 events and 2 edges', () => {
   const text = renderSessionMap(THREE_EVENTS);
   const expected = [
-    '---',
+    '<!-- yllir',
     'id: faro',
     'depends_on: [ponte]',
     'provenance: generated',
     'location: [porto, scogliera]',
     'arc: "Ombre"',
     'generated: true',
-    '---',
+    '-->',
     '',
     '> Generated file. Do not edit by hand: it is rebuilt from the files in Eventi/.',
     '',
@@ -80,7 +80,7 @@ test('renders frontmatter, mermaid graph, and the three sections for 3 events an
 
 test('omits arc when empty and writes [] for empty lists', () => {
   const text = renderSessionMap(session());
-  assert.match(text, /^---\nid: faro\ndepends_on: \[\]\nprovenance: generated\nlocation: \[\]\ngenerated: true\n---\n/);
+  assert.match(text, /^<!-- yllir\nid: faro\ndepends_on: \[\]\nprovenance: generated\nlocation: \[\]\ngenerated: true\n-->\n/);
   assert.doesNotMatch(text, /arc:/);
 });
 
@@ -111,7 +111,7 @@ test('a dependency on an event outside the session gives no edge and does not cr
       events: [event('a', 'Alfa', ['esterno'])],
     }),
   );
-  assert.doesNotMatch(text, /-->/);
+  assert.doesNotMatch(text, /^  e\d+ --> e\d+$/m);
   assert.match(text, /## Entry points\n\n- Alfa\n/);
   assert.match(text, /## Exits\n\n- Alfa\n/);
 });
@@ -154,20 +154,20 @@ test('a hand-edited main file is overwritten with the generated text', () => {
 
 test('keeps the provenance of the existing main file and places it right after depends_on', () => {
   const text = renderSessionMap(session({ depends_on: ['ponte'], provenance: 'master', events: [event('a', 'Alfa')] }));
-  assert.match(text, /^---\nid: faro\ndepends_on: \[ponte\]\nprovenance: master\nlocation: \[\]\ngenerated: true\n---\n/);
+  assert.match(text, /^<!-- yllir\nid: faro\ndepends_on: \[ponte\]\nprovenance: master\nlocation: \[\]\ngenerated: true\n-->\n/);
 });
 
 test('keeps played and generated provenance as read', () => {
   for (const value of ['played', 'generated']) {
     const text = renderSessionMap(session({ provenance: value }));
-    assert.match(text, new RegExp(`^---\\nid: faro\\ndepends_on: \\[\\]\\nprovenance: ${value}\\n`));
+    assert.match(text, new RegExp(`^<!-- yllir\\nid: faro\\ndepends_on: \\[\\]\\nprovenance: ${value}\\n`));
   }
 });
 
 test('a missing or invalid provenance becomes generated', () => {
   for (const value of [undefined, null, '', 'invented', 'Master']) {
     const text = renderSessionMap(session({ provenance: value }));
-    assert.match(text, /^---\nid: faro\ndepends_on: \[\]\nprovenance: generated\n/);
+    assert.match(text, /^<!-- yllir\nid: faro\ndepends_on: \[\]\nprovenance: generated\n/);
     assert.equal(text.match(/^provenance:/gm).length, 1);
   }
 });
@@ -181,7 +181,7 @@ test('writeSessionMaps keeps master provenance of the existing main file on rege
     const sessions = [session({ provenance: 'master', events: [event('a', 'Alfa')] })];
 
     writeSessionMaps(root, sessions);
-    assert.match(fs.readFileSync(target, 'utf8'), /^---\nid: faro\ndepends_on: \[\]\nprovenance: master\n/);
+    assert.match(fs.readFileSync(target, 'utf8'), /^<!-- yllir\nid: faro\ndepends_on: \[\]\nprovenance: master\n/);
 
     const again = writeSessionMaps(root, sessions);
     assert.deepEqual(again, { written: [], unchanged: ['Trama/Il faro/Il faro.md'] });

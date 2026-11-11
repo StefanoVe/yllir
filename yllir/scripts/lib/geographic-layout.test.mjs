@@ -58,6 +58,23 @@ test('plans common-ancestor canonical sheets, precise subject views, event views
   } finally { cleanup(root); }
 });
 
+test('place and sheet metadata is read in the comment form as well as the dashes form', () => {
+  const { root, put } = fixture();
+  try {
+    put('World/World/Coast/Port.md', '<!-- yllir\nid: port\n-->\n# Port\n');
+    put('People/Ada.md', '<!-- yllir\nid: ada\nlocation: [port, market]\n-->\n# Ada\n[Coast](../World/World/Coast/Coast.md)\n![map](img/portrait.png)\n');
+    const plan = planGeographicLayout(root);
+    assert.equal(plan.status, 'ready', JSON.stringify(plan.errors));
+    assert.deepEqual(plan.moves.map((m) => [m.from, m.to]), [
+      ['Objects/Relic.md', 'Objects/World/Coast/Relic.md'],
+      ['People/Ada.md', 'People/World/Coast/Ada.md'],
+    ]);
+    assert(plan.links.some((l) => l.path === 'People/World/Coast/Port/Ada.md'));
+  } finally {
+    cleanup(root);
+  }
+});
+
 test('a stale snapshot rejects the entire plan before changing files', () => {
   const { root } = fixture();
   try {

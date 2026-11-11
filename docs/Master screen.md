@@ -97,7 +97,7 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 
 - **Una schermata principale.** La chat e il pannello delle modifiche occupano il centro. Gli altri pannelli si aprono a richiesta e si chiudono senza perdere lo stato.
 - **Icone con tooltip (Deciso).** Ogni icona ha un tooltip e un nome accessibile. Nessuna barra di testo sopra le icone. Se un'icona non basta, la soluzione è cambiarla, non aggiungere etichette.
-- **Linguaggio del master.** Nell'interfaccia si usano parole come documento, scena, scheda, sessione, annuncio, personaggio. Restano fuori parole come commit, indice, canone, frontmatter, provider, token. I termini tecnici vivono nel glossario di `Principi.md`.
+- **Linguaggio del master.** Nell'interfaccia si usano parole come documento, scena, scheda, sessione, annuncio, personaggio. Restano fuori parole come commit, indice, canone, frontmatter, blocco dei metadati, provider, token. I termini tecnici vivono nel glossario di `Principi.md`.
 - **Nessuna modifica silenziosa.** Ogni cambiamento è visibile, collegato a una richiesta e annullabile.
 - **Nessun aggiornamento ottimistico.** Ciò che compare sullo schermo è ciò che è stato davvero scritto. Vale per la musica come per tutto il resto.
 - **Il master decide, l'agente propone.** Le scelte di trama, di regole e di contenuto restano al master; l'agente indica le opzioni.

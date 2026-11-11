@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { compareStrings } from '../subjects.mjs';
 import { PROVENANCES } from '../world-graph.mjs';
+import { METADATA_CLOSE, METADATA_OPEN } from '../frontmatter.mjs';
 
 const LIST_SEPARATOR = ', ';
 
@@ -35,13 +36,13 @@ export function renderSessionMap(session) {
   const indexById = new Map();
   events.forEach((event, index) => indexById.set(event.id, index));
 
-  const lines = ['---', `id: ${session.id}`];
+  const lines = [METADATA_OPEN, `id: ${session.id}`];
   lines.push(`depends_on: [${(session.depends_on ?? []).join(LIST_SEPARATOR)}]`);
   lines.push(`provenance: ${provenanceOf(session)}`);
   lines.push(`location: [${(session.location ?? []).join(LIST_SEPARATOR)}]`);
   if (session.arc) lines.push(`arc: "${session.arc}"`);
   lines.push('generated: true');
-  lines.push('---', '');
+  lines.push(METADATA_CLOSE, '');
   lines.push('> Generated file. Do not edit by hand: it is rebuilt from the files in Eventi/.', '');
 
   if (events.length > 0) {

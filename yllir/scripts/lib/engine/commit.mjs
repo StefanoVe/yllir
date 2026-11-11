@@ -16,7 +16,7 @@ import { planGeographicLayout, applyGeographicLayout } from '../geographic-layou
 import { validateConfig } from '../config.mjs';
 import { loadAdapter, pluginRootFromHere } from '../adapter.mjs';
 import { parseYamlLite } from '../yaml-lite.mjs';
-import { parseFrontmatter } from '../frontmatter.mjs';
+import { findMetadataBlock, parseFrontmatter, toCommentMetadata } from '../frontmatter.mjs';
 import { status, saveVersion, saveManualChanges, listVersions, ensureRepo } from '../versions.mjs';
 import { validateSheet } from '../adapter-ops.mjs';
 import { plotMap } from '../plot/plot-map.mjs';
@@ -342,6 +342,11 @@ async function transform(dir, copy, { files, deletes }) {
     const dest = path.join(copy, rel);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(path.join(dir, DRAFT_DIR, rel), dest);
+    if (rel.endsWith('.md')) {
+      // Every saved document uses the comment form, even when an agent wrote a dashes block.
+      const converted = toCommentMetadata(fs.readFileSync(dest, 'utf8'));
+      if (converted !== null) fs.writeFileSync(dest, converted);
+    }
   }
   for (const rel of deletes) fs.rmSync(path.join(copy, rel), { force: true });
 
@@ -707,12 +712,17 @@ function removeDrafts(dir, files) {
  * document the master edited by hand. Returns the new text, or null when nothing changes.
  */
 function masterProvenance(text) {
-  const match = /^---\r?\n[\s\S]*?\r?\n---/.exec(text);
-  if (match === null) return null;
-  const head = match[0];
-  const fixed = head.replace(/^provenance:[ \t]*generated([ \t]*\r?)$/m, 'provenance: master$1');
-  if (fixed === head) return null;
-  return fixed + text.slice(head.length);
+  const lines = text.split('\n');
+  const block = findMetadataBlock(lines.map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line)));
+  if (block === null || block.close === -1) return null;
+  for (let i = 1; i < block.close; i++) {
+    const fixed = lines[i].replace(/^provenance:[ \t]*generated([ \t]*\r?)$/, 'provenance: master$1');
+    if (fixed !== lines[i]) {
+      lines[i] = fixed;
+      return lines.join('\n');
+    }
+  }
+  return null;
 }
 
 function campaignLanguage(dir) {

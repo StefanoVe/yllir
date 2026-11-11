@@ -324,6 +324,12 @@ async function runUpdate(root, out, { dryRun, resume, today, registryDir }) {
       setResult(out, run);
       if (!run.fatal) {
         out.errors = Object.values(run.details).flatMap((detail) => detail.errors);
+        // Migrations after the recorded version (for example metadata-comment-v1 after
+        // world-graph-v1) change files too, and an update never leaves campaign files unsaved.
+        // The update state lives in .campaign/state, which git ignores, so it never dirties the tree.
+        if (!status(root).clean) {
+          saveVersion(root, { message: `Updated Yllir to ${to}`, kind: 'framework' });
+        }
         writeUpdateState(root, { ...state, status: 'completed', completed_on: today, migrations: run.statuses });
         out.status = 'updated';
         return out;

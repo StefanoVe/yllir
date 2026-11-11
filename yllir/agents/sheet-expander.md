@@ -32,7 +32,7 @@ If an input is missing or cannot be read, do not write anything. Reply with exac
 
 ## The document
 
-1. **Frontmatter**, first, between `---` lines, with these keys in this order:
+1. **Metadata block**, first, opening with the line `<!-- yllir` and closing with the line `-->`, with these keys in this order:
    - `id`: the `id` of `LINE`.
    - `kind`: the `kind` of `LINE`.
    - `template`: `TEMPLATE`, except for `place`, which has no `template` key at all.

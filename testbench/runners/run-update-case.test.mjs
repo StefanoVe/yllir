@@ -362,7 +362,8 @@ test('gradeLegacy accepts the added links and provenance and kind lines (L3)', a
     const text = fs.readFileSync(file, 'utf8');
     assert.ok(text.includes('provenance: master'), 'the migration adds provenance');
     const linked = text.replace('Il sentiero si divide', 'Il sentiero [si divide](../../../Luoghi/Pozzo.md)');
-    fs.writeFileSync(file, linked.replace('\n---\n', '\nkind: event\n---\n'));
+    // The migrated block is in the comment form: the kind line goes before its closing -->.
+    fs.writeFileSync(file, linked.replace('\n-->\n', '\nkind: event\n-->\n'));
     const results = gradeLegacy({ dir, setup, report: LEGACY_REPORT });
     assert.deepEqual(results.find(([id]) => id === 'L3')[2], [], JSON.stringify(results));
   } finally {
@@ -394,6 +395,27 @@ test('gradeLegacy fails L3 when a scene text is altered', async () => {
       results.find(([id]) => id === 'L3')[2],
       ['Verso il pozzo: text changed'],
     );
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+});
+
+test('gradeLegacy fails S7 when a migrated scene is turned back to the --- form', async () => {
+  const { tmp, dir, setup } = await migratedFolder();
+  try {
+    const before = gradeLegacy({ dir, setup, report: LEGACY_REPORT });
+    assert.deepEqual(before.find(([id]) => id === 'S7')[2], [], JSON.stringify(before));
+    const file = path.join(dir, 'Trama', 'Sessione 2', 'Eventi', 'Verso il pozzo.md');
+    const text = fs.readFileSync(file, 'utf8');
+    const dashes = text.replace('<!-- yllir\n', '---\n').replace('\n-->\n', '\n---\n');
+    assert.notEqual(dashes, text, 'the comment block was not found');
+    fs.writeFileSync(file, dashes);
+    const results = gradeLegacy({ dir, setup, report: LEGACY_REPORT });
+    assert.deepEqual(
+      results.find(([id]) => id === 'S7')[2],
+      ['Trama/Sessione 2/Eventi/Verso il pozzo.md: metadata block still in the --- form'],
+    );
+    assert.ok(failing(results).includes('S7'), JSON.stringify(results));
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
   }

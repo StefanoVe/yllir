@@ -478,7 +478,11 @@ test('a pending world migration of an up-to-date campaign is finished on the nex
   assert.match(read(dir, 'Trama/Sessione 1/Eventi/Arrivo.md'), /^provenance: master$/m);
   assert.match(read(dir, '.campaign/state/update.yaml'), /- id: "world-graph-v1"\n    status: complete/);
   assert.doesNotMatch(read(dir, '.campaign/state/update.yaml'), /world_migration/);
-  assert.equal(listVersions(dir, { limit: 2 })[0].message, 'Aggiornamento del formato della campagna');
+  // The metadata comment migration runs after the world migration and changes Arrivo.md too,
+  // so the framework version is saved last; the world version is still in the history.
+  assert.equal(listVersions(dir, { limit: 1 })[0].message, `Updated Yllir to ${INSTALLED}`);
+  assert.ok(listVersions(dir, { limit: 3 }).some((entry) => entry.message === 'Aggiornamento del formato della campagna'));
+  assert.equal(git(dir, 'status', '--porcelain', '--untracked-files=all'), '');
 });
 
 test('a world migration that cannot be applied restores the campaign to the restore point', async () => {
@@ -585,3 +589,20 @@ test('a campaign at 0.30.x with the generated AGENTS.md gets it removed by the w
   assert.deepEqual(result.errors, []);
 });
 
+
+test('a world migration followed by the metadata comment migration leaves no campaign file unsaved', async () => {
+  const dir = makeCampaign(MINIMAL_CONFIG + '  - id: soggetti\n    folder: Soggetti\n    type: subjects\n');
+  write(dir, 'Soggetti/Lyra.md', '---\nid: lyra\nkind: character\nprovenance: master\nlocation: []\n---\n\n# Lyra\n');
+  saveVersion(dir, { message: 'Test: a document with the old metadata block', kind: 'manual' });
+  setVersion(dir, '0.30.1');
+  const result = await updateCampaign(dir, { today: '2026-11-09' });
+  assert.equal(result.status, 'updated');
+  assert.equal(result.migrations['world-graph-v1'], 'complete');
+  assert.equal(result.migrations['metadata-comment-v1'], 'complete');
+  assert.deepEqual(result.errors, []);
+  assert.equal(git(dir, 'status', '--porcelain', '--untracked-files=all'), '');
+  assert.ok(read(dir, 'Soggetti/Lyra.md').startsWith('<!-- yllir'));
+  assert.ok(git(dir, 'show', 'HEAD:Soggetti/Lyra.md').startsWith('<!-- yllir'));
+  const versions = listVersions(dir, { limit: 100 });
+  assert.equal(versions[0].message, `Updated Yllir to ${INSTALLED}`);
+});

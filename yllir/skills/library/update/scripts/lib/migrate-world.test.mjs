@@ -7,7 +7,7 @@ import { applyWorldMigration, planWorldMigration } from './migrate-world.mjs';
 import { ensureRepo, listVersions, saveVersion } from '../../../../../scripts/lib/versions.mjs';
 import { newTopic, askTopic, finishTopic } from '../../../../../scripts/lib/topics.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
-import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
+import { findMetadataBlock, parseFrontmatter, toCommentMetadata } from '../../../../../scripts/lib/frontmatter.mjs';
 
 // Identity logic is exercised only when no global or system git config exists.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
@@ -52,11 +52,28 @@ function snapshot(root) {
   return out;
 }
 
-/** Text after the closing frontmatter line (the body, byte for byte). */
+/** Text after the closing metadata line, in either form (the body, byte for byte). */
 function bodyOf(text) {
   const lines = text.split('\n');
-  const close = lines.indexOf('---', 1);
-  return lines.slice(close + 1).join('\n');
+  const block = findMetadataBlock(lines);
+  return lines.slice(block.close + 1).join('\n');
+}
+
+/** Converts the closed dashes headers of every document of the campaign to the comment form. */
+function toCommentForm(root) {
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === '.git' || entry.name === '.campaign') continue;
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(full);
+      } else if (entry.name.endsWith('.md')) {
+        const converted = toCommentMetadata(fs.readFileSync(full, 'utf8'));
+        if (converted !== null) fs.writeFileSync(full, converted);
+      }
+    }
+  };
+  walk(root);
 }
 
 const fm = (root, rel) => parseFrontmatter(read(root, rel)).data;
@@ -152,6 +169,7 @@ test('the seed is created with the description, and campaign.yaml keeps its othe
   applyWorldMigration(root);
 
   const seed = read(root, 'Seme del mondo.md');
+  assert.match(seed, /^<!-- yllir\nid: seme-del-mondo\nprovenance: master\n-->\n# Seme del mondo\n/);
   const data = parseFrontmatter(seed).data;
   assert.equal(data.id, 'seme-del-mondo');
   assert.equal(data.provenance, 'master');
@@ -181,6 +199,7 @@ test('an English campaign gets the English seed file and sections', () => {
   assert.equal(exists(root, 'World seed.md'), true);
   assert.equal(exists(root, 'Seme del mondo.md'), false);
   const seed = read(root, 'World seed.md');
+  assert.match(seed, /^<!-- yllir\nid: world-seed\n/);
   assert.match(seed, /^id: world-seed$/m);
   assert.match(seed, /^# World seed$/m);
   assert.match(seed, /### Genre and tone\n\nUna valle/);
@@ -260,6 +279,44 @@ test('a second run changes nothing and reports complete', () => {
   assert.deepEqual(snapshot(root), before);
   assert.equal(listVersions(root).length, versions);
   assert.equal(planWorldMigration(root).status, 'complete');
+});
+
+test('a current campaign whose headers are in the comment form is complete and changes nothing', () => {
+  const root = freshCampaign();
+  assert.equal(applyWorldMigration(root).status, 'complete');
+  toCommentForm(root);
+  assert.equal(parseFrontmatter(read(root, 'Mondo/Morvalle/Morvalle.md')).format, 'comment');
+
+  const before = snapshot(root);
+  const versions = listVersions(root).length;
+  const plan = planWorldMigration(root);
+  assert.equal(plan.status, 'complete');
+  assert.deepEqual(plan.changed, []);
+  assert.deepEqual(plan.errors, []);
+
+  const again = applyWorldMigration(root);
+  assert.equal(again.status, 'complete');
+  assert.deepEqual(again.changed, []);
+  assert.deepEqual(snapshot(root), before);
+  assert.equal(listVersions(root).length, versions);
+});
+
+test('a comment-form campaign gets the missing lines after id and keeps the comment form', () => {
+  const root = freshCampaign();
+  toCommentForm(root);
+  const original = read(root, 'Mondo/Morvalle/Morvalle.md');
+  assert.equal(planWorldMigration(root).status, 'pending');
+
+  assert.equal(applyWorldMigration(root).status, 'complete');
+  const edited = read(root, 'Mondo/Morvalle/Morvalle.md');
+  const lines = edited.split('\n');
+  assert.equal(lines[0], '<!-- yllir');
+  assert.match(lines[1], /^id: /);
+  assert.equal(lines[2], 'kind: place');
+  assert.equal(lines[3], 'provenance: master');
+  assert.equal(parseFrontmatter(edited).format, 'comment');
+  assert.equal(bodyOf(edited), bodyOf(original));
+  assert.equal(fm(root, 'Mondo/Morvalle/Morvalle.md').provenance, 'master');
 });
 
 test('an existing seed file with other content is not overwritten: error seed-exists, nothing written', () => {

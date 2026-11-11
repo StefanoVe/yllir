@@ -308,6 +308,20 @@ La migrazione è idempotente: si può interrompere e riprendere senza duplicare 
 
 La migrazione non ricava relazioni, perché nessuna si può leggere con certezza dalla prosa con uno script: restano in sospeso, e le dichiara l’autore quando tocca i documenti (Implementato in 0.30.0; Riprogettazione, sezione 10).
 
+## Migrazione metadata-comment-v1 (Deciso, 2026-11-11)
+
+Migrazione post-aggiornamento, introdotta nella versione 0.35.0. Porta le schede delle campagne esistenti al blocco dei metadati scritto come commento HTML (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md), 1.2). Fa questi passi:
+
+- sostituisce le due righe `---` che delimitano il blocco dei metadati con `<!-- yllir` e `-->`, e non tocca il resto del file, né i metadati né la prosa;
+- è deterministica e non chiede decisioni al master;
+- `needed: detect`: serve finché resta un documento con il blocco `---`;
+- dichiara `after` tutte le altre migrazioni, quindi viene dopo tutte le altre;
+- converte il seme, i documenti delle cartelle della struttura (non quelle di tipo `external`) e lo stato in `.campaign/state/`; non tocca mai gli originali nelle cartelle `sources`, `customizations.md`, `CLAUDE.md` né i collegamenti simbolici.
+
+Poiché viene dopo `world-graph-v1`, che salva la propria versione, i suoi cambiamenti sarebbero rimasti fuori da ogni salvataggio. Per questo l'aggiornamento, dopo l'ultima migrazione, salva una versione finale se in git restano modifiche: un aggiornamento non lascia mai file della campagna non salvati, qualunque migrazione venga aggiunta in futuro.
+
+La migrazione è reversibile con git, come ogni migrazione, perché è un salvataggio in git.
+
 ## Registro delle migrazioni (Deciso, 2026-11-11)
 
 Le migrazioni post-aggiornamento non sono più una catena scritta a mano nello script di aggiornamento. Ogni migrazione è una cartella sotto `yllir/skills/library/update/migrations/<id>/`, e un solo esecutore generico le legge tutte dal registro.

@@ -22,7 +22,7 @@ The prompt gives you:
 1. Read `VOCABULARY` with the Read tool. Use only attribute names from it. The families are: `date.<founded|born|died|destroyed|began|ended>`, `number.<kebab-name>`, `location.current`, `origin.made-by`, `status.alive`, and `relation.<parent-of|child-of|sibling-of|spouse-of|member-of|leads|serves|owns|carried-by>`.
 2. Read `SUBJECTS_INDEX` with the Read tool. Each subject has `id`, `sheet` (its defining document, campaign-relative) and `forms` (its names and aliases).
 3. For each line `<fid> <document>` under DOCUMENTS:
-   a. Read the whole document, `CAMPAIGN_ROOT` joined with `<document>`, from its first line to its last, including the master block. For a long document, read it in chunks with offset and limit until you reach the end. Skip the frontmatter block (from the first line `---` to the next `---`): the script extracts its `location` itself. Take quotes only from the lines after it.
+   a. Read the whole document, `CAMPAIGN_ROOT` joined with `<document>`, from its first line to its last, including the master block. For a long document, read it in chunks with offset and limit until you reach the end. Skip the metadata block block (from the first line `<!-- yllir` to the first line `-->`): the script extracts its `location` itself. Take quotes only from the lines after it.
    b. Find its own subject: the subject whose `sheet` equals `<document>`. If there is none, the document has no own subject.
    c. A statement with no subject named in it is about the own subject.
 4. Write one fact for EVERY statement that gives a value for a vocabulary attribute. Go through the document line by line. Do not stop after the first few facts. Attribute rules:

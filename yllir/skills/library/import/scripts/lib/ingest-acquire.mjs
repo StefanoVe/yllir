@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { findSourcesFolder, ID_PATTERN, SHA_PATTERN, acquisitionIdFor, readRecordedSha, sha256File } from './ingest-inventory.mjs';
 import { KINDS } from './ingest-check.mjs';
+import { METADATA_CLOSE, METADATA_OPEN } from '../../../../../scripts/lib/frontmatter.mjs';
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -22,7 +23,9 @@ function isRealDate(value) {
  */
 function yamlText(value) {
   if (/^[\p{L}\p{N} ._()-]+$/u.test(value) && value === value.trim()) return value;
-  if (/["\r\n]/.test(value)) throw new Error(`cannot record file name in card.md: ${value}`);
+  if (/["\r\n]/.test(value) || value.includes(METADATA_CLOSE)) {
+    throw new Error(`cannot record file name in card.md: ${value}`);
+  }
   return `"${value}"`;
 }
 
@@ -33,7 +36,7 @@ function yamlText(value) {
  */
 export function renderCard({ id, original, originalName, sha256, date, provenance, kind }) {
   return [
-    '---',
+    METADATA_OPEN,
     `id: ${id}`,
     `original: ${original}`,
     `original_name: ${yamlText(originalName)}`,
@@ -43,7 +46,7 @@ export function renderCard({ id, original, originalName, sha256, date, provenanc
     `kind: ${kind}`,
     'pages: 0',
     'status: acquired',
-    '---',
+    METADATA_CLOSE,
     '',
     `# Acquisition ${id}`,
     '',
@@ -114,8 +117,8 @@ export function acquireSources({ campaignRoot, inventory, provenance, date, kind
   if (typeof provenance !== 'string' || provenance.trim() === '') {
     throw new Error('provenance must not be empty');
   }
-  if (/["\r\n]/.test(provenance)) {
-    throw new Error('provenance must not contain double quotes or line breaks');
+  if (/["\r\n]/.test(provenance) || provenance.includes(METADATA_CLOSE)) {
+    throw new Error('provenance must not contain double quotes, line breaks or -->');
   }
   if (!isRealDate(date)) {
     throw new Error(`date must be a real date YYYY-MM-DD: ${date}`);

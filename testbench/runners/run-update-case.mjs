@@ -47,7 +47,8 @@ import { generateInstructions } from '../../yllir/scripts/lib/instructions.mjs';
 import { ensureRepo, listVersions, saveManualChanges, saveVersion, status } from '../../yllir/scripts/lib/versions.mjs';
 import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
 import { parseYamlLite } from '../../yllir/scripts/lib/yaml-lite.mjs';
-import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
+import { findMetadataBlock, parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
+import { listMetadataFiles } from '../../yllir/skills/library/update/scripts/lib/migrate-metadata.mjs';
 import { plotMap } from '../../yllir/scripts/lib/plot/plot-map.mjs';
 
 const USAGE =
@@ -253,7 +254,22 @@ function versionUnchanged(dir, setup) {
   return readText(dir, VERSION_PATH) === setup.versionYamlText;
 }
 
-/** Stale campaign checks S1 to S6: the update ran silently and was saved, and the master's text is intact. */
+/**
+ * Metadata check S7: no campaign document still has the metadata block in the old --- form.
+ * It checks the files the migration lists, so a document the update left behind is reported by name.
+ */
+function metadataReasons(dir) {
+  const reasons = [];
+  for (const rel of listMetadataFiles(dir)) {
+    const text = readText(dir, rel);
+    if (text === null) continue;
+    const lines = text.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
+    if (findMetadataBlock(lines)?.format === 'dashes') reasons.push(`${rel}: metadata block still in the --- form`);
+  }
+  return reasons;
+}
+
+/** Stale campaign checks S1 to S7: the update ran silently and was saved, the master's text is intact, and the metadata is in the comment form. */
 export function gradeStale({ dir, setup, report }) {
   const s1 = [];
   const version = frameworkVersionOf(readText(dir, VERSION_PATH));
@@ -301,7 +317,9 @@ export function gradeStale({ dir, setup, report }) {
   } catch (err) {
     s6.push(`checkLinks: ${err.message}`);
   }
-  return [result('S1', s1), result('S2', s2), result('S3', s3), result('S4', s4), result('S5', s5), result('S6', s6)];
+  const s7 = metadataReasons(dir);
+
+  return [result('S1', s1), result('S2', s2), result('S3', s3), result('S4', s4), result('S5', s5), result('S6', s6), result('S7', s7)];
 }
 
 /** Newer-published checks N1 to N6: the question is answered, the notice is recorded, nothing is updated. */
@@ -372,12 +390,15 @@ const mainPath = (session) => `${TRAMA}/${session}/${session}.md`;
 /** Campaign-relative path of the file of one event of a session. */
 const eventPath = (session, title) => `${TRAMA}/${session}/${EVENT_FOLDER}/${eventFileName(title)}.md`;
 
-/** Lines of the frontmatter of a Markdown text, without the --- lines; [] when there is none. */
+/**
+ * Lines of the metadata block of a Markdown text, without its delimiters, in either form
+ * (the comment form the framework writes, or the old --- form); [] when there is no closed block.
+ */
 function frontmatterLines(text) {
-  const lines = text.split('\n');
-  if (lines[0] !== '---') return [];
-  const close = lines.indexOf('---', 1);
-  return close < 0 ? [] : lines.slice(1, close);
+  const lines = text.split('\n').map((line) => (line.endsWith('\r') ? line.slice(0, -1) : line));
+  const block = findMetadataBlock(lines);
+  if (block === null || block.close === -1) return [];
+  return lines.slice(1, block.close);
 }
 
 /** The text with every [text](target) replaced by text, trimmed. */
@@ -385,7 +406,7 @@ function withoutLinks(text) {
   return text.replace(MARKDOWN_LINK, (whole, label) => label).trim();
 }
 
-/** Legacy layout checks L1 to L4 on top of the stale-campaign checks S1 to S6. */
+/** Legacy layout checks L1 to L4 on top of the stale-campaign checks S1 to S7. */
 export function gradeLegacy({ dir, setup, report }) {
   const stale = gradeStale({ dir, setup, report });
   const sessions = Object.entries(setup.scenes);

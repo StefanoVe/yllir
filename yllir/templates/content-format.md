@@ -6,14 +6,16 @@ Framework-side reference of the format of campaign documents. Read the section o
 
 ### 1.1 Title
 
-- One level-1 title `#` after the frontmatter: the public name of the subject.
+- One level-1 title `#` after the metadata block: the public name of the subject.
 - Sections are `##`, subsections `###`.
 - For `npc`, `vendor`, `enemy` and `creature` the title must equal the file name without `.md` (checked). Keep this for every other kind too.
 - Plot event files have no title (section 2). Chronicle pages have a free title (section 3).
 
-### 1.2 Frontmatter
+### 1.2 Metadata block
 
-A YAML block between two `---` lines, first in the file. Only these fields are allowed.
+A YAML-like block, first in the file, written as an HTML comment so that Markdown previews hide it. Only these fields are allowed.
+
+Delimiters: line 1 of the file is exactly `<!-- yllir`; the block ends at the first line that is exactly `-->`. The lines in between use the same keys and the same syntax as before (flow lists `[a, b]`, a block list for `relations` and `appearances`). No line inside the block may contain `-->`. A block written in the old `---` form is still read, and the engine converts it to the form above when it saves the document.
 
 | Field | Required for | Form | Meaning |
 |---|---|---|---|
@@ -36,7 +38,7 @@ A YAML block between two `---` lines, first in the file. Only these fields are a
 | `merged_ids` | after a merge | flow list of ids | absorbed identities |
 | `generated` | derived main file of a session only | `true` | never written by hand |
 
-Rules of form: keys are lowercase; lists are flow lists `[a, b]`, except `relations`, a block list. A reference (`location`, `depends_on`, `characters`, `items`, `participants`, `appearances`) always points to an `id`, never to a file name or a link. The name and the category are not repeated in the frontmatter. The frontmatter holds no secret.
+Rules of form: keys are lowercase; lists are flow lists `[a, b]`, except `relations`, a block list. A reference (`location`, `depends_on`, `characters`, `items`, `participants`, `appearances`) always points to an `id`, never to a file name or a link. The name and the category are not repeated in the metadata block. The metadata block holds no secret.
 
 #### 1.2.1 Relations
 
@@ -129,7 +131,7 @@ The engine regenerates the main file from the event files at every commit. It ho
 ### 2.2 Event files
 
 - The file name is the event's name. There is no `#` title; the text starts at once.
-- Frontmatter: `id`, `session` (the id of its session), `depends_on` (required; `[]` when none), and optionally `location`, `characters`, `items`, `appearances`.
+- Metadata block: `id`, `session` (the id of its session), `depends_on` (required; `[]` when none), and optionally `location`, `characters`, `items`, `appearances`.
 - `characters`: the characters the event names and makes act or speak; each must have a sheet. `items`: relevant items used in the event, when they have value, effects, secrets or a plot role; each id must have an item sheet.
 - `appearances`: a list of `subject` and `location` pairs (`subject: <id>`, `location: [<place ids>]`), only for presences the text states. Presence is never inferred from `characters`, `items`, names or mentions.
 - `##` is a minor action inside the event; `###` is a check or single attempt, followed by a result list with `Successo` and `Fallimento` (English: `Success`, `Failure`).
@@ -145,10 +147,10 @@ A direct address to the players is a quote block (`>`). It defines no identity.
 A chronicle page records what happened at the table; it is written after a session from the game log. It lives in the `chronicle` category (for example `Cronaca/`), one file per evening.
 
 ```markdown
----
+<!-- yllir
 id: cronaca-2026-11-14
 played: [il-faro-spento-01]
----
+-->
 
 # Il faro si spegne
 
@@ -175,7 +177,7 @@ Sections are listed in their required order. Optional sections keep the order gi
 ### 4.1 Place (`kind: place`)
 
 - Category: nested folders under the places category.
-- Frontmatter: `id`, `kind: place`, `provenance`, `location` (the containing place, `[]` for a top place). **No `template` field.**
+- Metadata block: `id`, `kind: place`, `provenance`, `location` (the containing place, `[]` for a top place). **No `template` field.**
 - Required: the title and `## Descrizione` (English: `## Description`), opening with an italic paragraph.
 - Optional, after the description: `## Abitanti` (English: `## Inhabitants`), `## Punti d'interesse` (English: `## Points of interest`); `## Da definire` (English: `## To define`), required when gaps remain.
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), optionally `### Agganci` (English: `### Hooks`).
@@ -184,7 +186,7 @@ Sections are listed in their required order. Optional sections keep the order gi
 
 ### 4.2 Character (`template: npc`)
 
-- Category: `Personaggi/`. Frontmatter: `id`, `kind: character`, `template: npc`, `provenance`, `location` (where it normally is).
+- Category: `Personaggi/`. Metadata block: `id`, `kind: character`, `template: npc`, `provenance`, `location` (where it normally is).
 - Required: the title, `## Ruolo` (English: `## Role`), `## Aspetto e modi` (English: `## Appearance and manner`), `## Al tavolo` (English: `## At the table`) with voice, manner of speech and what the character wants.
 - Optional, in order: an image (portrait); `## Statistiche` (English: `## Statistics`), required when the character can fight (4.3); `## Da definire` (English: `## To define`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), then any of `### Motivazioni` (English: `### Motives`), `### Segreti` (English: `### Secrets`), `### Agganci` (English: `### Hooks`).
@@ -221,7 +223,7 @@ Validated: the stock columns and order, and the required sections.
 
 ### 4.5 Enemy and creature (`template: enemy` or `creature`)
 
-- Category: `Creature/`. Frontmatter: `id`, `kind: creature`, `template`, `provenance`, `location` (every place where it lives; `[]` when it wanders).
+- Category: `Creature/`. Metadata block: `id`, `kind: creature`, `template`, `provenance`, `location` (every place where it lives; `[]` when it wanders).
 - `enemy` fights; `creature` does not (animals, mounts).
 - Required: the title, `## Natura` (English: `## Nature`), public lore, and `## Statistiche` (English: `## Statistics`). An `enemy` has the tables (4.3). A `creature` writes in that section the sentence `Nessuna statistica: non combatte` (English: `No statistics: it does not fight`).
 - Optional, in order: an image; `## Bottino` (English: `## Loot`); `## Da definire` (English: `## To define`).
@@ -231,7 +233,7 @@ Validated: the sections and their order, the no-statistics sentence for `creatur
 
 ### 4.6 Item (`template: item`)
 
-- Category: `Oggetti/`; produces cards when its `structure` entry sets `cards: true`. Frontmatter: `id`, `kind: item`, `template: item`, `provenance`, `location` (where it is now), `print` for objects with a card.
+- Category: `Oggetti/`; produces cards when its `structure` entry sets `cards: true`. Metadata block: `id`, `kind: item`, `template: item`, `provenance`, `location` (where it is now), `print` for objects with a card.
 - Required, in order: the title; `## In breve` (English: `## In brief`), a public summary; `## Descrizione` (English: `## Description`); `## Effetti` (English: `## Effects`), in the adapter's format, or the sentence `Nessun effetto di gioco` (English: `No game effect`) when a source establishes there is none.
 - Optional, in order after Effects: `## Origine` (English: `## Origin`); `## Ritrovamento` (English: `## Finding`); `## Testo` (English: `## Text`), full text of a letter or book, ordinary prose; `## Valore` (English: `## Value`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), with the true origin and secrets.
@@ -241,7 +243,7 @@ Validated: exactly one public level-1 title; `In breve`, `Descrizione`, `Effetti
 
 ### 4.7 Notice (`template: notice`)
 
-- Category: `Oggetti/`: a notice is an item, the sheet of the paper pinned to a board. Frontmatter: `id`, `kind: item`, `template: notice`, `provenance`, `location` (the board's place only).
+- Category: `Oggetti/`: a notice is an item, the sheet of the paper pinned to a board. Metadata block: `id`, `kind: item`, `template: notice`, `provenance`, `location` (the board's place only).
 - Required, in order: the title; `## Testo` (English: `## Text`), the text as posted; `## Premio` (English: `## Reward`), in economy units, or `Nessun premio` (English: `No reward`).
 - Optional: `## Indizi` (English: `## Clues`) after the title's image.
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), with the real client and hidden conditions.
@@ -250,7 +252,7 @@ Validated: exactly one public level-1 title; `In breve`, `Descrizione`, `Effetti
 
 ### 4.8 Faction (`template: faction`)
 
-- Category: `Fazioni/`. Frontmatter: `id`, `kind: faction`, `template: faction`, `provenance`, `location` (its seat; `[]` when none).
+- Category: `Fazioni/`. Metadata block: `id`, `kind: faction`, `template: faction`, `provenance`, `location` (its seat; `[]` when none).
 - Required: the title and `## Chi sono` (English: `## Who they are`), what characters can know.
 - Optional, in order: an image; `## Obiettivi` (English: `## Goals`); `## Membri` (English: `## Members`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), `### Segreti` (English: `### Secrets`), `### Agganci` (English: `### Hooks`).
@@ -260,7 +262,7 @@ Validated: exactly one public level-1 title; `In breve`, `Descrizione`, `Effetti
 
 ### 4.9 Historical event (`kind: event`, `template: event`)
 
-- Category: `Storia/`. Not a plot event: no `depends_on`, not in `Trama/`. Frontmatter: `id`, `kind: event`, `template: event`, `provenance`, `when` (required), optional `participants` and `location` (lists).
+- Category: `Storia/`. Not a plot event: no `depends_on`, not in `Trama/`. Metadata block: `id`, `kind: event`, `template: event`, `provenance`, `when` (required), optional `participants` and `location` (lists).
 - Required: the title and `## Accaduto` (English: `## What happened`), prose in the past tense. Optional: `## Conseguenze` (English: `## Consequences`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`).
 
@@ -268,32 +270,32 @@ Validated by the world graph: `when` is a number, `participants` and `location` 
 
 ### 4.10 Concept of history (`free`)
 
-- Category: `Storia/`. Frontmatter: `id`, `kind`, `provenance`. Required: the title and `## Definizione` (English: `## Definition`). Optional: `## Come appare` (English: `## How it appears`), `## Da definire`. Master block: `### Indicazioni per il master`.
+- Category: `Storia/`. Metadata block: `id`, `kind`, `provenance`. Required: the title and `## Definizione` (English: `## Definition`). Optional: `## Come appare` (English: `## How it appears`), `## Da definire`. Master block: `### Indicazioni per il master`.
 
 ### 4.11 Economy document
 
-- File `Storia/Economia.md`, one per campaign. Frontmatter: `id: economia`.
+- File `Storia/Economia.md`, one per campaign. Metadata block: `id: economia`.
 - Required, in order: the title; `## Valute` (English: `## Currencies`): `Valuta`, `Equivalenza`, `Nota`; `## Prezzi base` (English: `## Base prices`): `Categoria`, `Minimo`, `Massimo`, `Unità`; `## Salari` (English: `## Wages`): `Mestiere`, `Paga`, `Periodo`; `## Variazioni per luogo` (English: `## Variations by place`): `Luogo` (an id), `Fattore`, `Motivo`.
 - Optional: `## Deroghe in vigore` (English: `## Exceptions in force`); `## Da definire`. Numbers use a dot as decimal separator.
 
 ### 4.12 Sketch (`sketch: true`)
 
-- Any kind and template. Frontmatter: `sketch: true`, `kind`, `provenance`, `location` and `relations` if any, `template`, and `when` for an event.
+- Any kind and template. Metadata block: `sketch: true`, `kind`, `provenance`, `location` and `relations` if any, `template`, and `when` for an event.
 - Content: the title and one sentence under the first required section of its template. The other sections are not written yet.
 - When the master names a sketch, or a session uses it, it is expanded into a full document.
 
 ### 4.13 Player character (`master-only`)
 
-- Category: `Giocatori/`, one file per character; the whole file is master-only. Frontmatter: `id`. Required: the title, `## Scheda` (English: `## Sheet`), `## Integrazione con la trama` (English: `## Plot integration`). Optional: `## Background`, `## Domande aperte` (English: `## Open questions`), `## Originali` (English: `## Originals`). No master block: the whole file is private.
+- Category: `Giocatori/`, one file per character; the whole file is master-only. Metadata block: `id`. Required: the title, `## Scheda` (English: `## Sheet`), `## Integrazione con la trama` (English: `## Plot integration`). Optional: `## Background`, `## Domande aperte` (English: `## Open questions`), `## Originali` (English: `## Originals`). No master block: the whole file is private.
 
 ## 5. Seed of the world
 
 The seed is the document named by `campaign.seed` in `campaign.yaml`. Its whole content is inside the master block, so no public output can show it.
 
 - Title `# <seed name>`, then the master block with `## Master` and one `###` heading per seed section, in the campaign language: Genre and tone, Themes, Central conflicts, Factions, Cultures, Naming conventions, Power level, Calendar, To avoid (the sections may be a subset when the master has said little).
-- Frontmatter: `id` is the slug of the seed name; `provenance: master` for what the master said; `generated` only when the whole seed was invented.
+- Metadata block: `id` is the slug of the seed name; `provenance: master` for what the master said; `generated` only when the whole seed was invented.
 - The Calendar section holds the convention that turns a date into a `when` number.
 
 ## 6. What the framework checks
 
-Without a model: frontmatter fields and forms; `id` unique; `location` a flow list; `relations` well formed; `when` only for events; `status` and `ended` consistent; references to missing subjects; a `location` that is not a place; an event involving a subject or place after its `ended`; the same participant in two places at the same `when`; sheet sections, order and names; stock and statistics tables; title equal to the file name; master block form; item section order; relative links and anchors that resolve.
+Without a model: metadata block fields and forms; `id` unique; `location` a flow list; `relations` well formed; `when` only for events; `status` and `ended` consistent; references to missing subjects; a `location` that is not a place; an event involving a subject or place after its `ended`; the same participant in two places at the same `when`; sheet sections, order and names; stock and statistics tables; title equal to the file name; master block form; item section order; relative links and anchors that resolve.

@@ -64,10 +64,10 @@ Write both drafts with the Write tool, under `.campaign/drafts/`, at the campaig
 **Seed**, at `.campaign/drafts/<Seed file name>` (campaign root, not in a folder). The whole seed is master-only, so ALL its content goes inside the master block. Structure, with `id` `seme-del-mondo` (Italian) or `world-seed` (English):
 
 ```markdown
----
+<!-- yllir
 id: seme-del-mondo
 provenance: master
----
+-->
 
 # Seme del mondo
 
@@ -89,11 +89,11 @@ Replace the example headings with the sections below, one `###` heading each, in
 **World description**, at `.campaign/drafts/<Folder>/<World name>.md`:
 
 ```markdown
----
+<!-- yllir
 id: <slug of the world name>
 kind: place
 provenance: master
----
+-->
 
 # <World name>
 

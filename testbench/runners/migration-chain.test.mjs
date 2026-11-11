@@ -6,12 +6,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { REPO_ROOT } from './lib/case-common.mjs';
 import { generateInstructions } from '../../yllir/scripts/lib/instructions.mjs';
 import { ensureRepo, listVersions, saveManualChanges, saveVersion } from '../../yllir/scripts/lib/versions.mjs';
 import { sessionCheck, formatCheck } from '../../yllir/scripts/lib/session-check.mjs';
 import { plotMap } from '../../yllir/scripts/lib/plot/plot-map.mjs';
 import { parseYamlLite } from '../../yllir/scripts/lib/yaml-lite.mjs';
+import { findMetadataBlock } from '../../yllir/scripts/lib/frontmatter.mjs';
+import { listMetadataFiles } from '../../yllir/skills/library/update/scripts/lib/migrate-metadata.mjs';
 import { updateCampaign } from '../../yllir/skills/library/update/scripts/lib/update-campaign.mjs';
 
 // Identity logic is exercised only when no global or system git config exists.
@@ -22,7 +25,7 @@ const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle-legacy',
 const INSTALLED = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'yllir', '.claude-plugin', 'plugin.json'), 'utf8')).version;
 const OLD = '0.0.1';
 const PENDING = ['category-first-geography-v1', 'item-descriptions-v1', 'statistics-tables-v1'];
-const ORDER = ['session-layout-v1', 'category-first-geography-v1', 'item-descriptions-v1', 'statistics-tables-v1', 'world-graph-v1'];
+const ORDER = ['session-layout-v1', 'category-first-geography-v1', 'item-descriptions-v1', 'statistics-tables-v1', 'world-graph-v1', 'metadata-comment-v1'];
 
 const tempDirs = [];
 after(() => {
@@ -52,6 +55,7 @@ test('the legacy campaign reaches the current format in one update; the guided p
   assert.deepEqual(Object.keys(result.migrations), ORDER);
   assert.equal(result.migrations['session-layout-v1'], 'complete');
   assert.equal(result.migrations['world-graph-v1'], 'complete');
+  assert.equal(result.migrations['metadata-comment-v1'], 'complete');
   assert.deepEqual(result.pending_migrations, PENDING);
   // The fixture's sessions are already folders: only the world graph is old in it.
   assert.deepEqual(result.migrated, []);
@@ -64,14 +68,23 @@ test('the legacy campaign reaches the current format in one update; the guided p
   assert.equal(fs.existsSync(path.join(dir, 'Trama/Sessione 1/Sessione 1.md')), true);
   assert.equal(fs.existsSync(path.join(dir, 'Trama/Sessione 1/Eventi')), true);
 
+  // No campaign document keeps the metadata block in the old --- form.
+  for (const rel of listMetadataFiles(dir)) {
+    const lines = fs.readFileSync(path.join(dir, rel), 'utf8').split('\n').map((line) => line.replace(/\r$/, ''));
+    assert.notEqual(findMetadataBlock(lines)?.format, 'dashes', `${rel} still has the --- form`);
+  }
+
   // The world migration added the seed of the world to campaign.yaml.
   const config = parseYamlLite(fs.readFileSync(path.join(dir, 'campaign.yaml'), 'utf8')).data;
   assert.equal(typeof config.campaign.seed, 'string');
 
-  // The history: the framework version first, then the world format on top of it.
-  const versions = listVersions(dir, { limit: 2 });
-  assert.equal(versions[1].message, `Updated Yllir to ${INSTALLED}`);
-  assert.equal(versions[0].message, 'Aggiornamento del formato della campagna');
+  // The history: the framework version, the world format, then the files of the later migrations.
+  const versions = listVersions(dir, { limit: 3 });
+  assert.equal(versions[2].message, `Updated Yllir to ${INSTALLED}`);
+  assert.equal(versions[1].message, 'Aggiornamento del formato della campagna');
+  assert.equal(versions[0].message, `Updated Yllir to ${INSTALLED}`);
+  // Nothing is left uncommitted after the update.
+  assert.equal(execFileSync('git', ['-C', dir, 'status', '--porcelain'], { encoding: 'utf8' }), '');
 
   // The session check now names the guided parts that are left, in order.
   const check = sessionCheck(dir);

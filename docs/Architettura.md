@@ -215,7 +215,7 @@ Ripetere le stesse aree in più categorie, con lo stesso nome da mantenere allin
 | Stato di un soggetto | `status` (per esempio vivo o morto, attivo o distrutto) | Controlli del grafo, pacchetto di contesto |
 | Provenienza | `provenance` (`master`, `played`, `generated`) | Regole di riscrittura e di avviso al master (Riprogettazione, sezione 6) |
 | Abbozzo | `sketch: true` | Elenco degli abbozzi da espandere |
-| Presenza esplicita di un soggetto in una scena | `appearances` nel frontmatter dell'evento, con ID del soggetto e dei luoghi | Percorso canonico del soggetto e viste geografiche |
+| Presenza esplicita di un soggetto in una scena | `appearances` nel blocco dei metadati dell'evento, con ID del soggetto e dei luoghi | Percorso canonico del soggetto e viste geografiche |
 | Luogo attuale di un personaggio, una creatura, un oggetto | `location` nei metadati (uno o più `id` di luoghi) | Percorso canonico del soggetto e vista «chi e che cosa c'è qui» (**Proposta** per la vista) |
 | Gerarchia dei luoghi | La posizione della cartella in `Mondo/` | Percorsi, breadcrumb, carte del mondo |
 | Prerequisito di una sessione | `depends_on` nei metadati della sessione | Mappa della trama |

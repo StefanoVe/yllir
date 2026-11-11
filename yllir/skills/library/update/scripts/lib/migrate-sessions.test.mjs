@@ -85,6 +85,19 @@ const OLD_SESSION = [
   '',
 ].join('\n');
 
+const MIGRATED_MAIN = [
+  '<!-- yllir',
+  'id: ombre-1',
+  'depends_on: [prologo]',
+  'location: [porto, faro]',
+  'arc: "Ombre"',
+  'generated: true',
+  '-->',
+  '',
+  'Generated file. Do not edit by hand.',
+  '',
+].join('\n');
+
 test('an old session with three scenes becomes a folder with a main file and three events', (t) => {
   const root = makeCampaign(t, { 'Trama/Ombre/Sessione 1.md': OLD_SESSION });
   const result = migrateSessions(root);
@@ -93,21 +106,7 @@ test('an old session with three scenes becomes a folder with a main file and thr
   assert.equal(exists(root, 'Trama/Ombre/Sessione 1.md'), false);
   assert.equal(exists(root, 'Trama/Ombre'), false, 'the empty arc folder is removed');
 
-  assert.equal(
-    read(root, 'Trama/Sessione 1/Sessione 1.md'),
-    [
-      '---',
-      'id: ombre-1',
-      'depends_on: [prologo]',
-      'location: [porto, faro]',
-      'arc: "Ombre"',
-      'generated: true',
-      '---',
-      '',
-      'Generated file. Do not edit by hand.',
-      '',
-    ].join('\n'),
-  );
+  assert.equal(read(root, 'Trama/Sessione 1/Sessione 1.md'), MIGRATED_MAIN);
 
   assert.deepEqual(fs.readdirSync(path.join(root, 'Trama/Sessione 1/Eventi')).sort(), [
     'Arrivo.md',
@@ -116,7 +115,7 @@ test('an old session with three scenes becomes a folder with a main file and thr
   ]);
   assert.equal(
     read(root, 'Trama/Sessione 1/Eventi/Arrivo.md'),
-    '---\nid: ombre-1-e01\nsession: ombre-1\ndepends_on: []\nlocation: []\n---\n\nI personaggi arrivano al porto.\n',
+    '<!-- yllir\nid: ombre-1-e01\nsession: ombre-1\ndepends_on: []\nlocation: []\n-->\n\nI personaggi arrivano al porto.\n',
   );
   assert.match(read(root, 'Trama/Sessione 1/Eventi/Scoperta del diario.md'), /^id: ombre-1-e02$/m);
   assert.match(read(root, 'Trama/Sessione 1/Eventi/Fuga.md'), /^id: ombre-1-e03$/m);
@@ -128,7 +127,29 @@ test('text before the first heading goes into the first event', (t) => {
     'Trama/Premessa.md': '---\nid: pre\ndepends_on: []\nlocation: []\n---\n\nNote generali.\n\n# Prima scena\n\nTesto.\n',
   });
   migrateSessions(root);
-  assert.equal(read(root, 'Trama/Premessa/Eventi/Prima scena.md').split('---\n\n')[1], 'Note generali.\n\nTesto.\n');
+  assert.equal(read(root, 'Trama/Premessa/Eventi/Prima scena.md').split('-->\n\n')[1], 'Note generali.\n\nTesto.\n');
+});
+
+test('the files the migration writes start with the comment form', (t) => {
+  const root = makeCampaign(t, { 'Trama/Ombre/Sessione 1.md': OLD_SESSION });
+  migrateSessions(root);
+
+  assert.ok(read(root, 'Trama/Sessione 1/Sessione 1.md').startsWith('<!-- yllir\n'));
+  const events = fs.readdirSync(path.join(root, 'Trama/Sessione 1/Eventi'));
+  assert.equal(events.length, 3);
+  for (const name of events) {
+    assert.ok(read(root, `Trama/Sessione 1/Eventi/${name}`).startsWith('<!-- yllir\n'), name);
+  }
+});
+
+test('an old session already written in the comment form is migrated the same way', (t) => {
+  const commented = OLD_SESSION.replace('---', '<!-- yllir').replace('---', '-->');
+  const root = makeCampaign(t, { 'Trama/Ombre/Sessione 1.md': commented });
+  const result = migrateSessions(root);
+
+  assert.deepEqual(result, { migrated: ['Trama/Ombre/Sessione 1.md'], errors: [] });
+  assert.equal(read(root, 'Trama/Sessione 1/Sessione 1.md'), MIGRATED_MAIN);
+  assert.match(read(root, 'Trama/Sessione 1/Eventi/Arrivo.md'), /^<!-- yllir\nid: ombre-1-e01\n/);
 });
 
 test('a file with no heading becomes one event titled with the session name', (t) => {

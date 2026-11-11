@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { buildWorldIndex } from '../world-graph.mjs';
 import { DRAFT_DIR, checkBatch, commitBatch } from './commit.mjs';
 import { ensureRepo } from '../versions.mjs';
+import { toCommentMetadata } from '../frontmatter.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.resolve(here, '../../../../testbench/fixtures/morvalle-legacy/campaign');
@@ -243,6 +244,22 @@ test('errors that already exist in the campaign do not block the batch', async (
   assert.equal(result.ok, true, JSON.stringify(result.errors));
 });
 
+test('a draft written with a dashes block is saved in the comment form', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const check = await checkBatch(dir, { files: [MIRA_PATH] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  writeReview(dir);
+  const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Add Mira Sanna' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+
+  const saved = readAt(dir, result.finalFiles[0]);
+  assert.ok(saved.startsWith('<!-- yllir\n'), saved.slice(0, 40));
+  assert.match(saved, /^id: mira-sanna$/m);
+  assert.match(saved, /^-->$/m);
+  assert.doesNotMatch(saved, /^---$/m);
+});
+
 test('a file edited by hand outside the batch is saved as a manual version and its provenance becomes master', async (t) => {
   const dir = makeCampaign(t);
   // A generated document, committed as the starting state.
@@ -270,6 +287,33 @@ test('a file edited by hand outside the batch is saved as a manual version and i
   assert.match(text, /Una nota scritta a mano\./);
   const manualSubject = git(dir, ['log', '-n', '1', '--format=%s', 'HEAD~1']).trim();
   assert.equal(manualSubject, 'Modifiche fatte a mano');
+});
+
+test('a hand edit to a comment-form document makes its provenance master', async (t) => {
+  const dir = makeCampaign(t);
+  const rel = 'Storia/Voce del Pozzo.md';
+  const commentForm = toCommentMetadata(readAt(dir, rel));
+  assert.notEqual(commentForm, null, 'the fixture document starts with a dashes block');
+  fs.writeFileSync(path.join(dir, rel), commentForm.replace('\n-->\n', '\nprovenance: generated\n-->\n'));
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'generated state in comment form']);
+  const before = commitCount(dir);
+
+  fs.writeFileSync(path.join(dir, rel), `${readAt(dir, rel)}\nUna nota scritta a mano.\n`);
+
+  writeDraft(dir, MIRA_PATH, MIRA);
+  await checkBatch(dir, { files: [MIRA_PATH] });
+  writeReview(dir);
+  const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Add Mira Sanna' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.deepEqual(result.manualChanges, [rel]);
+  assert.equal(commitCount(dir), before + 2, 'one manual version and one framework version');
+
+  const text = readAt(dir, rel);
+  assert.ok(text.startsWith('<!-- yllir\n'));
+  assert.match(text, /^provenance: master$/m);
+  assert.doesNotMatch(text, /provenance: generated/);
+  assert.match(text, /Una nota scritta a mano\./);
 });
 
 test('a file edited by hand inside the batch is saved, refused with manual-change, and redrafted', async (t) => {

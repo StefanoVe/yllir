@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { acquireSources, renderCard } from './ingest-acquire.mjs';
 import { buildInventory, sha256Buffer } from './ingest-inventory.mjs';
-import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
+import { METADATA_OPEN, parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 
 const CAMPAIGN = [
   'name: Test',
@@ -175,4 +175,48 @@ test('renderCard quotes names that a plain scalar cannot hold, and refuses unrec
   assert.deepEqual(bracket.errors, []);
   assert.equal(bracket.data.original_name, '[scan].jpg');
   assert.throws(() => renderCard({ ...base, originalName: 'bad"name.jpg' }), /cannot record file name/);
+  assert.throws(() => renderCard({ ...base, originalName: 'bad-->name.jpg' }), /cannot record file name/);
+});
+
+test('renderCard writes the comment form and parses back to the same data', () => {
+  const input = {
+    id: 'src-1a2b3c4d',
+    original: 'original.jpg',
+    originalName: 'Quaderno 1.jpg',
+    sha256: '0'.repeat(64),
+    date: '2026-11-09',
+    provenance: 'Quaderno del master',
+    kind: 'other',
+  };
+  const text = renderCard(input);
+  assert.equal(text.split('\n')[0], METADATA_OPEN);
+  assert.equal(text.includes('---'), false);
+
+  const parsed = parseFrontmatter(text);
+  assert.equal(parsed.format, 'comment');
+  assert.deepEqual(parsed.errors, []);
+  assert.deepEqual(parsed.data, {
+    id: 'src-1a2b3c4d',
+    original: 'original.jpg',
+    original_name: 'Quaderno 1.jpg',
+    sha256: '0'.repeat(64),
+    acquired: '2026-11-09',
+    provenance: 'Quaderno del master',
+    kind: 'other',
+    pages: '0',
+    status: 'acquired',
+  });
+  assert.equal(parsed.body.trimStart().startsWith('# Acquisition src-1a2b3c4d'), true);
+});
+
+test('provenance and file names that would close the comment block are refused', () => {
+  withEnv(({ root, inputs }) => {
+    write(path.join(inputs, 'photo.jpg'), 'x');
+    const inventory = buildInventory({ campaignRoot: root, inputs: ['photo.jpg'], baseDir: inputs });
+    assert.throws(
+      () => acquireSources({ campaignRoot: root, inventory, ...ARGS, provenance: 'fine --> not', baseDir: inputs }),
+      /-->/,
+    );
+    assert.equal(fs.existsSync(path.join(root, 'Fonti')), false);
+  });
 });

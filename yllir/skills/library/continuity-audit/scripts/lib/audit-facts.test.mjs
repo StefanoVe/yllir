@@ -561,3 +561,41 @@ test('a document of an external category is canon, read only: its facts and loca
     fs.rmSync(factsDir, { recursive: true, force: true });
   }
 });
+
+test('a document in the comment form is read exactly like the same document in the dashes form', () => {
+  const body = '\n# Trama\n\n## Atto primo\n\nOria Valdes trova la lanterna nel pozzo.\nIl lago è profondo e nero.\n';
+  const dashes = `---\nid: trama\nnote: Oria Valdes trova la lanterna\nhook: Il porto dimenticato\n---${body}`;
+  const comment = `<!-- yllir\nid: trama\nnote: Oria Valdes trova la lanterna\nhook: Il porto dimenticato\n-->${body}`;
+  const facts = {
+    D001: factsFile('D001', 'Plot/Trama.md', [
+      fact(),
+      fact({ quote: 'Il lago è profondo e nero' }),
+      fact({ quote: 'Il porto dimenticato' }),
+    ]),
+  };
+  const fromDashes = run({ files: { 'Plot/Trama.md': dashes }, docs: ONE, facts });
+  const fromComment = run({ files: { 'Plot/Trama.md': comment }, docs: ONE, facts });
+  assert.deepEqual(fromComment, fromDashes);
+  assert.deepEqual(fromComment.facts.map((f) => [f.id, f.line]), [
+    ['F-D001-001', 10],
+    ['F-D001-002', 11],
+  ]);
+  assert.deepEqual(fromComment.ignored_frontmatter.map((x) => x.index), [2]);
+});
+
+test('the location metadata fact of a sheet in the comment form has the same line as in the dashes form', () => {
+  const sheetBody = '\n# Oria Valdes\n\nUna guida.\n';
+  const dashes = `---\nid: oria-valdes\nlocation: [Morvalle, Borgo Cenere]\n---${sheetBody}`;
+  const comment = `<!-- yllir\nid: oria-valdes\nlocation: [Morvalle, Borgo Cenere]\n-->${sheetBody}`;
+  const scopeFiles = [{ fid: 'D001', document: 'People/Oria Valdes.md' }];
+  const factsOf = (sheet) =>
+    run({
+      files: { 'People/Oria Valdes.md': sheet },
+      docs: scopeFiles,
+      facts: { D001: factsFile('D001', 'People/Oria Valdes.md', []) },
+    });
+  const fromDashes = factsOf(dashes);
+  const fromComment = factsOf(comment);
+  assert.deepEqual(fromComment, fromDashes);
+  assert.deepEqual(fromComment.facts.map((f) => [f.id, f.line]), [['M-D001', 3]]);
+});

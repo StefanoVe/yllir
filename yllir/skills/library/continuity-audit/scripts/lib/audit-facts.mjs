@@ -2,12 +2,12 @@
 // audit scope. Deterministic: each fact must use a vocabulary attribute, a known
 // subject and a quote that really occurs in its document. Also records coverage
 // (which documents were read) and adds the metadata facts (location in the
-// frontmatter). Judging what to extract is left to the agents.
+// metadata block, in either form). Judging what to extract is left to the agents.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { buildSubjectIndex, readStructure, compareStrings } from '../../../../../scripts/lib/subjects.mjs';
-import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
+import { findMetadataBlock, parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../../../../scripts/lib/zones.mjs';
 import { foldText, foldForm } from '../../../../../scripts/lib/fold.mjs';
 import { checkAttribute, checkValue } from './audit-vocabulary.mjs';
@@ -21,8 +21,8 @@ const REQUIRED_FIELDS = ['subject', 'attribute', 'value', 'source_type', 'quote'
  * @param {string} factsDir folder with one `<fid>.json` per scope document
  * @param {{ families: object[], sourceTypes: string[] }} vocab result of loadVocabulary
  * @returns {{ mode: string, complete: boolean, coverage: object[], facts: object[], discarded: object[], ignored_frontmatter: object[], errors: object[] }}
- *   `ignored_frontmatter` holds the facts whose quote only occurs in the frontmatter
- *   (copied `location: [...]` lines): they are neither valid nor discarded.
+ *   `ignored_frontmatter` holds the facts whose quote only occurs in the metadata
+ *   block (copied `location: [...]` lines): they are neither valid nor discarded.
  */
 export function validateFacts(campaignRoot, scope, factsDir, vocab) {
   const index = buildSubjectIndex(campaignRoot);
@@ -151,19 +151,20 @@ function readText(absolute) {
 }
 
 /**
- * The lines between the first two `---` of a document, with their 1-based line
- * numbers. Empty when the document has no closed frontmatter.
+ * The content lines of the metadata block of a document, in either form (the
+ * HTML comment written by the framework, or the older `---` frontmatter), with
+ * their 1-based line numbers. Empty when the document has no closed block.
  * @returns {Array<{ line: number, text: string }>}
  */
 function frontmatterLines(text) {
   const rawLines = text.split('\n').map((raw) => raw.replace(/\r$/, ''));
-  if (rawLines[0] !== '---') return [];
+  const block = findMetadataBlock(rawLines);
+  if (!block || block.close === -1) return [];
   const found = [];
-  for (let i = 1; i < rawLines.length; i++) {
-    if (rawLines[i] === '---') return found;
+  for (let i = 1; i < block.close; i++) {
     found.push({ line: i + 1, text: rawLines[i] });
   }
-  return [];
+  return found;
 }
 
 /** The facts array of `<fid>.json`, or null when the document counts as not read. */
@@ -224,10 +225,10 @@ function checkFact(raw, { subjectIds, vocab, sourceTypes }) {
 
 /**
  * Finds the line of the document that contains the quote. Both sides are folded
- * (case, accents, apostrophes, dashes, spaces). Frontmatter lines are not in `lines`.
- * A quote with no body match that occurs in the frontmatter is `ignored`: extractors
- * copy frontmatter lines, and the metadata facts already cover them.
- * @param {Array<{ line: number, text: string }>} frontmatter frontmatter lines
+ * (case, accents, apostrophes, dashes, spaces). Metadata block lines are not in `lines`.
+ * A quote with no body match that occurs in the metadata block is `ignored`: extractors
+ * copy those lines, and the metadata facts already cover them.
+ * @param {Array<{ line: number, text: string }>} frontmatter content lines of the metadata block
  * @returns {{ line: object } | { ignored: true } | { reason: string }}
  */
 function locateQuote(quote, hint, lines, frontmatter) {
@@ -291,12 +292,16 @@ function metadataFact(fid, document, subjectId, items, line) {
   };
 }
 
-/** 1-based line of the top-level `key:` line inside the frontmatter (1 when not found). */
+/**
+ * 1-based line of the top-level `key:` line inside the metadata block, in either
+ * form (1 when not found). For an unclosed block the search runs to the end of the file.
+ */
 function keyLine(text, key) {
   const rawLines = text.split('\n').map((raw) => raw.replace(/\r$/, ''));
-  if (rawLines[0] !== '---') return 1;
-  for (let i = 1; i < rawLines.length; i++) {
-    if (rawLines[i] === '---') break;
+  const block = findMetadataBlock(rawLines);
+  if (!block) return 1;
+  const end = block.close === -1 ? rawLines.length : block.close;
+  for (let i = 1; i < end; i++) {
     if (rawLines[i].startsWith(`${key}:`)) return i + 1;
   }
   return 1;
