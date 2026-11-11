@@ -2,7 +2,7 @@
 
 Guided part of the migration `category-first-geography-v1`. The update runs it before the item and Statistics steps, because it moves sheets and those steps read the sheet paths. Follow the rules in `${CLAUDE_PLUGIN_ROOT}/skills/library/update/post-update.md` (commands and writes, questions, result).
 
-The arrangement is decided only by explicit text and explicit location data. Use the campaign language from `campaign.yaml`. Keep unresolved facts pending. Never infer a scene appearance from `characters`, `items`, names, links or mentions. The only appearance metadata is `appearances: [{subject: ID, location: [PLACE_IDS]}]`, supported by the explicit scene text. Never move or rename an event: event files stay in their session folders, and the geographic views are links.
+The arrangement is decided only by explicit text and explicit location data. Use the campaign language from `campaign.yaml`. Keep unresolved facts pending. Never infer a scene appearance from `characters`, `items`, names, links or mentions. The only appearance metadata is `appearances`, written as a block list, one item per subject (`- subject: ID` with `location: [PLACE_ID]` indented under it; the flow form `[{...}]` is rejected), supported by the explicit scene text. Never move or rename an event: event files stay in their session folders, and the geographic views are links.
 
 ## Steps
 

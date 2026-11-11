@@ -531,3 +531,34 @@ test('a batch that only adds links to a sheet needs no review', async (t) => {
   const textual = await checkBatch(dir, { files: [finalPath] });
   assert.equal(textual.reviewRequired, true);
 });
+
+test('a relative symlink to a folder outside the campaign passes check and survives commit', async (t) => {
+  const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
+  t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
+  const campaign = path.join(parent, 'campaign');
+  fs.mkdirSync(path.join(parent, 'outside/World'), { recursive: true });
+  fs.writeFileSync(path.join(parent, 'outside/World/Place.md'), '# Place\n\nA place outside the campaign.\n');
+  fs.cpSync(FIXTURE, campaign, { recursive: true, verbatimSymlinks: true });
+  git(campaign, ['init', '-q', '-b', 'main']);
+  git(campaign, ['config', 'user.name', 'Test Master']);
+  git(campaign, ['config', 'user.email', 'master@test.invalid']);
+  fs.mkdirSync(path.join(campaign, 'Sources'));
+  fs.symlinkSync('../../outside/World', path.join(campaign, 'Sources/World'));
+  const yamlPath = path.join(campaign, 'campaign.yaml');
+  const yaml = fs.readFileSync(yamlPath, 'utf8');
+  const structureEnd = '    folder: Appunti\n    type: notes\n';
+  if (!yaml.includes(structureEnd)) throw new Error('structure anchor');
+  fs.writeFileSync(yamlPath, yaml.replace(structureEnd, structureEnd + '  - id: fonti\n    folder: Sources/World\n    type: external\n'));
+  ensureRepo(campaign);
+  git(campaign, ['add', '-A']);
+  git(campaign, ['commit', '-q', '-m', 'fixture']);
+
+  writeDraft(campaign, MIRA_PATH, MIRA);
+  const check = await checkBatch(campaign, { files: [MIRA_PATH] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  writeReview(campaign);
+  const result = await commitBatch(campaign, { files: [MIRA_PATH], message: 'Add Mira Sanna', note: 'test' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(fs.readlinkSync(path.join(campaign, 'Sources/World')), '../../outside/World');
+});

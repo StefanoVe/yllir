@@ -183,7 +183,7 @@ export async function commitBatch(root, options = {}) {
     // 5. Write: the copy, then the saved version, then the work state.
     let saved;
     try {
-      syncTree(evaluation.copy, dir);
+      syncTree(evaluation.copy, dir, evaluation.externalLinks);
       saved = saveVersion(dir, { message, kind: 'framework' });
       removeDrafts(dir, files);
       rmIfExists(path.join(dir, REVIEW_FILE));
@@ -229,16 +229,17 @@ async function evaluate(dir, { files, deletes, sources, tmpRoot }) {
   const draftsHash = hashDrafts(dir, files, deletes, sources);
   const preflightErrors = preflight(dir, files, deletes, sources);
   if (preflightErrors.length > 0) {
-    return { errors: preflightErrors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null };
+    return { errors: preflightErrors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map() };
   }
 
   const copy = fs.mkdtempSync(path.join(tmpRoot, 'yllir-engine-'));
-  const result = { errors: [], finalFiles: [...files], ambiguousMentions: [], draftsHash, copy };
+  const result = { errors: [], finalFiles: [...files], ambiguousMentions: [], draftsHash, copy, externalLinks: new Map() };
   try {
     const existing = files.filter((rel) => lstatOrNull(path.join(dir, rel)) !== null);
     const baseline = await validate(dir, scopesFor(dir, existing, deletes));
 
     const transformed = await transform(dir, copy, { files, deletes });
+    result.externalLinks = transformed.externalLinks;
     result.finalFiles = transformed.finalFiles;
     result.ambiguousMentions = transformed.ambiguousMentions;
     if (transformed.errors.length > 0) {
@@ -334,8 +335,8 @@ function preflight(dir, files, deletes, sources) {
  * layout, links, plot maps, derived indexes. Errors returned here always block.
  */
 async function transform(dir, copy, { files, deletes }) {
-  const out = { errors: [], finalFiles: [...files], pathMap: {}, ambiguousMentions: [] };
-  copyCampaign(dir, copy);
+  const out = { errors: [], finalFiles: [...files], pathMap: {}, ambiguousMentions: [], externalLinks: new Map() };
+  out.externalLinks = copyCampaign(dir, copy);
 
   for (const rel of files) {
     const dest = path.join(copy, rel);
@@ -504,8 +505,14 @@ function conflictError(file) {
 // Copy and tree synchronisation
 // ---------------------------------------------------------------------------
 
-/** Copies the campaign, without .git and the transient folders. Symlinks stay relative. */
+/**
+ * Copies the campaign, without .git and the transient folders. Relative symlinks inside the
+ * campaign stay relative. Relative symlinks that point outside the campaign are made absolute in
+ * the copy, because a relative target would resolve to another place there; syncTree restores
+ * them. Returns the rewritten links by campaign-relative path: { absolute, original }.
+ */
 function copyCampaign(dir, copy) {
+  const restored = new Map();
   fs.cpSync(dir, copy, {
     recursive: true,
     dereference: false,
@@ -515,10 +522,22 @@ function copyCampaign(dir, copy) {
       return !isExcludedFromTree(rel);
     },
   });
+  for (const [rel, kind] of listTree(copy)) {
+    if (kind !== 'link') continue;
+    const original = fs.readlinkSync(path.join(dir, rel));
+    if (path.isAbsolute(original)) continue;
+    const resolved = path.resolve(path.dirname(path.join(dir, rel)), original);
+    const inside = path.relative(dir, resolved);
+    if (!inside.startsWith('..') && !path.isAbsolute(inside)) continue;
+    fs.rmSync(path.join(copy, rel), { force: true });
+    fs.symlinkSync(resolved, path.join(copy, rel));
+    restored.set(rel, { absolute: resolved, original });
+  }
+  return restored;
 }
 
 /** Makes the campaign tree equal to the copy: writes what differs, deletes what is gone. */
-function syncTree(from, to) {
+function syncTree(from, to, externalLinks = new Map()) {
   const source = listTree(from);
   const target = listTree(to);
   const emptied = new Set();
@@ -536,7 +555,9 @@ function syncTree(from, to) {
     const toFull = path.join(to, rel);
     const current = target.get(rel);
     if (kind === 'link') {
-      const linkTarget = fs.readlinkSync(fromFull);
+      let linkTarget = fs.readlinkSync(fromFull);
+      const external = externalLinks.get(rel);
+      if (external && linkTarget === external.absolute) linkTarget = external.original;
       if (current === 'link' && fs.readlinkSync(toFull) === linkTarget) continue;
       if (current !== undefined) fs.rmSync(toFull, { force: true });
       fs.mkdirSync(path.dirname(toFull), { recursive: true });
