@@ -1,0 +1,8 @@
+id: item-knowledge-v1
+after: [item-descriptions-v1]
+introduced_in: 0.37.0
+needed:
+  from_version_below: 0.37.0
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs

@@ -108,3 +108,70 @@ test('completion reports a listed file that does not exist as unverified instead
     errors: [{ code: 'unverified-publication', file: 'Objects/missing.md' }],
   });
 });
+
+const K = 'item-knowledge-v1';
+function knowledgeComplete(root, file, draftText) {
+  prepareItemDescriptions(root, { migration: K });
+  assert.equal(stageItemDescriptionDraft(root, file, draftText, K).status, 'staged');
+  assert.equal(verifyItemDescriptionDrafts(root, [file], K).status, 'verified');
+  return completeItemDescriptions(root, [file], K);
+}
+
+test('knowledge: moving a public fact into the master block verifies and completes', () => {
+  const source = sheet().replace('A key made of silver.', 'A key made of silver. It is cursed.');
+  const root = campaign([['key.md', source]]);
+  const draft = source.replace(' It is cursed.', '').replace('secret\n<!-- /master -->', 'secret\nIt is cursed.\n<!-- /master -->');
+  prepareItemDescriptions(root, { migration: K });
+  assert.equal(stageItemDescriptionDraft(root, 'Objects/key.md', draft, K).status, 'staged');
+  assert.equal(verifyItemDescriptionDrafts(root, ['Objects/key.md'], K).status, 'verified');
+  const published = path.join(root, 'Objects/key.md'); fs.writeFileSync(published, draft);
+  assert.equal(completeItemDescriptions(root, ['Objects/key.md'], K).status, 'complete');
+  assert.ok(fs.existsSync(path.join(root, '.campaign/state/update/item-knowledge.json')));
+  assert.equal(fs.existsSync(path.join(root, '.campaign/state/update/item-descriptions.json')), false);
+});
+
+test('knowledge: effects may change, but the title may not', () => {
+  const root = campaign([['key.md', sheet()]]);
+  prepareItemDescriptions(root, { migration: K });
+  assert.equal(stageItemDescriptionDraft(root, 'Objects/key.md', sheet().replace('No game effect.', 'Nessun effetto di gioco'), K).status, 'staged');
+  const bad = stageItemDescriptionDraft(root, 'Objects/key.md', sheet().replace('# Key', '# Big key'), K);
+  assert.equal(bad.status, 'failed');
+  assert.equal(bad.errors[0].code, 'head-changed');
+});
+
+test('knowledge: dropping a master line fails with master-notes-lost', () => {
+  const root = campaign([['key.md', sheet()]]);
+  prepareItemDescriptions(root, { migration: K });
+  const draft = sheet().replace('secret\n<!-- /master -->', 'other\n<!-- /master -->');
+  assert.equal(stageItemDescriptionDraft(root, 'Objects/key.md', draft, K).status, 'staged');
+  const result = verifyItemDescriptionDrafts(root, ['Objects/key.md'], K);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.errors[0].code, 'master-notes-lost');
+});
+
+test('knowledge: empty Effects fails with public-sections-missing', () => {
+  const root = campaign([['key.md', sheet()]]);
+  prepareItemDescriptions(root, { migration: K });
+  const draft = sheet().replace('No game effect.', '');
+  assert.equal(stageItemDescriptionDraft(root, 'Objects/key.md', draft, K).status, 'staged');
+  const result = verifyItemDescriptionDrafts(root, ['Objects/key.md'], K);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.errors[0].code, 'public-sections-missing');
+});
+
+test('knowledge: text after the master block fails with master-block-invalid', () => {
+  const root = campaign([['key.md', sheet()]]);
+  prepareItemDescriptions(root, { migration: K });
+  const draft = `${sheet()}Trailing text.\n`;
+  assert.equal(stageItemDescriptionDraft(root, 'Objects/key.md', draft, K).status, 'staged');
+  const result = verifyItemDescriptionDrafts(root, ['Objects/key.md'], K);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.errors[0].code, 'master-block-invalid');
+});
+
+test('the two migrations keep separate inventories', () => {
+  const root = campaign([['key.md', sheet()]]);
+  assert.equal(knowledgeComplete(root, 'Objects/key.md', sheet()).status, 'complete');
+  assert.equal(prepareItemDescriptions(root, { migration: K }).status, 'complete');
+  assert.equal(prepareItemDescriptions(root).status, 'pending');
+});
