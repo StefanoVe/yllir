@@ -10,6 +10,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 import { readStructure, listCanonicalSheets, compareStrings } from '../../../../../scripts/lib/subjects.mjs';
+import { PROVENANCES } from '../../../../../scripts/lib/world-graph.mjs';
 
 const EVENT_FOLDERS = new Set(['Eventi', 'Events']);
 
@@ -95,6 +96,7 @@ export function plotMap(root) {
       name: path.posix.basename(file, '.md'),
       depends_on: dependsOn,
       location: readLocation(data),
+      provenance: readProvenance(data),
     };
     sessions.push(doc);
     sessionById.set(doc.id, doc);
@@ -270,6 +272,7 @@ export function plotMap(root) {
       name: doc.name,
       depends_on: doc.depends_on.slice(),
       location: doc.location.slice(),
+      provenance: doc.provenance,
       played,
       ready,
       events: eventsBySession.get(doc.id) ?? [],
@@ -332,6 +335,11 @@ function readDependsOn(data, file, errors, missingCode, invalidCode) {
     return [];
   }
   return data.depends_on.slice();
+}
+
+/** The provenance of a session main file, or null when it is missing or not one of PROVENANCES. */
+function readProvenance(data) {
+  return typeof data.provenance === 'string' && PROVENANCES.includes(data.provenance) ? data.provenance : null;
 }
 
 function readLocation(data) {

@@ -5,8 +5,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { compareStrings } from '../../../../../scripts/lib/subjects.mjs';
+import { PROVENANCES } from '../../../../../scripts/lib/world-graph.mjs';
 
 const LIST_SEPARATOR = ', ';
+
+/** Keeps the provenance of the existing main file; anything missing or invalid becomes generated. */
+function provenanceOf(session) {
+  return PROVENANCES.includes(session.provenance) ? session.provenance : 'generated';
+}
 
 /** Mermaid labels are wrapped in double quotes, so inner quotes become single. */
 function mermaidLabel(name) {
@@ -31,6 +37,7 @@ export function renderSessionMap(session) {
 
   const lines = ['---', `id: ${session.id}`];
   lines.push(`depends_on: [${(session.depends_on ?? []).join(LIST_SEPARATOR)}]`);
+  lines.push(`provenance: ${provenanceOf(session)}`);
   lines.push(`location: [${(session.location ?? []).join(LIST_SEPARATOR)}]`);
   if (session.arc) lines.push(`arc: "${session.arc}"`);
   lines.push('generated: true');

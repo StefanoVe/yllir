@@ -514,3 +514,17 @@ test('CLI --out writes the JSON result', (t) => {
   const text = fs.readFileSync(out, 'utf8');
   assert.equal(text, `${JSON.stringify(plotMap(root), null, 2)}\n`);
 });
+
+test('the session object carries the provenance of its main file, or null when missing or invalid', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/Sessione 1/Sessione 1.md': '---\nid: s-01\ndepends_on: []\nprovenance: master\n---\n\n# S1\n',
+    'Trama/Sessione 2/Sessione 2.md': '---\nid: s-02\ndepends_on: []\n---\n\n# S2\n',
+    'Trama/Sessione 3/Sessione 3.md': '---\nid: s-03\ndepends_on: []\nprovenance: invented\n---\n\n# S3\n',
+  });
+  const result = plotMap(root);
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(
+    result.sessions.map((s) => [s.id, s.provenance]),
+    [['s-01', 'master'], ['s-02', null], ['s-03', null]],
+  );
+});
