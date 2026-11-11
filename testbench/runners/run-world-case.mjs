@@ -56,7 +56,7 @@ import { foldForm } from '../../yllir/scripts/lib/fold.mjs';
 const USAGE =
   'usage: node testbench/runners/run-world-case.mjs <caseDir> [--runs N] [--model sonnet] [--agent claude] [--keep] [--delegation auto|always|never] [--judge] [--judge-model opus] [--setup-only] [--grade-only <dir> --run-json <file>]';
 const AGENT_TIMEOUT_MS = 1800000;
-const PLUGIN_ROOT = path.join(REPO_ROOT, 'yllir');
+const PLUGIN_DIR = path.join(REPO_ROOT, 'yllir');
 const FIXTURES = path.join(REPO_ROOT, 'testbench', 'fixtures');
 const VERSION_MESSAGE = 'Creata la campagna di prova';
 const CASE_KINDS = new Map([
@@ -449,7 +449,7 @@ export async function gradeCreature({ key, adapterId, lang, baseline, after, dir
   // C2: the sheet passes the adapter's validation (shape and arithmetic), and the adapter loads.
   const c2 = [];
   let adapter = null;
-  const loaded = loadAdapter(PLUGIN_ROOT, adapterId);
+  const loaded = loadAdapter(PLUGIN_DIR, adapterId);
   if (!loaded.ok || loaded.adapter === null) {
     c2.push(...loaded.errors.map((error) => `adapter: ${error.message}`));
   } else {
@@ -579,7 +579,7 @@ function consoleView(record) {
 
 /** The files that define the process under test (the same set as the other runners). */
 function instructionFiles() {
-  const yllir = PLUGIN_ROOT;
+  const yllir = PLUGIN_DIR;
   const files = ['skills', 'agents', 'templates', 'hooks'].flatMap((dir) => listFiles(path.join(yllir, dir)));
   files.push(...listFiles(path.join(yllir, 'scripts'), { scriptsOnly: true }));
   return [...new Set(files)].filter((file) => !path.basename(file).startsWith('.'));
@@ -652,7 +652,7 @@ async function main() {
   for (let i = 1; i <= opts.runs; i++) {
     const date = new Date().toISOString();
     const setup = setupWorldCase(caseData);
-    const variant = buildPluginVariant({ mode: delegation, sourceDir: PLUGIN_ROOT });
+    const variant = buildPluginVariant({ mode: delegation, sourceDir: PLUGIN_DIR });
     let record;
     try {
       const agent = runAgent({

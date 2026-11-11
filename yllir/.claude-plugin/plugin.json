@@ -1,6 +1,6 @@
 {
   "name": "yllir",
-  "version": "0.31.0",
+  "version": "0.31.1",
   "description": "Create and maintain tabletop RPG campaigns by talking in natural language.",
   "skills": ["./skills/core/", "./skills/library/"]
 }

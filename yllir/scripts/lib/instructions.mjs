@@ -19,7 +19,7 @@ const DEFAULT_TEMPLATE = path.resolve(import.meta.dirname, '../../templates/inst
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
 // The plugin folder: the parent of the scripts folder. The generated instructions
 // state this path for the case where CLAUDE_PLUGIN_ROOT is empty.
-export const PLUGIN_ROOT = path.resolve(import.meta.dirname, '../..');
+export const PLUGIN_DIR = path.resolve(import.meta.dirname, '../..');
 
 const CONFIG_PATH = 'campaign.yaml';
 const AGENT_PATH = '.campaign/instructions/agent.md';
@@ -277,7 +277,7 @@ export function generateInstructions(campaignRoot, { templatePath = DEFAULT_TEMP
     return fail([{ file: templatePath, line: null, code: 'missing-template', message: 'template not found' }]);
   }
   // The generator's own values are added under `plugin`, after campaign.yaml.
-  const rendered = renderTemplate(templateText, { ...parsed.data, plugin: { root: PLUGIN_ROOT } });
+  const rendered = renderTemplate(templateText, { ...parsed.data, plugin: { root: PLUGIN_DIR } });
   if (rendered.errors.length > 0) {
     return fail(rendered.errors.map((error) => ({ file: templatePath, ...error })));
   }
