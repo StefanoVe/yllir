@@ -2,6 +2,7 @@
 
 **Stato:** Bozza di progetto
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
+Allineato alla [Riprogettazione](Riprogettazione.md) (2026-11-11).
 
 Questo file descrive come il master vive il framework senza sapere cos'è un'intelligenza artificiale, un orchestratore o una versione salvata nel repository git. Ogni affermazione è marcata come **Deciso** (presente nelle decisioni dell'indice) oppure **Proposta** (idea di questo documento, da confermare). Il funzionamento sotto il cofano è descritto nel file [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md), la cui lettura non è necessaria per il master.
 
@@ -68,7 +69,7 @@ Il ritorno non cancella mai nulla in modo definitivo. Il master non deve sceglie
 
 ## «Dove eravamo rimasti»
 
-**Proposta.** All'apertura di una campagna esistente, il framework fa un riepilogo breve, al massimo cinque righe:
+**Proposta.** All'apertura di una campagna esistente, il framework fa un riepilogo breve, al massimo cinque righe (Riprogettazione, decisione 15: il riepilogo nasce dal pacchetto di contesto e dalla nota sul lavoro in corso):
 
 - l'ultima sessione, con data e titolo;
 - le cose rimaste in sospeso: domande senza risposta, conflitti aperti, personaggi con una scelta ancora da fare;
@@ -103,9 +104,11 @@ I dettagli dell'errore finiscono in un registro che il master può consultare da
 - Una domanda su un limite («non puoi farlo?», «perché non ci riesci?») ha una risposta di una frase: che cosa non si può fare e qual è il passo successivo utile. Non si elencano le funzioni del framework.
 - Un problema concreto (una scheda vuota, una scena da sistemare) viene trattato subito. La manutenzione (versioni vecchie, collegamenti ambigui) resta in sottofondo: non viene proposta a parte, a meno che il master la chieda o che sia necessaria per rispondere.
 
+Quando completa una scheda, il framework separa ciò che la campagna già dice da ciò che inventa, e lo dichiara (Riprogettazione, decisione 7).
+
 > **Master:** Non puoi completare una scheda che esiste già?
 >
-> **Assistente:** Sì, per personaggi, creature, venditori e luoghi: dimmi quale scheda, e completo le parti vuote con ciò che la campagna già dice.
+> **Assistente:** Sì, per personaggi, creature, venditori e luoghi: dimmi quale scheda, e completo le parti vuote: ciò che la campagna già dice lo riprendo, il resto lo inventerò e te lo dirò.
 
 ## Separazione automatica fra pubblico e master
 
@@ -120,7 +123,7 @@ I dettagli dell'errore finiscono in un registro che il master può consultare da
 
 ## Dialoghi di esempio
 
-I dialoghi seguenti mostrano come il framework parla al master. «Master» è l'utente; «Assistente» è il framework. Il linguaggio è semplice: nessun termine dell'elenco di esclusione. Tutti i nomi che compaiono (Vessel, Ormesta, Mira, il capitano) sono **esempi fittizi**.
+I dialoghi seguenti mostrano come il framework parla al master. Il seme del mondo è il documento che raccoglie ciò che vale per tutto il mondo, e il framework lo aggiorna man mano (Riprogettazione, sezione 4). «Master» è l'utente; «Assistente» è il framework. Il linguaggio è semplice: nessun termine dell'elenco di esclusione. Tutti i nomi che compaiono (Vessel, Ormesta, Mira, il capitano) sono **esempi fittizi**.
 
 ### 1. Creare una nuova campagna
 
@@ -138,7 +141,7 @@ I dialoghi seguenti mostrano come il framework parla al master. «Master» è l'
 >
 > **Master:** Governa un consiglio di mercanti. E la torre sommersa resta segreta.
 >
-> **Assistente:** Annotato nella scheda radice del mondo: il consiglio dei mercanti compare nella parte pubblica, la torre sommersa va nel blocco riservato. Vuoi che prepari la prima sessione, oppure aggiungiamo un personaggio prima?
+> **Assistente:** Annotato nel seme del mondo: il consiglio dei mercanti governa Ormesta, e la torre sommersa resta tra noi. Vuoi che prepari la prima sessione, oppure aggiungiamo un personaggio prima?
 
 ### 2. Preparare la sessione del giovedì
 
@@ -194,7 +197,7 @@ Per aprire il terminale: su macOS, premere Cmd e barra spaziatrice, digitare «T
 
 ## Una sola chat, senza organizzare le richieste
 
-Il master non deve aprire conversazioni nuove né ordinare le proprie richieste per argomento: lo fa il framework (vedi [Gestione delle sessioni](Gestione%20delle%20sessioni.md)). Al massimo vede una riga come «Riprendo da dove avevamo lasciato la taverna».
+Il master non deve aprire conversazioni nuove né ordinare le proprie richieste: il framework riprende il lavoro dal pacchetto di contesto e dalla nota sul lavoro in corso, senza argomenti né handoff (Riprogettazione, decisione 15; vedi [Gestione delle sessioni](Gestione%20delle%20sessioni.md)). Al massimo vede una riga come «Riprendo da dove avevamo lasciato la taverna».
 
 ## Questioni aperte
 

@@ -2,6 +2,7 @@
 
 **Stato:** Bozza di progetto
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
+Allineato alla [Riprogettazione](Riprogettazione.md) (2026-11-11).
 
 Questo documento descrive come il framework si aggiorna senza mettere a rischio la campagna del master. Le scelte già prese dall’autore sono indicate come tali; tutto il resto è una proposta e va letto come tale.
 
@@ -52,7 +53,7 @@ Esempio di messaggio, pensato per chi non conosce l’informatica:
 
 > È disponibile una versione nuova del sistema con cui lavori. Migliora il modo in cui vengono ritrovate le citazioni dei personaggi nei documenti e i controlli di coerenza. Non cambia nulla nelle tue schede e nelle tue sessioni. Vuoi che aggiorni ora? Posso prima mostrarti che cosa cambia.
 
-Da verificare: se l’hook di avvio è disponibile in Claude Code e in Codex con lo stesso comportamento. Se non lo è, il controllo va fatto dal comando di avvio della skill principale, con lo stesso testo.
+Da verificare: se l’hook di avvio è disponibile in Claude Code con lo stesso comportamento. Il confronto con Codex è superato dalla Riprogettazione (2026-11-11), decisione 11: il framework si distribuisce solo come plugin per Claude Code. Se non lo è, il controllo va fatto dal comando di avvio della skill principale, con lo stesso testo.
 
 ## Skill di update
 
@@ -217,8 +218,8 @@ Non è incompatibile, di per sé, cambiare il testo delle istruzioni che guidano
 
 Il framework va distribuito in modo che il master non usi mai git o un terminale. Le ipotesi di distribuzione sono da verificare, non fatti.
 
-- **Ipotesi A, plugin e marketplace di Claude Code.** Un plugin potrebbe includere skill, hook di avvio e script, e un marketplace potrebbe servire la versione pubblicata. Da verificare: se un plugin può contenere hook di sessione e script eseguibili, come si aggiorna su richiesta, se lo stesso pacchetto funziona in Codex. Non risulta ancora verificato.
-- **Ipotesi B, repository con etichette di versione.** Il framework è un repository pubblico con tag di versione; l’update scarica l’ultimo tag. Funziona con entrambi gli agenti, ma richiede che il master abbia git installato, o che lo script lo gestisca in modo nascosto.
+- **Ipotesi A, plugin e marketplace di Claude Code.** Un plugin potrebbe includere skill, hook di avvio e script, e un marketplace potrebbe servire la versione pubblicata. Da verificare: se un plugin può contenere hook di sessione e script eseguibili, come si aggiorna su richiesta. Il punto su Codex è superato dalla Riprogettazione (2026-11-11), decisione 11. Non risulta ancora verificato.
+- **Ipotesi B, repository con etichette di versione.** Il framework è un repository pubblico con tag di versione; l’update scarica l’ultimo tag. Superata dalla Riprogettazione (2026-11-11), decisione 11, la parte «funziona con entrambi gli agenti»: il framework è solo per Claude Code. Richiede che il master abbia git installato, o che lo script lo gestisca in modo nascosto.
 - **Ipotesi C, archivio versionato.** Un’archiviazione con un file dell’ultima versione e la sua impronta. È la più semplice e la meno dipendente dagli strumenti, ma richiede un servizio di pubblicazione.
 
 Indipendentemente dall’ipotesi, il controllo all’avvio deve funzionare anche offline (silenzio) e la skill di update deve poter lavorare su una copia già in locale.
@@ -241,9 +242,9 @@ Regole aggiuntive:
 
 ### Adattamento delle descrizioni degli oggetti
 
-L'aggiornamento che introduce la distinzione fra `## In breve` e `## Descrizione` include anche le schede di oggetti già esistenti. L'inventario riprendibile vive separatamente dallo stato delle tabelle delle statistiche e dalla migrazione geografica: una campagna già allineata a una versione precedente avvia comunque questo controllo. Le schede vengono esaminate da Luna usando solo il canone pubblico, le personalizzazioni e il registro di prosa; le note del master non entrano nelle descrizioni né nel contesto del revisore di testo pubblico.
+L'aggiornamento che introduce la distinzione fra `## In breve` e `## Descrizione` include anche le schede di oggetti già esistenti. L'inventario riprendibile vive separatamente dallo stato delle tabelle delle statistiche e dalla migrazione geografica: una campagna già allineata a una versione precedente avvia comunque questo controllo. Le schede vengono esaminate da un esecutore economico, su ordine dell’autore (Riprogettazione, decisione 4; al posto di Luna, il modello di Codex, ora fuori dal framework), usando solo il canone pubblico, le personalizzazioni e il registro di prosa; le note del master non entrano nelle descrizioni né nel contesto del revisore di testo pubblico.
 
-Ogni bozza può cambiare solo le due sezioni descrittive. Le impronte della fonte impediscono di pubblicare una bozza preparata su una scheda nel frattempo modificata; le verifiche preservano byte per byte effetti, sezioni facoltative e blocco riservato. `write-sequence` applica la revisione indipendente e salva la versione. Se il contesto è insufficiente, la scheda resta in sospeso finché il master non chiarisce; se la descrizione esistente è già adeguata, la revisione viene registrata senza riscrivere il file. La migrazione si chiude soltanto quando ogni bozza verificata corrisponde al testo pubblicato.
+Ogni bozza può cambiare solo le due sezioni descrittive. Le impronte della fonte impediscono di pubblicare una bozza preparata su una scheda nel frattempo modificata; le verifiche preservano byte per byte effetti, sezioni facoltative e blocco riservato. Il motore (`commit`) applica le modifiche dopo i suoi controlli e salva la versione; la revisione di un modello distinto segue la decisione 5 e vale solo per i lotti che aggiungono fatti al canone (Riprogettazione, decisione 5 e sezione 2). Se il contesto è insufficiente, la scheda resta in sospeso finché il master non chiarisce; se la descrizione esistente è già adeguata, la revisione viene registrata senza riscrivere il file. La migrazione si chiude soltanto quando ogni bozza verificata corrisponde al testo pubblicato.
 
 Proposta: due documenti distinti, scritti per pubblici diversi.
 
@@ -281,27 +282,41 @@ Scelte di implementazione dell’MVP, da confermare:
 
 - **Due aggiornamenti distinti.** Il plugin lo sostituisce lo strumento; il framework aggiorna solo i file generati nella campagna, confrontando `framework_version` della campagna con quella del plugin installato. Il master vede un solo aggiornamento.
 - **File generati modificati a mano.** Coerentemente con il comportamento già in uso, si ripristinano; la versione modificata resta recuperabile dalla storia git, perché prima dell’aggiornamento si salvano le modifiche pendenti. Non si creano copie accanto. Le regole del master vivono in `.campaign/customizations.md`, che non si tocca.
-- **Memoria dell’avviso** in `.campaign/state/update-notice.yaml` (ultima versione avvisata, data, eventuale rinvio), non in una cartella dati del plugin: funziona anche in Codex e non dipende da una variabile d’ambiente.
+- **Memoria dell’avviso** in `.campaign/state/update-notice.yaml` (ultima versione avvisata, data, eventuale rinvio), non in una cartella dati del plugin, e non dipende da una variabile d’ambiente. Il «funziona anche in Codex» è superato dalla Riprogettazione (2026-11-11), decisione 11.
 - **Novità per il master** in `news/<versione>.md` (con variante `news/<versione>.<lingua>.md`) dentro il plugin pubblicato.
 - **Stato dell’aggiornamento** in `.campaign/state/update.yaml` (`in_progress`, `completed`, `cancelled`), con il punto di ripristino: se resta `in_progress`, alla sessione dopo si propone di riprendere o tornare com’era.
 
 ## Conversione delle statistiche dopo l’aggiornamento (Deciso, 2026-11-10)
 
-Quando una nuova versione introduce il formato a tabelle per `## Statistiche`, al completamento dell’aggiornamento il framework avvia automaticamente una ricognizione delle schede coinvolte. La ricognizione meccanica è deterministica. Per ogni scheda convertibile, Luna prepara la disposizione in tre tabelle: `Caratteristica` / `Valore`, `Attacco o capacità` / `Dettagli` e `Oggetto` / `Dettagli` per l’equipaggiamento, con intestazioni nella lingua della campagna. La bozza passa sempre dal cablaggio di scrittura, compresa la revisione indipendente, prima di essere applicata.
+Quando una nuova versione introduce il formato a tabelle per `## Statistiche`, al completamento dell’aggiornamento il framework avvia automaticamente una ricognizione delle schede coinvolte. La ricognizione meccanica è deterministica. Per ogni scheda convertibile, un esecutore economico prepara la disposizione in tre tabelle: `Caratteristica` / `Valore`, `Attacco o capacità` / `Dettagli` e `Oggetto` / `Dettagli` per l’equipaggiamento, con intestazioni nella lingua della campagna. La bozza passa sempre dal motore (`commit`) prima di essere applicata. **Superata dalla Riprogettazione (2026-11-11), decisioni 4, 5 e 11:** il cablaggio di scrittura è ora il motore; l’esecutore non è più Luna, modello di Codex, fuori dal framework; la revisione di un modello distinto si fa solo per i lotti che aggiungono fatti al canone.
 
 La conversione conserva ogni valore e dettaglio già presente; non inventa, elimina o ricalcola dati. Non cambia le scorte o i prezzi dei venditori, le personalizzazioni del master né il confine fra testo pubblico e blocco riservato. I segnaposto restano segnaposto e una creatura non combattente conserva la dichiarazione «Nessuna statistica: non combatte» senza ricevere tabelle.
 
 Se la forma precedente è ambigua, la scheda resta intatta e la conversione risulta in sospeso. Il framework la ripropone alla sessione successiva e può riprendere il lavoro dopo la decisione necessaria del master. Lo stato registra quali schede attendono la conversione; completare di nuovo un passaggio già applicato non duplica cambiamenti. Git fornisce il punto di ripristino e consente di annullare le modifiche della migrazione.
 
+## Migrazione world-graph-v1 (Riprogettazione, decisione 6)
+
+Migrazione post-aggiornamento, implementata nella versione 0.30.0. Porta le campagne esistenti al formato del mondo come grafo (Riprogettazione, sezione 3). Fa questi passi:
+
+- aggiunge a ogni documento esistente i metadati di tipo e di provenienza: tutto il contenuto già scritto risulta «detto dal master». Il testo dei documenti resta com’era, byte per byte;
+- crea il seme del mondo dalla frase di descrizione di `campaign.yaml` (Riprogettazione, sezione 4);
+- toglie da `campaign.yaml` la chiave `allow_model_imagination` (Riprogettazione, decisione 7);
+- trasforma gli argomenti aperti in una nota sul lavoro in corso (Riprogettazione, decisione 15);
+- ricostruisce gli indici derivati e salva una versione.
+
+La migrazione è idempotente: si può interrompere e riprendere senza duplicare nulla. È reversibile con git, tranne lo stato locale, che git non copre.
+
+La migrazione non ricava relazioni, perché nessuna si può leggere con certezza dalla prosa con uno script: restano in sospeso, e le dichiara l’autore quando tocca i documenti (Implementato in 0.30.0; Riprogettazione, sezione 10).
+
 ## Questioni aperte
 
 - Dove si trova, sul computer del master, la cartella del plugin pubblicato (la sorgente delle novità): per ora il controllo la legge dalla variabile `YLLIR_PUBLISHED_SOURCE`, e senza di essa tace. Va verificato come il marketplace la rende disponibile.
-- Come si aggiorna in Codex: si usa `codex plugin marketplace upgrade yllir --json` (verificato 2026-11-09: aggiorna il plugin installato da 0.1.0 a 0.2.0). Il comando funziona solo se il marketplace è stato aggiunto da Git e non da cartella locale.
+- Come si aggiorna in Codex: si usa `codex plugin marketplace upgrade yllir --json` (verificato 2026-11-09: aggiorna il plugin installato da 0.1.0 a 0.2.0). Il comando funziona solo se il marketplace è stato aggiunto da Git e non da cartella locale. **Superata dalla Riprogettazione (2026-11-11), decisione 11:** il framework non si distribuisce più per Codex.
 - Qual è la fonte dell’ultima versione pubblicata (plugin, repository con tag, archivio) e chi la pubblica.
 - Come funziona in dettaglio la versione di Baltimora: formato del file di versione, comando di controllo, skill di update. Serve un confronto diretto con l’autore.
 - Le personalizzazioni di un file del framework: scelta sempre esplicita o solo sopra una soglia di modifica.
 - Quanto spesso controllare la versione: a ogni sessione, una volta al giorno, una volta per versione.
 - Come gestire un’installazione che salta più versioni: applicare tutte le migrazioni in sequenza o chiedere al master se procedere.
-- Se l’hook di avvio è disponibile in Codex e con quale forma; se non lo è, quale comando di avvio lo sostituisce.
+- Se l’hook di avvio è disponibile in Codex e con quale forma; se non lo è, quale comando di avvio lo sostituisce. **Superata dalla Riprogettazione (2026-11-11), decisione 11:** la parte su Codex non vale più.
 - Se il changelog per il master vada tradotto in più lingue, dato che la prosa della campagna può essere in lingue diverse.
-- **Migrazione «Eventi in file separati» (Proposta, 2026-11-09).** Per le campagne già create: ogni sessione `Trama/<Arco>/<Sessione>.md` diventa `Trama/<Sessione>/<Sessione>.md`, e ogni titolo `#` diventa `Eventi/<Evento>.md` con `id`, `session` e `depends_on`. La migrazione crea gli eventi con `depends_on: []` e subito dopo l'agente esamina gli eventi e li collega (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md), 2.9): il master non deve confermare ogni collegamento, ma i collegamenti restano nella storia git. Serve che la migrazione sia reversibile, che riscriva i link alle vecchie ancore e che non tocchi il testo scritto dal master. Il file principale si genera dopo.
+- **Migrazione «Eventi in file separati» (Proposta, 2026-11-09).** Per le campagne già create: ogni sessione `Trama/<Arco>/<Sessione>.md` diventa `Trama/<Sessione>/<Sessione>.md`, e ogni titolo `#` diventa `Eventi/<Evento>.md` con `id`, `session` e `depends_on`. La migrazione crea gli eventi con `depends_on: []` e subito dopo l'agente esamina gli eventi e li collega (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md), 2.9): il master non deve confermare ogni collegamento, ma i collegamenti restano nella storia git. Serve che la migrazione sia reversibile, che riscriva i link alle vecchie ancore e che non tocchi il testo scritto dal master. Il file principale si genera dopo. **Superata in parte dalla Riprogettazione (2026-11-11), sezione 2:** il passo in cui l’agente collega gli eventi era della skill `plot-map`, ora rimossa, e il file principale della sessione è derivato: lo rigenera il motore a ogni salvataggio.

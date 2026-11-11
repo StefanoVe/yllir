@@ -3,6 +3,7 @@
 **Stato:** Bozza di progetto
 
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
+Allineato alla [Riprogettazione](Riprogettazione.md) (2026-11-11).
 
 ## Scopo
 
@@ -111,7 +112,7 @@ Proposta, non decisione. Lo schema descrive i ruoli, non la tecnologia.
 Master
   │
   ▼
-Master screen locale ───────────► Agente (Claude o Codex)
+Master screen locale ───────────► Agente (Claude)        
   ▲   │                            │  usa solo gli strumenti del framework
   │   ▼                            ▼
   │  Cosa è cambiato        File della campagna (Markdown e immagini)
@@ -126,10 +127,10 @@ Moduli attivabili: musica · stampa · enciclopedia · altri (vedi sotto)
 Componenti:
 
 1. **Applicazione locale.** Un solo processo sul computer del master, raggiungibile solo dal computer stesso. Si avvia con un'azione semplice (un doppio clic o un comando) e si chiude senza lasciare processi.
-2. **Collegamento all'agente.** Il master screen parla con uno o più agenti (Claude e Codex, secondo la specifica di orchestrazione). Ogni turno riceve solo gli strumenti previsti dal framework e mai una shell libera. Un possibile meccanismo è un server di strumenti locale con un token valido per il solo turno: è un'ipotesi da valutare, non un obbligo.
+2. **Collegamento all'agente.** Il master screen parla con l'agente principale di Claude: Codex non fa più parte del framework, al più è un fornitore facoltativo di immagini (Riprogettazione, decisioni 4 e 11). Ogni turno riceve solo gli strumenti previsti dal framework e mai una shell libera. Un possibile meccanismo è un server di strumenti locale con un token valido per il solo turno: è un'ipotesi da valutare, non un obbligo.
 3. **Lettura dei file.** I Markdown e le immagini della campagna sono la fonte di verità. L'indice è una cache: se si cancella, si ricostruisce dai file senza perdere nulla.
 4. **Aggiornamento in tempo reale.** Un osservatore dei file rileva ogni creazione, modifica, rinomina ed eliminazione, qualunque ne sia l'autore: l'agente nel master screen, l'agente nel terminale o il master con un editor. La vista si aggiorna da questo flusso, così il master screen non è un secondo motore.
-5. **Stato di sessione.** Chat, registro, tela libera e combattimento vivono in `.campaign/state/`, separata dal canone (vedi [Architettura](Architettura.md#3-campagna-generata)): è lo stato operativo della campagna e non modifica i file del canone. Se il master chiede una modifica canonica, questa passa dal processo di manutenzione con i suoi controlli.
+5. **Stato di sessione.** Chat, registro, tela libera e combattimento vivono in `.campaign/state/`, separata dal canone (vedi [Architettura](Architettura.md#3-campagna-generata)): è lo stato operativo della campagna e non modifica i file del canone. Se il master chiede una modifica canonica, questa passa dal motore di scrittura (`commit`), con i suoi controlli (Riprogettazione, sezione 2).
 6. **Moduli.** Musica, stampa e le funzioni da decidere sono moduli attivati dalla configurazione della campagna. Se un modulo è spento, la sua sezione non compare.
 7. **Preferenze.** Solo sul computer del master, mai nei file della campagna.
 
