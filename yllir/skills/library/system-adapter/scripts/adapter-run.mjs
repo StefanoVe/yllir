@@ -53,7 +53,7 @@ function reportText(status, adapter, operation, language, result, problems = [])
     `result: ${JSON.stringify(result)}`, ...problems.map((problem) => `problem: ${problem}`), ''].join('\n');
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (!args) { process.stderr.write(`${USAGE}\n`); exitWith(2); return; }
   const root = path.resolve(args.root);
@@ -102,7 +102,7 @@ function main() {
               const template = parsed.data?.template;
               const kind = template === 'enemy' || template === 'creature' ? 'creature' : template === 'item' ? 'item' : null;
               if (!kind) { skipped.push(input); continue; }
-              const validation = validateSheet(loaded.adapter, kind, markdown, language);
+              const validation = await validateSheet(loaded.adapter, kind, markdown, language);
               checked.push({ file: input, kind, ok: validation.ok });
               errors.push(...validation.errors.map((entry) => ({ ...entry, file: input })));
             }
@@ -115,7 +115,7 @@ function main() {
             const rel = path.relative(realRoot, realFile);
             if (!rel || rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) throw new Error(`path escapes campaign root: ${args.file}`);
             const markdown = fs.readFileSync(realFile, 'utf8');
-            result = args.operation === 'validate-sheet' ? validateSheet(loaded.adapter, args.kind, markdown, language) : cardFields(loaded.adapter, markdown, language);
+            result = args.operation === 'validate-sheet' ? await validateSheet(loaded.adapter, args.kind, markdown, language) : cardFields(loaded.adapter, markdown, language);
           }
           if (!['info', 'check-drafts'].includes(args.operation)) status = result.ok ? 'OK' : 'NEEDS_ATTENTION';
         } catch (error) { result = fail('file-error', error.message); status = 'FAILED'; }
@@ -136,4 +136,6 @@ function main() {
   exitWith(0);
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) runCli(main);
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((err) => { process.stderr.write(`${err?.message ?? String(err)}\n`); exitWith(2); });
+}

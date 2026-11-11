@@ -121,3 +121,28 @@ test('validates heading keys and nonempty Italian and English labels', () => {
     assert.ok(errors.some((e) => e.path === 'headings.effects.fr' && e.code === 'unknown-key'));
   });
 });
+
+test('optional checks key must name an existing .mjs file in the adapter folder', () => {
+  withRoot((temp) => {
+    const dir = path.join(temp, 'modules/systems/dnd-2024');
+    const base = replace(source, 'checks: checks.mjs\n', '');
+    write(temp, 'dnd-2024', base);
+    assert.equal(loadAdapter(temp, 'dnd-2024').adapter.checksPath, undefined);
+
+    write(temp, 'dnd-2024', `${base}checks: checks.mjs\n`);
+    let loaded = loadAdapter(temp, 'dnd-2024');
+    assert.ok(loaded.errors.some((e) => e.code === 'missing-file' && e.path === 'checks'));
+
+    fs.writeFileSync(path.join(dir, 'checks.mjs'), 'export function checkCreature() { return []; }\n');
+    loaded = loadAdapter(temp, 'dnd-2024');
+    assert.deepEqual(loaded.errors, []);
+    assert.equal(loaded.adapter.checksPath, path.join(dir, 'checks.mjs'));
+
+    for (const bad of ['../checks.mjs', 'sub/checks.mjs', 'checks.js']) {
+      write(temp, 'dnd-2024', `${base}checks: ${bad}\n`);
+      const errors = loadAdapter(temp, 'dnd-2024').errors;
+      assert.ok(errors.some((e) => e.code === 'bad-value' && e.path === 'checks'), bad);
+      assert.equal(loadAdapter(temp, 'dnd-2024').adapter.checksPath, undefined, bad);
+    }
+  });
+});

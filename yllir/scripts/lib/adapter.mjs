@@ -43,7 +43,11 @@ export function loadAdapter(pluginRoot, id) {
   if (parsed.errors.length) {
     return result(null, parsed.errors.map((e) => ({ code: 'bad-yaml', path: base, message: `line ${e.line}: ${e.message}` })));
   }
-  const errors = validate(parsed.data, folderId);
+  const folder = path.dirname(filename);
+  const errors = validate(parsed.data, folderId, folder);
+  if (isMapping(parsed.data) && checksFileProblem(parsed.data.checks, folder) === null && parsed.data.checks !== undefined) {
+    parsed.data.checksPath = path.join(folder, parsed.data.checks);
+  }
   return result(parsed.data, errors);
 }
 
@@ -60,11 +64,23 @@ function manifests(pluginRoot) {
 
 function result(adapter, errors) { return { ok: errors.length === 0, adapter, errors }; }
 function isMapping(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
-function validate(adapter, folderId) {
+// Returns null when the optional checks key is absent or valid, otherwise the problem.
+function checksFileProblem(name, folder) {
+  if (name === undefined) return null;
+  if (typeof name !== 'string' || !name.endsWith('.mjs') || name.length <= '.mjs'.length || /[/\\]/.test(name) || name.includes('..')) {
+    return { code: 'bad-value', message: 'checks must be a file name ending in .mjs, without folders' };
+  }
+  try {
+    if (fs.statSync(path.join(folder, name)).isFile()) return null;
+  } catch { /* reported below */ }
+  return { code: 'missing-file', message: `checks file ${name} is not in the adapter folder` };
+}
+
+function validate(adapter, folderId, folder) {
   const errors = [];
   const error = (code, field, message) => errors.push({ code, path: field, message });
   if (!isMapping(adapter)) return [{ code: 'bad-type', path: '', message: 'adapter manifest must be a mapping' }];
-  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'creature_sheet', 'item_sheet', 'tracking', 'do_not'];
+  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'creature_sheet', 'checks', 'item_sheet', 'tracking', 'do_not'];
   for (const key of Object.keys(adapter)) if (!allowed.includes(key)) error('unknown-key', key, `"${key}" is not a setting of an adapter manifest`);
   if (typeof adapter.id !== 'string' || !SLUG_RE.test(adapter.id)) error('bad-value', 'id', 'id must be a lowercase slug');
   if (adapter.id !== folderId) error('id-mismatch', 'id', `id must match the adapter folder ${folderId}`);
@@ -108,6 +124,8 @@ function validate(adapter, folderId) {
       }
     });
   }
+  const checksProblem = checksFileProblem(adapter.checks, folder);
+  if (checksProblem) error(checksProblem.code, 'checks', checksProblem.message);
   if (!isMapping(adapter.item_sheet) || !Array.isArray(adapter.item_sheet.printable_fields) || adapter.item_sheet.printable_fields.length === 0) error('bad-value', 'item_sheet.printable_fields', 'item_sheet.printable_fields must be a nonempty list');
   if (!Array.isArray(adapter.do_not) || adapter.do_not.length === 0) error('bad-value', 'do_not', 'do_not must be a nonempty list');
   return errors;

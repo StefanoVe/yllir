@@ -1,7 +1,14 @@
+import { pathToFileURL } from 'node:url';
 import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
 
 const LANGUAGES = new Set(['it', 'en']);
 const MASTER_MARKER = '<!-- master -->';
+const CHARACTERISTICS = { it: 'Caratteristiche', en: 'Characteristics' };
+// Optional creature fields that a Characteristics table may name, by language.
+const OPTIONAL_CREATURE_LABELS = {
+  it: { sfida: 'cr', 'bonus competenza': 'proficiency_bonus' },
+  en: { challenge: 'cr', cr: 'cr', 'proficiency bonus': 'proficiency_bonus' },
+};
 
 function error(code, message) { return { code, message }; }
 
@@ -35,7 +42,62 @@ function hasWholeLabel(text, label) {
   return new RegExp(`(^|[^\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(text);
 }
 
-export function validateSheet(adapter, kind, markdown, lang) {
+// Rows of the table under a `### title` subsection, as { label, value } from the first two cells.
+function characteristicRows(statistics, title) {
+  const lines = statistics.split(/\r?\n/);
+  const start = lines.findIndex((line) => {
+    const match = /^###[ \t]+(.+?)[ \t]*#*[ \t]*$/.exec(line);
+    return match !== null && match[1].trim() === title;
+  });
+  if (start < 0) return [];
+  const rows = [];
+  let header = true;
+  for (const line of lines.slice(start + 1)) {
+    if (/^#{1,6}[ \t]/.test(line)) break;
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('|')) continue;
+    const cells = trimmed.replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
+    if (cells.every((cell) => /^:?-{3,}:?$/.test(cell))) continue;
+    if (header) { header = false; continue; }
+    if (cells.length >= 2) rows.push({ label: cells[0], value: cells[1] });
+  }
+  return rows;
+}
+
+// Maps table labels to adapter field ids (case-insensitive, trimmed). Raw cell text is kept.
+function characteristicFields(adapter, rows, lang) {
+  const labelToField = new Map();
+  for (const field of adapter.creature_sheet?.required ?? []) {
+    const label = field[`label_${lang}`];
+    if (typeof label === 'string') labelToField.set(label.trim().toLowerCase(), field.id);
+  }
+  for (const [label, id] of Object.entries(OPTIONAL_CREATURE_LABELS[lang] ?? {})) {
+    if (!labelToField.has(label)) labelToField.set(label, id);
+  }
+  const fields = {};
+  for (const row of rows) {
+    const id = labelToField.get(row.label.trim().toLowerCase());
+    if (id !== undefined && fields[id] === undefined) fields[id] = row.value;
+  }
+  return fields;
+}
+
+// Runs the adapter's own arithmetic checks, if the adapter declares a checks file.
+async function arithmeticErrors(adapter, statistics, lang) {
+  if (!adapter.checksPath) return [];
+  let checks;
+  try {
+    checks = await import(pathToFileURL(adapter.checksPath).href);
+  } catch (err) {
+    return [error('checks-unavailable', `adapter checks could not be loaded: ${err.message}`)];
+  }
+  if (typeof checks.checkCreature !== 'function') return [error('checks-unavailable', 'adapter checks do not export checkCreature')];
+  const rows = characteristicRows(statistics, CHARACTERISTICS[lang]);
+  const fields = characteristicFields(adapter, rows, lang);
+  return checks.checkCreature(fields).map((entry) => error(entry.code, entry.message));
+}
+
+export async function validateSheet(adapter, kind, markdown, lang) {
   const errors = [];
   const langIssue = languageError(lang);
   if (langIssue) return { ok: false, errors: [langIssue] };
@@ -56,6 +118,7 @@ export function validateSheet(adapter, kind, markdown, lang) {
           errors.push(error('missing-field', `missing field: ${field.id}`));
         }
       }
+      errors.push(...await arithmeticErrors(adapter, statistics, lang));
     }
   } else {
     for (const key of ['description', 'effects']) {
