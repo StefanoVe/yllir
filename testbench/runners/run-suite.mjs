@@ -5,9 +5,10 @@
 // the JSON line the child prints and summarises it.
 //
 // Usage: node testbench/runners/run-suite.mjs [--agent claude] [--runs N]
-//          [--parallel N] [--with-audit] [--only <substring>] [--model <m>]
+//          [--parallel N] [--with-audit] [--with-world] [--only <substring>] [--model <m>]
 // Defaults: --agent claude, --runs 1 (quick), --parallel 8. The audit kind is skipped
-// unless --with-audit is given (each audit run takes 10+ minutes).
+// unless --with-audit is given (each audit run takes 10+ minutes). The world kind is
+// skipped unless --with-world is given (it runs only when the world-generation path changes).
 // Exit codes: 0 every job passes; 1 some job fails or errors; 2 usage error or no cases.
 
 import fs from 'node:fs';
@@ -27,7 +28,7 @@ const AGENT_SETS = new Map([['claude', ['claude']]]);
 const AGENT_ORDER = ['claude'];
 const REASON_WIDTH = 160;
 const USAGE =
-  'usage: node testbench/runners/run-suite.mjs [--agent claude] [--runs N] [--parallel N] [--with-audit] [--only <substring>] [--model <m>]';
+  'usage: node testbench/runners/run-suite.mjs [--agent claude] [--runs N] [--parallel N] [--with-audit] [--with-world] [--only <substring>] [--model <m>]';
 
 class UsageError extends Error {}
 
@@ -44,15 +45,23 @@ function sortedDirs(dir) {
  * The jobs for every case under casesRoot: one per (case, agent, run index), in case
  * order, then agent order, then run order. A case is a folder casesRoot/<kind>/<name>
  * holding case.yaml; kinds without a runner are ignored. The audit kind is skipped
- * unless withAudit is true. only, when given, keeps the cases whose "<kind>/<name>"
- * contains that substring.
+ * unless withAudit is true, and the world kind unless withWorld is true. only, when
+ * given, keeps the cases whose "<kind>/<name>" contains that substring.
  */
-export function planJobs({ casesRoot = CASES_ROOT, agents = ['claude'], runs = 1, withAudit = false, only = null } = {}) {
+export function planJobs({
+  casesRoot = CASES_ROOT,
+  agents = ['claude'],
+  runs = 1,
+  withAudit = false,
+  withWorld = false,
+  only = null,
+} = {}) {
   const cases = [];
   for (const kind of sortedDirs(casesRoot)) {
     const runner = KIND_RUNNERS.get(kind);
     if (runner === undefined) continue;
     if (kind === 'audit' && !withAudit) continue;
+    if (kind === 'world' && !withWorld) continue;
     for (const name of sortedDirs(path.join(casesRoot, kind))) {
       const caseDir = path.join(casesRoot, kind, name);
       if (!fs.existsSync(path.join(caseDir, 'case.yaml'))) continue;
@@ -67,6 +76,18 @@ export function planJobs({ casesRoot = CASES_ROOT, agents = ['claude'], runs = 1
     }
   }
   return jobs;
+}
+
+/**
+ * The world cases that an --only filter names but that are not run because withWorld is
+ * false, as "world/<name>" strings. Empty when only is null or withWorld is true.
+ */
+export function skippedWorldCases({ casesRoot = CASES_ROOT, only = null, withWorld = false } = {}) {
+  if (withWorld || only === null || only === undefined) return [];
+  return planJobs({ casesRoot, withWorld: true, only })
+    .filter((job) => job.kind === 'world')
+    .map((job) => `${job.kind}/${job.name}`)
+    .filter((name, index, names) => names.indexOf(name) === index);
 }
 
 /** The arguments of the child process for a job. */
@@ -229,7 +250,7 @@ function positiveInt(name, value) {
 
 /** Parses the command line. Throws UsageError on anything it does not accept. */
 export function parseArgs(argv) {
-  const opts = { agent: 'claude', runs: 1, parallel: 8, withAudit: false, only: null, model: null };
+  const opts = { agent: 'claude', runs: 1, parallel: 8, withAudit: false, withWorld: false, only: null, model: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const value = () => {
@@ -247,6 +268,8 @@ export function parseArgs(argv) {
       opts.parallel = positiveInt('--parallel', value());
     } else if (arg === '--with-audit') {
       opts.withAudit = true;
+    } else if (arg === '--with-world') {
+      opts.withWorld = true;
     } else if (arg === '--only') {
       opts.only = value();
     } else if (arg === '--model') {
@@ -269,7 +292,18 @@ async function main(argv) {
     return 2;
   }
   const agents = AGENT_SETS.get(opts.agent);
-  const jobs = planJobs({ casesRoot: CASES_ROOT, agents, runs: opts.runs, withAudit: opts.withAudit, only: opts.only });
+  const skippedWorld = skippedWorldCases({ casesRoot: CASES_ROOT, only: opts.only, withWorld: opts.withWorld });
+  if (skippedWorld.length > 0) {
+    console.error(`run-suite: ${skippedWorld.join(', ')} need --with-world; not run`);
+  }
+  const jobs = planJobs({
+    casesRoot: CASES_ROOT,
+    agents,
+    runs: opts.runs,
+    withAudit: opts.withAudit,
+    withWorld: opts.withWorld,
+    only: opts.only,
+  });
   if (jobs.length === 0) {
     console.error('run-suite: no cases match');
     return 2;

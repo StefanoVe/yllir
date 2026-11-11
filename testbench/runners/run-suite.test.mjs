@@ -17,6 +17,7 @@ import {
   summarize,
   formatReport,
   childArgs,
+  skippedWorldCases,
 } from './run-suite.mjs';
 
 function makeCases(layout) {
@@ -90,8 +91,9 @@ test('childArgs passes the case, agent, one run and the model when given', () =>
 });
 
 test('parseArgs reads the options and rejects bad values', () => {
-  const opts = parseArgs(['--agent', 'claude', '--runs', '3', '--parallel', '4', '--with-audit', '--only', 'entry', '--model', 'haiku']);
-  assert.deepEqual(opts, { agent: 'claude', runs: 3, parallel: 4, withAudit: true, only: 'entry', model: 'haiku' });
+  const opts = parseArgs(['--agent', 'claude', '--runs', '3', '--parallel', '4', '--with-audit', '--with-world', '--only', 'entry', '--model', 'haiku']);
+  assert.deepEqual(opts, { agent: 'claude', runs: 3, parallel: 4, withAudit: true, withWorld: true, only: 'entry', model: 'haiku' });
+  assert.equal(parseArgs([]).withWorld, false);
   assert.equal(parseArgs([]).agent, 'claude');
   assert.throws(() => parseArgs(['--agent', 'bogus']), /--agent must be claude/);
   assert.throws(() => parseArgs(['--agent', 'codex']), /codex is no longer a test agent/);
@@ -213,14 +215,45 @@ test('formatReport prints the table, the total and truncated failure reasons', (
   assert.equal(reason.slice(reason.indexOf('run 2: ') + 'run 2: '.length).length, 160);
 });
 
-test('planJobs registers the world kind with run-world-case.mjs, without the audit flag', () => {
+test('planJobs registers the world kind with run-world-case.mjs, when withWorld is set', () => {
   const root = makeCases({ 'world/region': 'case: world-region\n', 'world/creature': 'case: world-creature\n' });
-  const jobs = planJobs({ casesRoot: root });
+  const jobs = planJobs({ casesRoot: root, withWorld: true });
   assert.deepEqual(
     jobs.map((job) => `${job.kind}/${job.name}`),
     ['world/creature', 'world/region'],
   );
   assert.ok(jobs.every((job) => job.runner.endsWith('run-world-case.mjs')));
-  const [region] = planJobs({ casesRoot: root, only: 'region' });
+  const [region] = planJobs({ casesRoot: root, withWorld: true, only: 'region' });
   assert.deepEqual(childArgs(region, { model: 'haiku' }).slice(1), [region.caseDir, '--agent', 'claude', '--runs', '1', '--model', 'haiku']);
+});
+
+test('planJobs excludes world cases by default, in quick mode and in release mode', () => {
+  const root = makeCases({
+    'world/region': 'case: world-region\n',
+    'entry/a': 'case: x\n',
+    'audit/full': 'case: x\n',
+  });
+  const quick = planJobs({ casesRoot: root });
+  assert.deepEqual(quick.map((job) => `${job.kind}/${job.name}`), ['entry/a']);
+  const release = planJobs({ casesRoot: root, runs: 3, withAudit: true });
+  assert.ok(!release.some((job) => job.kind === 'world'));
+  assert.deepEqual([...new Set(release.map((job) => `${job.kind}/${job.name}`))].sort(), ['audit/full', 'entry/a']);
+});
+
+test('planJobs includes world cases with withWorld, alongside the others', () => {
+  const root = makeCases({ 'world/region': 'case: world-region\n', 'entry/a': 'case: x\n' });
+  const jobs = planJobs({ casesRoot: root, withWorld: true, runs: 2 });
+  assert.equal(jobs.filter((job) => job.kind === 'world').length, 2);
+  assert.equal(jobs.filter((job) => job.kind === 'entry').length, 2);
+  const onlyWorld = planJobs({ casesRoot: root, withWorld: true, only: 'world/' });
+  assert.deepEqual(onlyWorld.map((job) => `${job.kind}/${job.name}`), ['world/region']);
+});
+
+test('skippedWorldCases names the world cases that --only asks for without --with-world', () => {
+  const root = makeCases({ 'world/region': 'case: world-region\n', 'world/creature': 'case: world-creature\n', 'entry/a': 'case: x\n' });
+  assert.deepEqual(skippedWorldCases({ casesRoot: root, only: 'world/' }), ['world/creature', 'world/region']);
+  assert.deepEqual(skippedWorldCases({ casesRoot: root, only: 'region' }), ['world/region']);
+  assert.deepEqual(skippedWorldCases({ casesRoot: root, only: 'entry/' }), []);
+  assert.deepEqual(skippedWorldCases({ casesRoot: root, only: null }), []);
+  assert.deepEqual(skippedWorldCases({ casesRoot: root, only: 'world/', withWorld: true }), []);
 });

@@ -52,6 +52,8 @@ Do this at the end of every task that changes files under `yllir/`, `testbench/`
 
 A test case is a campaign, a natural-language request and a verifiable `expected.yaml`/`key.yaml`. Keep the answer key **outside** the folder the agent under test can read: if the agent sees the key, the test measures copying, not finding. Fixtures must be synthetic, with no real campaign or specific game system in them, and contain seeded traps: homonyms, aliases, distant contradictions, hypotheses that must not become accusations, and recorded exclusions that must not be flagged. Each case runs several times per agent, and the result is a pass rate recorded with the model and a hash of the instructions.
 
+The world-generation cases (`testbench/cases/world/`) are long and cost money: run them (`run-suite.mjs --with-world --only world/`) only when an implementation changes the generation path (build-world, write-document, the sheet-expander or batch-reviewer agents, `authoring.md`, the engine's context or commit, the adapter checks).
+
 ## Local working files
 
 `.claude/memory/` (auto-memory, configured in `.claude/settings.local.json`) and `.claude/scratchpad/` are gitignored. Put temporary files in `.claude/scratchpad/`.

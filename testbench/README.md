@@ -98,7 +98,7 @@ Delegation (decision 16). `--delegation auto` (default) runs the plugin as it is
 
 Quality (`--judge`). After the checks, a model distinct from the model under test (`opus` by default; `--judge-model` changes it, and an equal model is refused) reads the new documents and the seed, master-only block included, and scores specific, playable and coherent from 1 to 5. The judge gets the texts inline and no tools, because the strict permissions grant it none. `Q-grid` passes when the mean reaches `quality_min` (default 3.5). Without `--judge` there is no `Q-grid` check.
 
-The suite runs the world cases in its quick mode (one run each). They cost money like every agent case. The suite never passes `--judge`.
+The world cases do not run by default, in quick mode or in release mode: the suite runs them only with `--with-world`. Run them only when an implementation changes the world-generation path (`build-world`, `write-document`, `sheet-expander`, `batch-reviewer`, `authoring.md`, the engine context and commit, the adapter checks). They cost money like every agent case. The suite never passes `--judge`.
 
 ## Mention scanner
 
@@ -113,11 +113,13 @@ The scanner is graded against `fixtures/morvalle/key.yaml`. A mention may set `o
 `runners/run-suite.mjs` runs every case under `cases/` through its runner, one child process per (case, run), at most `--parallel` at a time (default 8). The child uses the runner's default model (`sonnet`) unless `--model` is given. Each child appends its own record to `results/`. The suite prints a table of `p/n` per case, a TOTAL line and the reasons of the failed jobs, and exits 0 only when every job passes.
 
 ```sh
-node testbench/runners/run-suite.mjs                                  # quick: one run per case, audit skipped
+node testbench/runners/run-suite.mjs                                  # quick: one run per case, audit and world skipped
 node testbench/runners/run-suite.mjs --runs 3 --with-audit           # release measurement
 node testbench/runners/run-suite.mjs --only entry/                   # a subset
-node testbench/runners/run-suite.mjs --only world/                   # the world cases
+node testbench/runners/run-suite.mjs --with-world --only world/      # the world cases (only when the world path changed)
 ```
+
+`--only world/` without `--with-world` runs nothing for the world cases and says so on stderr.
 
 ## Unit tests
 
