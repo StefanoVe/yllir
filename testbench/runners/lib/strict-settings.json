@@ -16,6 +16,15 @@
       "Bash(node \"*/skills/library/continuity-audit/scripts/audit-scope.mjs\" *)",
       "Bash(node \"*/skills/library/continuity-audit/scripts/audit-validate.mjs\" *)",
       "Bash(node \"*/skills/library/continuity-audit/scripts/coverage-review-cache.mjs\" *)",
+      "Bash(node \"*/skills/library/images/scripts/codex-run.mjs\" *)",
+      "Bash(node \"*/skills/library/images/scripts/comfyui-run.mjs\" *)",
+      "Bash(node \"*/skills/library/images/scripts/command-run.mjs\" *)",
+      "Bash(node \"*/skills/library/images/scripts/http-run.mjs\" *)",
+      "Bash(node \"*/skills/library/images/scripts/image-place.mjs\" *)",
+      "Bash(node \"*/skills/library/images/scripts/image-probe.mjs\" *)",
+      "Bash(node \"*/skills/library/images/scripts/image-prompt.mjs\" *)",
+      "Bash(node \"*/skills/library/images/scripts/image-select.mjs\" *)",
+      "Bash(node \"*/skills/library/images/scripts/provider-check.mjs\" *)",
       "Bash(node \"*/skills/library/import/scripts/ingest-acquire.mjs\" *)",
       "Bash(node \"*/skills/library/import/scripts/ingest-check.mjs\" *)",
       "Bash(node \"*/skills/library/import/scripts/ingest-inventory.mjs\" *)",
@@ -25,7 +34,9 @@
       "Bash(node \"*/skills/library/update/scripts/post-update.mjs\" *)",
       "Bash(node \"*/skills/library/update/scripts/update-campaign.mjs\" *)",
       "Edit(.campaign/drafts/**)",
+      "Edit(.campaign/image-providers/**)",
       "Edit(.campaign/state/**)",
+      "Edit(.campaign/styles/**)",
       "Skill(yllir:*)"
     ]
   }

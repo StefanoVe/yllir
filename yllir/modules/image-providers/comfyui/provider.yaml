@@ -1,0 +1,5 @@
+# Image provider manifest. Read by skills/library/images/scripts/lib/providers.mjs.
+id: comfyui
+kind: script
+operations: [generate, remove_background]
+external: false

@@ -32,6 +32,8 @@ Un **fornitore di immagini** è un'integrazione che sa produrre o modificare imm
 | `ingrandisci` | Aumenta la risoluzione per la stampa | Immagine, fattore | File e metadati |
 | `togli_sfondo` | Ottiene un PNG con trasparenza reale | Immagine | File con canale alfa |
 
+**Deciso** (2026-11-11, decisione D1): le immagini sono uno strumento di libreria, `images` (yllir:images), raggiunto dall'ingresso: genera un'immagine per un documento della campagna o toglie lo sfondo a un'immagine esistente. Prima versione: solo le operazioni `genera` e `togli_sfondo`; `modifica_zona`, `espandi` e `ingrandisci` restano nel contratto ma non sono realizzate.
+
 **Capacità senza maschera.** Non tutti i fornitori accettano una maschera. Un fornitore senza maschera, se riceve l'intera mappa, tende a ridisegnare le coste e a cancellare i dettagli già presenti: il rischio è concreto e colpisce le mappe più di ogni altra immagine. Il metodo corretto (ritaglio ingrandito, ricomposizione solo sulla zona cambiata, controllo della differenza) può essere svolto dal core stesso. Quindi `modifica_zona` si può offrire anche a fornitori senza maschera, purché il core esegua il ritaglio e la ricomposizione. Proposta: la capacità dichiarata è «modifica di una zona», non «maschera nativa».
 
 ### Metadati obbligatori
@@ -56,25 +58,28 @@ Il file serve a tre cose: rifare la stessa immagine, rivederla dopo un cambio di
 
 ### Regole del contratto
 
-1. **Il core filtra prima di inviare.** Il fornitore riceve soltanto ciò che il core gli passa: descrizione verificata, immagini pubbliche, riferimenti di stile. Le note riservate al master non vanno mai a un fornitore esterno: è un requisito di ogni processo di generazione, non una questione di buona volontà del fornitore. Il controllo sta nel core.
+1. **Il core filtra prima di inviare.** Il fornitore riceve soltanto ciò che il core gli passa: descrizione verificata, immagini pubbliche, riferimenti di stile. Le note riservate al master non vanno mai a un fornitore esterno: è un requisito di ogni processo di generazione, non una questione di buona volontà del fornitore. Il controllo sta nel core. Per l'immagine di un documento, la descrizione è costruita da uno script dalla sola parte pubblica del documento: il seme del mondo e le categorie riservate al master vengono rifiutati. Un'immagine non aggiunge fatti: aggiungere o cambiare l'immagine sotto il titolo non richiede il revisore (**Deciso**, 2026-11-11, decisione D7).
 2. **Lo stile è neutro, la traduzione è del fornitore.** Il profilo di stile della campagna è scritto in un linguaggio indipendente. Ogni fornitore lo traduce nel proprio formato. L'esperienza mostra che la traduzione conta: alcuni generatori rendono cenciosi i personaggi comuni e aggiungono cappucci e armi, e le istruzioni efficaci contrastano questa deriva con vincoli espliciti in positivo e in negativo («intact, ordinary working clothes, NOT rags»). Proposta: queste regole sono una proprietà del profilo di stile, valida per ogni fornitore, e ogni fornitore aggiunge le proprie.
 3. **Un fornitore dichiara i propri limiti.** Per esempio: massimo di pixel, formati accettati, presenza o assenza di trasparenza, numero di riferimenti ammessi. Il core adatta la richiesta o, se non è possibile, passa al fornitore successivo.
 4. **Nessun segreto nei file di metadati.** Le chiavi API non compaiono mai nei metadati o nei log.
 
 ### Ordine di fallback
 
-L'ordine dei fornitori è nella configurazione della campagna (dettagli in [Configurazione](Configurazione.md)). Esempio di come potrebbe apparire:
+**Deciso** (2026-11-11, decisione D3). L'ordine è fisso nel framework: non è un'impostazione della campagna. Sostituisce l'ordine proposto in precedenza (`photoshop, codex, third_party_api, local, upload`, con `fallback` configurabile):
 
-```yaml
-image_providers:
-  order:
-    - photoshop        # usato se disponibile e con la capacità richiesta
-    - codex
-    - third_party_api
-    - local
-    - upload          # le immagini le porta l'utente
-  fallback: automatic # su indisponibilità o errore tecnico: ask | automatic | never
-```
+1. Servizi aggiunti dal master, dal più recente (decisione D9, sezione 3)
+2. ComfyUI (locale)
+3. Codex (delega, solo `genera`)
+4. Photoshop MCP
+5. caricamento manuale (decisione D4: il master dà un file suo e lo strumento lo collega al documento)
+
+**Deciso** (2026-11-11, decisione D9): i servizi aggiunti dal master vengono **prima** dei fornitori del framework, nell'ordine automatico dal più recente al più vecchio. Da quando un servizio è aggiunto, lo strumento lo considera per primo. ComfyUI, Codex, Photoshop e il caricamento manuale restano come ripiego, nello stesso ordine di prima.
+
+Regole decise:
+
+- Lo strumento sceglie da solo il primo fornitore disponibile che supporta l'operazione richiesta.
+- Se il master nomina un fornitore, si usa quello. Se non è disponibile, lo si dice al master e non si passa a un altro.
+- Il ripiego automatico vale solo per indisponibilità o errore tecnico.
 
 Regole proposte per il fallback:
 
@@ -82,11 +87,11 @@ Regole proposte per il fallback:
 - Si ripiega su un altro fornitore solo per **indisponibilità o errore tecnico**, mai perché il risultato non piace: la revisione resta una decisione dell'autore o dell'agente di revisione.
 - Il cambio di fornitore a metà di un ciclo (per esempio una coppia PNG/PSD, o un'artwork con più tentativi) va dichiarato nei metadati e comunicato, perché lo stile può cambiare. Dopo il cambio la verifica visiva si rifà da zero.
 - Se nessun fornitore è disponibile, l'operazione si ferma con un messaggio chiaro e propone il caricamento manuale.
-- **Deciso** (vedi [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md#fallback)): il ripiego per indisponibilità segue l'ordine configurato, e il framework lo comunica al master.
+- **Deciso** (vedi [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md#fallback)): il ripiego per indisponibilità segue l'ordine fisso del framework (decisione D3, 2026-11-11), e il framework lo comunica al master.
 
 ## 3. Fornitori candidati
 
-Tutti i candidati sono opzioni. Nessuno è obbligatorio, e l'ordine sopra è una proposta. La difficoltà è stimata per un master che non programma e non ha mai usato un'intelligenza artificiale: **bassa** (basta un clic o una copia), **media** (installazione e un accesso da fare una volta), **alta** (serve configurare un servizio o un computer).
+Tutti i candidati sono opzioni. Nessuno è obbligatorio; l'ordine di scelta è deciso (decisione D3, sezione 2). La difficoltà è stimata per un master che non programma e non ha mai usato un'intelligenza artificiale: **bassa** (basta un clic o una copia), **media** (installazione e un accesso da fare una volta), **alta** (serve configurare un servizio o un computer).
 
 | Fornitore | Operazioni | Pro | Contro | Requisiti | Difficoltà |
 |---|---|---|---|---|---|
@@ -98,17 +103,29 @@ Tutti i candidati sono opzioni. Nessuno è obbligatorio, e l'ordine sopra è una
 
 ### Note per ciascun candidato
 
+**Fornitori come moduli (Deciso, 2026-11-11, decisione D2).** Ogni fornitore è un modulo in `yllir/modules/image-providers/<id>/provider.yaml`, che dichiara le operazioni che supporta. I fornitori adottati sono ComfyUI (locale), Codex (solo `genera`, come fornitore delegato), Photoshop MCP e il caricamento manuale (decisione D4). L'ordine di scelta è nella sezione 2.
+
 **Photoshop MCP.** Il server espone, tra gli altri: `photoshop_generate_image`, `photoshop_generative_fill`, `photoshop_generative_expand`, `photoshop_generative_upscale`, `photoshop_generative_remove`, `photoshop_create_text_layer`, `photoshop_create_layer`, `photoshop_place_image`, `photoshop_apply_layer_style`, `photoshop_export_as`, `photoshop_save_document`, `photoshop_get_preview`, e le ricette `photoshop_recipe_csv_to_cards`, `photoshop_recipe_remove_background`, `photoshop_recipe_apply_color_grade`, `photoshop_recipe_prepare_for_web`. Richiede Photoshop installato e in esecuzione. Le funzioni generative dipendono dalla versione e dall'abbonamento Adobe: prima di proporle si chiama `photoshop_get_capabilities`. Le funzioni generative non sono un generatore indipendente: producono l'immagine con il servizio di Adobe, quindi il costo e i termini sono quelli dell'abbonamento.
 
 **Codex con ImageGen.** Fornitore già sperimentato per la generazione di artwork e di carte. È un fornitore facoltativo, al più: il framework non dipende da lui e il plugin per Codex è stato rimosso (**Deciso**, 2026-11-11, decisione 11). Il problema emerso nelle prove è l'affidabilità del processo, non la qualità: per questo il processo chiude lo standard input, sorveglia il log e impone un timeout. Il framework dovrà conservare questi controlli, anche quando Codex è un fornitore tra gli altri. Osservazione dell'autore: Codex ha bisogno di istruzioni molto più esplicite di Claude (vedi la [specifica principale](Framework%20per%20campagne%20di%20GDR.md)): ogni fornitore va trattato come un caso a sé nel contratto.
 
 **Server MCP verso API di terzi.** Una strada indipendente dagli altri due. Il framework non dovrebbe includere un fornitore specifico: dovrebbe definire il contratto e lasciare la scelta del servizio all'utente. Ogni servizio ha un proprio elenco di operazioni, di modelli e di condizioni d'uso, che vanno verificati al momento dell'adozione (DA VERIFICARE). Il punto critico per un master è la chiave API: va inserita una volta, conservata fuori dal progetto e mai copiata nei file della campagna.
 
-**Generazione locale.** Adatta a chi ha già un computer potente e vuole tenere tutto in casa. Per un master non tecnico è l'opzione più costosa in tempo: la prima installazione va guidata passo per passo. Il framework la propone solo se il controllo capacità (sezione 6) trova il servizio già attivo, oppure con un'istruzione esplicita.
+**Generazione locale: ComfyUI adottato (Deciso, 2026-11-11, decisioni D2 e D3).** ComfyUI è il primo fornitore dell'ordine. Resta aperto l'hardware minimo da dichiarare (DA VERIFICARE). Adatta a chi ha già un computer potente e vuole tenere tutto in casa. Per un master non tecnico è l'opzione più costosa in tempo: la prima installazione va guidata passo per passo. Il framework la propone solo se il controllo capacità (sezione 6) trova il servizio già attivo, oppure con un'istruzione esplicita. Con la decisione D3, lo strumento lo usa da solo quando il controllo lo trova attivo.
 
 **Nessun fornitore.** È la soluzione di base: tutto ciò che il framework fa deve funzionare anche così. Per le carte, senza Photoshop, il PSD a livelli non si produce. Resta da decidere se la carta si costruisca con un compositore a livelli libero, con un file di livelli esportato in altro formato o se il PSD diventi una funzione solo per chi ha Photoshop (vedi [Questioni aperte](#7-questioni-aperte)).
 
-**Scelta predefinita (proposta).** Per il master che non ha un'opinione, l'ordine più sensato è: Photoshop se presente e con funzioni generative attive; altrimenti Codex se installato (fornitore facoltativo); altrimenti il caricamento manuale. Le API e la generazione locale restano opzioni esplicite. Questa proposta dipende dalle risposte alle questioni aperte su costi e dati.
+**Scelta predefinita (superata dalla decisione D3, 2026-11-11: vedi sezione 2).** Per il master che non ha un'opinione, l'ordine più sensato è: Photoshop se presente e con funzioni generative attive; altrimenti Codex se installato (fornitore facoltativo); altrimenti il caricamento manuale. Le API e la generazione locale restano opzioni esplicite. Questa proposta dipende dalle risposte alle questioni aperte su costi e dati.
+
+### Servizi aggiunti dal master
+
+**Deciso** (2026-11-11, decisione D9). Il master può aggiungere un proprio servizio parlando, per esempio «crealo con gemini». Il framework non include quel servizio: l'assistente cerca come si usa (la ricerca web contiene solo il nome del servizio, mai dati della campagna) e scrive un adattatore della campagna in `.campaign/image-providers/<id>/`, salvato nella cronologia. Gli adattatori sono di tre tipi:
+
+- `command`: un programma da terminale, eseguito da uno script senza shell, con un timeout e con l'input chiuso.
+- `mcp`: uno strumento MCP già collegato all'assistente, con un file di istruzioni.
+- `http`: una chiamata web. La chiave non sta mai nei file della campagna: sta in una variabile d'ambiente o nel file locale `.campaign/state/keys.json`, escluso dalla cronologia. Uno script rifiuta l'adattatore se vi trova una chiave.
+
+Un servizio della campagna è sempre esterno, quindi il consenso si chiede una volta (vedi sezione 6). Dalla sua aggiunta, i servizi della campagna vengono prima di quelli del framework nell'ordine automatico (il più recente per primo); ComfyUI, Codex, Photoshop e il caricamento manuale restano come ripiego, nello stesso ordine (sezione 2).
 
 ## 4. Photoshop MCP come pilastro della pipeline delle carte
 
@@ -173,6 +190,8 @@ All'apertura di una campagna, e alla prima richiesta che ha bisogno di un'integr
 
 Il risultato alimenta una tabella di capacità: quali funzioni sono disponibili, con quale fornitore, e che cosa serve per attivarle. Non si ripete il controllo a ogni richiesta: si ripete all'avvio, quando l'utente lo chiede e dopo un aggiornamento del framework (vedi [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md)).
 
+**Deciso** (2026-11-11, decisione D6): la disponibilità dei fornitori e il consenso dato una volta sono nella tabella locale `.campaign/state/image-providers.json`, esclusa dalla cronologia della campagna.
+
 ### Che cosa dice all'utente
 
 Il framework non elenca strumenti. Dice che cosa può fare, che cosa gli serve e che cosa succede senza. Esempi di messaggi, in linguaggio comune:
@@ -191,11 +210,11 @@ Regole di scrittura dei messaggi (proposta, da riprendere in [Esperienza utente]
 
 ## 7. Questioni aperte
 
-1. **Fornitore predefinito.** Per un master che non ha Photoshop né Codex, il framework deve proporre subito il caricamento manuale o un servizio con chiave? Chi sostiene il costo di un servizio a consumo?
+1. **Fornitore predefinito.** Per un master che non ha Photoshop né Codex, il framework deve proporre subito il caricamento manuale o un servizio con chiave? Chi sostiene il costo di un servizio a consumo? **Risposta (2026-11-11, D3):** la prima parte è risolta: il primo fornitore disponibile nell'ordine fisso è ComfyUI, poi Codex, poi Photoshop, poi il caricamento manuale. Resta aperta la seconda domanda, sul costo dei servizi a consumo.
 2. **PSD senza Photoshop.** Le carte a livelli sono una funzione per chi ha Photoshop, oppure il framework deve produrre un equivalente con un compositore libero? Quale formato a livelli è accettabile per l'autore?
 3. **Maschere.** La modifica di una zona senza maschera (ritaglio e ricomposizione del core) è accettabile per tutte le immagini, o solo per le carte della mappa?
-4. **Generazione locale.** È un'opzione ufficiale o solo per utenti esperti? Quale hardware minimo dichiarare, e chi lo verifica (DA VERIFICARE)?
-5. **Sincronizzazione dello stile.** Cambiando fornitore, lo stile della campagna resta riconoscibile? Chi decide se una nuova illustrazione è accettabile: l'autore, l'agente di revisione o entrambi?
+4. **Generazione locale.** È un'opzione ufficiale o solo per utenti esperti? Quale hardware minimo dichiarare, e chi lo verifica (DA VERIFICARE)? **Risposta (2026-11-11, D2 e D3):** la generazione locale con ComfyUI è un fornitore adottato ed è il primo dell'ordine. Restano aperti l'hardware minimo da dichiarare e chi lo verifica.
+5. **Sincronizzazione dello stile.** Cambiando fornitore, lo stile della campagna resta riconoscibile? Chi decide se una nuova illustrazione è accettabile: l'autore, l'agente di revisione o entrambi? **Risposta parziale (2026-11-11, D5 e D8):** lo stile appartiene alla campagna (`.campaign/styles/`), non al fornitore. Chi approva è l'assistente principale: confronta l'immagine con la descrizione pubblica, tratto per tratto, e il master può chiedere di ripetere il controllo. Resta aperta la domanda sulla riconoscibilità dello stile dopo un cambio di fornitore.
 6. **Musica e flussi online.** Un'integrazione può riprodurre audio da YouTube. Si mantiene questa integrazione, si sostituisce con file caricati dall'utente o si esclude? Serve una verifica giuridica dei termini d'uso (DA VERIFICARE)?
 7. **Pubblicazione.** L'enciclopedia pubblica resta un'integrazione del framework o un'opzione legata a una sola campagna? Chi controlla che le parti riservate non finiscano online?
 8. **Versioni di Photoshop.** Quale versione minima va dichiarata per le funzioni generative, e come si comunica al master che una funzione richiede un abbonamento (DA VERIFICARE)?

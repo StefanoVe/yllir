@@ -1,0 +1,5 @@
+# Image provider manifest. Read by skills/library/images/scripts/lib/providers.mjs.
+id: codex
+kind: script
+operations: [generate]
+external: true

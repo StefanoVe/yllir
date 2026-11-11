@@ -225,10 +225,11 @@ Non ancora implementata in 0.30.0. La Riprogettazione non la tocca: la decisione
 ### L8. Artwork
 
 - **Scopo:** generare un dipinto per una creatura o un personaggio, dalla descrizione verificata, e collegarlo alla scheda.
+- **Stato (2026-11-11):** la prima parte è realizzata come strumento `images` (yllir:images), raggiunto dall'ingresso: genera un'immagine per un documento della campagna o toglie lo sfondo a un'immagine esistente (decisione D1). Il caricamento manuale è l'ultimo fornitore (D4). La descrizione per l'immagine è costruita da uno script dalla sola parte pubblica del documento: il seme del mondo e le categorie riservate al master sono rifiutati (D7). Restano da fare: le carte (L9), le mappe, e le operazioni `modifica_zona`, `espandi` e `ingrandisci`, che sono nel contratto ma non realizzate.
 - **Avvio:** dal core, su richiesta.
 - **Input → output:** scheda, tratti visibili, profilo di stile → PNG in `img/`, file del prompt accanto, collegamento Markdown sotto il titolo.
 - **Deterministico:** nomi dei file; dimensioni e trasparenza; scrittura del prompt in file; inserimento del collegamento in una sola riga (script); chiamata al fornitore di immagini con gestione di blocchi e timeout.
-- **Giudizio:** descrizione visiva senza segreti; confronto voce per voce fra immagine e descrizione; decisione su correzioni.
+- **Giudizio:** descrizione visiva senza segreti; confronto voce per voce fra immagine e descrizione; decisione su correzioni. Controllo visivo (D8, 2026-11-11): l'assistente principale confronta l'immagine con la descrizione pubblica, tratto per tratto, con al più 2 tentativi correttivi sullo stesso fornitore.
 - **Modello:** superato dalla decisione 16.
 - **Dipendenze:** profilo di stile (per creature e per personaggi sono due profili, non due skill); adattatore del sistema di gioco per i dati di taglia e aspetto; fornitore di immagini. Codex, se presente, è al più fornitore di immagini facoltativo (decisione 4 e 11 della Riprogettazione): il framework sceglie il fornitore, non il master.
 - **Requisiti:**

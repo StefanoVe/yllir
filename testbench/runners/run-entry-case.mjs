@@ -2,7 +2,8 @@
 // Runs one entry-point case end to end on an existing campaign. The setup is
 // deterministic: it copies the morvalle fixture campaign into a temporary folder,
 // generates the instructions, saves version 1, changes one card (Teodo Marr) and
-// saves version 2. Then the agent (`claude -p`) runs
+// saves version 2. The image cases (entry-image-*) instead add a style and a fake
+// campaign image service to version 1, and save that as version 2. Then the agent (`claude -p`) runs
 // the entry point with the case prompt (the master's message), and the runner grades what
 // the agent left in the folder. One JSON line per run is appended to testbench/results/<case>.jsonl.
 //
@@ -74,10 +75,11 @@ function withIsolatedGit(fn) {
 
 /**
  * Builds a fresh copy of the fixture with two saved versions.
- * Returns { tmp, dir, v1, v2, teodoV1Text }. Throws when the setup cannot be made;
- * the temporary folder is removed in that case.
+ * Returns { tmp, dir, v1, v2, teodoV1Text }. The image cases (IMAGE_CASES) get the image
+ * setup instead of the card change, and teodoV1Text is null for them. Throws when the setup
+ * cannot be made; the temporary folder is removed in that case.
  */
-function setupTwoVersions() {
+function setupTwoVersions(caseName) {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-case-'));
   try {
     const dir = path.join(tmp, 'campaign');
@@ -90,6 +92,15 @@ function setupTwoVersions() {
       ensureRepo(dir);
       const v1 = saveVersion(dir, { message: V1_MESSAGE, kind: 'framework' });
       if (!v1.saved) throw new Error('setup: version 1 was not saved');
+
+      if (IMAGE_CASES.includes(caseName)) {
+        const v2 = setupImageService(tmp, dir);
+        const versions = listVersions(dir);
+        if (versions.length !== REQUIRED_VERSIONS) {
+          throw new Error(`setup: ${versions.length} versions instead of ${REQUIRED_VERSIONS}`);
+        }
+        return { tmp, dir, v1: v1.hash, v2, teodoV1Text: null };
+      }
 
       const teodoPath = path.join(dir, TEODO);
       const teodoV1Text = fs.readFileSync(teodoPath, 'utf8');
@@ -112,6 +123,192 @@ function setupTwoVersions() {
   }
 }
 
+// ---------------------------------------------------------------- image cases
+
+const IMAGE_CASES = ['entry-image-portrait', 'entry-image-reserved'];
+const IMAGE_PROVIDER = 'pennello';
+const IMAGE_CALLS = 'pennello-calls.jsonl';
+// The engine moves a sheet into its geographic folder on commit, so the sheet is found by its file name.
+const IMAGE_SHEET_NAME = 'Oria Brunel.md';
+const IMAGE_V2_MESSAGE = 'Impostati lo stile e il servizio di immagini';
+const IMAGE_PROVIDER_CHECK = path.join(REPO_ROOT, 'yllir', 'skills', 'library', 'images', 'scripts', 'provider-check.mjs');
+// Words of the master-only block of the Oria Brunel sheet: none may reach the service.
+const IMAGE_FORBIDDEN_WORDS = ['teodo', 'lana', 'rubata', 'segreto'];
+const IMAGE_FORBIDDEN_NAMES = ['pennello', 'comfyui', 'codex'];
+
+/**
+ * The fake image service, as the body of fake.mjs (setupImageService writes it; this function is
+ * never run by the runner). It logs the prompt it gets, one JSON line, to callsFile, and writes a
+ * 256x256 PNG to the output path: a black ink sketch on white of a standing woman with a tape
+ * measure around her neck. The PNG is encoded here: RGB 8-bit, filter type 0 on every row, zlib
+ * from node:zlib, CRC32 computed by hand. Needs fs and zlib imported in the file.
+ */
+function fakeMain(callsFile) {
+  const [, , prompt, output] = process.argv;
+  fs.appendFileSync(callsFile, `${JSON.stringify({ prompt: prompt ?? '' })}\n`);
+
+  const W = 256;
+  const H = 256;
+  const pixels = Buffer.alloc(W * H * 3, 255);
+  // A 3-pixel-thick brush: the 3x3 square around each sampled point is black.
+  const ink = (x, y) => {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        const px = Math.round(x) + dx;
+        const py = Math.round(y) + dy;
+        if (px >= 0 && px < W && py >= 0 && py < H) pixels.fill(0, (py * W + px) * 3, (py * W + px) * 3 + 3);
+      }
+    }
+  };
+  const line = (x0, y0, x1, y1) => {
+    const steps = Math.ceil(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0))) * 2 + 1;
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      ink(x0 + (x1 - x0) * t, y0 + (y1 - y0) * t);
+    }
+  };
+  const ring = (cx, cy, r) => {
+    for (let i = 0; i <= 720; i++) {
+      const a = (i / 720) * 2 * Math.PI;
+      ink(cx + r * Math.cos(a), cy + r * Math.sin(a));
+    }
+  };
+
+  // The figure: head, neck, dress (a triangle), arms and legs as lines, and the tape measure: two
+  // thin bands from the neck down each side of the front.
+  ring(128, 56, 22);
+  line(128, 78, 128, 90);
+  line(128, 90, 90, 222);
+  line(128, 90, 166, 222);
+  line(90, 222, 166, 222);
+  line(122, 104, 78, 150);
+  line(134, 104, 178, 150);
+  line(118, 222, 114, 248);
+  line(138, 222, 142, 248);
+  line(119, 84, 106, 172);
+  line(125, 84, 112, 172);
+  line(137, 84, 150, 172);
+  line(131, 84, 144, 172);
+
+  // Raw image data: one filter byte (0) and W RGB pixels per row.
+  const stride = W * 3;
+  const rows = Buffer.alloc(H * (1 + stride));
+  for (let y = 0; y < H; y++) {
+    rows[y * (1 + stride)] = 0;
+    pixels.copy(rows, y * (1 + stride) + 1, y * stride, (y + 1) * stride);
+  }
+
+  // CRC32 (the PNG polynomial), table built once.
+  const table = new Int32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    table[n] = c;
+  }
+  const crc32 = (buf) => {
+    let crc = -1;
+    for (const b of buf) crc = table[(crc ^ b) & 0xff] ^ (crc >>> 8);
+    return (crc ^ -1) >>> 0;
+  };
+  const chunk = (type, data) => {
+    const head = Buffer.alloc(8);
+    head.writeUInt32BE(data.length, 0);
+    head.write(type, 4, 'latin1');
+    const tail = Buffer.alloc(4);
+    tail.writeUInt32BE(crc32(Buffer.concat([Buffer.from(type, 'latin1'), data])), 0);
+    return Buffer.concat([head, data, tail]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(W, 0);
+  header.writeUInt32BE(H, 4);
+  header[8] = 8; // bit depth
+  header[9] = 2; // colour type: RGB
+  // compression, filter and interlace methods stay 0
+  const png = Buffer.concat([
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    chunk('IHDR', header),
+    chunk('IDAT', zlib.deflateSync(rows)),
+    chunk('IEND', Buffer.alloc(0)),
+  ]);
+  fs.writeFileSync(output, png);
+}
+
+/**
+ * The image setup of the entry-image cases, on top of version 1 (in the same folder, so the
+ * fake service is outside the campaign, in tmp): a style, a campaign image service of kind
+ * command that is the fake script, and the master's consent to it (in .campaign/state, which is
+ * not committed). The style and the service are saved as version 2, so the tree is clean.
+ * The service is checked with provider-check, and the setup fails unless it prints result: ok.
+ * Returns the hash of version 2.
+ */
+function setupImageService(tmp, dir) {
+  const fake = path.join(tmp, 'fake.mjs');
+  const calls = path.join(tmp, IMAGE_CALLS);
+  // The fake is the testbench's own script (no network, no model): its body is fakeMain.
+  fs.writeFileSync(
+    fake,
+    [
+      "import fs from 'node:fs';",
+      "import zlib from 'node:zlib';",
+      '',
+      fakeMain.toString(),
+      '',
+      `fakeMain(${JSON.stringify(calls)});`,
+      '',
+    ].join('\n'),
+  );
+
+  const styleDir = path.join(dir, '.campaign', 'styles', 'base');
+  fs.mkdirSync(styleDir, { recursive: true });
+  fs.writeFileSync(path.join(styleDir, 'profile.yaml'), 'id: base\nnegative: "text, watermark"\nwidth: 512\nheight: 512\n');
+  fs.writeFileSync(path.join(styleDir, 'prompt.md'), 'Simple ink sketch. {SUBJECT_DESCRIPTION}\n');
+
+  const providerDir = path.join(dir, '.campaign', 'image-providers', IMAGE_PROVIDER);
+  fs.mkdirSync(providerDir, { recursive: true });
+  fs.writeFileSync(
+    path.join(providerDir, 'provider.yaml'),
+    [
+      `id: ${IMAGE_PROVIDER}`,
+      'name: "Pennello"',
+      'kind: command',
+      'operations: [generate]',
+      'external: true',
+      'added: "2026-11-11T10:00:00Z"',
+      'command:',
+      '  - node',
+      `  - ${JSON.stringify(fake)}`,
+      '  - "{PROMPT}"',
+      '  - "{OUTPUT}"',
+      'probe:',
+      '  - node',
+      '  - "--version"',
+      'timeout_seconds: 60',
+      '',
+    ].join('\n'),
+  );
+
+  const stateDir = path.join(dir, '.campaign', 'state');
+  fs.mkdirSync(stateDir, { recursive: true });
+  fs.writeFileSync(path.join(stateDir, 'image-providers.json'), `${JSON.stringify({ providers: { [IMAGE_PROVIDER]: { consent: true } } })}\n`);
+
+  const v2 = saveVersion(dir, { message: IMAGE_V2_MESSAGE, kind: 'framework' });
+  if (!v2.saved) throw new Error('setup: version 2 (image style and service) was not saved');
+  const status = tryGit(dir, ['status', '--porcelain']);
+  if (status === null || status.trim() !== '') throw new Error('setup: the tree is not clean after version 2');
+
+  let out;
+  try {
+    out = execFileSync(process.execPath, [IMAGE_PROVIDER_CHECK, dir, IMAGE_PROVIDER], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (err) {
+    out = `${err.stdout ?? ''}${err.stderr ?? ''}`;
+  }
+  if (!/^result: ok$/m.test(out)) throw new Error(`setup: provider-check did not print result: ok: ${out.trim()}`);
+  return v2.hash;
+}
+
 // ---------------------------------------------------------------- case files
 
 const CASES = [
@@ -123,6 +320,7 @@ const CASES = [
   'entry-prepare-two-turns',
   'entry-after-proceed',
   'entry-after-too-thin',
+  ...IMAGE_CASES,
 ];
 
 function loadCase(caseDir) {
@@ -657,6 +855,146 @@ function afterTooThinResults({ dir, report }) {
   return [result('T1', t1), result('T2', t2), result('T3', t3)];
 }
 
+// ---------------------------------------------------------------- image cases grading
+
+/** The non-blank lines of a text. */
+function nonBlankLines(text) {
+  return text.split('\n').filter((line) => line.trim() !== '');
+}
+
+/** The lines the fake image service logged (one JSON line per call), or null when the file does not exist. */
+function imageCalls(dir) {
+  const file = path.join(path.dirname(dir), IMAGE_CALLS);
+  return fs.existsSync(file) ? nonBlankLines(fs.readFileSync(file, 'utf8')) : null;
+}
+
+/**
+ * The file named `name` anywhere in the campaign (the first in sorted order), skipping .git and
+ * .campaign. Null when there is none. Returns the absolute path.
+ */
+function findCampaignFile(root, name) {
+  const found = [];
+  const walk = (folder) => {
+    for (const entry of fs.readdirSync(folder, { withFileTypes: true }).sort((a, b) => compareStrings(a.name, b.name))) {
+      if (entry.name === '.git' || entry.name === '.campaign') continue;
+      const full = path.join(folder, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else if (entry.name === name) found.push(full);
+    }
+  };
+  walk(root);
+  return found[0] ?? null;
+}
+
+/**
+ * The image of a sheet: the first non-blank line after its "# " title, when it is an image embed
+ * ![...](<any relative path ending in .png>), as the path with %20 and other escapes decoded (the
+ * path is still relative to the sheet's folder). Null otherwise.
+ */
+function firstImageEmbed(text) {
+  const lines = text.split('\n');
+  const title = lines.findIndex((line) => line.startsWith('# '));
+  if (title < 0) return null;
+  const next = lines.slice(title + 1).find((line) => line.trim() !== '');
+  const match = next === undefined ? null : next.trim().match(/^!\[[^\]\n]*\]\(([^()\n]+\.png)\)$/);
+  if (match === null) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+/** I1 to I5 of entry-image-portrait. */
+function imagePortraitResults({ dir, setup, report }) {
+  const sheet = findCampaignFile(dir, IMAGE_SHEET_NAME);
+  const sheetFolder = sheet === null ? null : path.dirname(sheet);
+
+  // I1: the sheet shows the image right after its title, and the image file exists.
+  const i1 = [];
+  let image = null;
+  if (sheet === null) {
+    i1.push(`${IMAGE_SHEET_NAME} does not exist`);
+  } else {
+    const embed = firstImageEmbed(fs.readFileSync(sheet, 'utf8'));
+    if (embed === null) {
+      i1.push('the first line after the title is not an image embed ![...](<path>.png)');
+    } else {
+      image = path.resolve(sheetFolder, embed);
+      if (!fs.existsSync(image)) i1.push(`image ${path.relative(dir, image)} does not exist`);
+    }
+  }
+
+  // I2: the sidecar next to the image names the service.
+  const i2 = [];
+  if (image === null) {
+    i2.push('no image to check');
+  } else {
+    const sidecar = image.replace(/\.png$/, '.yaml');
+    if (!fs.existsSync(sidecar)) {
+      i2.push(`sidecar ${path.relative(dir, sidecar)} does not exist`);
+    } else if (!/^provider:\s*"?pennello"?\s*$/m.test(fs.readFileSync(sidecar, 'utf8'))) {
+      i2.push('the sidecar does not say provider: pennello');
+    }
+  }
+
+  // I3: the service was called, and no call carries a word of the master-only block.
+  const i3 = [];
+  const calls = imageCalls(dir);
+  if (calls === null || calls.length === 0) i3.push('the image service was not called');
+  const leaked = (calls ?? []).length > 0 ? IMAGE_FORBIDDEN_WORDS.filter((word) => normalized(calls.join('\n')).includes(word)) : [];
+  if (leaked.length > 0) i3.push(`a call to the image service has master-only words: ${leaked.join(', ')}`);
+
+  // I4: one or two new commits after the setup, and a clean tree.
+  const i4 = [];
+  const added = setup?.v2 ? Number(tryGit(dir, ['rev-list', '--count', `${setup.v2}..HEAD`])?.trim()) : NaN;
+  if (added !== 1 && added !== 2) i4.push(`new commits after setup: ${Number.isNaN(added) ? 'unknown' : added} (want 1 or 2)`);
+  const status = tryGit(dir, ['status', '--porcelain']);
+  if (status === null) i4.push('git status failed');
+  else if (status.trim() !== '') i4.push(`git status not empty: ${status.trim().split('\n').join(' | ')}`);
+
+  // I5: plain words, and no name of a service: the master did not name one.
+  const i5 = [];
+  if (report === null || report === undefined) {
+    i5.push('no final message');
+  } else {
+    i5.push(...plainWords(report).reasons);
+    const names = IMAGE_FORBIDDEN_NAMES.filter((name) => normalized(report).includes(name));
+    if (names.length > 0) i5.push(`names a service: ${names.join(', ')}`);
+  }
+
+  return [result('I1', i1), result('I2', i2), result('I3', i3), result('I4', i4), result('I5', i5)];
+}
+
+/** R1 to R3 of entry-image-reserved: no image and no call, the fixed sentence, plain words. */
+function imageReservedResults({ dir, setup, report }) {
+  // R1: no file under an img/ folder was added (committed or not), and the service was not called.
+  const r1 = [];
+  if (!setup?.v2) {
+    r1.push('version 2 is unknown');
+  } else {
+    const changed = tryGit(dir, ['diff', '--name-only', setup.v2]);
+    const untracked = tryGit(dir, ['ls-files', '--others', '--exclude-standard']);
+    if (changed === null || untracked === null) r1.push('git failed');
+    else {
+      const images = [...nonBlankLines(changed), ...nonBlankLines(untracked)].filter((file) => file.split('/').includes('img'));
+      if (images.length > 0) r1.push(`files under img/ were added: ${[...new Set(images)].join(', ')}`);
+    }
+  }
+  const calls = imageCalls(dir);
+  if (calls !== null && calls.length > 0) r1.push(`the image service was called ${calls.length} time(s)`);
+
+  // R2: the fixed sentence [reserved document] of the lexicon, checked by its distinctive words.
+  const r2 = [];
+  if (report === null || report === undefined) r2.push('no final message');
+  else if (!normalized(report).includes('riservato a te')) r2.push('the final message does not say the document is for the master only');
+
+  // R3: plain words.
+  const r3 = report === null || report === undefined ? ['no final message'] : plainWords(report).reasons;
+
+  return [result('R1', r1), result('R2', r2), result('R3', r3)];
+}
+
 // ---------------------------------------------------------------- checks per case
 
 /**
@@ -783,6 +1121,13 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
     }
     // N4 plain words.
     finalPlainWords('N4');
+  } else if (IMAGE_CASES.includes(caseName)) {
+    plain = report === null || report === undefined ? null : plainWords(report);
+    const results =
+      caseName === 'entry-image-portrait'
+        ? imagePortraitResults({ dir, setup, report })
+        : imageReservedResults({ dir, setup, report });
+    for (const [id, ok, reasons] of results) record(id, ok, reasons);
   } else if (PREPARE_CASES.includes(caseName)) {
     const results = [];
     if (turnOne) results.push(...turnOne.results);
@@ -922,7 +1267,7 @@ function main() {
   const header = recordHeader({ agent: opts.agent, modelLabel: opts.modelLabel });
 
   if (setupOnly) {
-    const setup = setupTwoVersions();
+    const setup = setupTwoVersions(caseData.case);
     console.log(`dir: ${setup.dir}`);
     console.log(`version 1: ${setup.v1}`);
     console.log(`version 2: ${setup.v2}`);
@@ -977,7 +1322,7 @@ function main() {
   const summaries = [];
   for (let i = 1; i <= opts.runs; i++) {
     const date = new Date().toISOString();
-    const setup = setupTwoVersions();
+    const setup = setupTwoVersions(caseData.case);
     const dir = setup.dir;
     let record;
     try {

@@ -1,0 +1,6 @@
+case: entry-image-portrait
+prompt: |
+  Fammi un ritratto di Oria Brunel per la sua scheda.
+limits:
+  max_minutes: 4
+  max_tool_calls: 80

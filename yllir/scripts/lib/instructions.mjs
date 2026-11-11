@@ -31,7 +31,13 @@ const SETTINGS_PATH = '.claude/settings.json';
 // The Bash rules come from the allowed-tools of every skill (see projectSettingsText).
 // The master's rules go in .claude/settings.local.json, which is never generated.
 const SKILLS_DIR = path.join(PLUGIN_DIR, 'skills');
-const FIXED_RULES = ['Skill(yllir:*)', 'Edit(.campaign/state/**)', 'Edit(.campaign/drafts/**)'];
+const FIXED_RULES = [
+  'Skill(yllir:*)',
+  'Edit(.campaign/state/**)',
+  'Edit(.campaign/drafts/**)',
+  'Edit(.campaign/image-providers/**)',
+  'Edit(.campaign/styles/**)',
+];
 const PLUGIN_UPDATE_COMMAND = 'claude plugin update *';
 const ALLOWED_TOOLS_LINE = /^allowed-tools:[ \t]*(.*)$/m;
 const BASH_ENTRY_RE = /Bash\(([^()]*)\)/g;

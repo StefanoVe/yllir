@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { validateConfig } from './config.mjs';
+import { validateConfig, listCampaignStyles } from './config.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.resolve(here, '../../../testbench/fixtures/morvalle/campaign');
@@ -305,6 +305,40 @@ test('a style is not installed, and cards only makes sense on objects', () => {
   assert.deepEqual(pairsOf(errorsOf(cards, ['Trama'])), ['cards-not-objects structure[0].cards']);
   const notBool = `${MINIMAL}structure:\n  - id: oggetti\n    folder: Oggetti\n    type: objects\n    cards: "yes"\n`;
   assert.deepEqual(pairsOf(errorsOf(notBool, ['Oggetti'])), ['bad-type structure[0].cards']);
+});
+
+test('a style is valid when the campaign has its folder with a prompt.md', () => {
+  const styled = `${MINIMAL}structure:\n  - id: creature\n    folder: Creature\n    type: subjects\n    style: base\n`;
+  const root = makeCampaign(styled, ['Creature']);
+  fs.mkdirSync(path.join(root, '.campaign', 'styles', 'base'), { recursive: true });
+  fs.writeFileSync(path.join(root, '.campaign', 'styles', 'base', 'prompt.md'), 'Base style.\n');
+  assert.deepEqual(pairsOf(validateConfig(root).errors), []);
+
+  const unknown = `${MINIMAL}structure:\n  - id: creature\n    folder: Creature\n    type: subjects\n    style: dipinto\n`;
+  const unknownRoot = makeCampaign(unknown, ['Creature']);
+  fs.mkdirSync(path.join(unknownRoot, '.campaign', 'styles', 'base'), { recursive: true });
+  fs.writeFileSync(path.join(unknownRoot, '.campaign', 'styles', 'base', 'prompt.md'), 'Base style.\n');
+  assert.deepEqual(pairsOf(validateConfig(unknownRoot).errors), ['unknown-style structure[0].style']);
+});
+
+test('a style folder without prompt.md does not count as a style', () => {
+  const styled = `${MINIMAL}structure:\n  - id: creature\n    folder: Creature\n    type: subjects\n    style: base\n`;
+  const root = makeCampaign(styled, ['Creature']);
+  fs.mkdirSync(path.join(root, '.campaign', 'styles', 'base'), { recursive: true });
+  assert.deepEqual(pairsOf(validateConfig(root).errors), ['unknown-style structure[0].style']);
+});
+
+test('listCampaignStyles lists the sorted style folders that have a prompt.md, and [] without a styles folder', () => {
+  const bare = makeCampaign(MINIMAL);
+  assert.deepEqual(listCampaignStyles(bare), []);
+
+  const root = makeCampaign(MINIMAL);
+  for (const name of ['olio', 'base']) {
+    fs.mkdirSync(path.join(root, '.campaign', 'styles', name), { recursive: true });
+    fs.writeFileSync(path.join(root, '.campaign', 'styles', name, 'prompt.md'), 'Style.\n');
+  }
+  fs.mkdirSync(path.join(root, '.campaign', 'styles', 'vuoto'), { recursive: true });
+  assert.deepEqual(listCampaignStyles(root), ['base', 'olio']);
 });
 
 test('unknown keys inside a category are reported', () => {

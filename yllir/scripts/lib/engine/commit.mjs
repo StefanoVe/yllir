@@ -306,7 +306,7 @@ function preflight(dir, files, deletes, sources) {
   }
 
   for (const rel of sources) {
-    const why = relativeProblem(rel, false);
+    const why = relativeProblem(rel, false, { source: true });
     if (why !== null) {
       add(rel, 'bad-path', `${rel} ${why}`);
       continue;
@@ -628,27 +628,46 @@ function hashDrafts(dir, files, deletes, sources) {
 
 /**
  * A review is needed for drafts, deletes, and Markdown sources. Two cases need none: a layout-only
- * batch, and a batch whose drafts differ from the campaign only by Markdown link markup (the author
- * adding links to ambiguous mentions).
+ * batch, and a batch whose drafts differ from the campaign only by Markdown link markup or image
+ * embeds (the author adding links to ambiguous mentions, or images, which add no facts).
  */
 function needsReview(dir, files, deletes, sources) {
-  const markdownSources = sources.some((rel) => rel.endsWith('.md'));
-  if (files.length > 0 && deletes.length === 0 && !markdownSources && onlyLinksAdded(dir, files)) return false;
+  // Image styles and image providers are configuration, not canon: their Markdown prompts need no review.
+  const markdownSources = sources.some((rel) => rel.endsWith('.md') && !isCampaignContentSource(rel));
+  if (files.length > 0 && deletes.length === 0 && !markdownSources && onlyLinksOrImagesChanged(dir, files)) return false;
   return files.length > 0 || deletes.length > 0 || markdownSources;
 }
 
-/** True when every draft equals its campaign file once every [text](target) is reduced to text. */
-function onlyLinksAdded(dir, files) {
+/**
+ * True when every draft equals its campaign file once link and image markup is removed and blank
+ * lines are collapsed (see normalizeText).
+ */
+function onlyLinksOrImagesChanged(dir, files) {
   return files.every((rel) => {
     const draft = readText(path.join(dir, DRAFT_DIR, rel));
     const current = readText(path.join(dir, rel));
-    return draft !== null && current !== null && stripLinks(draft) === stripLinks(current);
+    return draft !== null && current !== null && comparable(draft) === comparable(current);
   });
+}
+
+/** The text used to compare a draft with its campaign file: no links, no images, normalized blank lines. */
+function comparable(text) {
+  return normalizeText(stripLinks(stripImages(text)));
+}
+
+/** Removes each whole line that is only an image embed, and every inline image embed. */
+function stripImages(text) {
+  return text.replace(/^[ \t]*!\[[^\]]*\]\([^)]*\)[ \t]*\r?\n?/gm, '').replace(/!\[[^\]]*\]\([^)]*\)/g, '');
 }
 
 /** Replaces every Markdown link (not an image) with its text. */
 function stripLinks(text) {
   return text.replace(/(?<!!)\[([^\]]*)\]\([^)]*\)/g, '$1');
+}
+
+/** Collapses every run of two or more blank lines into one blank line. */
+function normalizeText(text) {
+  return text.replace(/\n[ \t]*\r?\n(?:[ \t]*\r?\n)+/g, '\n\n');
 }
 
 function isLayoutOnly(files, deletes, sources) {
@@ -770,8 +789,23 @@ function readArgs(root, options, requireMessage) {
   };
 }
 
-/** Null when the path may be used, otherwise the reason it may not. */
-function relativeProblem(rel, markdown) {
+/**
+ * Folders under .campaign/ whose files a batch may name as sources: image styles
+ * (.campaign/styles/<id>/<file>) and campaign image providers (.campaign/image-providers/<id>/<file>).
+ * Nothing else under .campaign/ is allowed, and files and deletes are never allowed there.
+ */
+const CAMPAIGN_CONTENT_DIRS = ['.campaign/styles/', '.campaign/image-providers/'];
+
+/** True for a file inside one of CAMPAIGN_CONTENT_DIRS, at least one level below it. */
+function isCampaignContentSource(rel) {
+  return CAMPAIGN_CONTENT_DIRS.some((dir) => rel.startsWith(dir) && rel.length > dir.length);
+}
+
+/**
+ * Null when the path may be used, otherwise the reason it may not. A source may also be a file of
+ * a campaign content folder (see isCampaignContentSource); files and deletes may not.
+ */
+function relativeProblem(rel, markdown, { source = false } = {}) {
   if (rel === '') return 'must not be empty';
   if (rel.includes('\\') || path.posix.isAbsolute(rel) || /^[A-Za-z]:/.test(rel)) {
     return 'must be a relative path with forward slashes';
@@ -780,7 +814,8 @@ function relativeProblem(rel, markdown) {
   if (parts.some((part) => part === '' || part === '.' || part === '..')) {
     return 'must be a plain relative path without . or ..';
   }
-  if (parts.includes('.campaign') || parts.includes('.git')) {
+  if (parts.includes('.git')) return 'is inside a folder the framework owns';
+  if (parts.includes('.campaign') && !(source && isCampaignContentSource(rel))) {
     return 'is inside a folder the framework owns';
   }
   if (markdown && !rel.endsWith('.md')) return 'must be a Markdown file ending in .md';

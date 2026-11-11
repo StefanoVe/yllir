@@ -242,9 +242,11 @@ Un profilo di stile descrive l'aspetto di una famiglia di immagini: artwork di c
 | `references` | immagini da allegare alla generazione | base di impaginazione, immagine di oggetto |
 | `checks` | elenco di voci da controllare su ogni immagine | abiti, copricapi, oggetti in mano, numero delle figure |
 
+**Deciso** (2026-11-11, decisione D5): lo stile delle immagini appartiene alla campagna, non al framework. Ogni stile vive in `.campaign/styles/<id>/`, con `profile.yaml` e `prompt.md`, che contiene il segnaposto `{SUBJECT_DESCRIPTION}`. Lo stile `base` si crea alla prima richiesta di immagine: lo strumento lo propone dalla descrizione pubblica del mondo, e il master lo conferma. Il framework non ne fornisce nessuno. `structure[].style` in `campaign.yaml` si valida contro gli stili della campagna.
+
 ### Dove vive e come cambia (proposta)
 
-Ogni profilo è una cartella: `profile.yaml` con i campi sopra, `prompt.md` con il prompt base e i riferimenti in una sottocartella `references/`. I profili di esempio arrivano con il framework; quelli della campagna stanno nel progetto e possono derivare da un profilo base.
+Ogni profilo è una cartella: `profile.yaml` con i campi sopra, `prompt.md` con il prompt base e i riferimenti in una sottocartella `references/`. ~~I profili di esempio arrivano con il framework;~~ (superato da D5) quelli della campagna stanno nel progetto e possono derivare da un profilo base.
 
 - Un profilo non viene riscritto da un'immagine. Se cambia, si rigenerano solo le immagini richieste; le versioni precedenti restano.
 - Non si mescolano profili nella stessa categoria, né si adattano alla preferenza del momento: un soggetto diverso dallo stile si gestisce con una richiesta esplicita per quel soggetto.
@@ -279,5 +281,5 @@ Ogni profilo elenca le voci da controllare sull'immagine generata. Le voci dei d
 - **Formato del manifest.** YAML è implementato nella 0.30.0 (`adapter.yaml`, con `checks.mjs` per l'aritmetica). Resta da decidere se il master debba poterlo leggere senza strumenti.
 - **Chi scrive un nuovo adattatore.** Proposta: l'agente, a partire dallo schema e da casi di prova; il master lo conferma con una descrizione del sistema. Da verificare con un sistema non noto. Ora che l'adattatore è uno schema, la domanda riguarda anche la forma dei valori di regola (statistiche, difficoltà, prezzi) che il modello scrive e lo schema valida.
 - **Fasce di difficoltà.** Tabella fascia → GS nell'adattatore o nella campagna? La proposta è nell'adattatore, con possibilità di personalizzazione per campagna. Finché la tabella manca, `rate_encounter` non è implementata.
-- **Procedura di generazione.** Quali parti del processo di artwork appartengono al profilo e quali alla funzione di libreria? Oggi la procedura è tutta in un unico documento di istruzioni.
+- **Procedura di generazione.** Quali parti del processo di artwork appartengono al profilo e quali alla funzione di libreria? Oggi la procedura è tutta in un unico documento di istruzioni. **Risposta (2026-11-11, D5 e D8):** il profilo contiene il prompt (`base_prompt`), i vincoli negativi (`constraints`) e le dimensioni (`format`). I tentativi correttivi e il controllo visivo appartengono alla skill di libreria: l'assistente principale confronta l'immagine con la descrizione pubblica, tratto per tratto, con al più 2 tentativi correttivi sullo stesso fornitore. Resta da decidere se la voce `checks` del profilo, che elenca i tratti da controllare, resta nel profilo o passa alla skill.
 - **Aritmetica di un secondo sistema (domanda aggiunta dalla riscrittura del 2026-11-11).** `checks.mjs`, con funzioni nominate per il sistema, è il formato definitivo per l'aritmetica, o serve un modo dichiarativo per le formule più semplici?

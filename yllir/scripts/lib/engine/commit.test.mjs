@@ -576,6 +576,55 @@ test('a batch that only adds links to a sheet needs no review', async (t) => {
   assert.equal(textual.reviewRequired, true);
 });
 
+/** Writes a small placeholder PNG at a campaign path, so the embed in a draft has a target. */
+function writeImage(dir, rel) {
+  fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+  fs.writeFileSync(path.join(dir, rel), Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+}
+
+/** The campaign document with an image line under its title line, as the master would embed a portrait. */
+function withImageUnderTitle(current, image) {
+  const lines = current.split('\n');
+  const titleAt = lines.findIndex((line) => line.startsWith('# '));
+  assert.ok(titleAt >= 0, 'the fixture document has a title line');
+  lines.splice(titleAt + 1, 0, '', image);
+  return lines.join('\n');
+}
+
+test('a batch that only adds an image embed needs no review', async (t) => {
+  const dir = makeCampaign(t);
+  const rel = 'Cronaca/2026-10-03.md';
+  const current = readAt(dir, rel);
+  writeImage(dir, 'Cronaca/img/oria.png');
+  writeDraft(dir, rel, withImageUnderTitle(current, '![Ritratto di Oria](img/oria.png)'));
+  const check = await checkBatch(dir, { files: [rel] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, false);
+});
+
+test('a batch that adds an image embed and a new sentence still needs review', async (t) => {
+  const dir = makeCampaign(t);
+  const rel = 'Cronaca/2026-10-03.md';
+  const current = readAt(dir, rel);
+  writeImage(dir, 'Cronaca/img/oria.png');
+  writeDraft(dir, rel, `${withImageUnderTitle(current, '![Ritratto di Oria](img/oria.png)')}\nUna frase nuova.\n`);
+  const check = await checkBatch(dir, { files: [rel] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, true);
+});
+
+test('a batch with an image-only draft and an image source needs no review', async (t) => {
+  const dir = makeCampaign(t);
+  const rel = 'Cronaca/2026-10-03.md';
+  const current = readAt(dir, rel);
+  const image = 'Personaggi/img/oria.png';
+  writeImage(dir, image);
+  writeDraft(dir, rel, withImageUnderTitle(current, '![Ritratto di Oria](../Personaggi/img/oria.png)'));
+  const check = await checkBatch(dir, { files: [rel], sources: [image] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, false);
+});
+
 test('a relative symlink to a folder outside the campaign passes check and survives commit', async (t) => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
   t.after(() => fs.rmSync(parent, { recursive: true, force: true }));
@@ -605,4 +654,67 @@ test('a relative symlink to a folder outside the campaign passes check and survi
   const result = await commitBatch(campaign, { files: [MIRA_PATH], message: 'Add Mira Sanna', note: 'test' });
   assert.equal(result.ok, true, JSON.stringify(result.errors));
   assert.equal(fs.readlinkSync(path.join(campaign, 'Sources/World')), '../../outside/World');
+});
+
+test('image style files under .campaign/styles are saved as sources, and the Markdown prompt needs no review', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  const profile = '.campaign/styles/base/profile.yaml';
+  const prompt = '.campaign/styles/base/prompt.md';
+  fs.mkdirSync(path.join(dir, '.campaign/styles/base'), { recursive: true });
+  fs.writeFileSync(path.join(dir, profile), 'name: Base\n');
+  fs.writeFileSync(path.join(dir, prompt), '# Base\n\nAcquerello su carta ruvida.\n');
+
+  const check = await checkBatch(dir, { sources: [profile, prompt] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, false);
+
+  const result = await commitBatch(dir, { sources: [profile, prompt], message: 'Add the base image style' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(result.reviewRequired, false);
+  assert.equal(commitCount(dir), before + 1);
+  const named = git(dir, ['show', '--name-only', '--format=', 'HEAD']).split('\n').filter(Boolean);
+  assert.ok(named.includes(profile), named.join(', '));
+  assert.ok(named.includes(prompt), named.join(', '));
+});
+
+test('image provider files under .campaign/image-providers are saved as sources, and the Markdown instructions need no review', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  const provider = '.campaign/image-providers/gemini/provider.yaml';
+  const instructions = '.campaign/image-providers/gemini/instructions.md';
+  fs.mkdirSync(path.join(dir, '.campaign/image-providers/gemini'), { recursive: true });
+  fs.writeFileSync(path.join(dir, provider), 'id: gemini\n');
+  fs.writeFileSync(path.join(dir, instructions), '# Gemini\n\nInvia il prompt come testo.\n');
+
+  const check = await checkBatch(dir, { sources: [provider, instructions] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, false);
+
+  const result = await commitBatch(dir, { sources: [provider, instructions], message: 'Add the gemini image provider' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(result.reviewRequired, false);
+  assert.equal(commitCount(dir), before + 1);
+  const named = git(dir, ['show', '--name-only', '--format=', 'HEAD']).split('\n').filter(Boolean);
+  assert.ok(named.includes(provider), named.join(', '));
+  assert.ok(named.includes(instructions), named.join(', '));
+});
+
+test('a source under .campaign outside the content folders is still refused', async (t) => {
+  const dir = makeCampaign(t);
+  const rel = '.campaign/state/x.json';
+  fs.mkdirSync(path.join(dir, '.campaign/state'), { recursive: true });
+  fs.writeFileSync(path.join(dir, rel), '{}\n');
+  const check = await checkBatch(dir, { sources: [rel] });
+  assert.equal(check.ok, false);
+  assert.deepEqual(check.errors.map((e) => e.code), ['bad-path']);
+});
+
+test('a draft under .campaign/styles is still refused as a file to write', async (t) => {
+  const dir = makeCampaign(t);
+  const rel = '.campaign/styles/base/prompt.md';
+  writeDraft(dir, rel, '# Base\n\nTesto.\n');
+  const check = await checkBatch(dir, { files: [rel] });
+  assert.equal(check.ok, false);
+  assert.deepEqual(check.errors.map((e) => e.code), ['bad-path']);
 });

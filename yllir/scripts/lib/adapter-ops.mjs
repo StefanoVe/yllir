@@ -1,8 +1,8 @@
 import { pathToFileURL } from 'node:url';
 import { parseFrontmatter } from './frontmatter.mjs';
+import { publicBody } from './public-text.mjs';
 
 const LANGUAGES = new Set(['it', 'en']);
-const MASTER_MARKER = '<!-- master -->';
 const CHARACTERISTICS = { it: 'Caratteristiche', en: 'Characteristics' };
 // Optional creature fields that a Characteristics table may name, by language.
 const OPTIONAL_CREATURE_LABELS = {
@@ -14,12 +14,6 @@ function error(code, message) { return { code, message }; }
 
 function languageError(lang) {
   return LANGUAGES.has(lang) ? null : error('unsupported-language', `unsupported language: ${lang}`);
-}
-
-function publicBody(markdown) {
-  const { body } = parseFrontmatter(String(markdown));
-  const marker = body.indexOf(MASTER_MARKER);
-  return marker >= 0 ? body.slice(0, marker) : body;
 }
 
 function headingLines(text) {

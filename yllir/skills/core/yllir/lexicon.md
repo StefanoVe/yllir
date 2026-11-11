@@ -63,6 +63,8 @@ Use only the words in the language column of the campaign: the Italian column fo
 | JSON, YAML | «Dati» | «Data» |
 | Sources folder / acquisition card | «Fonti» | «Sources» |
 | Ingest | «Portare nella campagna» | «Bring into the campaign» |
+| Image provider | «Servizio per le illustrazioni» | «Illustration service» |
+| API key | «Chiave del servizio» | «Service key» |
 
 ## Never say
 
@@ -77,6 +79,19 @@ Use these words when you tell the master where something comes from. They are no
 | Provenance master | «Detto da te» | «Said by you» |
 | Provenance played | «Giocato al tavolo» | «Played at the table» |
 | Provenance generated | «Inventato dall'assistente» | «Invented by the assistant» |
+
+## Fixed sentences for images
+
+Use these sentences as they are when the image tool needs them. The label in brackets is how the instructions of the images skill name each sentence. The master never hears the name of a service, except in the consent sentence.
+
+| Label | Italian | English |
+|---|---|---|
+| [no service] | Nessun servizio per le illustrazioni è disponibile in questo momento. Se hai un'immagine tua, mandamela e la collego alla scheda. | No illustration service is available right now. If you have an image of your own, send it to me and I will attach it to the sheet. |
+| [requested service unavailable] | Il servizio per le illustrazioni che hai chiesto non è disponibile in questo momento. Vuoi che ne usi un altro? | The illustration service you asked for is not available right now. Do you want me to use another one? |
+| [consent] | Per creare l'immagine userò <servizio>, un servizio esterno: riceverà solo la descrizione pubblica di «<titolo>», mai le tue note riservate. Va bene? | To create the image I will use <service>, an outside service: it will receive only the public description of «<title>», never your private notes. Is that all right? |
+| [reserved document] | Questo documento è riservato a te, quindi non lo mando a nessun servizio per le illustrazioni. | This document is for your eyes only, so I will not send it to any illustration service. |
+| [send your own image] | Non ho un servizio per le illustrazioni disponibile: mandami un'immagine tua e la collego alla scheda. | I have no illustration service available: send me an image of your own and I will attach it to the sheet. |
+| [key needed] | Per usare <servizio> mi serve la sua chiave. Me la incolli qui? La tengo solo su questo computer, fuori dalla campagna. | To use <service> I need its key. Can you paste it here? I keep it only on this computer, outside the campaign. |
 
 ## Other languages
 

@@ -16,7 +16,6 @@ const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];
 const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only', 'external'];
 const MODULE_KEYS = ['print', 'encyclopedia', 'master_screen', 'music'];
 const INSTALLED_ADAPTERS = ['none', ...listAdapters(pluginRootFromHere())];
-const INSTALLED_STYLES = [];
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const LANG_RE = /^[a-z]{2}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -106,6 +105,27 @@ function isDirectory(target) {
   } catch {
     return false;
   }
+}
+
+/**
+ * Lists the image styles of a campaign: the sorted names of the folders in
+ * `<campaignRoot>/.campaign/styles/` that contain a `prompt.md`.
+ * A missing styles folder gives an empty list.
+ * @param {string} campaignRoot path to the campaign folder
+ * @returns {string[]}
+ */
+export function listCampaignStyles(campaignRoot) {
+  const stylesDir = path.join(campaignRoot, '.campaign', 'styles');
+  let entries;
+  try {
+    entries = fs.readdirSync(stylesDir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((entry) => entry.isDirectory() && fs.existsSync(path.join(stylesDir, entry.name, 'prompt.md')))
+    .map((entry) => entry.name)
+    .sort();
 }
 
 /** A folder is usable when it is non-empty, relative, free of `..` and has no backslash. */
@@ -416,8 +436,12 @@ function validateStructure(r, structure, campaignRoot) {
     if (Object.hasOwn(entry, 'style')) {
       if (typeof entry.style !== 'string') {
         r.error('bad-type', `${base}.style`, `${base}.style must be text`);
-      } else if (!INSTALLED_STYLES.includes(entry.style)) {
-        r.error('unknown-style', `${base}.style`, `the style ${entry.style} is not installed`);
+      } else if (!listCampaignStyles(campaignRoot).includes(entry.style)) {
+        r.error(
+          'unknown-style',
+          `${base}.style`,
+          `the style ${entry.style} is not among the campaign's styles in .campaign/styles/`,
+        );
       }
     }
 

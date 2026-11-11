@@ -1,0 +1,6 @@
+case: entry-image-reserved
+prompt: |
+  Fammi un ritratto di Neri Calce per la sua scheda.
+limits:
+  max_minutes: 4
+  max_tool_calls: 80

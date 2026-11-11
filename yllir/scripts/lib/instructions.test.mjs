@@ -65,7 +65,14 @@ describe('project allow rules', () => {
   test('the real skills give one rule per plugin script, the update command, and the fixed rules', () => {
     const allow = projectAllowRules();
     assert.deepEqual(allow, [...new Set(allow)].sort(), 'sorted and unique');
-    for (const rule of ['Skill(yllir:*)', 'Edit(.campaign/state/**)', 'Edit(.campaign/drafts/**)', 'Bash(claude plugin update *)']) {
+    for (const rule of [
+      'Skill(yllir:*)',
+      'Edit(.campaign/state/**)',
+      'Edit(.campaign/drafts/**)',
+      'Edit(.campaign/image-providers/**)',
+      'Edit(.campaign/styles/**)',
+      'Bash(claude plugin update *)',
+    ]) {
       assert.ok(allow.includes(rule), rule);
     }
     assert.ok(allow.includes('Bash(node "*/scripts/engine.mjs" *)'));
@@ -112,7 +119,9 @@ describe('project allow rules', () => {
       'Bash(node "*/b/y.mjs" *)',
       'Bash(node "*/scripts/x.mjs" *)',
       'Edit(.campaign/drafts/**)',
+      'Edit(.campaign/image-providers/**)',
       'Edit(.campaign/state/**)',
+      'Edit(.campaign/styles/**)',
       'Skill(yllir:*)',
     ]);
   });
