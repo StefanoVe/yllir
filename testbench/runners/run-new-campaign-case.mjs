@@ -32,7 +32,7 @@ import {
 } from './lib/case-common.mjs';
 import { validateConfig } from '../../yllir/scripts/lib/config.mjs';
 import { checkFingerprints } from '../../yllir/scripts/lib/instructions.mjs';
-import { checkLinks } from '../../yllir/skills/library/linker/scripts/lib/check-links.mjs';
+import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../yllir/scripts/lib/zones.mjs';
 

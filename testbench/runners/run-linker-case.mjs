@@ -51,8 +51,7 @@ function loadKey(fixtureDir) {
 /** The files that define the linker under test. */
 function linkerInstructionFiles() {
   return [
-    ...listFiles(path.join(REPO_ROOT, 'yllir', 'skills', 'library', 'linker')),
-    path.join(REPO_ROOT, 'yllir', 'agents', 'linker-reviewer.md'),
+    ...listFiles(path.join(REPO_ROOT, 'yllir', 'scripts', 'lib', 'links')),
     ...listFiles(path.join(REPO_ROOT, 'yllir', 'scripts'), { scriptsOnly: true }),
   ];
 }

@@ -257,6 +257,8 @@ export function runClaude({
       timeout: timeoutMs,
       maxBuffer: MAX_BUFFER,
       stdio: ['ignore', 'pipe', 'pipe'],
+      // Feedback is off by default; test runs record it for the case reports.
+      env: { ...process.env, YLLIR_FEEDBACK: '1' },
     });
     const { result: data, denied, tool_calls: toolCalls } = parseStream(stdout);
     if (data === null || typeof data.result !== 'string') throw new Error('no result text in JSON output');

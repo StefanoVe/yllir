@@ -453,22 +453,42 @@ test('the morvalle fixture is valid with no errors', () => {
   assert.deepEqual(result.errors, []);
 });
 
-test('allow_model_imagination accepts null, true, false and an absent key', () => {
+test('allow_model_imagination is optional and ignored: any value is accepted and not read', () => {
   assert.deepEqual(errorsOf(MINIMAL), []);
   assert.deepEqual(errorsOf(`${MINIMAL}allow_model_imagination: null\n`), []);
   assert.deepEqual(errorsOf(`${MINIMAL}allow_model_imagination: true\n`), []);
-  assert.deepEqual(errorsOf(`${MINIMAL}allow_model_imagination: false\n`), []);
-  assert.equal(validateConfig(makeCampaign(`${MINIMAL}allow_model_imagination: true\n`)).config.allow_model_imagination, true);
+  assert.deepEqual(errorsOf(`${MINIMAL}allow_model_imagination: "yes"\n`), []);
+  assert.deepEqual(errorsOf(`${MINIMAL}allow_model_imagination: [true]\n`), []);
+  assert.deepEqual(validateConfig(makeCampaign(`${MINIMAL}allow_model_imagination: true\n`)).warnings, validateConfig(makeCampaign(MINIMAL)).warnings);
 });
 
-test('allow_model_imagination rejects text, numbers, lists and mappings with its own path', () => {
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}allow_model_imagination: "yes"\n`)), ['bad-value allow_model_imagination']);
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}allow_model_imagination: yes\n`)), ['bad-value allow_model_imagination']);
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}allow_model_imagination: 1\n`)), ['bad-value allow_model_imagination']);
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}allow_model_imagination: [true]\n`)), ['bad-type allow_model_imagination']);
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}allow_model_imagination: {}\n`)), ['bad-type allow_model_imagination']);
-  assert.equal(
-    errorsOf(`${MINIMAL}allow_model_imagination: "yes"\n`)[0].message,
-    'allow_model_imagination must be true, false or null',
-  );
+test('campaign.description is optional', () => {
+  const text = MINIMAL.replace('  slug: ceneri-della-valle\n', '  slug: ceneri-della-valle\n  description: ""\n');
+  assert.deepEqual(errorsOf(MINIMAL), []);
+  assert.equal(validateConfig(makeCampaign(text)).ok, true);
+  assert.equal(validateConfig(makeCampaign(MINIMAL)).config.campaign.description, undefined);
+});
+
+test('campaign.seed accepts a relative .md file name and keeps it', () => {
+  const root = makeCampaign(MINIMAL.replace('  created: 2026-11-07\n', '  created: 2026-11-07\n  seed: "Seme del mondo.md"\n'));
+  const result = validateConfig(root);
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.config.campaign.seed, 'Seme del mondo.md');
+});
+
+test('campaign.seed is accepted before its file exists', () => {
+  const root = makeCampaign(MINIMAL.replace('  created: 2026-11-07\n', '  created: 2026-11-07\n  seed: World seed.md\n'));
+  assert.equal(fs.existsSync(path.join(root, 'World seed.md')), false);
+  assert.deepEqual(validateConfig(root).errors, []);
+});
+
+test('campaign.seed rejects paths outside the campaign, other extensions and non-text values', () => {
+  const withSeed = (value) => MINIMAL.replace('  created: 2026-11-07\n', `  created: 2026-11-07\n  seed: ${value}\n`);
+  assert.deepEqual(pairsOf(errorsOf(withSeed('"../Seme.md"'))), ['bad-value campaign.seed']);
+  assert.deepEqual(pairsOf(errorsOf(withSeed('"Mondo/../../Seme.md"'))), ['bad-value campaign.seed']);
+  assert.deepEqual(pairsOf(errorsOf(withSeed('"/tmp/Seme.md"'))), ['bad-value campaign.seed']);
+  assert.deepEqual(pairsOf(errorsOf(withSeed('"Seme.txt"'))), ['bad-value campaign.seed']);
+  assert.deepEqual(pairsOf(errorsOf(withSeed('"Seme\\mondo.md"'))), ['bad-value campaign.seed']);
+  assert.deepEqual(pairsOf(errorsOf(withSeed('""'))), ['bad-value campaign.seed']);
+  assert.deepEqual(pairsOf(errorsOf(withSeed('[Seme.md]'))), ['bad-type campaign.seed']);
 });

@@ -14,14 +14,15 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { checkFingerprints, generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
-import { plotMap } from '../../../../../skills/library/plot-map/scripts/lib/plot-map.mjs';
-import { writeSessionMaps } from '../../../../../skills/library/plot-map/scripts/lib/session-map.mjs';
+import { plotMap } from '../../../../../scripts/lib/plot/plot-map.mjs';
+import { writeSessionMaps } from '../../../../../scripts/lib/plot/session-map.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { listVersions, restore, saveManualChanges, saveVersion, status } from '../../../../../scripts/lib/versions.mjs';
 import { migrateSessions } from './migrate-sessions.mjs';
 import { completePostUpdate, preparePostUpdate } from './post-update.mjs';
 import { prepareItemDescriptions } from './item-descriptions.mjs';
 import { planGeographicLayout } from '../../../../../scripts/lib/geographic-layout.mjs';
+import { WORLD_MIGRATION_ID, applyWorldMigration, planWorldMigration } from './migrate-world.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../../../../.claude-plugin/plugin.json');
 const CONFIG_PATH = 'campaign.yaml';
@@ -33,8 +34,9 @@ const SHEET_MIGRATION_ID = 'statistics-tables-v1';
 const GEOGRAPHY_MIGRATION_ID = 'category-first-geography-v1';
 
 // Keys written without quotes: their values never need escaping.
-const UNQUOTED_KEYS = new Set(['status', 'started_on', 'completed_on', 'last_notified_on', 'snoozed_until', 'sheet_migration', 'geography_migration']);
-const UPDATE_KEYS = ['status', 'from_version', 'to_version', 'restore_point', 'started_on', 'completed_on', 'sheet_migration_id', 'sheet_migration', 'geography_migration_id', 'geography_migration'];
+const UNQUOTED_KEYS = new Set(['status', 'started_on', 'completed_on', 'last_notified_on', 'snoozed_until', 'sheet_migration', 'geography_migration', 'world_migration']);
+const UPDATE_KEYS = ['status', 'from_version', 'to_version', 'restore_point', 'started_on', 'completed_on', 'sheet_migration_id', 'sheet_migration', 'geography_migration_id', 'geography_migration', 'world_migration_id', 'world_migration'];
+const MIGRATION_MARKER_KEYS = ['sheet_migration_id', 'sheet_migration', 'geography_migration_id', 'geography_migration', 'world_migration_id', 'world_migration'];
 const DAY_MS = 86_400_000;
 
 /**
@@ -53,6 +55,10 @@ const DAY_MS = 86_400_000;
  *   sheet_migration_errors: Array<{code: string, message: string}>,
  *   geography_migration: 'pending' | 'complete' | null,
  *   geography_migration_errors: Array<{file?: string, message: string}>,
+ *   world_migration: 'pending' | 'complete' | null,
+ *   world_migration_files: string[],
+ *   world_migration_skipped: Array<{file: string, reason: string}>,
+ *   world_migration_errors: Array<{code: string, message: string, file?: string}>,
  *   errors: Array<{ code: string, message: string, file?: string, line?: number | null }>,
  * }} UpdateResult
  */
@@ -240,6 +246,16 @@ function runUpdate(root, out, { dryRun, resume, today }) {
     if (itemScan.status === 'failed') return failWith(out, 'item-description-scan-failed', itemScan.errors[0]?.message ?? 'item scan failed');
     out.item_description_migration = itemScan.status;
     out.item_description_files = itemScan.items.filter((item) => item.status !== 'complete').map((item) => item.file);
+    if (saved?.world_migration === 'pending') {
+      if (dryRun) {
+        setWorldResult(out, planWorldMigration(root));
+      } else {
+        const world = applyWorldMigration(root);
+        setWorldResult(out, world);
+        if (world.status !== 'complete') return failWith(out, world.errors[0]?.code ?? 'world-migration-failed', world.errors[0]?.message ?? 'world migration failed');
+        writeUpdateState(root, { ...readUpdateState(root), world_migration_id: WORLD_MIGRATION_ID, world_migration: 'complete' });
+      }
+    }
     if (!dryRun && (geography.status === 'pending' || saved?.geography_migration !== undefined)) {
       const current = readUpdateState(root);
       writeUpdateState(root, {
@@ -286,6 +302,9 @@ function runUpdate(root, out, { dryRun, resume, today }) {
     out.item_description_migration = itemDry.status;
     out.item_description_files = itemDry.items.filter((item) => item.status !== 'complete').map((item) => item.file);
     setGeographyResult(out, geographyState(root));
+    const worldDry = planWorldMigration(root);
+    setWorldResult(out, worldDry);
+    if (worldDry.errors.length > 0) { out.errors = worldDry.errors; return out; }
     out.errors = dry.errors;
     return out;
   }
@@ -302,6 +321,8 @@ function runUpdate(root, out, { dryRun, resume, today }) {
       to_version: to,
       restore_point: saved.restore_point,
       started_on: stringOrNull(saved.started_on) ?? today,
+      world_migration_id: WORLD_MIGRATION_ID,
+      world_migration: 'pending',
       ...migrationMarkers(saved),
     };
   } else {
@@ -318,6 +339,8 @@ function runUpdate(root, out, { dryRun, resume, today }) {
       to_version: to,
       restore_point: head.hash,
       started_on: today,
+      world_migration_id: WORLD_MIGRATION_ID,
+      world_migration: 'pending',
       ...migrationMarkers(saved),
     };
   }
@@ -350,6 +373,12 @@ function runUpdate(root, out, { dryRun, resume, today }) {
         const geography = geographyState(root);
         setGeographyResult(out, geography);
         saveVersion(root, { message: `Updated Yllir to ${to}`, kind: 'framework' });
+        // The last migration: deterministic, idempotent. A failure goes back to the restore point below.
+        const world = applyWorldMigration(root);
+        setWorldResult(out, world);
+        if (world.status !== 'complete') {
+          throw Object.assign(new Error(world.errors[0]?.message ?? 'world migration failed'), { code: world.errors[0]?.code ?? 'world-migration-failed' });
+        }
         writeUpdateState(root, {
           ...state,
           status: 'completed',
@@ -358,6 +387,8 @@ function runUpdate(root, out, { dryRun, resume, today }) {
           sheet_migration: out.sheet_migration,
           geography_migration_id: GEOGRAPHY_MIGRATION_ID,
           geography_migration: geography.status,
+          world_migration_id: WORLD_MIGRATION_ID,
+          world_migration: 'complete',
         });
         out.status = 'updated';
         return out;
@@ -445,10 +476,18 @@ function setGeographyResult(out, geography) {
   out.geography_migration_errors = geography.errors;
 }
 
+/** A world migration result (plan or apply) in the update result. An unfinished one is pending. */
+function setWorldResult(out, world) {
+  out.world_migration = world.status === 'complete' ? 'complete' : 'pending';
+  out.world_migration_files = world.changed;
+  out.world_migration_skipped = world.skipped;
+  out.world_migration_errors = world.errors;
+}
+
 function migrationMarkers(saved) {
   if (!saved || typeof saved !== 'object') return {};
   return Object.fromEntries(
-    ['sheet_migration_id', 'sheet_migration', 'geography_migration_id', 'geography_migration']
+    MIGRATION_MARKER_KEYS
       .filter((key) => saved[key] !== undefined)
       .map((key) => [key, saved[key]]),
   );
@@ -493,7 +532,7 @@ function readInstalledVersion() {
 // ---------------------------------------------------------------- helpers
 
 function newResult(from, to) {
-  return { status: 'failed', from, to, restore_point: null, rewritten: [], restored_by_hand: [], migrated: [], sheet_migration: null, sheet_migration_files: [], sheet_migration_drafted: [], sheet_migration_pending: [], sheet_migration_errors: [], geography_migration: null, geography_migration_errors: [], item_description_migration: null, item_description_files: [], errors: [] };
+  return { status: 'failed', from, to, restore_point: null, rewritten: [], restored_by_hand: [], migrated: [], sheet_migration: null, sheet_migration_files: [], sheet_migration_drafted: [], sheet_migration_pending: [], sheet_migration_errors: [], geography_migration: null, geography_migration_errors: [], item_description_migration: null, item_description_files: [], world_migration: null, world_migration_files: [], world_migration_skipped: [], world_migration_errors: [], errors: [] };
 }
 
 function failWith(out, code, message) {

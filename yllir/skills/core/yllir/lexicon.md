@@ -17,7 +17,6 @@ Use only the words in the language column of the campaign: the Italian column fo
 | Sub-agent | «Un revisore» o «un assistente» | «A reviewer» or «an assistant» |
 | Independent review | «Controllo di un secondo assistente» | «A second assistant's check» |
 | Economy model | Non visibile | Not visible |
-| Codex | Non visibile | Not visible |
 | Orchestration | Non visibile | Not visible |
 | ImageGen | «Generatore di immagini» | «Image generator» |
 | Prompt | «Descrizione per l'immagine» | «Image description» |
@@ -52,8 +51,7 @@ Use only the words in the language column of the campaign: the Italian column fo
 | Working state | «Appunti della partita» | «Game notes» |
 | Live session | «Partita in corso» | «Game in progress» |
 | Working session | «Conversazione» | «Conversation» |
-| Topic | «Argomento» | «Topic» |
-| Handoff | «Riepilogo per riprendere» | «Summary to resume» |
+| Work note (what is in progress) | «Il lavoro in corso» | «Work in progress» |
 | Session document | «Sessione» | «Session» |
 | Event (plot event file) | «Scena» | «Scene» |
 | Session map (main file of a session) | «Mappa della sessione» | «Session map» |
@@ -65,11 +63,20 @@ Use only the words in the language column of the campaign: the Italian column fo
 | JSON, YAML | «Dati» | «Data» |
 | Sources folder / acquisition card | «Fonti» | «Sources» |
 | Ingest | «Portare nella campagna» | «Bring into the campaign» |
-| Sheet completion (complete-sheet process) | «Completa o correggi una scheda» | «Complete or fix a card» |
 
 ## Never say
 
-Never write these words, in any language, in a message to the master or in a document meant for players: skill, script, git, commit, repository, YAML, frontmatter, Markdown, sub-agent, model, Haiku, Claude, Codex, hook, MCP, template, prompt, JSON, plugin, codes of saved versions (for example a1b2c3d), text in backticks, and the names of terminal commands (for example `node`, `mkdir`, `git`, `cat`).
+Never write these words, in any language, in a message to the master or in a document meant for players: skill, script, git, commit, repository, YAML, frontmatter, Markdown, sub-agent, model, Haiku, Claude, hook, MCP, template, prompt, JSON, plugin, draft, batch, provenance field, codes of saved versions (for example a1b2c3d), text in backticks, and the names of terminal commands (for example `node`, `mkdir`, `git`, `cat`).
+
+## Where a document comes from
+
+Use these words when you tell the master where something comes from. They are not internal terms.
+
+| Internal term (never say it) | Italian word the master sees | English word the master sees |
+|---|---|---|
+| Provenance master | «Detto da te» | «Said by you» |
+| Provenance played | «Giocato al tavolo» | «Played at the table» |
+| Provenance generated | «Inventato dall'assistente» | «Invented by the assistant» |
 
 ## Other languages
 
@@ -104,15 +111,3 @@ Use this sentence as it is when the master asks to change a session that has alr
 |---|---|
 | Questa sessione è già stata giocata, quindi non posso più cambiarla. Posso preparare la prossima, se vuoi. | This session has already been played, so I can no longer change it. I can prepare the next one, if you want. |
 
-## Fixed question about invention
-
-Use this question and these four options as they are, in this order, when the master has not yet said whether the assistant may invent details. Do not add, rename or reorder them.
-
-| Item | Italian | English |
-|---|---|---|
-| Question header | «Fantasia» | «Imagination» |
-| Question | Posso inventare dettagli che le fonti non danno (nomi, storia, aspetto, regole)? | May I invent details the sources do not give (names, history, looks, rules)? |
-| Option 1 | Sì | Yes |
-| Option 2 | No | No |
-| Option 3 | Sempre sì | Always yes |
-| Option 4 | Sempre no | Always no |

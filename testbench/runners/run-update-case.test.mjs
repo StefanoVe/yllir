@@ -29,7 +29,7 @@ import {
   withIsolatedGit,
 } from './run-update-case.mjs';
 import { updateCampaign } from '../../yllir/skills/core/update/scripts/lib/update-campaign.mjs';
-import { checkLinks } from '../../yllir/skills/library/linker/scripts/lib/check-links.mjs';
+import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 
 const LEXICON = path.resolve(import.meta.dirname, '..', '..', 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');

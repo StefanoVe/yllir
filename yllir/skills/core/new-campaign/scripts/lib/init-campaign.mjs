@@ -19,7 +19,7 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 /**
  * @returns {{ created: string[], slug: string|null, errors: Array<{code: string, path: string|null, message: string}> }}
  */
-export function initCampaign(root, { name, language, register, world, description, adapter = 'none', today = localToday() } = {}) {
+export function initCampaign(root, { name, language, register, world, description, seed, adapter = 'none', today = localToday() } = {}) {
   const dir = path.resolve(root);
   const refuse = (code, message) => ({ created: [], slug: null, errors: [{ code, path: null, message }] });
 
@@ -52,13 +52,17 @@ export function initCampaign(root, { name, language, register, world, descriptio
   }
   const worldText = optionalText(world);
   const descriptionText = optionalText(description);
-  if (worldText === false || descriptionText === false) {
-    return refuse('bad-input', 'world and description must be text');
+  const seedText = optionalText(seed);
+  if (worldText === false || descriptionText === false || seedText === false) {
+    return refuse('bad-input', 'world, description and seed must be text');
   }
   if (typeof today !== 'string' || !DATE_RE.test(today) || !isRealDate(today)) {
     return refuse('bad-input', 'today must be a real date written as YYYY-MM-DD');
   }
-  // Checked before anything is written, so a refused adapter leaves the folder clean.
+  // Checked before anything is written, so a refused seed or adapter leaves the folder clean.
+  if (seedText && !isSafeSeedName(seedText)) {
+    return refuse('bad-input', 'seed must be a relative path to a .md file inside the campaign, without ..');
+  }
   if (typeof adapter !== 'string') {
     return refuse('bad-input', 'adapter must be text');
   }
@@ -71,6 +75,8 @@ export function initCampaign(root, { name, language, register, world, descriptio
   if (worldText) campaign.world = worldText;
   if (descriptionText) campaign.description = descriptionText;
   campaign.created = today;
+  // The seed file itself is written later, by the first write of the campaign.
+  if (seedText) campaign.seed = seedText;
   const config = {
     schema: 1,
     campaign,
@@ -128,6 +134,11 @@ function optionalText(value) {
   if (value === undefined) return '';
   if (typeof value !== 'string') return false;
   return value.trim();
+}
+
+/** Same rule as campaign.seed in config.mjs. */
+function isSafeSeedName(text) {
+  return text.endsWith('.md') && !text.startsWith('/') && !text.includes('\\') && !text.split('/').includes('..');
 }
 
 function isRealDate(text) {

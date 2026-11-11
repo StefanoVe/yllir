@@ -328,7 +328,7 @@ function renderNewHandoff({ id, process, goal, updated }) {
 }
 
 /**
- * Creates a topic and makes it the active one. Any other active topic is paused.
+ * Creates a topic and makes it the active one. Any other current topic is paused.
  * @returns {{ id: string, path: string }}
  */
 export function newTopic(root, { process, goal, now = new Date() } = {}) {
@@ -410,7 +410,7 @@ function setStatus(root, id, status, now) {
 }
 
 /**
- * Makes a topic the single active one; the previously active topic is paused.
+ * Makes a topic the single active one; the previously current topic is paused.
  * Sets `updated` on the activated topic.
  */
 export function activateTopic(root, { id, now = new Date() } = {}) {
@@ -428,7 +428,7 @@ export function listTopics(root) {
   return sortedEntries(loadAll(base)).map((e) => ({ ...e }));
 }
 
-/** The active topic, or null. */
+/** The current topic, or null. */
 export function activeTopic(root) {
   return listTopics(root).find((e) => e.status === 'active') ?? null;
 }
@@ -499,7 +499,7 @@ function sectionLines(h, name, body) {
 
 /**
  * Writes a handoff with some sections replaced, the given status and `updated`,
- * and regenerates the index. Activating pauses the other active topic.
+ * and regenerates the index. Activating pauses the other current topic.
  * @param {Map<string, string[]>} blocks section name -> full section lines
  */
 function commitHandoff(base, all, h, blocks, status, now) {

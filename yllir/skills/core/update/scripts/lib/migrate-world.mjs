@@ -1,0 +1,391 @@
+// Migration world-graph-v1: brings a campaign written before the world graph up
+// to the current document format. Deterministic: no model is called, and no
+// relation is derived from prose.
+//
+// What it changes:
+//   1. Metadata of every document of a places, subjects, objects, free, plot or
+//      chronicle category: `kind` when missing (places: place; objects: item;
+//      subjects: from `template`; free, plot and chronicle: none) and
+//      `provenance: master` when missing. The lines go right after the `id:` line;
+//      every other byte of the file is kept.
+//   2. The seed of the world (campaign.seed) when the campaign has none, built from
+//      campaign.description; campaign.yaml keeps every other byte.
+//   3. The top-level key allow_model_imagination is removed when present.
+//   4. Topics of the previous engine (.campaign/state/topics/) become one work note,
+//      and the topics folder is deleted. This step runs last: state is git-ignored.
+//   5. The derived indexes are rebuilt (subjects and world).
+//   6. One framework version is saved, only when a campaign document or
+//      campaign.yaml changed.
+//
+// planWorldMigration writes nothing. applyWorldMigration checks the whole plan
+// first, so a plan error writes nothing at all. Running it again changes nothing.
+
+import fs from 'node:fs';
+import path from 'node:path';
+import { parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
+import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
+import { buildSubjectIndex, listCanonicalSheets, readStructure } from '../../../../../scripts/lib/subjects.mjs';
+import { buildWorldIndex, writeWorldIndex } from '../../../../../scripts/lib/world-graph.mjs';
+import { listVersions, saveManualChanges, saveVersion, status } from '../../../../../scripts/lib/versions.mjs';
+import { listTopics, readSection } from '../../../../../scripts/lib/topics.mjs';
+
+export const WORLD_MIGRATION_ID = 'world-graph-v1';
+
+const CAMPAIGN_YAML = 'campaign.yaml';
+const TOPICS_DIR = path.join('.campaign', 'state', 'topics');
+const WORK_NOTE = path.join('.campaign', 'state', 'work-note.md');
+const SUBJECTS_CACHE = path.join('.campaign', 'cache', 'subjects.json');
+const METADATA_TYPES = new Set(['places', 'subjects', 'objects', 'free', 'plot', 'chronicle']);
+const DEFAULT_SEED_FILE = { it: 'Seme del mondo.md', en: 'World seed.md' };
+const SEED_ID = { it: 'seme-del-mondo', en: 'world-seed' };
+const SEED_HEADINGS = {
+  it: ['Genere e tono', 'Temi', 'Conflitti centrali', 'Fazioni', 'Culture', 'Convenzioni dei nomi', 'Livello di potere', 'Calendario', 'Da evitare'],
+  en: ['Genre and tone', 'Themes', 'Central conflicts', 'Factions', 'Cultures', 'Naming conventions', 'Power level', 'Calendar', 'To avoid'],
+};
+const SEED_PLACEHOLDER = { it: 'Da definire.', en: 'To be defined.' };
+const SAVE_MESSAGE = { it: 'Aggiornamento del formato della campagna', en: 'Campaign format update' };
+const MANUAL_MESSAGE = { it: 'Modifiche fatte a mano', en: 'Changes made by hand' };
+
+/**
+ * @typedef {{
+ *   status: 'pending' | 'complete' | 'failed',
+ *   changed: string[],
+ *   skipped: Array<{ file: string, reason: string }>,
+ *   errors: Array<{ code: string, message: string, file?: string }>,
+ * }} WorldMigrationResult
+ */
+
+/**
+ * Dry run: what applyWorldMigration would change. Writes nothing.
+ * status is 'pending' when there is work, 'complete' when there is none.
+ * @param {string} root campaign folder
+ * @returns {WorldMigrationResult}
+ */
+export function planWorldMigration(root) {
+  const plan = computePlan(path.resolve(root));
+  if (plan.errors.length > 0) return result('failed', plan);
+  return result(plan.changed.length > 0 ? 'pending' : 'complete', plan);
+}
+
+/**
+ * Applies the migration. Safe to run again: a second run finds nothing to change.
+ * @param {string} root campaign folder (a git repository)
+ * @returns {WorldMigrationResult}
+ */
+export function applyWorldMigration(root) {
+  const dir = path.resolve(root);
+  const plan = computePlan(dir);
+  if (plan.errors.length > 0) return result('failed', plan);
+
+  const repo = status(dir);
+  if (!repo.isRepo) {
+    return result('failed', { ...plan, errors: [{ code: 'no-repo', message: `${dir} is not a git repository; the framework does not write without git` }] });
+  }
+
+  const language = plan.language;
+  const hasContentChanges = plan.contentWrites.length > 0;
+  try {
+    if (hasContentChanges && !repo.clean) {
+      saveManualChanges(dir, MANUAL_MESSAGE[language]);
+    }
+    for (const write of plan.contentWrites) {
+      fs.writeFileSync(path.join(dir, write.path), write.text, 'utf8');
+    }
+    rebuildIndexes(dir);
+    if (hasContentChanges) {
+      saveVersion(dir, { message: SAVE_MESSAGE[language], kind: 'framework' });
+    }
+    if (plan.topics !== null) {
+      writeWorkNote(dir, plan.topics.note);
+      fs.rmSync(path.join(dir, TOPICS_DIR), { recursive: true, force: true });
+    }
+  } catch (err) {
+    return result('failed', { ...plan, errors: [{ code: err.code ?? 'world-migration-failed', message: err.message }] });
+  }
+  return result('complete', plan);
+}
+
+// ---------------------------------------------------------------- plan
+
+function computePlan(root) {
+  const plan = {
+    language: 'en',
+    changed: [],
+    skipped: [],
+    errors: [],
+    contentWrites: [],
+    topics: null,
+  };
+
+  const { structure, errors: structureErrors } = readStructure(root);
+  if (structure === null) {
+    plan.errors.push({ code: 'campaign-yaml', message: structureErrors[0]?.message ?? 'campaign.yaml cannot be read' });
+    return plan;
+  }
+  const configText = readText(path.join(root, CAMPAIGN_YAML));
+  const parsed = parseYamlLite(configText ?? '');
+  if (configText === null || parsed.errors.length > 0 || parsed.data === null || typeof parsed.data !== 'object') {
+    plan.errors.push({ code: 'campaign-yaml', message: 'campaign.yaml cannot be read' });
+    return plan;
+  }
+  const config = parsed.data;
+  plan.language = language(config);
+
+  planMetadata(root, structure, plan);
+  planSeedAndConfig(root, configText, config, plan);
+  planTopics(root, plan);
+
+  plan.changed = [...new Set([
+    ...plan.contentWrites.map((write) => write.path),
+    ...(plan.topics !== null ? [WORK_NOTE.split(path.sep).join('/'), TOPICS_DIR.split(path.sep).join('/')] : []),
+  ])].sort();
+  return plan;
+}
+
+/** Metadata of every document of the metadata categories (one entry per canonical file). */
+function planMetadata(root, structure, plan) {
+  const owner = new Map(); // canonical path -> category of the longest folder
+  for (const category of structure) {
+    if (typeof category.folder !== 'string' || !METADATA_TYPES.has(category.type)) continue;
+    const folder = category.folder.replace(/\/+$/, '');
+    for (const file of listCanonicalSheets(root, folder)) {
+      const previous = owner.get(file);
+      if (previous === undefined || previous.folder.length < folder.length) {
+        owner.set(file, { type: category.type, folder });
+      }
+    }
+  }
+
+  for (const file of [...owner.keys()].sort()) {
+    const { type } = owner.get(file);
+    const text = readText(path.join(root, file));
+    if (text === null) {
+      plan.errors.push({ code: 'unreadable', file, message: `${file} cannot be read` });
+      continue;
+    }
+    const { data } = parseFrontmatter(text);
+    if (data === null || typeof data.id !== 'string' || data.id === '') {
+      plan.skipped.push({ file, reason: 'no-id' });
+      continue;
+    }
+
+    const additions = [];
+    if (data.kind === undefined) {
+      const kind = kindFor(type, data.template);
+      if (kind === 'unknown-template') {
+        plan.skipped.push({ file, reason: 'unknown-template' });
+      } else if (kind !== null) {
+        additions.push(['kind', kind]);
+      }
+    }
+    if (data.provenance === undefined) {
+      additions.push(['provenance', 'master']);
+    }
+    if (additions.length === 0) continue;
+
+    const edited = insertAfterId(text, additions);
+    if (edited === null) {
+      plan.skipped.push({ file, reason: 'no-id-line' });
+      continue;
+    }
+    plan.contentWrites.push({ path: file, text: edited });
+  }
+}
+
+/** The kind for a document of this category and template; null for none; 'unknown-template' when undecidable. */
+function kindFor(type, template) {
+  if (type === 'places') return 'place';
+  if (type === 'objects') return 'item';
+  if (type === 'subjects') {
+    if (template === undefined || template === 'npc' || template === 'vendor') return 'character';
+    if (template === 'enemy' || template === 'creature') return 'creature';
+    if (template === 'faction') return 'faction';
+    return 'unknown-template';
+  }
+  return null; // free, plot, chronicle
+}
+
+/** Inserts `key: value` lines right after the `id:` line of the frontmatter. Null when there is no such line. */
+function insertAfterId(text, additions) {
+  const lines = text.split('\n');
+  if (stripCr(lines[0]) !== '---') return null;
+  let close = -1;
+  for (let i = 1; i < lines.length; i++) {
+    if (stripCr(lines[i]) === '---') {
+      close = i;
+      break;
+    }
+  }
+  if (close === -1) return null;
+  let idLine = -1;
+  for (let i = 1; i < close; i++) {
+    if (/^id:/.test(stripCr(lines[i]))) {
+      idLine = i;
+      break;
+    }
+  }
+  if (idLine === -1) return null;
+  const eol = lines[idLine].endsWith('\r') ? '\r' : '';
+  const inserted = additions.map(([key, value]) => `${key}: ${value}${eol}`);
+  lines.splice(idLine + 1, 0, ...inserted);
+  return lines.join('\n');
+}
+
+/** Seed of the world and the campaign.yaml edits (seed key, description moved, allow_model_imagination removed). */
+function planSeedAndConfig(root, configText, config, plan) {
+  const lang = plan.language;
+  const campaign = isRecord(config.campaign) ? config.campaign : null;
+  if (campaign === null) {
+    plan.errors.push({ code: 'campaign-yaml', file: CAMPAIGN_YAML, message: 'campaign.yaml has no campaign block' });
+    return;
+  }
+
+  let text = configText;
+  if (!(typeof campaign.seed === 'string' && campaign.seed !== '')) {
+    const fileName = DEFAULT_SEED_FILE[lang];
+    const seedText = buildSeed(lang, typeof campaign.description === 'string' ? campaign.description.trim() : '');
+    const existing = readText(path.join(root, fileName));
+    if (existing !== null && existing !== seedText) {
+      plan.errors.push({ code: 'seed-exists', file: fileName, message: `${fileName} already exists with other content; it was not overwritten` });
+      return;
+    }
+    if (existing === null) plan.contentWrites.push({ path: fileName, text: seedText });
+    text = setSeedKey(text, fileName);
+  }
+
+  text = removeTopLevelLine(text, 'allow_model_imagination');
+
+  if (text !== configText) {
+    plan.contentWrites.push({ path: CAMPAIGN_YAML, text });
+  }
+}
+
+/** Replaces the campaign.description line with the seed key, or adds the key at the end of the campaign block. */
+function setSeedKey(text, fileName) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((line) => /^campaign:\s*$/.test(stripCr(line)));
+  let end = start + 1;
+  while (end < lines.length && (lines[end] === '' || /^\s/.test(lines[end]))) end++;
+  // The block ends before trailing blank lines.
+  let last = end;
+  while (last > start + 1 && lines[last - 1].trim() === '') last--;
+  const descIndex = lines.findIndex((line, i) => i > start && i < last && /^  description:/.test(stripCr(line)));
+  const seedLine = `  seed: ${fileName}`;
+  if (descIndex !== -1) {
+    lines.splice(descIndex, 1, seedLine);
+  } else {
+    lines.splice(last, 0, seedLine);
+  }
+  return lines.join('\n');
+}
+
+/** Removes the top-level line `key: ...` (text level), keeping every other byte. */
+function removeTopLevelLine(text, key) {
+  const pattern = new RegExp(`^${key}:`);
+  const lines = text.split('\n');
+  const kept = lines.filter((line) => !pattern.test(stripCr(line)));
+  return kept.length === lines.length ? text : kept.join('\n');
+}
+
+function buildSeed(lang, description) {
+  const headings = SEED_HEADINGS[lang];
+  const name = lang === 'it' ? 'Seme del mondo' : 'World seed';
+  const lines = [
+    '---',
+    `id: ${SEED_ID[lang]}`,
+    'provenance: master',
+    '---',
+    `# ${name}`,
+    '',
+    '<!-- master -->',
+    '## Master',
+    '',
+  ];
+  headings.forEach((heading, index) => {
+    lines.push(`### ${heading}`, '', index === 0 && description !== '' ? description : SEED_PLACEHOLDER[lang], '');
+  });
+  lines.push('<!-- /master -->', '');
+  return lines.join('\n');
+}
+
+/** The work note of the old topics, when the topics folder exists. */
+function planTopics(root, plan) {
+  const dir = path.join(root, TOPICS_DIR);
+  if (!fs.existsSync(dir)) return;
+  let entries;
+  try {
+    entries = listTopics(root);
+  } catch (err) {
+    plan.errors.push({ code: 'topics-unreadable', message: `the topics cannot be read: ${err.message}` });
+    return;
+  }
+  const open = [];
+  for (const entry of entries) {
+    if (entry.status === 'closed') continue;
+    let next = 'none';
+    try {
+      next = readSection(root, { id: entry.id, section: 'Next step' }).replace(/\s+/g, ' ').trim() || 'none';
+    } catch (err) {
+      plan.errors.push({ code: 'topics-unreadable', message: `topic ${entry.id}: ${err.message}` });
+      return;
+    }
+    open.push(`${entry.goal} — next: ${next}`);
+  }
+  plan.topics = { note: open.length > 0 ? open.join('; ') : 'none' };
+}
+
+// ---------------------------------------------------------------- apply helpers
+
+function rebuildIndexes(root) {
+  const subjects = buildSubjectIndex(root);
+  const cache = path.join(root, '.campaign', 'cache');
+  fs.mkdirSync(cache, { recursive: true });
+  fs.writeFileSync(path.join(root, SUBJECTS_CACHE), `${JSON.stringify(subjects, null, 2)}\n`);
+  writeWorldIndex(root, buildWorldIndex(root));
+}
+
+function writeWorkNote(root, note) {
+  const [latest] = listVersions(root, { limit: 1 });
+  const lastSaved = latest ? `${latest.hash} ${latest.message}` : 'none';
+  const lines = [
+    '# Work in progress',
+    `updated: ${new Date().toISOString()}`,
+    `last saved: ${lastSaved}`,
+    'files: none',
+    `note: ${note}`,
+  ];
+  fs.mkdirSync(path.dirname(path.join(root, WORK_NOTE)), { recursive: true });
+  fs.writeFileSync(path.join(root, WORK_NOTE), `${lines.join('\n')}\n`, 'utf8');
+}
+
+// ---------------------------------------------------------------- small helpers
+
+function result(state, plan) {
+  return {
+    status: state,
+    changed: plan.changed,
+    skipped: plan.skipped,
+    errors: plan.errors,
+  };
+}
+
+function language(config) {
+  return config.language && config.language.main === 'it' ? 'it' : 'en';
+}
+
+function readText(file) {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err.code === 'ENOENT' || err.code === 'ENOTDIR') return null;
+    throw err;
+  }
+}
+
+function stripCr(line) {
+  return line.endsWith('\r') ? line.slice(0, -1) : line;
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}

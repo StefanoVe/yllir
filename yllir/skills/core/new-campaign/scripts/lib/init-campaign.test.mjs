@@ -103,6 +103,24 @@ test('optional world and description are left out when not given', () => {
   assert.equal(Object.hasOwn(config.campaign, 'description'), false);
 });
 
+test('--seed is written as campaign.seed without creating the seed file and never writes an imagination key', () => {
+  const dir = tmp();
+  const result = initCampaign(dir, { ...GOOD, seed: 'Seme del mondo.md' });
+  assert.deepEqual(result.errors, []);
+  const config = parseYamlLite(fs.readFileSync(path.join(dir, 'campaign.yaml'), 'utf8')).data;
+  assert.equal(config.campaign.seed, 'Seme del mondo.md');
+  assert.equal(Object.hasOwn(config, 'allow_model_imagination'), false);
+  assert.equal(Object.hasOwn(config.campaign, 'description'), false);
+  assert.equal(fs.existsSync(path.join(dir, 'Seme del mondo.md')), false);
+});
+
+test('a seed that points outside the campaign is refused and nothing is written', () => {
+  const dir = tmp();
+  const result = initCampaign(dir, { ...GOOD, seed: '../Seme.md' });
+  assert.equal(result.errors[0].code, 'bad-input');
+  assert.deepEqual(fs.readdirSync(dir), []);
+});
+
 test('an empty folder that holds only hidden entries is accepted', () => {
   const dir = tmp();
   fs.mkdirSync(path.join(dir, '.claude'));

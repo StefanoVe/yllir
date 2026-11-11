@@ -21,25 +21,25 @@ Yllir plugin root: {{plugin.root}}. Wherever a skill or agent file mentions `${C
 
 Use only the master-facing words listed in the lexicon of the `yllir` skill. Never say: skill, script, git, commit, repository, YAML, frontmatter, sub-agent, model, hook, MCP, template.
 
-## Local feedback
+## Writing
 
-Individual skill invocations are recorded by their callers because the supported hook set does not provide per-skill lifecycle events. Follow `${CLAUDE_PLUGIN_ROOT}/templates/feedback-protocol.md` for each skill invocation, including nested calls, retries, failures, and read-the-file substitutes. Capture available input/output in the local transcript file; use `unavailable` when the runtime does not expose it. Full transcripts and detail stay under `.campaign/state/feedback/`; exports omit them and allow only aggregate metadata. No feedback is sent over a network.
+The main assistant writes campaign documents only through the engine command, one batch per commit. Read `{{plugin.root}}/skills/core/yllir/authoring.md` once per conversation, before the first process or the first question about the world, and follow it.
 
 ## Fixed rules
 
 These rules cannot be changed by settings or by the master's rules.
 
-- Write campaign documents only through the skill `yllir:write-sequence`, never directly.
+- Write campaign documents only through the engine, as `authoring.md` describes; never write a campaign document directly.
 - A named character defined in a plot document needs their own character sheet. The sheet is the source of truth for who the character is, never for what the character does in the plot. Create sheets only through the processes.
 - Canonical documents are organized by category first and geography second. Put a subject at the common ancestor of its current `location` and its explicit scene `appearances`; use the campaign-language equivalent of `Da collocare` when no location is established. A scene records `appearances: [{subject: ID, location: [PLACE_IDS]}]` only when its text explicitly establishes the presence. Never infer presence from `characters`, `items`, links, names or mentions. Session scene files remain the originals; geographic views are symbolic links to them.
 - A significant item named or used in a plot document gets its own item sheet when it has notable value, effects, secrets, or a plot role. Ordinary scenery and incidental props do not. Item sheets describe what the item is, never its chronology. Plot events may declare relevant item ids as `items: [id]` metadata.
 - Item sheets keep the public `In breve`/`In brief`, `Description`, and `Effects` sections separate from the final master-only block. The brief concisely describes visible appearance and essential established function; the full description adds established context when available instead of merely repeating the brief. Effects retains all mechanical details. A short card description uses `In breve`/`In brief` when present and falls back to `Description` for legacy sheets. Public extracts never include the master-only block.
-- After any change to a campaign document, its mentions must be linked. Links are made only by the skill `yllir:linker`, which runs by itself after the write sequence and when the turn check lists unlinked mentions; never add links by hand.
-- Every write sequence reviews the complete geographic layout plan independently before any campaign mutation, then applies it before linking. Downstream review paths and checks use the final canonical paths.
+- After any change to a campaign document, its mentions must be linked. The engine adds the links at each commit; never type link syntax by hand.
+- Every commit reviews the complete geographic layout plan before any campaign mutation, then applies it before linking. Downstream checks use the final canonical paths.
 - Without git the framework writes nothing: tell the master that the campaign needs git, and write nothing.
 - The block between `<!-- master -->` and `<!-- /master -->` holds the master's private notes. Never copy it into anything meant for players, image services, web searches or publishing.
 - Never delete or rewrite history. Going back is always a new saved version.
-- Blocks such as `WRITE REPORT`, `LINKER REPORT` and `AUDIT REPORT` are results for the skill that invoked the one producing them, never messages for the master: never end your turn with one; continue the invoking skill. Your turn ends only with a message to the master, in the campaign language, using the master's words.
+- Blocks such as `AUDIT REPORT` are results for the skill that invoked the one producing them, never messages for the master: never end your turn with one; continue the invoking skill. Your turn ends only with a message to the master, in the campaign language, using the master's words.
 
 ## Folders
 
@@ -54,7 +54,7 @@ Categories appear when their first document is created. Create a folder only thr
 
 Game-rules adapter: {{system.adapter}}. If it is `none`, there are no game rules: write checks and statistics as plain text and never invent rules of a specific game.
 
-When the adapter is not `none`, the write sequence must check creature and item sheets through `yllir:system-adapter`. Ask that skill with `OPERATION=info` to learn what the system forbids. Never write a game rule from memory.
+When the adapter is not `none`, the engine checks creature and item sheets against it at each commit. Read its definition in `{{plugin.root}}/modules/systems/{{system.adapter}}/` before writing such a sheet. Never write a game rule from memory.
 {{/if}}
 
 {{#if modules.print}}

@@ -15,7 +15,8 @@ export const STATUSES = ['alive', 'dead', 'missing', 'active', 'destroyed', 'unk
 export const RELATION_TYPES = ['member-of', 'kin-of', 'ally-of', 'rival-of', 'depends-on'];
 
 const INDEXED_TYPES = new Set(['places', 'subjects', 'objects', 'free', 'plot', 'chronicle']);
-const KIND_REQUIRED_TYPES = new Set(['places', 'subjects', 'objects', 'free']);
+// A free document needs no kind: it is a note, or a concept of history (kind event only when it is an event).
+const KIND_REQUIRED_TYPES = new Set(['places', 'subjects', 'objects']);
 const PROVENANCE_REQUIRED_TYPES = new Set(['places', 'subjects', 'objects', 'free', 'plot', 'chronicle']);
 const END_STATUSES = new Set(['dead', 'destroyed']);
 const RELATION_KEYS = new Set(['to', 'type']);

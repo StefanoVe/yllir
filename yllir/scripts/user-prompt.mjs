@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // UserPromptSubmit hook: prints the turn check for the assistant. Never writes
 // the master's text. In a campaign it also records a feedback `turn` event in
-// .campaign/state/feedback/events.jsonl (session, agent, version, topic only).
+// .campaign/state/feedback/events.jsonl (session, agent, version only), and
+// only when feedback is switched on (see lib/feedback.mjs).
 // Usage: node user-prompt.mjs [root]
 // Root defaults to CLAUDE_PROJECT_DIR, then the working directory. Always exits 0.
 
@@ -9,7 +10,6 @@ import path from 'node:path';
 import { turnCheck } from './lib/turn-check.mjs';
 import { recordEvent } from './lib/feedback.mjs';
 import { frameworkVersion, hookAgent, isCampaign, readHookInput } from './lib/feedback-hook.mjs';
-import { activeTopic } from './lib/topics.mjs';
 
 // Stops git from refreshing the index on disk, in case a later check runs git.
 process.env.GIT_OPTIONAL_LOCKS = '0';
@@ -25,7 +25,6 @@ try {
       session: input.session_id,
       agent: hookAgent(),
       version: frameworkVersion(),
-      topic: activeTopic(root)?.id ?? 'none',
     });
   }
 } catch {

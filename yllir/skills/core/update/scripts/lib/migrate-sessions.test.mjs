@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { migrateSessions } from './migrate-sessions.mjs';
-import { plotMap } from '../../../../../skills/library/plot-map/scripts/lib/plot-map.mjs';
+import { plotMap } from '../../../../../scripts/lib/plot/plot-map.mjs';
 
 const CAMPAIGN = [
   'schema: 1',

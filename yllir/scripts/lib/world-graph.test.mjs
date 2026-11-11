@@ -362,3 +362,20 @@ test('the timeline is sorted by when, then by id', (t) => {
     participants: ['teodo-marr', 'lino-valdes'],
   });
 });
+
+test('a free document needs no kind; a free event still needs its when', (t) => {
+  const root = makeCampaign(t, {
+    'Storia/concetto.md': doc(['id: concetto', 'provenance: master'], 'Un concetto della storia'),
+  });
+  const index = buildWorldIndex(root);
+  assert.deepEqual(index.errors, []);
+  assert.equal(index.subjects.find((subject) => subject.id === 'concetto').kind, null);
+  assert.equal(index.subjects.find((subject) => subject.id === 'incontro-molo').kind, 'event');
+});
+
+test('a free document with kind event but no when is still an error', (t) => {
+  const root = makeCampaign(t, {
+    'Storia/caduta.md': doc(['id: caduta', 'kind: event', 'provenance: master'], 'La caduta'),
+  });
+  assert.ok(codesOf(buildWorldIndex(root)).includes('missing-when'));
+});

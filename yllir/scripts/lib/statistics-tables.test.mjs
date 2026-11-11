@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { inspectStatisticsTables, convertStatisticsTables, validateStatisticsTables } from './statistics-tables.mjs';
-import { validateSheet } from '../../skills/library/system-adapter/scripts/lib/adapter-ops.mjs';
+import { validateSheet } from './adapter-ops.mjs';
 
 test('converts only clear labelled rows and preserves outside bytes', async () => {
   const input = 'before\n\n## Statistics\n\nAC: 15\nHP: 22\nAttack: [Claw](rules.md) | +4, 1d6 damage.\n\n## Loot\n\nfur\n';

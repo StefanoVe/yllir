@@ -9,6 +9,8 @@ import { parseYamlLite } from './yaml-lite.mjs';
 import { listAdapters, pluginRootFromHere } from './adapter.mjs';
 
 const FILE = 'campaign.yaml';
+// allow_model_imagination is no longer read: it is accepted with any value and ignored
+// (the migration removes it from older campaigns).
 const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit', 'allow_model_imagination'];
 const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];
 const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only', 'external'];
@@ -272,25 +274,10 @@ function validateTopLevel(r, config, campaignRoot) {
 
   const audit = mappingField(r, config, '', 'audit');
   if (audit !== null) validateAudit(r, audit);
-
-  if (Object.hasOwn(config, 'allow_model_imagination')) {
-    validateModelImagination(r, config.allow_model_imagination);
-  }
-}
-
-/** allow_model_imagination is true, false or null (null is the default). */
-function validateModelImagination(r, value) {
-  const at = 'allow_model_imagination';
-  if (value === null || typeof value === 'boolean') return;
-  if (Array.isArray(value) || isMapping(value)) {
-    r.error('bad-type', at, `${at} must be true, false or null, not a list or a mapping`);
-  } else {
-    r.error('bad-value', at, `${at} must be true, false or null`);
-  }
 }
 
 function validateCampaign(r, campaign) {
-  checkUnknownKeys(r, campaign, 'campaign', ['name', 'slug', 'world', 'description', 'created']);
+  checkUnknownKeys(r, campaign, 'campaign', ['name', 'slug', 'world', 'description', 'created', 'seed']);
   checkText(r, campaign, 'campaign', 'name', { required: true, nonEmpty: true });
   checkText(r, campaign, 'campaign', 'slug', {
     required: true,
@@ -300,6 +287,31 @@ function validateCampaign(r, campaign) {
   checkText(r, campaign, 'campaign', 'world');
   checkText(r, campaign, 'campaign', 'description');
   checkDate(r, campaign, 'campaign', 'created', { required: true });
+  checkSeed(r, campaign);
+}
+
+/**
+ * campaign.seed is the file name of the world seed: a relative path to a .md
+ * file inside the campaign, without `..`, backslashes or a leading slash. The
+ * file may not exist yet (the first write creates it), so it is not checked here.
+ */
+function checkSeed(r, campaign) {
+  if (!Object.hasOwn(campaign, 'seed')) return;
+  const at = 'campaign.seed';
+  const value = campaign.seed;
+  if (typeof value !== 'string') {
+    r.error('bad-type', at, `${at} must be the file name of the world seed`);
+    return;
+  }
+  const safe =
+    value.trim() !== '' &&
+    value.endsWith('.md') &&
+    !value.startsWith('/') &&
+    !value.includes('\\') &&
+    !value.split('/').includes('..');
+  if (!safe) {
+    r.error('bad-value', at, `${at} must be a relative path to a .md file inside the campaign, without ..`);
+  }
 }
 
 function validateLanguage(r, language) {

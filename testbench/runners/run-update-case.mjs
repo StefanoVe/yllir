@@ -43,10 +43,10 @@ import {
 } from './lib/case-common.mjs';
 import { generateInstructions } from '../../yllir/scripts/lib/instructions.mjs';
 import { ensureRepo, saveManualChanges, saveVersion, status } from '../../yllir/scripts/lib/versions.mjs';
-import { checkLinks } from '../../yllir/skills/library/linker/scripts/lib/check-links.mjs';
+import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
 import { parseYamlLite } from '../../yllir/scripts/lib/yaml-lite.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
-import { plotMap } from '../../yllir/skills/library/plot-map/scripts/lib/plot-map.mjs';
+import { plotMap } from '../../yllir/scripts/lib/plot/plot-map.mjs';
 
 const USAGE =
   'usage: node testbench/runners/run-update-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
@@ -55,6 +55,8 @@ const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle', 'campa
 const LEXICON = path.join(REPO_ROOT, 'yllir', 'skills', 'core', 'yllir', 'lexicon.md');
 const PLUGIN_JSON = path.join(REPO_ROOT, 'yllir', '.claude-plugin', 'plugin.json');
 const VERSION_PATH = '.campaign/version.yaml';
+/** Subject of the version saved by the world-graph-v1 migration, in each language. */
+const FORMAT_MESSAGES = ['Aggiornamento del formato della campagna', 'Campaign format update'];
 const AGENT_PATH = '.campaign/instructions/agent.md';
 const CUSTOMIZATIONS_PATH = '.campaign/customizations.md';
 const UPDATE_PATH = '.campaign/state/update.yaml';
@@ -264,8 +266,12 @@ export function gradeStale({ dir, setup, report }) {
 
   const s4 = [];
   const count = commitCount(dir);
-  const want = setup.commits + 1;
-  if (count !== want) s4.push(`commit count is ${Number.isNaN(count) ? 'unknown' : count} (want ${want})`);
+  // The update saves its own version; the world-graph-v1 migration saves one more only when it changed a document.
+  const saved = count - setup.commits;
+  const recent = (tryGit(dir, ['log', '-n', '2', '--format=%s']) ?? '').split('\n');
+  const formatSaved = recent.some((subject) => FORMAT_MESSAGES.includes(subject));
+  const ok = saved === 1 || (saved === 2 && formatSaved);
+  if (!ok) s4.push(`commit count is ${Number.isNaN(count) ? 'unknown' : count} (want ${setup.commits + 1}, or ${setup.commits + 2} with the format version)`);
   s4.push(...dirtyReasons(dir));
 
   const s5 = [];

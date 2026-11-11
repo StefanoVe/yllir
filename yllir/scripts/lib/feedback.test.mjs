@@ -1,4 +1,4 @@
-import { describe, test } from 'node:test';
+import { after, before, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -12,9 +12,15 @@ import {
   latestTurn,
   readEvents,
   recordEnd,
+  feedbackEnabled,
   recordEvent,
   summarize,
 } from './feedback.mjs';
+
+// Recording is off by default; these tests switch it on and check the switch itself.
+const SAVED_FLAG = process.env.YLLIR_FEEDBACK;
+before(() => { process.env.YLLIR_FEEDBACK = '1'; });
+after(() => { if (SAVED_FLAG === undefined) delete process.env.YLLIR_FEEDBACK; else process.env.YLLIR_FEEDBACK = SAVED_FLAG; });
 
 /** Runs `body` with a fresh temp folder as the campaign root, then removes it. */
 function withRoot(body) {
@@ -46,7 +52,7 @@ describe('feedback', () => {
 
   test('recordEvent writes a valid turn and creates the folder', () => {
     withRoot((root) => {
-      const result = recordEvent(root, { type: 'turn', session: 's1', agent: 'a', version: '0.14.0', topic: 'session 3' });
+      const result = recordEvent(root, { type: 'turn', session: 's1', agent: 'a', version: '0.14.0' });
       assert.deepEqual(result, { ok: true });
       assert.ok(fs.existsSync(feedbackFile(root)));
       assert.ok(fs.existsSync(path.dirname(feedbackFile(root))));
@@ -55,12 +61,11 @@ describe('feedback', () => {
 
   test('readEvents returns the recorded turn with a ts', () => {
     withRoot((root) => {
-      recordEvent(root, { type: 'turn', session: 's1', topic: 'session 3' });
+      recordEvent(root, { type: 'turn', session: 's1' });
       const events = readEvents(root);
       assert.equal(events.length, 1);
       assert.equal(events[0].type, 'turn');
       assert.equal(events[0].session, 's1');
-      assert.equal(events[0].topic, 'session 3');
       assert.equal(typeof events[0].ts, 'string');
       assert.ok(!Number.isNaN(Date.parse(events[0].ts)));
     });
@@ -247,5 +252,38 @@ describe('feedback', () => {
         '  2026-01-01T00:00:01.000Z ok slow first',
       ].join('\n'),
     );
+  });
+});
+
+describe('feedback is off by default', () => {
+  test('nothing is recorded without YLLIR_FEEDBACK=1 or the on file, and the result is skipped', () => {
+    const saved = process.env.YLLIR_FEEDBACK;
+    delete process.env.YLLIR_FEEDBACK;
+    try {
+      withRoot((root) => {
+        assert.equal(feedbackEnabled(root), false);
+        assert.deepEqual(recordEvent(root, { type: 'turn', session: 's1' }), { ok: true, skipped: true });
+        assert.deepEqual(recordEnd(root, { session: 's1' }), { ok: true, skipped: true });
+        assert.equal(fs.existsSync(feedbackFile(root)), false);
+      });
+    } finally {
+      process.env.YLLIR_FEEDBACK = saved ?? '1';
+    }
+  });
+
+  test('the on file switches recording on for one campaign', () => {
+    const saved = process.env.YLLIR_FEEDBACK;
+    delete process.env.YLLIR_FEEDBACK;
+    try {
+      withRoot((root) => {
+        fs.mkdirSync(path.dirname(feedbackFile(root)), { recursive: true });
+        fs.writeFileSync(path.join(path.dirname(feedbackFile(root)), 'on'), '');
+        assert.equal(feedbackEnabled(root), true);
+        assert.deepEqual(recordEvent(root, { type: 'turn', session: 's1' }), { ok: true });
+        assert.equal(readEvents(root).length, 1);
+      });
+    } finally {
+      process.env.YLLIR_FEEDBACK = saved ?? '1';
+    }
   });
 });

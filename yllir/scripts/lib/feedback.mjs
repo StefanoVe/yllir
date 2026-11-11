@@ -2,7 +2,11 @@
 // <root>/.campaign/state/feedback/. Legacy turn/end/note fields are compact
 // metadata. New skill invocation fields and transcripts may contain campaign
 // text and are deliberately retained only in this local state folder.
-// The writing functions never throw: they return { ok, error } instead.
+// Feedback is off by default: nothing is recorded unless the environment sets
+// YLLIR_FEEDBACK=1 (development, testbench) or the file
+// <root>/.campaign/state/feedback/on exists (the master asked for it).
+// The writing functions never throw: they return { ok, error } instead, and
+// { ok: true, skipped: true } when feedback is off.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,10 +25,21 @@ export const EVENT_TYPES = ['turn', 'end', 'note', 'skill-start', 'skill-end'];
 export const MAX_DETAIL = 200;
 
 const MAX_RECENT_NOTES = 5;
+const SKIPPED = { ok: true, skipped: true };
 
 /** Absolute path of the feedback log for a campaign root. */
 export function feedbackFile(root) {
   return path.join(path.resolve(root), '.campaign', 'state', 'feedback', 'events.jsonl');
+}
+
+/** True when feedback is switched on: YLLIR_FEEDBACK=1, or the `on` file exists in the feedback folder. */
+export function feedbackEnabled(root) {
+  if (process.env.YLLIR_FEEDBACK === '1') return true;
+  try {
+    return fs.existsSync(path.join(path.dirname(feedbackFile(root)), 'on'));
+  } catch {
+    return false;
+  }
 }
 
 export function skillTranscriptFile(root, invocation) {
@@ -34,6 +49,7 @@ export function skillTranscriptFile(root, invocation) {
 
 /** Record one skill invocation boundary. Details stay in the local log. */
 export function recordSkillStart(root, fields) {
+  if (!feedbackEnabled(root)) return SKIPPED;
   if (!validInvocation(fields?.invocation)) return fail('invalid invocation id');
   if (readEvents(root).some((event) => event.invocation === fields.invocation)) return fail('invocation id already exists');
   return recordEvent(root, { ...fields, type: 'skill-start' });
@@ -41,6 +57,7 @@ export function recordSkillStart(root, fields) {
 
 /** Finish an invocation, optionally saving the caller's input/output transcript locally. */
 export function recordSkillEnd(root, fields) {
+  if (!feedbackEnabled(root)) return SKIPPED;
   try {
     if (!validInvocation(fields?.invocation)) return fail('invalid invocation id');
     const existing = readEvents(root);
@@ -118,6 +135,7 @@ export function skillReport(root, events, { includeTranscripts = false } = {}) {
 
 /** Appends one validated event. Returns { ok: true } or { ok: false, error }. Never throws. */
 export function recordEvent(root, event) {
+  if (!feedbackEnabled(root)) return SKIPPED;
   try {
     const checked = checkEvent(event);
     if (!checked.ok) return checked;
@@ -181,6 +199,7 @@ export function latestSession(root) {
  * Never throws.
  */
 export function recordEnd(root, { session, agent, version, process: proc } = {}) {
+  if (!feedbackEnabled(root)) return SKIPPED;
   try {
     const events = readEvents(root);
     const turnIndex = lastTurnIndex(events, session);
@@ -300,10 +319,6 @@ function checkEvent(event) {
 
   const fields = { type };
   copyStrings(event, fields, ['session', 'agent', 'version']);
-
-  if (type === 'turn') {
-    copyStrings(event, fields, ['topic']);
-  }
 
   if (type === 'skill-start' || type === 'skill-end') {
     copyStrings(event, fields, ['invocation', 'parent', 'skill', 'session', 'model']);

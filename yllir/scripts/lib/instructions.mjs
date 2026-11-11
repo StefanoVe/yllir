@@ -36,7 +36,8 @@ const SETTINGS_TEXT = `${JSON.stringify(
       allow: [
         'Skill(yllir:*)',
         'Edit(.campaign/state/**)',
-        'Bash(node "*/scripts/runner-result.mjs" *)',
+        'Edit(.campaign/drafts/**)',
+        'Bash(node "*/scripts/engine.mjs" *)',
       ],
     },
   },

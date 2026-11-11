@@ -15,20 +15,20 @@ function withCampaign(body) {
 }
 
 function cli(args) {
-  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8' });
+  return spawnSync(process.execPath, [script, ...args], { encoding: 'utf8', env: { ...process.env, YLLIR_FEEDBACK: '1' } });
 }
 
 test('CLI records nested and failed skill calls, local transcripts, detailed report and safe export', () => {
   withCampaign((root) => {
     const parent = cli(['record', 'skill-start', root, '--invocation', 'parent_1', '--skill', 'yllir', '--input', 'private master text']);
     assert.equal(parent.status, 0, parent.stderr);
-    const child = cli(['record', 'skill-start', root, '--invocation', 'child_1', '--parent', 'parent_1', '--skill', 'canon-research', '--input', 'private clue']);
+    const child = cli(['record', 'skill-start', root, '--invocation', 'child_1', '--parent', 'parent_1', '--skill', 'continuity-audit', '--input', 'private clue']);
     assert.equal(child.status, 0, child.stderr);
 
     const pending = path.join(root, '.campaign', 'state', 'feedback', 'pending-child_1.json');
     fs.mkdirSync(path.dirname(pending), { recursive: true });
-    fs.writeFileSync(pending, JSON.stringify({ skill: 'canon-research', input: 'private clue', output: 'private answer', status: 'failed' }));
-    const end = cli(['record', 'skill-end', root, '--invocation', 'child_1', '--parent', 'parent_1', '--skill', 'canon-research', '--status', 'failed', '--artifacts', 'private/path.md', '--issues', 'private issue', '--transcript', path.relative(root, pending)]);
+    fs.writeFileSync(pending, JSON.stringify({ skill: 'continuity-audit', input: 'private clue', output: 'private answer', status: 'failed' }));
+    const end = cli(['record', 'skill-end', root, '--invocation', 'child_1', '--parent', 'parent_1', '--skill', 'continuity-audit', '--status', 'failed', '--artifacts', 'private/path.md', '--issues', 'private issue', '--transcript', path.relative(root, pending)]);
     assert.equal(end.status, 0, end.stderr);
 
     const report = cli(['report', root, '--include-transcripts', 'yes']);
@@ -47,12 +47,12 @@ test('CLI records nested and failed skill calls, local transcripts, detailed rep
     for (const secret of ['private master text', 'private clue', 'private answer', 'private/path.md', 'private issue', 'transcripts/']) {
       assert.equal(exportedText.includes(secret), false, `export leaked ${secret}`);
     }
-    assert.doesNotMatch(exportedText, /canon-research/);
+    assert.doesNotMatch(exportedText, /continuity-audit/);
     const detailedExport = path.join(root, 'feedback-export-detailed.jsonl');
     const detailedResult = cli(['export', root, '--out', detailedExport, '--include-details', 'yes']);
     assert.equal(detailedResult.status, 0, detailedResult.stdout);
     const detailedText = fs.readFileSync(detailedExport, 'utf8');
-    assert.match(detailedText, /canon-research/);
+    assert.match(detailedText, /continuity-audit/);
     for (const secret of ['private clue', 'private answer', 'private/path.md', 'private issue', 'transcripts/']) assert.equal(detailedText.includes(secret), false);
 
     const destructive = cli(['export', root, '--out', path.join(root, '.campaign/state/feedback/events.jsonl')]);

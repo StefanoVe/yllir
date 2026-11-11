@@ -13,7 +13,7 @@ import {
 import { generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
 import { ensureRepo, listVersions, saveVersion } from '../../../../../scripts/lib/versions.mjs';
 import { stripExitLine } from '../../../../../scripts/lib/cli-exit.mjs';
-import { plotMap } from '../../../../../skills/library/plot-map/scripts/lib/plot-map.mjs';
+import { plotMap } from '../../../../../scripts/lib/plot/plot-map.mjs';
 
 // Identity logic is exercised only when no global or system git config exists.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
@@ -189,7 +189,7 @@ test('a dry-run never clears a stale pending sheet-migration marker', () => {
   assert.equal(read(dir, '.campaign/state/update.yaml'), state);
 });
 
-test('a campaign made with an older version is updated and saved as one version', () => {
+test('a campaign made with an older version is updated: the update version, then the format version', () => {
   const dir = makeCampaign();
   setVersion(dir, OLD);
   const before = listVersions(dir, { limit: 100 }).length;
@@ -201,10 +201,15 @@ test('a campaign made with an older version is updated and saved as one version'
   assert.ok(result.rewritten.includes('.campaign/version.yaml'));
   assert.match(read(dir, '.campaign/version.yaml'), new RegExp(`^framework_version: "${INSTALLED}"$`, 'm'));
   const versions = listVersions(dir, { limit: 100 });
-  assert.equal(versions.length, before + 1);
-  assert.equal(versions[0].message, `Updated Yllir to ${INSTALLED}`);
-  assert.equal(versions[0].kind, 'framework');
+  assert.equal(versions.length, before + 2);
+  assert.equal(versions[0].message, 'Aggiornamento del formato della campagna');
+  assert.equal(versions[1].message, `Updated Yllir to ${INSTALLED}`);
+  assert.equal(versions[1].kind, 'framework');
+  assert.equal(result.world_migration, 'complete');
+  assert.ok(result.world_migration_files.includes('Seme del mondo.md'));
   const state = read(dir, '.campaign/state/update.yaml');
+  assert.match(state, /^world_migration_id: "world-graph-v1"$/m);
+  assert.match(state, /^world_migration: complete$/m);
   assert.match(state, /^status: completed$/m);
   assert.match(state, /^completed_on: 2026-11-09$/m);
   assert.match(state, /^started_on: 2026-11-09$/m);
@@ -264,9 +269,10 @@ test('pending master changes are saved as a manual version before the update', (
   const result = updateCampaign(dir);
   assert.equal(result.status, 'updated');
   const log = git(dir, 'log', '--format=%s').split('\n');
-  assert.equal(log[0], `Updated Yllir to ${INSTALLED}`);
-  assert.equal(log[1], `Saved manual changes before updating Yllir to ${INSTALLED}`);
-  assert.match(git(dir, 'show', '--name-only', '--format=', 'HEAD~1'), /Trama\/session\.md/);
+  assert.equal(log[0], 'Aggiornamento del formato della campagna');
+  assert.equal(log[1], `Updated Yllir to ${INSTALLED}`);
+  assert.equal(log[2], `Saved manual changes before updating Yllir to ${INSTALLED}`);
+  assert.match(git(dir, 'show', '--name-only', '--format=', 'HEAD~2'), /Trama\/session\.md/);
 });
 
 test('a dry run reports the plan and writes nothing at all', () => {
@@ -279,6 +285,8 @@ test('a dry run reports the plan and writes nothing at all', () => {
   assert.equal(result.status, 'would-update');
   assert.equal(result.from, OLD);
   assert.equal(result.restore_point, null);
+  assert.equal(result.world_migration, 'pending');
+  assert.ok(result.world_migration_files.includes('Seme del mondo.md'));
   assert.ok(result.rewritten.includes('CLAUDE.md'));
   assert.ok(result.rewritten.includes('.campaign/version.yaml'));
   assert.equal(result.rewritten.includes('.campaign/customizations.md'), false);
@@ -432,11 +440,41 @@ test('an old-layout campaign is migrated to the session folders in one saved ver
   assert.equal(fs.existsSync(path.join(dir, 'Trama/Ombre/Sessione 1.md')), false);
   assert.match(read(dir, 'Trama/Sessione 1/Sessione 1.md'), /^arc: "Ombre"$/m);
   assert.match(read(dir, 'Trama/Sessione 1/Eventi/Fuga.md'), /^Nella notte\.$/m);
-  assert.equal(listVersions(dir, { limit: 1 })[0].message, `Updated Yllir to ${INSTALLED}`);
-  assert.match(git(dir, 'show', '--name-only', '--format=', 'HEAD', '--', 'Trama'), /Trama\/Sessione 1\/Sessione 1\.md/);
+  assert.equal(listVersions(dir, { limit: 2 })[1].message, `Updated Yllir to ${INSTALLED}`);
+  assert.equal(listVersions(dir, { limit: 1 })[0].message, 'Aggiornamento del formato della campagna');
+  assert.match(git(dir, 'show', '--name-only', '--format=', 'HEAD~1', '--', 'Trama'), /Trama\/Sessione 1\/Sessione 1\.md/);
 
   const map = plotMap(dir);
   assert.deepEqual(map.errors, []);
   assert.deepEqual(map.sessions.map((s) => s.id), ['ombre-1']);
   assert.equal(map.sessions[0].events.length, 2);
+});
+
+test('a pending world migration of an up-to-date campaign is finished on the next update', () => {
+  const dir = makeCampaign();
+  write(dir, 'Trama/Sessione 1.md', '---\nid: sessione-1\n---\n\n# Sessione 1\n\nTesto.\n');
+  saveVersion(dir, { message: 'Test: a place without kind', kind: 'manual' });
+  writeState(dir, 'status: completed\nfrom_version: "0.0.1"\nto_version: "' + INSTALLED + '"\nrestore_point: "abc1234"\nworld_migration_id: "world-graph-v1"\nworld_migration: pending\n');
+
+  const result = updateCampaign(dir, { today: '2026-11-09' });
+  assert.equal(result.status, 'up-to-date');
+  assert.equal(result.world_migration, 'complete');
+  assert.deepEqual(result.world_migration_errors, []);
+  assert.match(read(dir, 'Trama/Sessione 1.md'), /^provenance: master$/m);
+  assert.match(read(dir, '.campaign/state/update.yaml'), /^world_migration: complete$/m);
+  assert.equal(listVersions(dir, { limit: 1 })[0].message, 'Aggiornamento del formato della campagna');
+});
+
+test('a world migration that cannot be applied restores the campaign to the restore point', () => {
+  const dir = makeCampaign();
+  setVersion(dir, OLD);
+  write(dir, 'Seme del mondo.md', '# Altro\n\nScritto dal master.\n');
+  const campaignBefore = read(dir, 'campaign.yaml');
+
+  const result = updateCampaign(dir, { today: '2026-11-09' });
+  assert.equal(result.status, 'failed');
+  assert.equal(result.errors[0].code, 'seed-exists');
+  assert.equal(read(dir, 'Seme del mondo.md'), '# Altro\n\nScritto dal master.\n');
+  assert.equal(read(dir, 'campaign.yaml'), campaignBefore);
+  assert.match(read(dir, '.campaign/state/update.yaml'), /^status: cancelled$/m);
 });

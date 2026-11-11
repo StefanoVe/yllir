@@ -4,11 +4,12 @@
 // Legacy aggregate events contain no campaign text; skill events may contain
 // caller-provided text in local metadata and transcript files.
 // Commands:
-//   record turn [root] [--session S] [--agent A] [--version V] [--topic T]
+//   record turn [root] [--session S] [--agent A] [--version V]
 //   record end [root] [--session S] [--agent A] [--version V] [--process P]
 //   record note [root] --outcome O --friction F --detail "text"
 //   summary [root]
 //   export [root] --out FILE
+// Recording happens only when feedback is switched on (see lib/feedback.mjs).
 // Root defaults to the working directory. Exit codes: 0 success or skipped,
 // 1 the log refused a record or export failed, 2 usage error. The last line of
 // stdout is always `exit: <code>`.
@@ -28,14 +29,13 @@ import {
   summarize,
 } from './lib/feedback.mjs';
 import { frameworkVersion, hookAgent, isCampaign } from './lib/feedback-hook.mjs';
-import { activeTopic } from './lib/topics.mjs';
 
 const USAGE =
   'usage: node feedback.mjs <record turn|record end|record note|record skill-start|record skill-end|summary|report|export> [root] [options]';
 
 // Options accepted by each command (the root is a plain argument, not an option).
 const OPTIONS = {
-  'record turn': ['session', 'agent', 'version', 'topic'],
+  'record turn': ['session', 'agent', 'version'],
   'record end': ['session', 'agent', 'version', 'process'],
   'record note': ['outcome', 'friction', 'detail'],
   'record skill-start': ['session', 'invocation', 'parent', 'skill', 'input', 'model'],
@@ -112,14 +112,6 @@ function report(result) {
   return 0;
 }
 
-function currentTopic(root) {
-  try {
-    return activeTopic(root)?.id ?? 'none';
-  } catch {
-    return 'none';
-  }
-}
-
 function recordCommand(command, root, options) {
   if (!isCampaign(root)) {
     write('skipped: not a campaign\n');
@@ -135,7 +127,6 @@ function recordCommand(command, root, options) {
         session: options.session ?? `cli-${Date.now()}`,
         agent,
         version,
-        topic: options.topic ?? currentTopic(root),
       }),
     );
   }
@@ -192,7 +183,7 @@ function exportLog(root, options) {
     fs.mkdirSync(path.dirname(target), { recursive: true });
     const lines = readEvents(root).flatMap((event) => {
       // Export aggregate metadata by default. Per-skill metadata is opt-in;
-      // paths, free text, topic, transcript references and bodies stay local.
+      // paths, free text, transcript references and bodies stay local.
       if ((event.type === 'skill-start' || event.type === 'skill-end') && options['include-details'] !== 'yes') return [];
       const safe = {};
       for (const key of ['type', 'ts', 'session', 'agent', 'version', 'duration_s', 'process', 'status', 'model', 'files', 'outcome', 'friction']) {

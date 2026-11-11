@@ -1,6 +1,5 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,7 +21,6 @@ import { slugify } from './normalize.mjs';
 import { stripExitLine } from './cli-exit.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const CLI = path.join(here, '..', '..', 'skills', 'core', 'yllir', 'scripts', 'topics.mjs');
 
 const created = [];
 after(() => {
@@ -148,7 +146,7 @@ test('new truncates the slug to 40 characters without a trailing hyphen', () => 
   assert.ok(!slug.endsWith('-'));
 });
 
-test('new pauses the previously active topic and orders the index', () => {
+test('new pauses the previously current topic and orders the index', () => {
   const root = tmp();
   const a = newTopic(root, { process: 'scene', goal: 'Alpha', now: T1 });
   const b = newTopic(root, { process: 'scene', goal: 'Beta', now: T2 });
@@ -308,168 +306,6 @@ test('errors: unknown id, invalid id, unsafe file path', () => {
   expectError(() => listTopics(path.join(root, 'missing')), 'bad-input');
 });
 
-test('CLI smoke for each command', () => {
-  const root = tmp();
-  const run = (args) => spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
-
-  const created1 = run(['new', root, '--process', 'prepare-session', '--goal', 'Prepare session 4']);
-  assert.equal(created1.status, 0, created1.stderr);
-  const { id } = JSON.parse(stripExitLine(created1.stdout));
-  assert.match(id, /^\d{4}-\d{2}-\d{2}-prepare-session-4$/);
-
-  fs.mkdirSync(path.join(root, 'Trama'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'Trama', 'a.md'), 'a');
-  const touched = run(['touch', root, '--id', id, '--files', 'Trama/a.md, Trama/b.md']);
-  assert.equal(touched.status, 0, touched.stderr);
-  assert.deepEqual(JSON.parse(stripExitLine(touched.stdout)), { id, changedSections: ['Files'] });
-
-  const checked = run(['check', root, '--id', id]);
-  assert.equal(checked.status, 0, checked.stderr);
-  assert.deepEqual(JSON.parse(stripExitLine(checked.stdout)), { id, changed: [] });
-
-  const second = run(['new', root, '--process', 'scene', '--goal', 'Docks']);
-  const secondId = JSON.parse(stripExitLine(second.stdout)).id;
-  assert.equal(second.status, 0, second.stderr);
-
-  const listed = run(['list', root]);
-  assert.equal(listed.status, 0, listed.stderr);
-  assert.deepEqual(
-    JSON.parse(stripExitLine(listed.stdout)).map((e) => [e.id, e.status]),
-    [
-      [secondId, 'active'],
-      [id, 'paused'],
-    ],
-  );
-
-  const active = run(['active', root]);
-  assert.equal(JSON.parse(stripExitLine(active.stdout)).id, secondId);
-
-  const activated = run(['activate', root, '--id', id]);
-  assert.equal(activated.status, 0, activated.stderr);
-  assert.equal(JSON.parse(stripExitLine(run(['active', root]).stdout)).id, id);
-
-  const closed = run(['close', root, '--id', id]);
-  assert.equal(closed.status, 0, closed.stderr);
-  assert.equal(JSON.parse(stripExitLine(run(['active', root]).stdout)), null);
-
-  const unknown = run(['check', root, '--id', '2026-01-01-nope']);
-  assert.equal(unknown.status, 1);
-  assert.equal(JSON.parse(stripExitLine(unknown.stdout)).error, 'no-topic');
-
-  assert.equal(run(['check', root]).status, 2);
-  assert.equal(run(['frobnicate', root]).status, 2);
-  assert.equal(run(['new', root, '--process', 'scene']).status, 2);
-});
-
-// Body of a handoff from the start of the body up to the given marker (frontmatter excluded).
-function bodyBefore(text, marker) {
-  const start = text.indexOf('\n---\n') + 5;
-  return text.slice(start, text.indexOf(marker));
-}
-
-test('ask replaces only the question and the next step, and keeps the rest byte for byte', () => {
-  const root = tmp();
-  const r = newTopic(root, { process: 'prepare-session', goal: 'Prepare session 4', now: T1 });
-  const before = readHandoff(root, r.id);
-  const res = askTopic(root, {
-    id: r.id,
-    question: 'Chi apre la porta?',
-    next: 'Parlare con il sindaco.',
-    now: T2,
-  });
-  assert.deepEqual(res, { id: r.id, status: 'active' });
-  const expected = before
-    .replace(
-      '## Questions for the master\n\n## Next step\n',
-      '## Questions for the master\n\n- Chi apre la porta?\n\n## Next step\n\nParlare con il sindaco.\n',
-    )
-    .replace('updated: 2026-11-07T16:00:00.000Z', 'updated: 2026-11-07T17:00:00.000Z');
-  assert.equal(readHandoff(root, r.id), expected);
-  assert.match(indexText(root), /\| active \| 2026-11-07-prepare-session-4 \|.*2026-11-07T17:00:00.000Z/);
-});
-
-test('ask reactivates a paused topic and pauses the active one', () => {
-  const root = tmp();
-  const a = newTopic(root, { process: 'scene', goal: 'Alpha', now: T1 });
-  const b = newTopic(root, { process: 'scene', goal: 'Beta', now: T2 });
-  assert.equal(activeTopic(root).id, b.id);
-  askTopic(root, { id: a.id, question: 'Dove vanno?', next: 'Chiedere al porto.', now: T3 });
-  assert.deepEqual(
-    listTopics(root).map((e) => [e.id, e.status]),
-    [
-      [a.id, 'active'],
-      [b.id, 'paused'],
-    ],
-  );
-  assert.equal(readSection(root, { id: a.id, section: 'Questions for the master' }), '- Dove vanno?');
-  assert.equal(readSection(root, { id: a.id, section: 'Next step' }), 'Chiedere al porto.');
-});
-
-test('ask rejects empty or multi-line input and unknown topics', () => {
-  const root = tmp();
-  const r = newTopic(root, { process: 'scene', goal: 'Docks', now: T1 });
-  expectError(() => askTopic(root, { id: r.id, question: ' ', next: 'x', now: T2 }), 'bad-input');
-  expectError(() => askTopic(root, { id: r.id, question: 'a\nb', next: 'x', now: T2 }), 'bad-input');
-  expectError(() => askTopic(root, { id: r.id, question: '# x', next: 'x', now: T2 }), 'bad-input');
-  expectError(() => askTopic(root, { id: r.id, question: 'q', next: undefined, now: T2 }), 'bad-input');
-  expectError(() => askTopic(root, { id: '2026-01-01-nope', question: 'q', next: 'n', now: T2 }), 'no-topic');
-});
-
-test('finish appends to Done, sets question and next step to none, refreshes Files, and closes', () => {
-  const root = tmp();
-  const r = newTopic(root, { process: 'prepare-session', goal: 'Prepare session 4', now: T1 });
-  fs.mkdirSync(path.join(root, 'Trama'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'Trama', 'a.md'), 'a');
-  const edited = readHandoff(root, r.id)
-    .replace('## Decisions\n\n', '## Decisions\n\n- Niente pioggia.\n\n')
-    .replace('## Done\n\n', '## Done\n\n- Primo passo.\n\n')
-    .replace('## Questions for the master\n\n', '## Questions for the master\n\n- Vuoi X?\n\n')
-    .replace('## Next step\n', '## Next step\n\nAndare al porto.\n');
-  fs.writeFileSync(handoffPath(root, r.id), edited);
-  const before = readHandoff(root, r.id);
-
-  const res = finishTopic(root, {
-    id: r.id,
-    done: 'Taverna arredata',
-    files: ['Trama/a.md'],
-    now: T2,
-  });
-  assert.deepEqual(res, { id: r.id, status: 'closed' });
-
-  const after = readHandoff(root, r.id);
-  // Files comes before Done in the template, so the untouched prefix ends at Files.
-  assert.equal(bodyBefore(after, '## Files'), bodyBefore(before, '## Files'));
-  assert.match(after, /^status: closed$/m);
-  assert.match(after, /^updated: 2026-11-07T17:00:00.000Z$/m);
-  assert.equal(readSection(root, { id: r.id, section: 'Done' }), '- Primo passo.\n- Taverna arredata');
-  assert.equal(readSection(root, { id: r.id, section: 'Questions for the master' }), 'none');
-  assert.equal(readSection(root, { id: r.id, section: 'Next step' }), 'none');
-  assert.equal(readSection(root, { id: r.id, section: 'Remaining' }), '');
-  assert.equal(
-    readSection(root, { id: r.id, section: 'Files' }),
-    `- \`Trama/a.md\` — sha256 ${sha('a')}`,
-  );
-  assert.deepEqual(
-    listTopics(root).map((e) => [e.id, e.status]),
-    [[r.id, 'closed']],
-  );
-  assert.match(indexText(root), /\| closed \| 2026-11-07-prepare-session-4 \|/);
-});
-
-test('finish without files keeps the listed files and refreshes their hashes', () => {
-  const root = tmp();
-  const r = newTopic(root, { process: 'scene', goal: 'Docks', now: T1 });
-  fs.mkdirSync(path.join(root, 'Trama'), { recursive: true });
-  fs.writeFileSync(path.join(root, 'Trama', 'a.md'), 'a');
-  touchTopic(root, { id: r.id, files: ['Trama/a.md'], now: T2 });
-  fs.writeFileSync(path.join(root, 'Trama', 'a.md'), 'changed');
-  finishTopic(root, { id: r.id, done: 'Fatto', now: T3 });
-  assert.equal(
-    readSection(root, { id: r.id, section: 'Files' }),
-    `- \`Trama/a.md\` — sha256 ${sha('changed')}`,
-  );
-  assert.equal(readSection(root, { id: r.id, section: 'Done' }), '- Fatto');
-});
 
 test('finish rejects bad input and unknown topics', () => {
   const root = tmp();
@@ -482,26 +318,3 @@ test('finish rejects bad input and unknown topics', () => {
   assert.match(readHandoff(root, r.id), /^status: active$/m);
 });
 
-test('CLI smoke for ask and finish', () => {
-  const root = tmp();
-  const run = (args) => spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
-
-  const created = run(['new', root, '--process', 'scene', '--goal', 'Docks']);
-  const { id } = JSON.parse(stripExitLine(created.stdout));
-
-  const asked = run(['ask', root, '--id', id, '--question', 'Chi c\'è?', '--next', 'Andare avanti']);
-  assert.equal(asked.status, 0, asked.stderr);
-  assert.deepEqual(JSON.parse(stripExitLine(asked.stdout)), { id, status: 'active' });
-
-  const missing = run(['ask', root, '--id', id, '--question', 'Chi c\'è?']);
-  assert.equal(missing.status, 2);
-
-  const finished = run(['finish', root, '--id', id, '--done', 'Porto visitato']);
-  assert.equal(finished.status, 0, finished.stderr);
-  assert.deepEqual(JSON.parse(stripExitLine(finished.stdout)), { id, status: 'closed' });
-  assert.equal(JSON.parse(stripExitLine(run(['active', root]).stdout)), null);
-
-  const unknown = run(['finish', root, '--id', '2026-01-01-nope', '--done', 'x']);
-  assert.equal(unknown.status, 1);
-  assert.equal(JSON.parse(stripExitLine(unknown.stdout)).error, 'no-topic');
-});

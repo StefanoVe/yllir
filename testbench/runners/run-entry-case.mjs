@@ -33,13 +33,13 @@ import {
 } from './lib/case-common.mjs';
 import { generateInstructions } from '../../yllir/scripts/lib/instructions.mjs';
 import { ensureRepo, listVersions, saveVersion } from '../../yllir/scripts/lib/versions.mjs';
-import { checkLinks } from '../../yllir/skills/library/linker/scripts/lib/check-links.mjs';
+import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
 import { listTopics, readSection } from '../../yllir/scripts/lib/topics.mjs';
 import { buildSubjectIndex, compareStrings } from '../../yllir/scripts/lib/subjects.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { analyzeMarkdown } from '../../yllir/scripts/lib/zones.mjs';
 import { foldForm } from '../../yllir/scripts/lib/fold.mjs';
-import { plotMap } from '../../yllir/skills/library/plot-map/scripts/lib/plot-map.mjs';
+import { plotMap } from '../../yllir/scripts/lib/plot/plot-map.mjs';
 
 const USAGE =
   'usage: node testbench/runners/run-entry-case.mjs <caseDir> [--runs N] [--model haiku] [--agent claude] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
@@ -378,7 +378,7 @@ function reviewResult(dir) {
   }
 }
 
-/** Reasons why the topic does not hold an open question: one active topic with a non-empty, not "none", question section. */
+/** Reasons why the topic does not hold an open question: one current topic with a non-empty, not "none", question section. */
 function openQuestionReasons(dir, topicProcess = 'prepare-session') {
   const reasons = topicReasons(dir, 'active', topicProcess);
   if (reasons.length === 0) {
@@ -746,7 +746,7 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
       const reasons = noWriteCheck(dir);
       record('Q1', reasons.length === 0, reasons);
     }
-    // Q2 canon-research ran: its report is in the folder.
+    // Q2 the research step ran: its report is in the folder.
     {
       const file = path.join(dir, '.campaign', 'state', 'research', 'report.txt');
       const lines = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n') : [];

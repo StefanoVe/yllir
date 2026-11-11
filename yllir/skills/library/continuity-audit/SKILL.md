@@ -7,7 +7,7 @@ allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), B
 
 # Continuity audit
 
-When another skill invoked you (for example write-sequence), the AUDIT REPORT is the result for that skill, not a message for the master: never end your turn with it. As soon as the report is complete, go back to the step of the invoking skill and continue from there. Only when the master asked for the check directly does the invoking process present the result to the master, in plain words.
+When another skill invoked you (for example a core process), the AUDIT REPORT is the result for that skill, not a message for the master: never end your turn with it. As soon as the report is complete, go back to the step of the invoking skill and continue from there. Only when the master asked for the check directly does the invoking process present the result to the master, in plain words.
 
 **Commands.** Run each command exactly as written in this file, as one single command: nothing before it and nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Anything added makes the command refused. Every script prints its result and, as its last line, `exit: <code>`: read the exit code from that line (the `exit:` line). Read result files with the Read tool. If a command is refused, run it again exactly as written, with nothing added; if it is refused again, end this skill with `status: FAILED`, reason "permission refused".
 
@@ -21,7 +21,7 @@ The caller gives:
 - `MODE`: `pre` or `full`. Default `pre`.
 - `FILES` and/or `SUBJECTS`: comma-separated campaign-relative paths and subject ids. Required in `pre` mode. In `full` mode, pass neither.
 - `CHANGE`: one sentence describing the planned modification. Pre mode only. Default: "not described".
-- `CONTINUE_WITH`: text given by the invoking skill naming the exact step to resume (for example "write-sequence step 3"). Default: "the step of the invoking skill that called the audit".
+- `CONTINUE_WITH`: text given by the invoking skill naming the exact step to resume (for example "prepare-session step 3"). Default: "the step of the invoking skill that called the audit".
 
 If `MODE` is `pre` and both `FILES` and `SUBJECTS` are empty, end this skill with status `FAILED`, reason "no scope given" (the invoking skill continues and asks the master which files or subjects to audit). Do not audit the whole campaign.
 
@@ -121,9 +121,9 @@ Add `--coverage-review .campaign/state/audit/coverage-review.json` only when Ste
 
 The report stays in `.campaign/state/audit/report.txt`. Never print it and never paste it into a message.
 
-Correct last actions (pre mode, invoked by write-sequence with `CONTINUE_WITH` = "write-sequence step 3"; the report script exits 0, status COMPLETE, one problem):
+Correct last actions (pre mode, invoked by a core process with `CONTINUE_WITH` = "prepare-session step 3"; the report script exits 0, status COMPLETE, one problem):
 1. Run the report script, with its full command from Step 7. Its output is not shown to the master.
-2. In the same turn, without writing anything else first, start write-sequence step 3.
+2. In the same turn, without writing anything else first, start prepare-session step 3.
 
 Wrong last actions, do not do this:
 ```

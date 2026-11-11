@@ -10,7 +10,7 @@ import { validateConfig } from './config.mjs';
 import { checkFingerprints } from './instructions.mjs';
 import { listVersions, status } from './versions.mjs';
 import { parseYamlLite } from './yaml-lite.mjs';
-import { activeTopic, listTopics } from './topics.mjs';
+import { workNote } from './work-note.mjs';
 import { checkUpdate, formatUpdateNotice } from './update-check.mjs';
 import { listSheets, readStructure } from './subjects.mjs';
 import { parseFrontmatter } from './frontmatter.mjs';
@@ -38,7 +38,7 @@ const NEXT_STEP = 'next: invoke the skill yllir:yllir before answering the maste
  *   framework_version: string | null,
  *   campaign_framework_version: string | null,
  *   post_update: 'needed' | null,
- *   topics: { active: object | null, open: number } | null,
+ *   work_note: string | null,
  *   update: { installed: string, published: string, news: string | null } | null,
  * }}
  */
@@ -56,7 +56,7 @@ export function sessionCheck(root) {
     framework_version: attempt(readFrameworkVersion, null),
     campaign_framework_version: null,
     post_update: null,
-    topics: null,
+    work_note: null,
     update: null,
   };
   if (folder !== 'campaign') {
@@ -83,7 +83,7 @@ export function sessionCheck(root) {
   }, null);
   result.campaign_framework_version = attempt(() => readCampaignVersion(dir), null);
   result.post_update = attempt(() => readPostUpdate(dir), null);
-  result.topics = attempt(() => topicsState(dir), null);
+  result.work_note = attempt(() => workNote(dir), null);
   result.update = attempt(() => checkUpdate(dir), null);
   return result;
 }
@@ -135,13 +135,8 @@ export function formatCheck(result) {
   if (result.post_update === 'needed') {
     lines.push('post-update: needed');
   }
-  if (result.topics?.active) {
-    const active = result.topics.active;
-    lines.push(`active topic: ${active.id} (${active.process}) — ${active.goal}`);
-    lines.push(`resume from: .campaign/state/topics/${active.id}.md`);
-  }
-  if (result.topics && result.topics.open > 0) {
-    lines.push(`open topics: ${result.topics.open}`);
+  if (result.work_note !== null) {
+    lines.push(`work note: ${result.work_note}`);
   }
   lines.push(NEXT_STEP);
   if (result.update) {
@@ -248,13 +243,6 @@ function countFiles(root) {
 
 function isIgnored(relPath) {
   return IGNORED_PREFIXES.some((prefix) => relPath === prefix || relPath.startsWith(`${prefix}/`));
-}
-
-/** Active topic (or null) and the number of topics that are not closed. */
-function topicsState(dir) {
-  const active = activeTopic(dir);
-  const open = listTopics(dir).filter((topic) => topic.status !== 'closed').length;
-  return { active, open };
 }
 
 function readCampaignVersion(dir) {
