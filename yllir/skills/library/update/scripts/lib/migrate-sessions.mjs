@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { METADATA_CLOSE, METADATA_OPEN, parseFrontmatter } from '../../../../../scripts/lib/frontmatter.mjs';
-import { compareStrings, listSheets, readStructure } from '../../../../../scripts/lib/subjects.mjs';
+import { compareStrings, listCanonicalSheets, readStructure } from '../../../../../scripts/lib/subjects.mjs';
 
 const EVENT_FOLDERS = new Set(['Eventi', 'Events']);
 const NEW_EVENT_FOLDER = 'Eventi';
@@ -114,16 +114,21 @@ export function migrateSessions(root, { dryRun = false } = {}) {
 
 // ---------------------------------------------------------------- planning
 
-/** Legacy plot files: in a plot category, neither `<X>/<X>.md` nor `<X>/Eventi|Events/<N>.md`. */
+/**
+ * Legacy plot files: in a plot category, neither `<X>/<X>.md` nor `<X>/Eventi|Events/<N>.md`.
+ * Symlinks (geographic views, import links) are never legacy files: they point to
+ * files that are classified on their own, and converting them would create fake sessions.
+ */
 function findLegacyFiles(root, structure) {
   const seen = new Set();
   const found = [];
   for (const category of structure) {
     if (category.type !== 'plot' || typeof category.folder !== 'string') continue;
     const folder = path.posix.normalize(category.folder);
-    for (const file of listSheets(root, category.folder)) {
+    for (const file of listCanonicalSheets(root, category.folder)) {
       if (seen.has(file)) continue;
       seen.add(file);
+      if (isSymlink(root, file)) continue;
       const rel = path.posix.relative(folder, file);
       if (classifyPlotFile(rel) === 'legacy') {
         found.push({ file, folder, rel });
@@ -131,6 +136,15 @@ function findLegacyFiles(root, structure) {
     }
   }
   return found.sort((a, b) => compareStrings(a.file, b.file));
+}
+
+/** True when the campaign path is a symlink. A path that cannot be read counts as a symlink, so it is skipped. */
+function isSymlink(root, file) {
+  try {
+    return fs.lstatSync(path.join(root, file)).isSymbolicLink();
+  } catch {
+    return true;
+  }
 }
 
 /** Same rule as plot-map.mjs: session main file, event file, or legacy. */

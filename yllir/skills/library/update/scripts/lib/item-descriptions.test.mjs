@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { completeItemDescriptions, prepareItemDescriptions, stageItemDescriptionDraft, verifyItemDescriptionDrafts } from './item-descriptions.mjs';
+import { toCommentMetadata } from '../../../../../scripts/lib/frontmatter.mjs';
 
 const roots = [];
 after(() => roots.forEach((root) => fs.rmSync(root, { recursive: true, force: true })));
@@ -167,6 +169,30 @@ test('knowledge: text after the master block fails with master-block-invalid', (
   const result = verifyItemDescriptionDrafts(root, ['Objects/key.md'], K);
   assert.equal(result.status, 'failed');
   assert.equal(result.errors[0].code, 'master-block-invalid');
+});
+
+test('converting the metadata block to the comment form does not mark items changed', () => {
+  const root = campaign([['key.md', sheet()]]);
+  const file = path.join(root, 'Objects/key.md');
+  assert.equal(prepareItemDescriptions(root).items[0].status, 'pending');
+  fs.writeFileSync(file, toCommentMetadata(fs.readFileSync(file, 'utf8')));
+  assert.equal(prepareItemDescriptions(root).items[0].status, 'pending');
+  fs.appendFileSync(file, '\nMaster edit\n');
+  assert.equal(prepareItemDescriptions(root).items[0].status, 'changed');
+});
+
+test('an inventory saved with the old plain hash is upgraded, not marked changed', () => {
+  const root = campaign([['key.md', sheet()]]);
+  const file = 'Objects/key.md';
+  const stateFile = path.join(root, '.campaign/state/update/item-descriptions.json');
+  fs.mkdirSync(path.dirname(stateFile), { recursive: true });
+  const oldHash = createHash('sha256').update(sheet()).digest('hex');
+  fs.writeFileSync(stateFile, JSON.stringify({ migration_id: 'item-descriptions-v1', items: [{ file, source: oldHash, status: 'pending' }] }, null, 2));
+  fs.writeFileSync(path.join(root, file), toCommentMetadata(sheet()));
+  const result = prepareItemDescriptions(root);
+  assert.equal(result.items[0].status, 'pending');
+  assert.equal('legacy' in result.items[0], false);
+  assert.equal('legacy' in JSON.parse(fs.readFileSync(stateFile, 'utf8')).items[0], false);
 });
 
 test('the two migrations keep separate inventories', () => {

@@ -311,3 +311,23 @@ test('the migrated campaign is valid for plotMap', (t) => {
     ],
   );
 });
+
+test('a symlink to an event file (geographic view) is never migrated as a legacy session', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/Sessione 1/Sessione 1.md': '---\nid: s1\ndepends_on: []\nlocation: []\ngenerated: true\n---\n\nGenerated file. Do not edit by hand.\n',
+    'Trama/Sessione 1/Eventi/sessione-1-e01.md': '---\nid: s1-e01\nsession: s1\ndepends_on: []\nlocation: []\n---\n\nIl porto.\n',
+  });
+  const target = '../../Sessione 1/Eventi/sessione-1-e01.md';
+  const linkPath = path.join(root, 'Trama/Per luogo/Raatnagar/sessione-1-e01.md');
+  fs.mkdirSync(path.dirname(linkPath), { recursive: true });
+  fs.symlinkSync(target, linkPath);
+
+  const dry = migrateSessions(root, { dryRun: true });
+  assert.deepEqual(dry.migrated, []);
+
+  const result = migrateSessions(root);
+  assert.deepEqual(result.migrated, []);
+  assert.equal(fs.lstatSync(linkPath).isSymbolicLink(), true);
+  assert.equal(exists(root, 'Trama/sessione-1-e01'), false);
+  assert.equal(exists(root, 'Trama/Per luogo/Raatnagar/sessione-1-e01'), false);
+});
