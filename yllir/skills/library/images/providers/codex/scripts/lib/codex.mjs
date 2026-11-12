@@ -5,8 +5,7 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-
-export const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+import { PNG_SIGNATURE } from '../../../../scripts/lib/png-signature.mjs';
 
 const KILL_GRACE_MS = 2000;
 const MESSAGE_LIMIT = 200;

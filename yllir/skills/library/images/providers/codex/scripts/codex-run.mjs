@@ -5,7 +5,7 @@
 
 import path from 'node:path';
 import { runCodex } from './lib/codex.mjs';
-import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+import { exitWith, runCli } from '../../../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE = 'usage: node codex-run.mjs <jobDir> [--timeout-seconds <n>] [--command <path>]';
 

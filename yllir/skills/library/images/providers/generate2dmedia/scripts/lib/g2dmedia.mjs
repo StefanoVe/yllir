@@ -8,7 +8,7 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { PNG_SIGNATURE } from './codex.mjs';
+import { PNG_SIGNATURE } from '../../../../scripts/lib/png-signature.mjs';
 
 export const G2D_KEY_NAMES = ['OPENAI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY', 'XAI_API_KEY', 'ARK_API_KEY', 'FAL_KEY'];
 

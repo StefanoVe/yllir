@@ -6,7 +6,7 @@
 
 import path from 'node:path';
 import { G2D_ROUTES, isValidRoute, readReady, runG2dmedia } from './lib/g2dmedia.mjs';
-import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+import { exitWith, runCli } from '../../../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE =
   'usage: node g2dmedia-run.mjs <campaignRoot> <jobDir> [--data-dir <path>] [--timeout-seconds <n>] [--route <name>]';

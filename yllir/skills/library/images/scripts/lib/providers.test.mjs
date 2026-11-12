@@ -51,7 +51,7 @@ test('loadProviders reads the five real manifests in ORDER', () => {
 
 test('loadProviders throws naming the file on an invalid manifest', () => {
   const root = tempDir('yllir-providers-');
-  const dir = path.join(root, 'modules', 'image-providers', 'broken');
+  const dir = path.join(root, 'skills', 'library', 'images', 'providers', 'broken');
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'provider.yaml');
   fs.writeFileSync(file, 'id: broken\nkind: spaceship\noperations: [generate]\nexternal: false\n');

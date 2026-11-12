@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { PNG_SIGNATURE, probeCodex, runCodex } from './codex.mjs';
+import { probeCodex, runCodex } from './codex.mjs';
+import { PNG_SIGNATURE } from '../../../../scripts/lib/png-signature.mjs';
 
 const PNG_HEX_BODY = '0000000d49484452';
 

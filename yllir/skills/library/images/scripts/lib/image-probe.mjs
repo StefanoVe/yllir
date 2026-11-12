@@ -6,9 +6,9 @@
 import { spawn } from 'node:child_process';
 import { ORDER, readTable, writeTable } from './providers.mjs';
 import { loadCampaignProviders, readKey } from './campaign-providers.mjs';
-import { DEFAULT_URL, probeComfyui } from './comfyui.mjs';
-import { probeCodex } from './codex.mjs';
-import { probeG2dmedia, readReady } from './g2dmedia.mjs';
+import { DEFAULT_URL, probeComfyui } from '../../providers/comfyui/scripts/lib/comfyui.mjs';
+import { probeCodex } from '../../providers/codex/scripts/lib/codex.mjs';
+import { probeG2dmedia, readReady } from '../../providers/generate2dmedia/scripts/lib/g2dmedia.mjs';
 
 const PROBE_TIMEOUT_MS = 5000;
 

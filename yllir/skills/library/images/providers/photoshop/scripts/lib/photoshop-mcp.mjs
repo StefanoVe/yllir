@@ -14,7 +14,7 @@ const PACKAGE_DIR = ['node_modules', '@alisaitteke', 'photoshop-mcp'];
 const LOCK_STALE_MS = 10 * 60 * 1000;
 const DEFAULT_TIMEOUT_MS = 300000;
 const MESSAGE_LIMIT = 200;
-const DEFAULT_PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const DEFAULT_PLUGIN_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../../../..');
 
 /** A step failure carrying one of the reasons of the contract. */
 class StepError extends Error {
@@ -35,7 +35,7 @@ function failure(reason, message) {
 
 /** Reads the pinned manifest of the Photoshop MCP server. */
 export function loadManifest(pluginRoot = DEFAULT_PLUGIN_ROOT) {
-  const file = path.join(pluginRoot, 'modules', 'third-party', 'photoshop-mcp', 'manifest.json');
+  const file = path.join(pluginRoot, 'skills', 'library', 'images', 'providers', 'photoshop', 'manifest.json');
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
@@ -199,7 +199,7 @@ export async function ensureInstalled({
     if (again) return { ok: true, entry: again.entry };
 
     fs.mkdirSync(dir, { recursive: true });
-    const moduleDir = path.join(pluginRoot, 'modules', 'third-party', manifest.id);
+    const moduleDir = path.join(pluginRoot, 'skills', 'library', 'images', 'providers', 'photoshop');
     for (const name of ['package.json', 'package-lock.json']) {
       fs.copyFileSync(path.join(moduleDir, name), path.join(dir, name));
     }

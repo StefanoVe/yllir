@@ -1,5 +1,5 @@
 // Image provider manifests and the deterministic choice of the provider.
-// Manifests live in <pluginRoot>/modules/image-providers/<id>/provider.yaml.
+// Manifests live in <pluginRoot>/skills/library/images/providers/<id>/provider.yaml.
 // The choice is made here, never by the agent: the master's named provider is
 // never replaced silently, and automatic choice follows the order of the list
 // given to selectProvider (campaign providers first, then ORDER; see loadAllProviders).
@@ -17,7 +17,7 @@ const STATE_FILE = path.join('.campaign', 'state', 'image-providers.json');
 
 /** Folder that holds one provider manifest per subfolder. */
 export function providersDir(pluginRoot) {
-  return path.join(pluginRoot, 'modules', 'image-providers');
+  return path.join(pluginRoot, 'skills', 'library', 'images', 'providers');
 }
 
 function orderIndex(id) {

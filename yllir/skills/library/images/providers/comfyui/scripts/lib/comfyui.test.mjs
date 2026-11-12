@@ -8,7 +8,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_URL, fillTemplate, probeComfyui, runComfyui } from './comfyui.mjs';
 
-const TEMPLATES_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../../modules/image-providers/comfyui');
+const TEMPLATES_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });

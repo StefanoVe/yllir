@@ -6,7 +6,7 @@ import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { PNG_SIGNATURE } from './codex.mjs';
+import { PNG_SIGNATURE } from '../../../../scripts/lib/png-signature.mjs';
 import {
   childEnv,
   G2D_KEY_NAMES,

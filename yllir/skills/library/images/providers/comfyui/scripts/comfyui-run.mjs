@@ -6,12 +6,12 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DEFAULT_URL, runComfyui } from './lib/comfyui.mjs';
-import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
+import { exitWith, runCli } from '../../../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE =
   'usage: node comfyui-run.mjs <jobDir> --checkpoint <name> [--url <url>] [--timeout-seconds <n>]';
 
-const TEMPLATES_RELATIVE = '../../../../modules/image-providers/comfyui';
+const TEMPLATES_RELATIVE = '..';
 const VALUE_OPTIONS = new Set(['--checkpoint', '--url', '--timeout-seconds']);
 
 function parseArgs(argv) {

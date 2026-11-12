@@ -1,12 +1,12 @@
 {
   "name": "yllir",
-  "version": "0.42.0",
+  "version": "0.43.0",
   "description": "Create and maintain tabletop RPG campaigns by talking in natural language.",
   "skills": ["./skills/core/", "./skills/library/"],
   "mcpServers": {
     "photoshop": {
       "command": "node",
-      "args": ["${CLAUDE_PLUGIN_ROOT}/scripts/photoshop-mcp.mjs"]
+      "args": ["${CLAUDE_PLUGIN_ROOT}/skills/library/images/providers/photoshop/scripts/photoshop-mcp.mjs"]
     }
   }
 }

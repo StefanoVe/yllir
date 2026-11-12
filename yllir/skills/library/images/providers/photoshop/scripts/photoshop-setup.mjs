@@ -5,11 +5,11 @@
 
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveDataDir } from './lib/data-dir.mjs';
+import { resolveDataDir } from '../../../../../../scripts/lib/data-dir.mjs';
 import { findPhotoshop, ensureInstalled } from './lib/photoshop-mcp.mjs';
-import { exitWith, runCli } from './lib/cli-exit.mjs';
+import { exitWith, runCli } from '../../../../../../scripts/lib/cli-exit.mjs';
 
-const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../../..');
 
 function parseArgs(argv) {
   const args = {};

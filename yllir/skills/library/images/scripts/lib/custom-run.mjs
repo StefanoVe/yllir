@@ -13,7 +13,7 @@ import {
   readKey,
   validateCampaignProvider,
 } from './campaign-providers.mjs';
-import { PNG_SIGNATURE } from './codex.mjs';
+import { PNG_SIGNATURE } from './png-signature.mjs';
 
 const STALL_MS = 180000;
 const HTTP_TIMEOUT_MS = 300000;

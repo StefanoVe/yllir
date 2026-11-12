@@ -14,7 +14,7 @@ import {
   emptyServer,
 } from './photoshop-mcp.mjs';
 
-const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
+const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../../../..');
 const manifest = loadManifest(pluginRoot);
 
 function tempDir() {

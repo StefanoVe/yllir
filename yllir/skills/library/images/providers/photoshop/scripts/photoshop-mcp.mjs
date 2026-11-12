@@ -6,11 +6,12 @@
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveDataDir } from './lib/data-dir.mjs';
+import { resolveDataDir } from '../../../../../../scripts/lib/data-dir.mjs';
 import { loadManifest, findPhotoshop, readReady, emptyServer } from './lib/photoshop-mcp.mjs';
 
-const pluginRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const setupScript = path.join(pluginRoot, 'scripts', 'photoshop-setup.mjs');
+const here = path.dirname(fileURLToPath(import.meta.url));
+const pluginRoot = path.resolve(here, '../../../../../..');
+const setupScript = path.join(here, 'photoshop-setup.mjs');
 
 async function main() {
   const dataDir = resolveDataDir(process.env.YLLIR_DATA_DIR);
