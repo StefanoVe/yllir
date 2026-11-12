@@ -3,7 +3,7 @@
 **Stato:** Bozza di progetto
 
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
-Allineato alla [Riprogettazione](Riprogettazione.md) (2026-11-11).
+Allineato alla [Riprogettazione](Riprogettazione.md) (2026-11-11) e alle decisioni dell'autore del 2026-11-12.
 
 ## Scopo
 
@@ -19,6 +19,14 @@ Questo documento descrive il master screen: la parte del framework che il master
 - La versione iniziale del master screen è snella: una chat con l'agente in cui si vedono, in tempo reale, le modifiche che l'agente fa ai file.
 - **Interfacce semplici (Deciso).** Icone con tooltip al posto dei testi, nessuna complessità non richiesta.
 - Quali altre funzioni confluiscono (enciclopedia pubblica, atlante, vedute illustrate dei luoghi, carte nautiche) non è ancora stato deciso. Le opzioni sono presentate in fondo al documento.
+- **Tecnologia (Deciso, 2026-11-12).** Client-server: un server Node.js con Express e un client Angular, con aggiornamenti in tempo reale via SSE. Il server ascolta solo su 127.0.0.1, cioè solo sul computer del master.
+- **Distribuzione (Deciso, 2026-11-12).** Il sorgente sta in `master-screen/`, fuori da `yllir/`. Una CI (GitHub Actions) lo compila e committa in `yllir/master-screen/` solo l'output buildato: il server in un unico file `server.mjs` e il client statico. Il framework pubblicato contiene solo questa forma; sul computer del master non serve `npm install`.
+- **Avvio (Deciso, 2026-11-12).** Alla creazione di una campagna, Yllir crea nella sua cartella una scorciatoia che avvia server e client e apre il browser: `.command` su macOS, `.cmd` su Windows, `.sh` o `.desktop` su Linux. C'è un'istanza per campagna, e la chiusura non lascia processi residui.
+- **Node.js (Deciso, 2026-11-12).** Il launcher controlla che Node.js, versione minima 20, sia nel PATH o in `~/.yllir/node`. Se manca, lo scarica da nodejs.org in `~/.yllir/node`: versione LTS fissata, checksum SHA256 verificato, nessun permesso di amministratore, nessun installer. Il master non installa nulla a mano.
+- **Agente (Deciso, 2026-11-12).** Il server parla con Claude tramite Claude Agent SDK. Un server MCP locale espone solo gli strumenti del framework, con un token valido per il solo turno; nessuna shell libera. Vedi [Architettura proposta](#architettura-proposta), componente 2.
+- **Prototipo (Deciso, 2026-11-12).** Esiste un prototipo dell'autore, fuori dal repository. Ne va portata solo la parte di sessione live; il resto si riprogetta secondo questo documento.
+- **Fasi e sessione live (Deciso, 2026-11-12).** Le fasi di rilascio restano. Si parte dalla fase 1: chat, pannello «cosa è cambiato», «torna a com'era», ricerca e lettura con marcatura pubblico/master, impostazioni essenziali. La sessione live (tela, registro, combattimento, musica) viene dopo. Combattimento e musica sono skill di libreria non ancora realizzate ([L12 Scontri](Skill%20di%20libreria.md#l12-scontri), [L13 Ricerca musicale](Skill%20di%20libreria.md#l13-ricerca-musicale)): il master screen ne è solo una vista.
+- **Interfaccia (Deciso, 2026-11-12).** Moderna e semplice da usare, ma abbastanza funzionale. È coerente con le icone con tooltip decise sopra.
 
 ### Strumenti della sessione live estratti (Deciso)
 
@@ -106,7 +114,7 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 
 ## Architettura proposta
 
-Proposta, non decisione. Lo schema descrive i ruoli, non la tecnologia.
+Proposta, salvo i componenti 1 e 2, che sono decisioni del 2026-11-12. Lo schema descrive i ruoli; la tecnologia è nelle decisioni dell'autore.
 
 ```text
 Master
@@ -126,8 +134,8 @@ Moduli attivabili: musica · stampa · enciclopedia · altri (vedi sotto)
 
 Componenti:
 
-1. **Applicazione locale.** Un solo processo sul computer del master, raggiungibile solo dal computer stesso. Si avvia con un'azione semplice (un doppio clic o un comando) e si chiude senza lasciare processi.
-2. **Collegamento all'agente.** Il master screen parla con l'agente principale di Claude: Codex non fa più parte del framework, al più è un fornitore facoltativo di immagini (Riprogettazione, decisioni 4 e 11). Ogni turno riceve solo gli strumenti previsti dal framework e mai una shell libera. Un possibile meccanismo è un server di strumenti locale con un token valido per il solo turno: è un'ipotesi da valutare, non un obbligo.
+1. **Applicazione locale (Deciso, 2026-11-12).** Un server locale (Node.js) e un'interfaccia nel browser, sul computer del master. Il server ascolta solo su 127.0.0.1 ed è raggiungibile solo dal computer stesso. Si avvia con la scorciatoia della campagna, con un doppio clic, e si chiude senza lasciare processi. C'è un'istanza per ogni campagna.
+2. **Collegamento all'agente (Deciso, 2026-11-12).** Il master screen parla con l'agente principale di Claude tramite Claude Agent SDK. Un server di strumenti locale (MCP) espone solo gli strumenti previsti dal framework, con un token valido per il solo turno: nessuna shell libera. Codex non fa più parte del framework, al più è un fornitore facoltativo di immagini (Riprogettazione, decisioni 4 e 11).
 3. **Lettura dei file.** I Markdown e le immagini della campagna sono la fonte di verità. L'indice è una cache: se si cancella, si ricostruisce dai file senza perdere nulla.
 4. **Aggiornamento in tempo reale.** Un osservatore dei file rileva ogni creazione, modifica, rinomina ed eliminazione, qualunque ne sia l'autore: l'agente nel master screen, l'agente nel terminale o il master con un editor. La vista si aggiorna da questo flusso, così il master screen non è un secondo motore.
 5. **Stato di sessione.** Chat, registro, tela libera e combattimento vivono in `.campaign/state/`, separata dal canone (vedi [Architettura](Architettura.md#3-campagna-generata)): è lo stato operativo della campagna e non modifica i file del canone. Se il master chiede una modifica canonica, questa passa dal motore di scrittura (`commit`), con i suoi controlli (Riprogettazione, sezione 2).
@@ -146,7 +154,7 @@ Principio guida: il master screen è un modo di guardare la campagna, non un luo
 | 3. Moduli principali | Musica e stampa, come moduli attivabili. | La musica parte e si ferma senza bloccare la chat; i fogli si generano e si anteprimano. |
 | 4. Completo | Le funzioni confluite dopo la decisione (vedi sotto), configurazione completa, installazione semplificata. | Tutte le funzioni richieste sono coperte o dichiarate fuori ambito. |
 
-La fase 1 segue la prima versione, come deciso dall'autore: nessun master screen prima che il framework funzioni da solo.
+La fase 1 segue la prima versione, come deciso dall'autore: nessun master screen prima che il framework funzioni da solo. La fase 1 deve lasciare predisposta la registrazione di pannelli e moduli, in vista della sessione live che viene dopo.
 
 ## Funzioni candidate a confluire
 
@@ -180,7 +188,6 @@ Nota: se più funzioni entrano nel framework, serve un modello comune per le imm
 - Quali funzioni confluiscono nel master screen (enciclopedia pubblica, atlante, vedute, carte nautiche) e con quale opzione, fra A, B e C per ciascuna.
 - Esiste una vista per i giocatori? Non è prevista nella prima specifica. Le schede pubbliche sono già adatte a una vista condivisa, ma è una scelta di prodotto.
 - Piattaforma: alcune funzioni (musica, vedute, carte nautiche) potrebbero dipendere dal sistema operativo. Il framework deve girare anche altrove? Qual è il minimo accettabile per la fase 1?
-- Tecnologia del master screen: da scegliere all'inizio della fase 1, con criteri chiari (semplicità d'installazione, facilità di modifica da parte di un agente, supporto alle icone con tooltip).
 - Autonomia dell'agente: le modifiche compaiono in tempo reale, ma il master le approva dopo o prima? Serve un'approvazione esplicita per i file del canone?
 - Marcatura pubblico/master: il formato è definito in `Configurazione.md`, ma il master screen deve applicarlo anche ai file scritti dall'agente. Chi controlla che un blocco riservato non esca in una vista pubblica?
 - Parità fra master screen e terminale: quali operazioni devono esistere in entrambi, e quali sono solo del master screen (per esempio il pannello delle modifiche)?

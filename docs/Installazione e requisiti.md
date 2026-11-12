@@ -23,7 +23,7 @@ Convenzioni: **Deciso** indica ciò che è nell'indice o è una decisione dell'a
 | Sistema | Proposta per la prima versione | Note |
 |---|---|---|
 | macOS (ultime due versioni principali) | Supportato | La versione minima esatta è **da verificare** sulle versioni rilasciate da Claude Code. Le istruzioni per aprire il terminale in [Esperienza utente](Esperienza%20utente.md) restano valide come alternativa. |
-| Windows 11 | Supportato, da confermare | Richiede Git e Node installati dall'installatore; le istruzioni per il terminale puntano a PowerShell, come in [Esperienza utente](Esperienza%20utente.md). |
+| Windows 11 | Supportato, da confermare | Richiede Git installato dall'installatore; Node lo installa il launcher se manca (sezione 1.4). Le istruzioni per il terminale puntano a PowerShell, come in [Esperienza utente](Esperienza%20utente.md). |
 | Windows 10 | Da decidere | Dipende dal supporto che Claude Code offre a quel sistema (**da verificare**). |
 | Linux | Fuori dalla prima versione | Non è il pubblico previsto dalla specifica. Lo stesso installatore può essere esteso in seguito. |
 | Tablet e telefoni | Non supportati | Il framework scrive file nella cartella del computer. |
@@ -51,7 +51,7 @@ Regole:
 |---|---|---|---|
 | Claude Code, con il plugin di Yllir | L'assistente | Obbligatorio | Scaricato dal sito ufficiale; l'installatore lo propone e lo avvia se manca. |
 | Git | Conserva le versioni salvate della campagna. Il master non lo vede mai. | Obbligatorio (**Deciso**): senza, il framework non scrive | Installato dall'installatore se manca. |
-| Node.js, versione LTS | Esegue gli script deterministici: controllo dei collegamenti, validazione, indici, controllo dell'installazione | Obbligatorio (**Proposta**) | Installato dall'installatore se manca. |
+| Node.js, versione LTS, minima 20 | Esegue gli script deterministici: controllo dei collegamenti, validazione, indici, controllo dell'installazione | Obbligatorio (**Deciso**, 2026-11-12) | Installato automaticamente dal launcher se manca: lo cerca nel computer e in `~/.yllir/node`; se non c'è, lo scarica da nodejs.org, senza permessi di amministratore e senza installer. |
 | Editor di testo | Il master può leggere e correggere le schede a mano | Facoltativo | Non serve: va bene qualunque editor di Markdown o di testo. |
 
 **Deciso: runtime per gli script, Node.js.** Tra le opzioni (Node.js, Python, script di shell) è stata scelta Node.js, per quattro motivi:
@@ -61,7 +61,7 @@ Regole:
 3. Python non è garantito di default su entrambi i sistemi (**da verificare**). La specifica della stampa, inoltre, evita esplicitamente la dipendenza da Python per leggere i modelli ([Master screen](Master%20screen.md)).
 4. Le librerie necessarie possono essere incluse nel pacchetto del framework, così l'installatore non deve installare programmi separati per la composizione dei fogli o dei QR. Questo riduce i requisiti ma va verificato sulle licenze delle librerie (**da verificare**).
 
-La versione minima di Node non si fissa qui: si sceglie al momento del rilascio, tra le versioni LTS in corso.
+**Deciso (2026-11-12): installazione automatica di Node.js.** Il launcher controlla la presenza di Node.js, versione minima 20, nel PATH e in `~/.yllir/node`. Se manca, lo scarica da nodejs.org in `~/.yllir/node`: la versione LTS è fissata dal framework e il file è verificato con checksum SHA256. Non servono permessi di amministratore né un installer, e il master non deve installare nulla a mano.
 
 **Git: motivazione.** Le versioni salvate, il «torna a com'era» e la storia dei file passano tutti da Git ([Architettura](Architettura.md), sezione 5; [Esperienza utente](Esperienza%20utente.md)). Senza Git non esiste una versione salvata a cui tornare, e per questo la scrittura è bloccata (vedi sezione 4). Per questo Git è obbligatorio, e la creazione di una campagna ne inizializza il repository.
 
@@ -93,7 +93,7 @@ La versione minima di Node non si fissa qui: si sceglie al momento del rilascio,
 | **Pubblicazione dell'enciclopedia** | Account di hosting, programma a riga di comando del servizio scelto, dominio (**da verificare**) | L'enciclopedia resta una raccolta di pagine locali, consultabile sul computer. Nulla viene pubblicato. |
 | **Browser di verifica** (controllo visivo dell'enciclopedia) | Un browser e gli strumenti di verifica (**da verificare**) | Il controllo dei collegamenti resta, perché è deterministico. Manca il controllo visivo, e il framework dichiara che non è stato fatto. |
 | **Lettura di PDF scansionati** (importazione di appunti) | Uno strumento di riconoscimento del testo (**da verificare**) | I PDF scansionati non si leggono come testo. Le foto restano leggibili dall'assistente, se il servizio lo consente (**da verificare**). |
-| **Master screen** | **Deciso:** non è nella prima versione. In seguito, un'app locale senza servizi esterni | Nessun master screen: si lavora dal terminale di Claude Code. Nulla cambia nel resto. |
+| **Master screen** | **Deciso:** non è nella prima versione. In seguito, un'app locale che si apre nel browser e usa l'assistente come il terminale | Nessun master screen: si lavora dal terminale di Claude Code. Nulla cambia nel resto. |
 | **Skill documentali** (PDF, Word, presentazioni) | Disponibili nell'ambiente di Claude, non nel pacchetto | Dispense e schede stampabili restano in formato Markdown o si producono con i fogli di stampa. |
 
 ## 3. Percorso di installazione per chi non ha mai aperto un terminale
@@ -133,7 +133,7 @@ Alla fine dell'installazione, e ogni volta che il master lo chiede con una frase
 | Sistema supportato | Versione del sistema operativo | Non pronto: sistema non supportato. |
 | Claude Code presente e accesso attivo | Presenza di Claude Code e prova di accesso leggera (**da verificare** che non consumi risorse) | Non pronto: accesso da completare. |
 | Git presente e configurato | Presenza e versione minima; identità locale impostata una volta dall'installatore con un nome generico | Non pronto: manca lo strumento delle versioni salvate. Nessuna scrittura è possibile (sezione 4). |
-| Node presente, versione minima | Presenza e versione | Non pronto: manca il componente di controllo. |
+| Node presente, versione minima 20 | Presenza e versione, nel computer o in `~/.yllir/node` | Non pronto: manca il componente di controllo, che il launcher prova a scaricare da solo. |
 | Pacchetto integro | Impronte dei file del framework (vedi [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md)) | Avviso: alcuni file sono cambiati. |
 | Cartella di prova scrivibile | Creazione e rimozione di un file di prova in una cartella di prova | Non pronto: la cartella non è scrivibile. |
 | Cartella non sincronizzata | Percorso confrontato con le cartelle che i sistemi sincronizzano con il cloud (euristica) | Avviso: la cartella può essere copiata online. |
@@ -181,7 +181,7 @@ Ogni messaggio dice tre cose: che cosa non funziona, che cosa non è cambiato, c
 | Accesso a Claude scaduto o non attivo | «Non riesco a collegarmi all'assistente: l'accesso sembra scaduto. Accedi di nuovo all'assistente, poi riprendiamo.» | Accedi di nuovo; se il piano non basta, controlla sul sito del fornitore. | Nessuna richiesta all'assistente finché non si accede. La lettura resta possibile. |
 | Claude Code disinstallato | «Non trovo più lo strumento con cui lavoriamo. Rilancia l'installatore: ritrovo la campagna com'è.» | Rilancia l'installatore, che ripara l'installazione (sezione 5). | Nessuna richiesta all'assistente. La campagna non cambia. |
 | Git mancante | «Non trovo lo strumento che conserva le versioni salvate. Finché non lo reinstalli non modifico nulla: ogni modifica deve poter tornare indietro.» | Rilancia l'installatore: installa il componente delle versioni salvate. | **Blocco delle scritture**: nessun file della campagna viene modificato senza una versione salvata a cui tornare. |
-| Node mancante o troppo vecchio | «Un componente necessario per i controlli è mancante o troppo vecchio. Rilancia l'installatore per ripararlo.» | Rilancia l'installatore. | Blocco dei controlli deterministici; le scritture restano bloccate fino al controllo riuscito. |
+| Node mancante o troppo vecchio | «Un componente necessario per i controlli è mancante o troppo vecchio. Lo riscarico da solo: se non ci riesco, rilancia l'installatore.» | Il launcher scarica e verifica Node (sezione 1.4). Se non ci riesce, rilancia l'installatore. | Blocco dei controlli deterministici; le scritture restano bloccate fino al controllo riuscito. |
 | Strumento più vecchio del minimo richiesto dal framework | «Lo strumento X è troppo vecchio per questa versione del framework. Aggiornalo dal suo sito; il framework non lo aggiorna da solo.» | Aggiornare lo strumento (sezione 5). | Solo il modulo che usa X resta spento. |
 | Versione della campagna più nuova del framework installato | «Questa campagna è stata creata con una versione più recente del framework. Aggiorna il framework prima di continuare.» | Aggiornare il framework (vedi [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md)). | Blocco delle scritture: la campagna non viene modificata da una versione più vecchia. |
 | Chiave di un fornitore di immagini scaduta o revocata | «La chiave del servizio X non funziona più. Inseriscine una nuova, oppure continuiamo senza quel servizio.» | Inserire una nuova chiave o disattivare il fornitore. | Il fornitore resta spento. |
