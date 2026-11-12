@@ -287,3 +287,23 @@ test('change-draft usage: a missing op or subject, a title with delete or withou
   assertUsage(cli(['change-draft', dir, '--op', 'delete', '--subject', 'oria-valdes', '--title', 'X']));
   assertUsage(cli(['change-draft', dir, '--op', 'merge', '--subject', 'teodo-marr']));
 });
+
+test('change-draft merge writes the drafts with exit 0, the same subject exits 1 with nothing written, --other on rename is a usage error', (t) => {
+  const dir = makeCampaign(t);
+  const sheet = 'Personaggi/Oria Valdes.md';
+  const original = fs.readFileSync(path.join(dir, sheet), 'utf8');
+  const merged = cli(['change-draft', dir, '--op', 'merge', '--subject', 'teodo-marr', '--other', 'oria-valdes']);
+  assert.equal(merged.status, 0, merged.stdout);
+  assert.equal(merged.json.ok, true);
+  assert.equal(merged.json.op, 'merge');
+  assert.equal(merged.json.subject, 'teodo-marr');
+  assert.deepEqual(merged.json.deletes, [sheet]);
+  assert.ok(merged.json.files.includes('Personaggi/Teodo Marr.md'), JSON.stringify(merged.json.files));
+  assert.ok(fs.existsSync(path.join(dir, '.campaign/drafts/Personaggi/Teodo Marr.md')));
+  assert.equal(fs.readFileSync(path.join(dir, sheet), 'utf8'), original, 'the campaign sheet is not changed by a draft');
+
+  const same = cli(['change-draft', dir, '--op', 'merge', '--subject', 'teodo-marr', '--other', 'teodo-marr']);
+  assert.equal(same.status, 1, same.stdout);
+  assert.equal(same.json.errors[0].code, 'same-subject');
+  assertUsage(cli(['change-draft', dir, '--op', 'rename', '--subject', 'teodo-marr', '--title', 'X', '--other', 'oria-valdes']));
+});

@@ -880,3 +880,107 @@ test('with the dnd-2024 adapter, a check value that is not a D&D 2024 check is r
   assert.ok(errors[0].message.startsWith('line 12: '), errors[0].message);
   assert.ok(errors[0].message.includes('"Persuasione CD 13" is not a D&D 2024 check'), errors[0].message);
 });
+
+// ---------------------------------------------------------------------------
+// Retired ids (retired-ids.mjs): a deleted or merged subject's id is never reused
+// ---------------------------------------------------------------------------
+
+const CAPRA_PATH = 'Creature/Capra cinerina.md';
+const RETIRED_PATH = '.campaign/retired-ids.json';
+
+function retiredIdsAt(dir) {
+  return JSON.parse(readAt(dir, RETIRED_PATH)).ids;
+}
+
+test('a delete retires the id and the retired list is saved in the same version', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  const check = await checkBatch(dir, { deletes: [CAPRA_PATH] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  writeReview(dir);
+  const result = await commitBatch(dir, { deletes: [CAPRA_PATH], message: 'Remove the goat' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(commitCount(dir), before + 1);
+  assert.equal(fs.existsSync(path.join(dir, CAPRA_PATH)), false);
+  assert.deepEqual(retiredIdsAt(dir), ['capra-cinerina']);
+  assert.equal(readAt(dir, RETIRED_PATH), '{\n  "ids": [\n    "capra-cinerina"\n  ]\n}\n');
+  assert.equal(git(dir, ['ls-files', RETIRED_PATH]).trim(), RETIRED_PATH);
+  assert.equal(git(dir, ['status', '--porcelain']).trim(), '');
+});
+
+test('a new sheet with a retired id is rejected with id-reused and nothing is written', async (t) => {
+  const dir = makeCampaign(t);
+  assert.equal((await checkBatch(dir, { deletes: [CAPRA_PATH] })).ok, true);
+  writeReview(dir);
+  const removed = await commitBatch(dir, { deletes: [CAPRA_PATH], message: 'Remove the goat' });
+  assert.equal(removed.ok, true, JSON.stringify(removed.errors));
+  const commitBefore = head(dir);
+
+  writeDraft(dir, MIRA_PATH, MIRA.replace('id: mira-sanna', 'id: capra-cinerina'));
+  const check = await checkBatch(dir, { files: [MIRA_PATH] });
+  assert.equal(check.ok, false);
+  const reused = check.errors.filter((e) => e.code === 'id-reused');
+  assert.equal(reused.length, 1, JSON.stringify(check.errors));
+  assert.equal(reused[0].file, MIRA_PATH);
+
+  writeReview(dir);
+  const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Add Mira with a retired id' });
+  assert.equal(result.ok, false);
+  assert.equal(head(dir), commitBefore);
+  assert.equal(fs.existsSync(path.join(dir, MIRA_PATH)), false);
+});
+
+test('a rename (delete and write with the same id) keeps working and does not retire the id', async (t) => {
+  const dir = makeCampaign(t);
+  const renamed = 'Creature/Capra rinominata.md';
+  writeDraft(dir, renamed, readAt(dir, CAPRA_PATH)
+    .replace('id: capra-cinerina', 'id: capra-cinerina\nkind: creature\nprovenance: master')
+    .replaceAll('Capra cinerina', 'Capra rinominata'));
+
+  const check = await checkBatch(dir, { files: [renamed], deletes: [CAPRA_PATH] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  writeReview(dir);
+  const result = await commitBatch(dir, { files: [renamed], deletes: [CAPRA_PATH], message: 'Rename the goat' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(fs.existsSync(path.join(dir, RETIRED_PATH)), false);
+  assert.equal(fs.existsSync(path.join(dir, CAPRA_PATH)), false);
+});
+
+test('merged_ids retire their ids, and a later sheet cannot take them', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, MIRA_PATH, MIRA.replace('provenance: master', 'provenance: master\nmerged_ids: [capra-cinerina]'));
+  const check = await checkBatch(dir, { files: [MIRA_PATH] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  writeReview(dir);
+  const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Merge the goat into Mira' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.deepEqual(retiredIdsAt(dir), ['capra-cinerina']);
+
+  writeDraft(dir, 'Creature/Capra due.md', readAt(dir, result.finalFiles[0]).replace('id: mira-sanna', 'id: capra-cinerina'));
+  const reuse = await checkBatch(dir, { files: ['Creature/Capra due.md'] });
+  assert.equal(reuse.ok, false);
+  assert.ok(reuse.errors.some((e) => e.code === 'id-reused'), JSON.stringify(reuse.errors));
+});
+
+test('an invalid retired-ids file blocks the batch with retired-ids-invalid and nothing is written', async (t) => {
+  const dir = makeCampaign(t);
+  fs.mkdirSync(path.join(dir, '.campaign'), { recursive: true });
+  fs.writeFileSync(path.join(dir, RETIRED_PATH), '{"ids": "capra-cinerina"}\n');
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'broken retired ids']);
+  const commitBefore = head(dir);
+
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const check = await checkBatch(dir, { files: [MIRA_PATH] });
+  assert.equal(check.ok, false);
+  assert.deepEqual(check.errors.map((e) => e.code), ['retired-ids-invalid'], JSON.stringify(check.errors));
+
+  writeReview(dir);
+  const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Add Mira' });
+  assert.equal(result.ok, false);
+  assert.equal(head(dir), commitBefore);
+  assert.equal(fs.existsSync(path.join(dir, MIRA_PATH)), false);
+});

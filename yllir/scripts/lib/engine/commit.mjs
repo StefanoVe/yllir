@@ -28,6 +28,7 @@ import { applyLinks } from '../links/apply-links.mjs';
 import { checkLinks } from '../links/check-links.mjs';
 import { checkSheets } from '../sheets/sheet-check.mjs';
 import { checkItemSheets } from '../items/item-manager.mjs';
+import { planRetiredIds, writeRetiredIds } from './retired-ids.mjs';
 
 export const DRAFT_DIR = '.campaign/drafts';
 
@@ -232,6 +233,10 @@ async function evaluate(dir, { files, deletes, sources, tmpRoot }) {
   if (preflightErrors.length > 0) {
     return { errors: preflightErrors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map() };
   }
+  const retired = planRetiredIds(dir, { files, deletes, draftRoot: path.join(dir, DRAFT_DIR) });
+  if (retired.errors.length > 0) {
+    return { errors: retired.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map() };
+  }
 
   const copy = fs.mkdtempSync(path.join(tmpRoot, 'yllir-engine-'));
   const result = { errors: [], finalFiles: [...files], ambiguousMentions: [], draftsHash, copy, externalLinks: new Map() };
@@ -239,7 +244,7 @@ async function evaluate(dir, { files, deletes, sources, tmpRoot }) {
     const existing = files.filter((rel) => lstatOrNull(path.join(dir, rel)) !== null);
     const baseline = await validate(dir, scopesFor(dir, existing, deletes));
 
-    const transformed = await transform(dir, copy, { files, deletes });
+    const transformed = await transform(dir, copy, { files, deletes, retired: retired.ids });
     result.externalLinks = transformed.externalLinks;
     result.finalFiles = transformed.finalFiles;
     result.ambiguousMentions = transformed.ambiguousMentions;
@@ -335,7 +340,7 @@ function preflight(dir, files, deletes, sources) {
  * Builds the copy, applies the batch to it, and runs the transform steps in order:
  * layout, links, plot maps, derived indexes. Errors returned here always block.
  */
-async function transform(dir, copy, { files, deletes }) {
+async function transform(dir, copy, { files, deletes, retired }) {
   const out = { errors: [], finalFiles: [...files], pathMap: {}, ambiguousMentions: [], externalLinks: new Map() };
   out.externalLinks = copyCampaign(dir, copy);
 
@@ -350,6 +355,7 @@ async function transform(dir, copy, { files, deletes }) {
     }
   }
   for (const rel of deletes) fs.rmSync(path.join(copy, rel), { force: true });
+  writeRetiredIds(copy, retired);
 
   // 1. Geographic layout. A plan that is blocked by an error is left to validation.
   const layout = planGeographicLayout(copy);

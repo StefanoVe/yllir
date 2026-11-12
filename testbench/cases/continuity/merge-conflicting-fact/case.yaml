@@ -1,0 +1,11 @@
+case: continuity-merge-conflict
+fixture: continuity
+# Runs per agent: 3 (the suite passes --runs 1 per job).
+runs: 3
+# One turn: the run must ask which birthplace is right and stop before any sheet changes.
+prompt: |
+  Brizio Fell e Brizio Fell il messaggero sono la stessa persona: tieni la scheda di Brizio Fell.
+# Not measured yet: the budget is the default of the continuity cases.
+limits:
+  max_minutes: 4
+  max_tool_calls: 60

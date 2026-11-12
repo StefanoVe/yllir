@@ -1,0 +1,22 @@
+# Answer key of continuity/delete-still-referenced. Never copied next to the campaign the agent works on.
+# Runs per agent: 3. Two turns: turn 1 is the master's request, turn 2 is the master's answer (case.yaml reply).
+#
+# Turn 1 (the request):
+# D1 the run ends on a question (the final message ends with a question mark).
+# D2 the sheet to delete still exists and is byte for byte the fixture's: nothing is deleted yet.
+# D3 nothing is saved and nothing outside .campaign/ is changed.
+# D4 the question names the document that still depends on the merchant (its title mentions "mercato").
+# Turn 2 (the answer):
+# D5 the sheet is gone.
+# D6 the dependent document no longer holds the id in the field named dependent_field.
+# D7 the dependent document has no link to the deleted sheet.
+# D8 exactly versions_added saved versions after both turns: the answer is saved first, then the delete.
+# D9 the saved changes touch only the sheet and the dependent document.
+kind: delete
+subject: ottone-sela
+sheet: Personaggi/Ottone Sela.md
+dependent: Trama/Il mercato di Tessa.md
+dependent_title_word: mercato
+dependent_field: merchant
+allowed_changes: [Personaggi/Ottone Sela.md, Trama/Il mercato di Tessa.md]
+versions_added: 2

@@ -1,0 +1,11 @@
+case: continuity-retcon-chronicle
+fixture: continuity
+# Runs per agent: 3 (the suite passes --runs 1 per job).
+runs: 3
+# One turn: the run must tell the master that the played chronicle changes and ask whether to go on.
+prompt: |
+  Il faro di Tessa è stato costruito cento anni prima: non sessant'anni fa, ma centosessant'anni fa. Sistema la data.
+# Not measured yet: the budget is the default of the continuity cases.
+limits:
+  max_minutes: 4
+  max_tool_calls: 60

@@ -5,6 +5,7 @@ The testbench holds synthetic campaigns, each with an answer key, and the runner
 - `fixtures/morvalle/campaign/`: a synthetic campaign in the current format (after the world-graph migration). It is the only part an agent under test works on.
 - `fixtures/morvalle/key.yaml`: the answer key for the mention scanner and the continuity audit: what must be found and what must not.
 - `fixtures/morvalle-seeded/campaign/`: the same campaign with three constraints seeded in the world seed (a faction, a family naming rule and something to avoid). Only the `world/region` case uses it. Its answer key is `cases/world/region/key.yaml`.
+- `fixtures/continuity/campaign/`: a small synthetic campaign for the library skill `continuity-keeper` (rename with a homonym, delete with a dependent document, merge with a conflicting fact, retcon of a played chronicle). Its traps are listed in `fixtures/continuity/README.md`. Each answer key is `cases/continuity/<name>/key.yaml`.
 - `fixtures/morvalle-legacy/campaign/`: a frozen copy of the same campaign before the world-graph migration (no `kind`, `provenance` or relations, and no seed). Only the update cases use it, because they need the old format.
 - `cases/<kind>/<name>/case.yaml`: one case: the master's message, the expected behaviour and its limits.
 - `runners/`: the scripts that run a case or grade a component against its key.
@@ -58,6 +59,7 @@ The minute targets come from the redesign document («Tempi misurati»). Note th
 | `run-entry-case.mjs` | `entry/go-back`, `entry/where-and-question`, `entry/not-available`, `entry/question-hypothesis`, `entry/prepare-proceed`, `entry/prepare-two-turns`, `entry/after-proceed`, `entry/after-too-thin` | E, W, N, Q, P, A and T checks, see the runner's header |
 | `run-update-case.mjs` | `update/stale-campaign`, `update/legacy-sessions`, `update/newer-published`, `update/declined` | S, L, N and D checks |
 | `run-audit-case.mjs` | `audit/full` | A1 to A8: recall of the contradictions, no problem for perspectives, hypotheses or recorded exclusions, no change to the documents |
+| `run-continuity-case.mjs` | `continuity/rename-with-homonym`, `continuity/delete-still-referenced` (two turns), `continuity/merge-conflicting-fact`, `continuity/retcon-contradicts-chronicle` | R1 to R6 (rename), D1 to D4 after the question and D5 to D9 after the answer (delete), M1 to M4 (merge), T1 to T3 (retcon). Each run starts from a copy of the fixture with one baseline version; a question turn must save nothing and change nothing. Three runs per agent (`runs: 3` in each `case.yaml`) |
 | `run-world-case.mjs` | `world/region`, `world/creature` | W1 to W10 (region: new subjects with provenance, kinds, sketches and full documents, no new world-graph error, the lake subtree, a faction with members, the family-name rule, the seed changed, one saved version, a final message that names a created subject and says it is invented). C1 to C5 (creature: one enemy sheet that the adapter validates, ability modifiers, location, one saved version). Optional `Q-grid` with `--judge` |
 
 Every case also has `L-time` and `L-calls` when it declares limits.

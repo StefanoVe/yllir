@@ -11,6 +11,7 @@
 //   change-plan <root> --subject <id>   (read-only census of the references to one subject)
 //   change-draft <root> --op rename --subject <id> --title "<new title>"
 //   change-draft <root> --op delete --subject <id>   (writes the drafts of a whole-subject change)
+//   change-draft <root> --op merge --subject <survivor> --other <id>   (two sheets become one; writes the drafts)
 // Exit codes: 0 ok, 1 campaign problem (ok:false, or a query error), 2 usage or internal error.
 
 import fs from 'node:fs';
@@ -32,7 +33,7 @@ const USAGE = [
   '  query   <root> <name> [args...]',
   '  index   <root>',
   '  change-plan <root> --subject <id>',
-  '  change-draft <root> --op rename|delete --subject <id> [--title "<new title>"]',
+  '  change-draft <root> --op rename|delete|merge --subject <id> [--title "<new title>"] [--other <id>]',
 ].join('\n');
 
 const COMMANDS = {
@@ -42,7 +43,7 @@ const COMMANDS = {
   query: null, // positional: <name> [args...], no options
   index: [],
   'change-plan': ['subject'],
-  'change-draft': ['op', 'subject', 'title'],
+  'change-draft': ['op', 'subject', 'title', 'other'],
 };
 
 class UsageError extends Error {}
@@ -160,18 +161,25 @@ async function run(parsed) {
       return { code: result.ok ? 0 : 1, value: result };
     }
     case 'change-draft': {
-      if (options.op !== 'rename' && options.op !== 'delete') {
-        usageError('--op must be rename or delete');
+      if (!['rename', 'delete', 'merge'].includes(options.op)) {
+        usageError('--op must be rename, delete or merge');
       }
       if (options.subject === undefined || options.subject.trim() === '') {
         usageError('--subject is required');
       }
       if (options.op === 'rename' && options.title === undefined) usageError('--title is required for rename');
-      if (options.op === 'delete' && options.title !== undefined) usageError('--title is not allowed for delete');
+      if (options.op !== 'rename' && options.title !== undefined) {
+        usageError(`--title is not allowed for ${options.op}`);
+      }
+      if (options.op === 'merge' && (options.other === undefined || options.other.trim() === '')) {
+        usageError('--other is required for merge');
+      }
+      if (options.op !== 'merge' && options.other !== undefined) usageError(`--other is not allowed for ${options.op}`);
       const result = changeDraft(root, {
         op: options.op,
         subject: options.subject.trim(),
         title: options.title,
+        other: options.other?.trim(),
       });
       return { code: result.ok ? 0 : 1, value: result };
     }

@@ -1,0 +1,11 @@
+case: continuity-rename-homonym
+fixture: continuity
+# Runs per agent: 3 (the suite passes --runs 1 per job).
+runs: 3
+# One master message, no reply: the rename runs to its saved version in one turn.
+prompt: |
+  Cambia il nome di Corrado Varno: da adesso si chiama Corrado Lesca. Il resto resta com'è.
+# Not measured yet: the budget is the default of the continuity cases.
+limits:
+  max_minutes: 4
+  max_tool_calls: 60

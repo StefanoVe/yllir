@@ -23,6 +23,7 @@ const KIND_RUNNERS = new Map([
   ['entry', 'run-entry-case.mjs'],
   ['audit', 'run-audit-case.mjs'],
   ['world', 'run-world-case.mjs'],
+  ['continuity', 'run-continuity-case.mjs'],
 ]);
 const AGENT_SETS = new Map([['claude', ['claude']]]);
 const AGENT_ORDER = ['claude'];

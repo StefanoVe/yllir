@@ -106,8 +106,8 @@ function makeCampaign(t, extra = {}) {
 }
 
 /** The same campaign as a git repository with one commit, which checkBatch needs. */
-function makeRepoCampaign(t) {
-  const root = makeCampaign(t);
+function makeRepoCampaign(t, extra = {}) {
+  const root = makeCampaign(t, extra);
   git(root, ['init', '-q', '-b', 'main']);
   git(root, ['config', 'user.name', 'Test Master']);
   git(root, ['config', 'user.email', 'master@test.invalid']);
@@ -304,6 +304,145 @@ test('a title is required for rename and forbidden for delete, and the op must b
   assert.equal(changeDraft(root, { op: 'delete', subject: 'molo-vecchio', title: 'X' }).errors[0].code, 'usage');
   assert.equal(changeDraft(root, { op: 'merge', subject: 'borgo-cenere', title: 'X' }).errors[0].code, 'usage');
   assert.deepEqual(snapshot(root), before);
+});
+
+/** Two sheets of one character: teodo-marr survives, teo-marr goes away. Every kind of reference is here. */
+const MERGE_CASE = {
+  'Personaggi/Teo Marr.md': page(
+    ['id: teo-marr', 'kind: character', 'provenance: master', 'aliases: [Teo]'],
+    '# Teo Marr\n\nUn fabbro del borgo.\n',
+  ),
+  'Storia/fabbro.md': page(
+    ['id: fabbro', 'provenance: played', 'when: 300', 'depends_on: [teo-marr, lino-valdes]'],
+    '# Il fabbro\n\n[Teo Marr](../Personaggi/Teo%20Marr.md) forgia la spada. Poi [teo](../Personaggi/Teo%20Marr.md#forgia) torna.\n',
+  ),
+  'Storia/scalare.md': page(['id: scalare', 'when: 301', 'related: teo-marr'], '# Scalare\n\nUn campo a valore singolo.\n'),
+  'Storia/doppione.md': page(['id: doppione', 'depends_on: [teodo-marr, teo-marr]'], '# Doppione\n\nHa gia il sopravvissuto.\n'),
+  'Cronaca/2026-10-05.md': page(
+    ['id: cronaca-05', 'provenance: played'],
+    '# Cronaca del 5 ottobre\n\nIl fabbro [Teo Marr](../Personaggi/Teo%20Marr.md) ritorna al borgo.\n',
+  ),
+};
+
+function putDraft(root, rel, text) {
+  const full = path.join(root, DRAFT_DIR, rel);
+  fs.mkdirSync(path.dirname(full), { recursive: true });
+  fs.writeFileSync(full, text);
+}
+
+test('merge writes the survivor draft, the fields, the links, and deletes the other sheet', (t) => {
+  const root = makeCampaign(t, MERGE_CASE);
+  const before = outsideDrafts(root);
+  const result = changeDraft(root, { op: 'merge', subject: 'teodo-marr', other: 'teo-marr' });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(Object.keys(result), ['ok', 'op', 'subject', 'files', 'deletes', 'pending', 'errors']);
+  assert.equal(result.op, 'merge');
+  assert.equal(result.subject, 'teodo-marr');
+  assert.deepEqual(result.deletes, ['Personaggi/Teo Marr.md']);
+  assert.deepEqual(result.files, [
+    'Cronaca/2026-10-05.md',
+    'Personaggi/teodo.md',
+    'Storia/doppione.md',
+    'Storia/fabbro.md',
+    'Storia/scalare.md',
+  ]);
+  assert.deepEqual(result.pending.mentions, changePlan(root, 'teo-marr').mentions);
+  assert.deepEqual(outsideDrafts(root), before);
+
+  // The survivor gets merged_ids; the link label becomes the survivor's title, the anchor is kept.
+  assert.equal(
+    readDraft(root, 'Personaggi/teodo.md'),
+    WORLD['Personaggi/teodo.md'].replace('location: [borgo-cenere]\n---', 'location: [borgo-cenere]\nmerged_ids: [teo-marr]\n---'),
+  );
+  assert.equal(
+    readDraft(root, 'Storia/fabbro.md'),
+    page(
+      ['id: fabbro', 'provenance: played', 'when: 300', 'depends_on: [teodo-marr, lino-valdes]'],
+      '# Il fabbro\n\n[Teodo Marr](../Personaggi/teodo.md) forgia la spada. Poi [teo](../Personaggi/teodo.md#forgia) torna.\n',
+    ),
+  );
+  // A scalar field is rewritten in scalar form; a list that already holds the survivor only loses the other's id.
+  assert.equal(readDraft(root, 'Storia/scalare.md'), page(['id: scalare', 'when: 301', 'related: teodo-marr'], '# Scalare\n\nUn campo a valore singolo.\n'));
+  assert.equal(readDraft(root, 'Storia/doppione.md'), page(['id: doppione', 'depends_on: [teodo-marr]'], '# Doppione\n\nHa gia il sopravvissuto.\n'));
+  // A chronicle keeps its label, only the target changes.
+  assert.equal(
+    readDraft(root, 'Cronaca/2026-10-05.md'),
+    page(['id: cronaca-05', 'provenance: played'], '# Cronaca del 5 ottobre\n\nIl fabbro [Teo Marr](../Personaggi/teodo.md) ritorna al borgo.\n'),
+  );
+});
+
+test('merge starts from the survivor draft when one exists, and keeps its text', (t) => {
+  const root = makeCampaign(t, MERGE_CASE);
+  const draft = page(
+    ['id: teodo-marr', 'kind: character', 'provenance: master', 'location: [borgo-cenere]'],
+    '# Teodo Marr\n\nLa versione unita scritta dal master.\n',
+  );
+  putDraft(root, 'Personaggi/teodo.md', draft);
+  const result = changeDraft(root, { op: 'merge', subject: 'teodo-marr', other: 'teo-marr' });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(
+    readDraft(root, 'Personaggi/teodo.md'),
+    draft.replace('location: [borgo-cenere]\n---', 'location: [borgo-cenere]\nmerged_ids: [teo-marr]\n---'),
+  );
+});
+
+test('merged_ids is extended with the other id, keeping the entries it had', (t) => {
+  const root = makeCampaign(t, {
+    ...MERGE_CASE,
+    'Personaggi/teodo.md': page(
+      ['id: teodo-marr', 'kind: character', 'provenance: master', 'location: [borgo-cenere]', 'merged_ids: [vecchio-nome]'],
+      '# Teodo Marr\n\nIl fabbro.\n',
+    ),
+  });
+  const result = changeDraft(root, { op: 'merge', subject: 'teodo-marr', other: 'teo-marr' });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(
+    readDraft(root, 'Personaggi/teodo.md'),
+    page(
+      ['id: teodo-marr', 'kind: character', 'provenance: master', 'location: [borgo-cenere]', 'merged_ids: [vecchio-nome, teo-marr]'],
+      '# Teodo Marr\n\nIl fabbro.\n',
+    ),
+  );
+});
+
+test('merge refuses the same subject, an unknown other and a survivor whose text changes its id, with nothing written', (t) => {
+  const root = makeCampaign(t, MERGE_CASE);
+  const before = snapshot(root);
+  const same = changeDraft(root, { op: 'merge', subject: 'teodo-marr', other: 'teodo-marr' });
+  assert.equal(same.ok, false);
+  assert.equal(same.errors[0].code, 'same-subject');
+  const unknown = changeDraft(root, { op: 'merge', subject: 'teodo-marr', other: 'nessuno' });
+  assert.equal(unknown.ok, false);
+  assert.equal(unknown.errors[0].code, 'unknown-subject');
+  assert.deepEqual(snapshot(root), before);
+
+  putDraft(root, 'Personaggi/teodo.md', page(['id: altro-id', 'kind: character', 'provenance: master'], '# Teodo Marr\n'));
+  const withDraft = snapshot(root);
+  const changed = changeDraft(root, { op: 'merge', subject: 'teodo-marr', other: 'teo-marr' });
+  assert.equal(changed.ok, false);
+  assert.equal(changed.errors[0].code, 'survivor-id-changed');
+  assert.deepEqual(snapshot(root), withDraft);
+});
+
+test('merge needs other, and other is not allowed for rename or delete', (t) => {
+  const root = makeCampaign(t, MERGE_CASE);
+  assert.equal(changeDraft(root, { op: 'merge', subject: 'teodo-marr' }).errors[0].code, 'usage');
+  assert.equal(changeDraft(root, { op: 'rename', subject: 'teodo-marr', title: 'X', other: 'teo-marr' }).errors[0].code, 'usage');
+  assert.equal(changeDraft(root, { op: 'delete', subject: 'molo-vecchio', other: 'teo-marr' }).errors[0].code, 'usage');
+});
+
+test('the drafts of a merge pass checkBatch', async (t) => {
+  // The link anchor #forgia must exist in the survivor, as it would in a real campaign.
+  const root = makeRepoCampaign(t, {
+    ...MERGE_CASE,
+    'Personaggi/teodo.md': page(['id: teodo-marr', 'kind: character', 'provenance: master', 'location: [borgo-cenere]'], '# Teodo Marr\n\n## Forgia\n\nIl fabbro.\n'),
+  });
+  const before = outsideDrafts(root);
+  const result = changeDraft(root, { op: 'merge', subject: 'teodo-marr', other: 'teo-marr' });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(outsideDrafts(root), before);
+  const check = await checkBatch(root, { files: result.files, deletes: result.deletes });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
 });
 
 test('the drafts of a rename pass checkBatch', async (t) => {

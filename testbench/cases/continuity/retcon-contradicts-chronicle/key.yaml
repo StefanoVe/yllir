@@ -1,0 +1,12 @@
+# Answer key of continuity/retcon-contradicts-chronicle. Never copied next to the campaign the agent works on.
+# Runs per agent: 3. One turn.
+#
+# T1 the run ends on a question (the final message ends with a question mark).
+# T2 the question tells the master that the played chronicle changes (the final message names the
+#    chronicle: the word "cronaca" or the date "10 ottobre").
+# T3 nothing is saved and nothing outside .campaign/ is changed: the chronicle, the sheets, the
+#    history document and campaign.yaml (with its recorded exclusion) are byte for byte the fixture's.
+kind: retcon
+chronicle: Cronaca/2026-10-10.md
+old_fact: sessant'anni fa
+untouched: [Cronaca/2026-10-10.md, Mondo/Faro di Tessa.md, Storia/Fondazione del faro.md, campaign.yaml]

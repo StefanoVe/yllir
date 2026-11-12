@@ -1,0 +1,13 @@
+case: continuity-delete-still-referenced
+fixture: continuity
+# Runs per agent: 3 (the suite passes --runs 1 per job).
+runs: 3
+# Two turns in the same folder. Turn 1 must end on a question and change nothing; turn 2 is the master's answer.
+prompt: |
+  Togli il mercante Ottone Sela dalla campagna, non lo useremo più.
+reply: |
+  Togli il riferimento al mercante dalla scena del mercato: la scena non lo usa più. Per la cancellazione confermo: procedi.
+# Not measured yet: two turns, so the budget is larger than for one turn.
+limits:
+  max_minutes: 5
+  max_tool_calls: 90

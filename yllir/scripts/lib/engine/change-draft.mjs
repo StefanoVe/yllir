@@ -1,6 +1,8 @@
 // Prepares the drafts of one whole-subject change as one batch: a rename (new
-// title, new file name, every link retargeted, the old title kept as an alias) or
-// a deletion (every link turned into its plain text). Every change is decided in
+// title, new file name, every link retargeted, the old title kept as an alias), a
+// deletion (every link turned into its plain text) or a merge (two sheets become
+// one: the other's id goes to the survivor's merged_ids, its references are
+// pointed at the survivor, its sheet is deleted). Every change is decided in
 // memory first; drafts are written under .campaign/drafts/ only when the whole
 // change is valid. The batch is then checked and saved by checkBatch and
 // commitBatch (commit.mjs), as for any other batch. Documents of a chronicle
@@ -15,20 +17,23 @@ import { buildSubjectIndex, compareStrings } from '../subjects.mjs';
 import { findMetadataBlock, parseFrontmatter } from '../frontmatter.mjs';
 import { analyzeMarkdown } from '../zones.mjs';
 import { foldForm } from '../fold.mjs';
+import { isSameSheet, resolveLinkTarget } from '../mentions.mjs';
 
-const OPS = new Set(['rename', 'delete']);
+const OPS = new Set(['rename', 'delete', 'merge']);
 const INVALID_FILE_CHARS = /[\/\\:*?"<>|]/g;
 
 /**
  * @param {string} root absolute path to the campaign folder
- * @param {{ op: 'rename'|'delete', subject: string, title?: string }} request
- *   title is required for rename and forbidden for delete.
+ * @param {{ op: 'rename'|'delete'|'merge', subject: string, title?: string, other?: string }} request
+ *   title is required for rename and forbidden otherwise. For merge, subject is the survivor
+ *   and other is the subject that goes away: other is required for merge and forbidden otherwise.
  * @returns {object} { ok: true, op, subject, files, deletes, pending, errors: [] }, or { ok: false, errors }
  *   with nothing written
  */
-export function changeDraft(root, { op, subject, title } = {}) {
-  const usage = usageProblem(op, subject, title);
+export function changeDraft(root, { op, subject, title, other } = {}) {
+  const usage = usageProblem(op, subject, title, other);
   if (usage !== null) return failure([usage]);
+  if (op === 'merge') return mergeDraft(root, subject, other);
 
   const plan = changePlan(root, subject);
   if (!plan.ok) return failure(plan.errors);
@@ -57,11 +62,13 @@ function failure(errors) {
   return { ok: false, errors };
 }
 
-function usageProblem(op, subject, title) {
-  if (!OPS.has(op)) return usage("op must be 'rename' or 'delete'");
+function usageProblem(op, subject, title, other) {
+  if (!OPS.has(op)) return usage("op must be 'rename', 'delete' or 'merge'");
   if (typeof subject !== 'string' || subject.trim() === '') return usage('subject is required');
   if (op === 'rename' && typeof title !== 'string') return usage('title is required for rename');
-  if (op === 'delete' && title !== undefined) return usage('title is not allowed for delete');
+  if (op !== 'rename' && title !== undefined) return usage(`title is not allowed for ${op}`);
+  if (op === 'merge' && (typeof other !== 'string' || other.trim() === '')) return usage('other is required for merge');
+  if (op !== 'merge' && other !== undefined) return usage(`other is not allowed for ${op}`);
   return null;
 }
 
@@ -216,6 +223,213 @@ function decideDelete(root, plan) {
     drafts.set(file, rewriteLinks(readText(root, file), links, edit));
   }
   return { errors: [], drafts, deletes: [sheet] };
+}
+
+// ---------------------------------------------------------------------------
+// Merge
+// ---------------------------------------------------------------------------
+
+/**
+ * Two sheets describe one subject: the survivor stays, the other goes away. The
+ * survivor's merged_ids gets the other's id, every field that named the other's
+ * id names the survivor, and every link to the other's sheet points at the survivor.
+ * Facts that differ between the two sheets are not judged here.
+ */
+function mergeDraft(root, survivor, other) {
+  if (survivor === other) {
+    return failure([{ code: 'same-subject', message: `${survivor} cannot be merged into itself` }]);
+  }
+  const survivorPlan = changePlan(root, survivor);
+  if (!survivorPlan.ok) return failure(survivorPlan.errors);
+  const otherPlan = changePlan(root, other);
+  if (!otherPlan.ok) return failure(otherPlan.errors);
+  const external = externalIds(root, [survivor, other]);
+  if (external.length > 0) {
+    return failure([{ code: 'external-subject', message: `${external[0]} is an external document and is read-only` }]);
+  }
+
+  const decided = decideMerge(root, survivorPlan, otherPlan);
+  if (decided.errors.length > 0) return failure(decided.errors);
+
+  const drafts = [...decided.drafts].sort(([a], [b]) => compareStrings(a, b));
+  for (const [rel, text] of drafts) writeDraft(root, rel, text);
+  return {
+    ok: true,
+    op: 'merge',
+    subject: survivor,
+    files: drafts.map(([rel]) => rel),
+    deletes: decided.deletes,
+    pending: {
+      mentions: otherPlan.mentions,
+      homonyms: uniqueByJson([...survivorPlan.homonyms, ...otherPlan.homonyms]),
+    },
+    errors: [],
+  };
+}
+
+function externalIds(root, ids) {
+  const subjects = buildSubjectIndex(root).subjects;
+  return ids.filter((id) => subjects.find((candidate) => candidate.id === id)?.external);
+}
+
+function uniqueByJson(items) {
+  return [...new Map(items.map((item) => [JSON.stringify(item), item])).values()];
+}
+
+function decideMerge(root, survivorPlan, otherPlan) {
+  const survivor = survivorPlan.subject.id;
+  const survivorSheet = survivorPlan.subject.sheet;
+  const otherId = otherPlan.subject.id;
+  const otherSheet = otherPlan.subject.sheet;
+  const otherEntry = buildSubjectIndex(root).subjects.find((candidate) => candidate.id === otherId);
+
+  // The base text of the survivor (its draft, or its sheet) must still name the survivor.
+  if (parseFrontmatter(baseText(root, survivorSheet)).data?.id !== survivor) {
+    return failed('survivor-id-changed', `the text of ${survivorSheet} changes the id ${survivor}`);
+  }
+
+  // Every document is edited in memory: `texts` holds its text after the edits so far.
+  const originals = new Map();
+  const texts = new Map();
+  const current = (rel) => {
+    if (!texts.has(rel)) {
+      const base = baseText(root, rel);
+      originals.set(rel, base);
+      texts.set(rel, base);
+    }
+    return texts.get(rel);
+  };
+  const history = new Map([...otherPlan.links, ...otherPlan.fields].map((entry) => [entry.file, entry.history]));
+
+  // 1. Fields that name the other's id: the id becomes the survivor's, or is dropped when the survivor is already there.
+  for (const { file, field } of otherPlan.fields) {
+    if (file === otherSheet) continue;
+    if (field === 'merged_ids' && file === survivorSheet) continue; // written by step 3
+    const edited = replaceIdInField(current(file), field, otherId, survivor);
+    if (edited.error) return failed(edited.error.code, edited.error.message);
+    texts.set(file, edited.text);
+  }
+
+  // 2. Links to the other's sheet: the target always, the label only when it is the other's title, never in a chronicle.
+  const linkFiles = new Set([survivorSheet, ...otherPlan.links.map((link) => link.file)]);
+  for (const file of [...linkFiles].sort(compareStrings)) {
+    if (file === otherSheet) continue;
+    const links = linksIntoSheet(root, current(file), file, otherEntry);
+    if (links.length === 0) continue;
+    const edit = mergeLinkEdit({
+      from: file,
+      survivorSheet,
+      survivorTitle: survivorPlan.subject.title,
+      otherTitle: otherPlan.subject.title,
+      history: history.get(file) === true,
+    });
+    texts.set(file, rewriteLinks(current(file), links, edit));
+  }
+
+  // 3. The survivor's merged_ids: created or extended with the other's id, never duplicated.
+  const survivorText = current(survivorSheet);
+  const existing = parseFrontmatter(survivorText).data.merged_ids;
+  if (existing !== undefined && (!Array.isArray(existing) || !existing.every((item) => typeof item === 'string'))) {
+    return failed('bad-merged-ids', 'merged_ids must be a flow list [a, b] to be extended');
+  }
+  const merged = existing ?? [];
+  if (!merged.includes(otherId)) {
+    texts.set(survivorSheet, setMetadataField(survivorText, 'merged_ids', renderValue([...merged, otherId])));
+  }
+
+  const drafts = new Map([[survivorSheet, texts.get(survivorSheet)]]);
+  for (const [rel, text] of texts) {
+    if (rel !== survivorSheet && text !== originals.get(rel)) drafts.set(rel, text);
+  }
+  return { errors: [], drafts, deletes: [otherSheet] };
+}
+
+/** The field's id replaced by the survivor's; in a list that already holds the survivor, the other's id is dropped. */
+function replaceIdInField(text, key, from, to) {
+  const value = parseFrontmatter(text).data[key];
+  let next;
+  if (typeof value === 'string') {
+    next = replaceToken(value, from, to);
+  } else if (Array.isArray(value) && value.every((item) => typeof item === 'string')) {
+    const replaced = value.map((item) => replaceToken(item, from, to));
+    next = replaced.filter((item, i) => item !== to || replaced.indexOf(to) === i);
+  } else {
+    return {
+      error: { code: 'unsupported-field-form', message: `the ${key} field holds the id in a form this change cannot rewrite` },
+    };
+  }
+  return { text: setMetadataField(text, key, renderValue(next)) };
+}
+
+/** `value` with every whole-token occurrence of `from` replaced by `to`. */
+function replaceToken(value, from, to) {
+  const pattern = new RegExp(`(^|[\\s,;[\\]])${escapeRegExp(from)}(?=$|[\\s,;[\\]])`, 'g');
+  return value.replace(pattern, `$1${to}`);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** The metadata line of a field as the framework writes it: a flow list, or a scalar. */
+function renderValue(value) {
+  return Array.isArray(value) ? `[${value.map(quoteItem).join(', ')}]` : quoteItem(value);
+}
+
+/**
+ * Sets one top-level metadata field to `rendered`: the existing line is replaced
+ * (one line for one line, so the body line numbers stay), or the field is added
+ * as the last line of the metadata block.
+ */
+function setMetadataField(text, key, rendered) {
+  const rawLines = text.split('\n');
+  const lines = rawLines.map(stripCr);
+  const block = findMetadataBlock(lines);
+  const pattern = new RegExp(`^${key}:(?: |$)`);
+  for (let i = 1; i < block.close; i++) {
+    if (pattern.test(lines[i])) {
+      rawLines[i] = keepLineEnding(rawLines[i], `${key}: ${rendered}`);
+      return rawLines.join('\n');
+    }
+  }
+  const cr = rawLines[block.close].endsWith('\r') ? '\r' : '';
+  rawLines.splice(block.close, 0, `${key}: ${rendered}${cr}`);
+  return rawLines.join('\n');
+}
+
+/** Census-style links of a document text whose target is the entry's sheet (for any text, not only the census one). */
+function linksIntoSheet(root, text, file, entry) {
+  const { data, body, bodyStartLine } = parseFrontmatter(text);
+  if (data === null) return [];
+  const found = [];
+  for (const line of analyzeMarkdown(body, bodyStartLine).lines) {
+    for (const span of line.spans) {
+      if (span.kind === 'link' && isSameSheet(resolveLinkTarget(span.target, file, root), entry, root)) {
+        found.push({ line: line.line, target: span.target });
+      }
+    }
+  }
+  return found;
+}
+
+/** The link edits of one document in a merge: the target always, the label only when it is the other's title (not in a chronicle). */
+function mergeLinkEdit({ from, survivorSheet, survivorTitle, otherTitle, history }) {
+  return (span, lineText) => {
+    const edits = [];
+    const label = lineText.slice(span.labelStart, span.labelEnd);
+    const start = lineText.indexOf(span.target, span.labelEnd + 2);
+    edits.push({ start, end: start + span.target.length, text: retargetedLink(span.target, from, survivorSheet) });
+    if (!history && label.toLowerCase() === otherTitle.toLowerCase()) {
+      edits.push({ start: span.labelStart, end: span.labelEnd, text: survivorTitle });
+    }
+    return edits;
+  };
+}
+
+/** The text a draft starts from: the draft of the document when one exists, else the document. */
+function baseText(root, rel) {
+  const draft = path.join(root, DRAFT_DIR, rel);
+  return fs.existsSync(draft) ? fs.readFileSync(draft, 'utf8') : readText(root, rel);
 }
 
 // ---------------------------------------------------------------------------

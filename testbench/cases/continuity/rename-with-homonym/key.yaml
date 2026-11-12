@@ -1,0 +1,22 @@
+# Answer key of continuity/rename-with-homonym. Never copied next to the campaign the agent works on.
+# Runs per agent: 3. One turn.
+#
+# R1 the subject sheet is renamed: the new file exists, the old one does not, the id is kept, the
+#    first level-1 heading is "# <new_title>" and the aliases hold the old title.
+# R2 every link to the subject points to the new file: none to the old file, and every document in
+#    link_documents links to the new file.
+# R3 the chronicle is byte for byte the fixture's (its text is not rewritten).
+# R4 the homonym sheet is byte for byte the fixture's (another character with the same surname).
+# R5 exactly versions_added saved versions after the run.
+# R6 the saved changes touch only allowed_changes, and nothing outside .campaign/ is left uncommitted.
+kind: rename
+subject: corrado-varno
+old_file: Personaggi/Corrado Varno.md
+new_file: Personaggi/Corrado Lesca.md
+old_title: Corrado Varno
+new_title: Corrado Lesca
+chronicle: Cronaca/2026-10-03.md
+homonym: Personaggi/Ilde Varno.md
+link_documents: [Trama/La strada verso il faro.md]
+allowed_changes: [Personaggi/Corrado Varno.md, Personaggi/Corrado Lesca.md, Trama/La strada verso il faro.md]
+versions_added: 1

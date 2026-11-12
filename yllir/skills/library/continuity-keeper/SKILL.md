@@ -67,18 +67,18 @@ A place is placed in the world by its `location` metadata. An item or a characte
 1. The master says which sheet stays. If it is not said, ask ONE question, naming both by title.
 2. Run the census (Step 2) for the sheet that goes away (call it OTHER) and for the one that stays (call it SURVIVOR).
 3. Compare the two sheets with the Read tool. A detail present in only one sheet passes into SURVIVOR. When the two sheets disagree on a fact, ask the master which is right, ONE question at a time, and wait. Never decide yourself.
-4. Write the SURVIVOR draft to `.campaign/drafts/<its path>`: the whole text, with the new details, and with `merged_ids: [<OTHER id>]` added to its metadata block (a flow list). Keep its id.
-5. For each document in the census `fields` list of OTHER: read it, and write its draft with the value of OTHER's id replaced by SURVIVOR's id in that field.
-6. For each document in the census `links` list of OTHER, one by one: read it, and write its draft with each link to OTHER replaced by the plain title of SURVIVOR (the engine adds the link when the batch is saved). Change only those links, nothing else.
-7. Chronicle documents (`history: true`): never change their text. If a link in a chronicle document cannot be changed without touching its words, leave that document as it is and say so to the master in one plain sentence, in the last message.
-8. Go to Step 4 with `--files` = every draft written, and `--deletes` = the path of OTHER's sheet. All in ONE batch.
+4. Write the SURVIVOR draft to `.campaign/drafts/<its path>`: the whole text, with the new details. Keep its id. Do not add `merged_ids` yourself: the engine does it.
+5. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" change-draft . --op merge --subject <SURVIVOR id> --other <OTHER id>`. The engine starts from your SURVIVOR draft, adds `merged_ids`, replaces OTHER's id with SURVIVOR's id in every document that names it, retargets every link to OTHER's sheet (a chronicle document changes only the link target, never its words), and lists OTHER's sheet in `deletes`. Read its JSON: `ok`, `files`, `deletes`, `pending`.
+6. If `ok` is false: `survivor-id-changed` means your draft changed the id, put it back and run again. `unsupported-field-form` means a document names OTHER's id in a block-style field: read that document, write its draft by hand with the id replaced, and run the command again (the engine uses your draft as the base). Any other failure: say the fixed sentence of the lexicon for an operation that could not be completed, and stop.
+7. The unlinked mentions of OTHER in `pending.mentions` stay as they are, unless the master asks otherwise.
+8. Go to Step 4 with `--files` = `files` and `--deletes` = `deletes`. All in ONE batch.
 
 ### 3e. Split (one sheet becomes two)
 
 1. The main part keeps the id and its sheet. The new part gets a NEW id: lowercase, unique in the campaign, never used before. Pick it from the title of the new part, and check with `query . find` that the id is not already in the campaign.
 2. The new part gets a new sheet: a file named after its title, in the folder of its kind, as `campaign.yaml` lists it under `structure`.
 3. Go through the census `mentions`, `links` and `fields` of the subject one by one. For each one, decide which part it belongs to. When it is not clear, ask the master ONE question about that one mention, and wait.
-4. Write the drafts of both parts, the references that move to the new part (its links, its fields with the new id), and the references that stay. Follow the same rules as Merge, steps 5 to 7.
+4. Write the drafts of both parts, the references that move to the new part (its links, its fields with the new id), and the references that stay. Rewrite each reference by hand from the census, one by one, reading each document first. The chronicle text is never changed; leave a chronicle link that cannot be moved without touching its words, and say so to the master in one plain sentence.
 5. Go to Step 4 with every draft in `--files`. All in ONE batch.
 
 ### 3f. Retcon (a fact already established is corrected)
@@ -101,4 +101,4 @@ One operation is one saved version, except when a delete needed answers first (S
 
 ## Known limits
 
-Merge and split rewrite references through drafts, one by one, from the census. The engine has no merge or split command yet.
+Split rewrites references through drafts, one by one, from the census: the engine has no split command. The engine refuses to give a new sheet an id that was ever deleted or merged away.

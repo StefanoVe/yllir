@@ -1,0 +1,42 @@
+schema: 1
+
+campaign:
+  name: "Il faro di Tessa"
+  slug: faro-di-tessa
+  seed: Seme del mondo.md
+  created: 2026-11-10
+
+language:
+  main: it
+  other: []
+
+prose:
+  register: plain
+
+system:
+  adapter: none
+
+structure:
+  - id: trama
+    folder: Trama
+    type: plot
+  - id: cronaca
+    folder: Cronaca
+    type: chronicle
+  - id: luoghi
+    folder: Mondo
+    type: places
+  - id: personaggi
+    folder: Personaggi
+    type: subjects
+  - id: storia
+    folder: Storia
+    type: free
+
+audit:
+  exclusions:
+    - subject: faro-di-tessa
+      attribute: number.height
+      values: ["30", "40"]
+      reason: "Il master: «l'altezza del faro cambia con le maree, va bene così»."
+      date: 2026-11-10

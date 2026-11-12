@@ -1,0 +1,13 @@
+# Answer key of continuity/merge-conflicting-fact. Never copied next to the campaign the agent works on.
+# Runs per agent: 3. One turn.
+#
+# M1 the run ends on a question (the final message ends with a question mark).
+# M2 the question names both conflicting birthplaces, so the master can choose between them.
+# M3 nothing is saved and nothing outside .campaign/ is changed: no sheet is merged or edited before the answer.
+# M4 the survivor, the other sheet and the similar-name sister are byte for byte the fixture's.
+kind: merge
+survivor: Personaggi/Brizio Fell.md
+other: Personaggi/Brizio Fell il messaggero.md
+sister: Personaggi/Brizia Fell.md
+conflict_words: [Porto Nero, Valle Bassa]
+untouched: [Personaggi/Brizio Fell.md, Personaggi/Brizio Fell il messaggero.md, Personaggi/Brizia Fell.md]
