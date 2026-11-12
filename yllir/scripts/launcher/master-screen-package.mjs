@@ -293,17 +293,32 @@ export async function extractPackage(tgz, destDir, { tarImpl = runTar } = {}) {
   }
 }
 
+/** Removes one folder; a failure (a locked folder on Windows, a folder that vanished) is ignored. */
+function removeQuietly(target) {
+  try {
+    fs.rmSync(target, { recursive: true, force: true });
+  } catch {
+    // Retried on the next start.
+  }
+}
+
 /**
- * Keeps the `keep` newest version folders and the `inUse` one; deletes the other version
- * folders, and `.tmp-*` folders older than an hour (a live download is never that old).
+ * Keeps only `keepVersion`: removes every other version folder under <home>/master-screen/
+ * and the `.tmp-*` folders (downloads and stages) older than an hour, since a live download
+ * is never that old. The bundled <frameworkRoot>/master-screen/ folder is outside <home> and
+ * is never touched. Never throws, and each folder is removed on its own.
+ *
+ * Running servers are not checked here. The launcher's lock (launch-lib.mjs, readLock) is per
+ * campaign and does not record the version folder a server runs from, so the launcher cannot
+ * tell whether an old version is in use. On macOS and Linux an open file survives unlink; a
+ * server that still reads files from a removed folder may fail until it is restarted. On
+ * Windows a locked folder cannot be removed and is skipped, then retried on the next start.
  */
-export function pruneOld(home, keep = 2, { inUse = null } = {}) {
+export function pruneOld(home, keepVersion) {
   const base = path.join(home, 'master-screen');
-  const versions = listVersionDirs(home).sort((a, b) => compareSemver(b, a));
-  versions.forEach((version, index) => {
-    if (index < keep || version === inUse) return;
-    fs.rmSync(path.join(base, version), { recursive: true, force: true });
-  });
+  for (const version of listVersionDirs(home)) {
+    if (version !== keepVersion) removeQuietly(path.join(base, version));
+  }
   let entries = [];
   try {
     entries = fs.readdirSync(base);
@@ -315,7 +330,7 @@ export function pruneOld(home, keep = 2, { inUse = null } = {}) {
     if (!name.startsWith('.tmp-')) continue;
     const full = path.join(base, name);
     try {
-      if (fs.statSync(full).mtimeMs < cutoff) fs.rmSync(full, { recursive: true, force: true });
+      if (fs.statSync(full).mtimeMs < cutoff) removeQuietly(full);
     } catch {
       // A folder that vanished meanwhile needs no cleanup.
     }
@@ -351,7 +366,10 @@ export async function ensureMasterScreen({
   if (isFile(bundled)) return { serverFile: bundled, source: 'bundled' };
 
   const pin = readPin(frameworkRoot);
-  if (pin && isInstalled(home, pin.version)) return installedResult(home, pin.version, 'installed');
+  if (pin && isInstalled(home, pin.version)) {
+    pruneOld(home, pin.version);
+    return installedResult(home, pin.version, 'installed');
+  }
 
   let error = 'no-package';
   if (pin) {
@@ -371,7 +389,7 @@ export async function ensureMasterScreen({
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
       if (!isInstalled(home, pin.version)) throw fail('bad-package', 'the package did not install');
-      pruneOld(home, 2, { inUse: pin.version });
+      pruneOld(home, pin.version);
       return installedResult(home, pin.version, 'downloaded');
     } catch (err) {
       error = ['bad-package', 'download-failed'].includes(err.code) ? err.code : 'download-failed';
@@ -380,6 +398,7 @@ export async function ensureMasterScreen({
 
   const fallback = newestInstalled(home);
   if (fallback) {
+    pruneOld(home, fallback);
     say(message('M8', lang));
     return installedResult(home, fallback, 'fallback');
   }

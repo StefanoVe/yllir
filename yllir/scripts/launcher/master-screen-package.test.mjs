@@ -416,20 +416,153 @@ test('an empty or unreadable archive is refused as bad-package', async (t) => {
   assert.deepEqual(leftovers(home), []);
 });
 
-test('pruneOld keeps the newest two and the one in use, and removes stale temp folders', (t) => {
+/** Makes a temp folder under <home>/master-screen/ that is `ageMs` old. */
+function tempFolder(home, name, ageMs) {
+  const dir = path.join(home, 'master-screen', name);
+  fs.mkdirSync(dir, { recursive: true });
+  const when = new Date(Date.now() - ageMs);
+  fs.utimesSync(dir, when, when);
+  return dir;
+}
+
+const TWO_HOURS = 2 * 60 * 60 * 1000;
+
+function masterScreenEntries(home) {
+  return fs.readdirSync(path.join(home, 'master-screen')).sort();
+}
+
+test('pruneOld keeps only the given version and removes stale temp folders', (t) => {
   const home = tempDir(t);
   for (const v of ['0.1.0', '0.2.0', '0.3.0', '0.4.0']) installFake(home, v);
-  const stale = path.join(home, 'master-screen', '.tmp-old');
-  const fresh = path.join(home, 'master-screen', '.tmp-new');
-  fs.mkdirSync(stale);
-  fs.mkdirSync(fresh);
-  const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-  fs.utimesSync(stale, twoHoursAgo, twoHoursAgo);
+  tempFolder(home, '.tmp-old', TWO_HOURS);
+  tempFolder(home, '.tmp-new', 0);
 
-  pruneOld(home, 2, { inUse: '0.1.0' });
+  pruneOld(home, '0.3.0');
 
-  const left = fs.readdirSync(path.join(home, 'master-screen')).sort();
-  assert.deepEqual(left, ['.tmp-new', '0.1.0', '0.3.0', '0.4.0']);
+  assert.deepEqual(masterScreenEntries(home), ['.tmp-new', '0.3.0']);
+});
+
+test('pruneOld never throws when the home has no master-screen folder', (t) => {
+  assert.doesNotThrow(() => pruneOld(tempDir(t), '0.1.0'));
+});
+
+test('ensureMasterScreen on an installed pin keeps only that version and removes stale temp folders', async (t) => {
+  const root = tempDir(t);
+  writePin(root);
+  const home = tempDir(t);
+  installFake(home, '0.1.0');
+  installFake(home, '0.2.6');
+  installFake(home, PIN_VERSION);
+  tempFolder(home, '.tmp-old', TWO_HOURS);
+  tempFolder(home, '.tmp-live', 0);
+
+  const res = await ensureMasterScreen({
+    frameworkRoot: root,
+    home,
+    env: {},
+    fetchImpl: async () => {
+      throw new Error('network must not be used');
+    },
+  });
+
+  assert.equal(res.source, 'installed');
+  assert.deepEqual(masterScreenEntries(home), ['.tmp-live', PIN_VERSION]);
+});
+
+test('ensureMasterScreen on a fallback keeps only the fallback version', async (t) => {
+  const root = tempDir(t);
+  writePin(root);
+  const home = tempDir(t);
+  installFake(home, '0.1.0');
+  installFake(home, '0.2.3');
+  installFake(home, '0.2.5');
+  tempFolder(home, '.tmp-old', TWO_HOURS);
+
+  const res = await ensureMasterScreen({
+    frameworkRoot: root,
+    home,
+    env: {},
+    say: () => {},
+    fetchImpl: async () => {
+      throw new TypeError('fetch failed');
+    },
+  });
+
+  assert.equal(res.source, 'fallback');
+  assert.equal(res.version, '0.2.5');
+  assert.deepEqual(masterScreenEntries(home), ['0.2.5']);
+});
+
+test('ensureMasterScreen prunes nothing when no version is usable', async (t) => {
+  const root = tempDir(t);
+  writePin(root);
+  const home = tempDir(t);
+  installFake(home, '0.1.0', { verified: false });
+  installFake(home, '0.2.0', { verified: false });
+  tempFolder(home, '.tmp-old', TWO_HOURS);
+
+  const res = await ensureMasterScreen({
+    frameworkRoot: root,
+    home,
+    env: {},
+    fetchImpl: async () => {
+      throw new TypeError('fetch failed');
+    },
+  });
+
+  assert.deepEqual(res, { error: 'download-failed' });
+  assert.deepEqual(masterScreenEntries(home), ['.tmp-old', '0.1.0', '0.2.0']);
+});
+
+test('ensureMasterScreen prunes nothing when the download fails the checksum', async (t) => {
+  const pkg = realPackage(t);
+  const root = tempDir(t);
+  writePin(root, { sha256: '0'.repeat(64), size: pkg.size });
+  const home = tempDir(t);
+  installFake(home, '0.1.0', { verified: false });
+
+  const res = await ensureMasterScreen({
+    frameworkRoot: root,
+    home,
+    env: {},
+    fetchImpl: async () => new Response(pkg.buf, { status: 200 }),
+  });
+
+  assert.deepEqual(res, { error: 'bad-package' });
+  assert.deepEqual(masterScreenEntries(home), ['0.1.0']);
+});
+
+test('a folder that cannot be removed is skipped and the start still succeeds', async (t) => {
+  if (process.platform === 'win32' || process.getuid?.() === 0) {
+    t.skip('needs a non-root POSIX user to make a folder read-only');
+    return;
+  }
+  // Registered before the temp dirs so it runs before their cleanup (hooks run in order).
+  let base = null;
+  t.after(() => {
+    if (base) fs.chmodSync(base, 0o700);
+  });
+  const root = tempDir(t);
+  writePin(root);
+  const home = tempDir(t);
+  installFake(home, PIN_VERSION);
+  installFake(home, '0.1.0');
+  base = path.join(home, 'master-screen');
+  fs.chmodSync(base, 0o500);
+
+  const res = await ensureMasterScreen({
+    frameworkRoot: root,
+    home,
+    env: {},
+    fetchImpl: async () => {
+      throw new Error('network must not be used');
+    },
+  });
+
+  // rmSync may empty the folder's own files before it fails on the read-only parent; the folder
+  // then has no marker, is never treated as installed, and is removed on a later start.
+  assert.equal(res.source, 'installed');
+  assert.ok(fs.existsSync(installedDir(home, '0.1.0')));
 });
 
 test('ensureMasterScreen uses the env override first and never touches the network', async (t) => {
@@ -505,7 +638,7 @@ test('ensureMasterScreen downloads the pin, installs it and prunes old versions'
   assert.equal(res.version, PIN_VERSION);
   assert.ok(fs.existsSync(res.serverFile));
   assert.deepEqual(said, [message('M6', 'en')]);
-  assert.deepEqual(fs.readdirSync(path.join(home, 'master-screen')).sort(), ['0.2.6', PIN_VERSION]);
+  assert.deepEqual(masterScreenEntries(home), [PIN_VERSION]);
 });
 
 test('ensureMasterScreen falls back to the newest installed version when offline', async (t) => {
@@ -531,6 +664,7 @@ test('ensureMasterScreen falls back to the newest installed version when offline
     version: '0.2.3',
   });
   assert.deepEqual(said, [message('M6', 'it'), message('M8', 'it')]);
+  assert.deepEqual(masterScreenEntries(home), ['0.2.3']);
 });
 
 test('ensureMasterScreen reports download-failed when offline and nothing is installed', async (t) => {
