@@ -95,6 +95,20 @@ Use these sentences as they are when the image tool needs them. The label in bra
 | [map tools unavailable] | Non riesco a preparare gli strumenti per le mappe su questo computer. Posso comunque creare un'illustrazione del luogo vista dall'alto, senza griglia: vuoi? | I cannot set up the map tools on this computer. I can still create an illustration of the place seen from above, without a grid: would you like that? |
 | [world map not available] | Per ora so fare mappe di un luogo, come una stanza, un edificio o una strada, ma non la carta di tutto il mondo o di una regione. | For now I can make maps of one place, such as a room, a building or a street, but not a chart of the whole world or of a region. |
 
+## Fixed sentences for artwork search
+
+Use these sentences as they are when the artwork tool needs them. The label in brackets is how the instructions of the artwork search skill name each sentence. The master never hears the name of a site or of a service.
+
+| Label | Italian | English |
+|---|---|---|
+| [artwork consent] | Per cercare l'immagine userò la ricerca sul web. Cercherò solo parole generiche sull'aspetto, mai nomi, luoghi o le tue note riservate. Va bene? | To find the picture I will search the web. I will search only generic words about how it looks, never names, places or your private notes. Is that all right? |
+| [artwork nothing found] | Non ho trovato nessuna immagine fatta da un artista che vada bene per questo. Posso crearne una con l'intelligenza artificiale, ma solo se me lo chiedi: vuoi? | I found no picture made by an artist that fits this. I can create one with artificial intelligence, but only if you ask me to: do you want that? |
+| [artwork license free] | Autore: <autore>. Licenza: <licenza>, una licenza libera. | Author: <author>. License: <license>, a free license. |
+| [artwork license private use] | Autore: <autore>. Licenza: <licenza>. Solo uso privato al tavolo, non per pubblicare. | Author: <author>. License: <license>. Private use at the table, not for publishing. |
+| [artwork no background provider] | Non ho un servizio che tolga lo sfondo su questo computer. Posso mostrarti le immagini con il loro sfondo, se vuoi. | I have no service that can remove the background on this computer. I can show you the pictures with their background, if you want. |
+| [artwork proposal intro] | Ho trovato queste immagini. Quale vuoi usare? Rispondi con il numero, o scrivi «nessuna». | I found these pictures. Which one do you want to use? Answer with the number, or write «none». |
+| [artwork applied] | Ho aggiunto l'immagine alla scheda di <scheda>, di <autore>. | I added the picture to the sheet of <sheet>, by <author>. |
+
 ## Other languages
 
 For a campaign language other than Italian or English, translate the English column faithfully and keep using the same word every time.

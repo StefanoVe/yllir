@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildJob, joinPrompt, placeImage, slugify, subjectDescription } from './image-job.mjs';
+import { buildJob, joinPrompt, placeImage, renderSidecar, slugify, subjectDescription } from './image-job.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -257,6 +257,113 @@ test('an upload keeps its extension, has no effective prompt and gets a free nam
   const draft = fs.readFileSync(path.join(root, '.campaign', 'drafts', 'Personaggi', 'Oria Brunel.md'), 'utf8');
   assert.ok(draft.includes('![Foto](img/oria-brunel-3.jpg)'));
   assert.equal(draft.split('](img/').length - 1, 1);
+});
+
+const SIDECAR_BASE = {
+  provider: 'upload',
+  operation: 'upload',
+  document: 'Personaggi/Oria Brunel.md',
+  effectivePrompt: null,
+  parameters: {},
+  review: '',
+};
+
+test('the sidecar without source is byte-identical to the old output, with or without source null', () => {
+  const expected =
+    'provider: "upload"\n' +
+    'operation: "upload"\n' +
+    'document: "Personaggi/Oria Brunel.md"\n' +
+    'effective_prompt: null\n' +
+    'references: []\n' +
+    'parameters: {}\n' +
+    'review: ""\n';
+  assert.equal(renderSidecar(SIDECAR_BASE), expected);
+  assert.equal(renderSidecar({ ...SIDECAR_BASE, source: null }), expected);
+});
+
+test('the sidecar with source appends a source block after review, skipping keys that are not non-empty strings', () => {
+  const text = renderSidecar({
+    ...SIDECAR_BASE,
+    source: { url: 'https://img.example/a', page: 'https://img.example/page', author: '', license: 'CC-BY 4.0', ai_screen: undefined },
+  });
+  assert.equal(
+    text,
+    'provider: "upload"\n' +
+      'operation: "upload"\n' +
+      'document: "Personaggi/Oria Brunel.md"\n' +
+      'effective_prompt: null\n' +
+      'references: []\n' +
+      'parameters: {}\n' +
+      'review: ""\n' +
+      'source:\n' +
+      '  url: "https://img.example/a"\n' +
+      '  page: "https://img.example/page"\n' +
+      '  license: "CC-BY 4.0"\n',
+  );
+});
+
+test('a source needs https url and page, and no line break in any value', () => {
+  const root = makeCampaign();
+  const photo = path.join(makeInbox(), 'photo.png');
+  fs.writeFileSync(photo, Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  const base = { root, document: 'Personaggi/Oria Brunel.md', alt: 'Foto', file: photo, provider: 'upload' };
+  const refused = [
+    { url: 'http://img.example/a', page: 'https://img.example/page' },
+    { url: 'https://img.example/a', page: 'ftp://img.example/page' },
+    { url: 'https://img.example/a' },
+    { url: 'https://img.example/a', page: 'https://img.example/page', author: 'Mario\nRossi' },
+    { url: 'https://img.example/a', page: 'https://img.example/page', license: 'CC\r' },
+    'https://img.example/a',
+  ];
+  for (const source of refused) {
+    const result = placeImage({ ...base, source });
+    assert.equal(result.ok, false);
+    assert.equal(result.error, 'bad-source');
+    assert.equal(result.message, 'source needs https url and page');
+  }
+});
+
+test('a source with a job is refused, as only uploads take a source', () => {
+  const root = makeCampaign();
+  const job = buildJob({ root, document: 'Personaggi/Oria Brunel.md', operation: 'generate' });
+  fakeRunOutput(root, job.jobDir);
+  const result = placeImage({
+    root,
+    document: 'Personaggi/Oria Brunel.md',
+    alt: 'Ritratto',
+    jobId: job.jobId,
+    provider: 'comfyui',
+    source: { url: 'https://img.example/a', page: 'https://img.example/page' },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'bad-source');
+  assert.equal(result.message, 'source is only for uploaded files');
+});
+
+test('an upload with source writes the source into the sidecar, read back with parseYamlLite', () => {
+  const root = makeCampaign();
+  const photo = path.join(makeInbox(), 'ritratto.webp');
+  fs.writeFileSync(photo, Buffer.from([0x52, 0x49, 0x46, 0x46]));
+  const result = placeImage({
+    root,
+    document: 'Personaggi/Oria Brunel.md',
+    alt: 'Ritratto',
+    file: photo,
+    provider: 'upload',
+    source: { url: 'https://img.example/a', page: 'https://img.example/page', author: 'Cartografa', license: 'CC0', ai_screen: 'no' },
+  });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(result.image, 'Personaggi/img/oria-brunel.webp');
+  const sidecar = fs.readFileSync(path.join(root, 'Personaggi', 'img', 'oria-brunel.yaml'), 'utf8');
+  assert.ok(sidecar.endsWith(
+    'source:\n  url: "https://img.example/a"\n  page: "https://img.example/page"\n  author: "Cartografa"\n  license: "CC0"\n  ai_screen: "no"\n',
+  ));
+  const parsed = parseYamlLite(sidecar);
+  assert.deepEqual(parsed.errors, []);
+  assert.equal(parsed.data.source.url, 'https://img.example/a');
+  assert.equal(parsed.data.source.page, 'https://img.example/page');
+  assert.equal(parsed.data.source.license, 'CC0');
+  assert.equal(parsed.data.source.ai_screen, 'no');
 });
 
 test('an upload of a .gif is bad-format', () => {

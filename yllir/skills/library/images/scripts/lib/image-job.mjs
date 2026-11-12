@@ -343,7 +343,23 @@ function renderParameters(obj) {
   return lines.length === 0 ? ['parameters: {}'] : ['parameters:', ...lines];
 }
 
-export function renderSidecar({ provider, operation, document, effectivePrompt, parameters, review }) {
+const SOURCE_KEYS = ['url', 'page', 'author', 'license', 'ai_screen'];
+
+/**
+ * The source of an uploaded image as a YAML block mapping; keys that are not
+ * non-empty strings are skipped, and nothing is written when none is left.
+ */
+function renderSource(source) {
+  if (source === null || source === undefined) return [];
+  const lines = [];
+  for (const key of SOURCE_KEYS) {
+    const value = source[key];
+    if (typeof value === 'string' && value !== '') lines.push(`  ${key}: ${JSON.stringify(value)}`);
+  }
+  return lines.length === 0 ? [] : ['source:', ...lines];
+}
+
+export function renderSidecar({ provider, operation, document, effectivePrompt, parameters, review, source = null }) {
   return [
     `provider: ${JSON.stringify(provider)}`,
     `operation: ${JSON.stringify(operation)}`,
@@ -352,7 +368,19 @@ export function renderSidecar({ provider, operation, document, effectivePrompt, 
     'references: []',
     ...renderParameters(parameters),
     `review: ${JSON.stringify(review)}`,
+    ...renderSource(source),
   ].join('\n') + '\n';
+}
+
+/** Checks the source of an upload: an object with https url and page, and no line breaks in any value. */
+function validSource(source) {
+  if (!isPlainObject(source)) return false;
+  if (typeof source.url !== 'string' || !source.url.startsWith('https://')) return false;
+  if (typeof source.page !== 'string' || !source.page.startsWith('https://')) return false;
+  return SOURCE_KEYS.every((key) => {
+    const value = source[key];
+    return value === undefined || value === null || (typeof value === 'string' && !/[\r\n]/.test(value));
+  });
 }
 
 /** Puts the embed right after the first `# ` line, one blank line before and after. */
@@ -373,13 +401,16 @@ function insertEmbed(text, embedLine) {
  * `<name>.yaml` and, for generate and upload, the draft of the document with
  * the image embedded under its title.
  * @param {{ root: string, document: string, alt: string, jobId?: string|null,
- *   file?: string|null, provider: string, review?: string }} args
+ *   file?: string|null, provider: string, review?: string, source?: object|null }} args
  * @returns {{ ok: true, image: string, sidecar: string, draft: string|null } | { ok: false, error: string, message: string }}
  */
-export function placeImage({ root, document, alt, jobId = null, file = null, provider, review = '' } = {}) {
+export function placeImage({ root, document, alt, jobId = null, file = null, provider, review = '', source: sidecarSource = null } = {}) {
   const hasJob = jobId !== null && jobId !== undefined;
   const hasFile = file !== null && file !== undefined;
   if (hasJob === hasFile) return fail('bad-source', 'give exactly one of jobId or file');
+  const hasSource = sidecarSource !== null && sidecarSource !== undefined;
+  if (hasSource && hasJob) return fail('bad-source', 'source is only for uploaded files');
+  if (hasSource && !validSource(sidecarSource)) return fail('bad-source', 'source needs https url and page');
   if (typeof alt !== 'string' || alt.trim() === '' || /[\]\r\n]/.test(alt)) {
     return fail('bad-alt', 'alt must be non-empty and must not contain ] or a line break');
   }
@@ -467,6 +498,7 @@ export function placeImage({ root, document, alt, jobId = null, file = null, pro
       effectivePrompt,
       parameters,
       review: String(review ?? ''),
+      source: hasSource ? sidecarSource : null,
     }),
     { flag: 'wx' },
   );

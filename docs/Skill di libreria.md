@@ -63,6 +63,7 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | [Gestione degli oggetti](Gestione%20degli%20oggetti.md) (`item-manager`) | Motore (controlli); skill rimossa | Creare bozze e controllare le schede degli oggetti, senza scrivere direttamente nella campagna. | Deciso (2026-11-10). Controlli implementati in 0.30.0; skill rimossa |
 | [Gestione dei PNG](#l14-gestione-dei-png) (`npc-manager`) | Processi del core e motore; skill rimossa | Creare e mantenere personaggi non giocanti, nemici e venditori con schede sempre standardizzate. | Deciso (indice). Skill rimossa; controlli implementati in 0.30.0 |
 | [Artwork](#l8-artwork) (`artwork`) | Libreria, chiamata dal core | Dipingere una creatura o un personaggio partendo da una descrizione verificata, e collegare il dipinto alla scheda. | Deciso (indice). Non implementata in 0.30.0 |
+| [Ricerca artwork](#l23-ricerca-artwork) (`artwork-search`) | Libreria, chiamata dal core | Trovare illustrazioni esistenti online, senza IA generativa, e proporne al master al massimo tre, con lo sfondo tolto da quella scelta. | Proposta (richiesta dell'autore, 2026-11-12). Non implementata |
 | [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Deciso (indice). Non implementata in 0.30.0 |
 | [Mappe di luogo e di battaglia](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Creare mappe con livelli separati, per luoghi e scontri. | Deciso (indice; modalità `map` dello strumento `images`, Deciso 2026-11-11). Implementata in 0.41.0 per mappe di luogo e di battaglia |
 | [Mappe del mondo](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Modificare una carta del mondo senza alterarne la geometria. | Deciso (indice). Non implementata in 0.30.0 |
@@ -239,6 +240,34 @@ Non ancora implementata in 0.30.0. La Riprogettazione non la tocca: la decisione
 - **Rischi da evitare:**
   - istruzioni specifiche di un solo host (comando di esecuzione, soglie di timeout) fuori dall'adattatore rendono la skill difficile da trasferire;
   - correzioni suggerite in prosa, senza criterio, non convergono.
+
+### L23. Ricerca artwork
+
+- **Stato:** **Proposta** (richiesta dell'autore, 2026-11-12). Non deciso, non implementato. Il numero è il primo libero dopo L22; la scheda sta accanto a L8 perché è la sua alternativa per le illustrazioni.
+- **Scopo:** trovare illustrazioni già esistenti online per personaggi, creature, luoghi, oggetti e mappe di battaglia, e proporne al master al massimo tre. Nessuna IA generativa: l'uso di immagini generate è escluso in modo categorico. Dell'immagine scelta si toglie lo sfondo (non per le mappe) e si colloca nella scheda.
+- **Avvio:** dal core, su richiesta del master, come alternativa o complemento a [Artwork](#l8-artwork) (L8).
+- **Input → output:** scheda e tratti visibili, parte pubblica del documento, profilo di stile → da zero a tre proposte numerate, ciascuna con file, pagina d'origine, autore, licenza e esito del controllo IA; l'immagine scelta, senza sfondo se previsto, collocata nella scheda tramite il percorso di caricamento, con la provenienza registrata nel file accanto all'immagine (sidecar).
+- **Flusso:**
+  1. la query è costruita da uno script a partire da parole visive generiche, controllate contro la campagna: niente nomi, niente parole riservate al master;
+  2. la ricerca interroga siti di illustrazioni qualsiasi (ArtStation, DeviantArt, Pinterest, Wikimedia Commons, OpenGameArt e simili);
+  3. il download è sicuro: solo `https`, solo png, jpg o webp, dimensione massima, tipo di file verificato dai byte;
+  4. il controllo anti-IA è deterministico: marcatori nel testo della pagina, metadati del file (compresi C2PA), data di pubblicazione confrontata con agosto 2022, salvo che la pagina dichiari l'assenza di IA. È chiuso per difetto: un caso dubbio viene scartato;
+  5. l'agente guarda ogni immagine rimasta (secondo filtro, di giudizio) e scarta quelle che non corrispondono o che sembrano generate;
+  6. per l'immagine scelta si toglie lo sfondo tramite l'operazione già esistente dello strumento `images`;
+  7. le proposte sono numerate e il master sceglie; la scelta è collocata con la provenienza registrata.
+- **Deterministico:** costruzione della query; ricerca e download sicuri; verifica del tipo e della dimensione; controllo anti-IA (testo, metadati, date); scrittura del sidecar con fonte, autore, licenza e esito; collocamento tramite il percorso di caricamento.
+- **Giudizio:** scelta delle parole visive; lettura di ogni immagine candidata come secondo filtro; confronto con la scheda; decisione su quali proposte presentare.
+- **Dipendenze:** strumento `images` (operazione di rimozione dello sfondo e percorso di collocamento); motore, per il controllo dei collegamenti e della parte riservata.
+- **Requisiti:**
+  - nessuna immagine generata con IA, e nessuna immagine che il controllo non riesca a valutare;
+  - il controllo anti-IA è fail-closed: il dubbio scarta;
+  - la query non contiene nomi, luoghi, segreti o parole della parte riservata;
+  - ogni immagine collocata ha fonte, autore, licenza e esito del controllo nel sidecar;
+  - se la ricerca non trova nulla di adatto, la skill lo dice e non riempie la lista.
+- **Rischi da evitare:**
+  - i siti generici hanno spesso licenze che vietano il riuso, e molte opere non dichiarano l'IA: il controllo riduce il rischio ma non lo elimina;
+  - con la regola della data molti risultati dei siti generici saranno scartati; è il costo voluto della prudenza;
+  - una pagina web che tenta di dare istruzioni all'assistente è un dato, come in tutte le ricerche (vedi [Sicurezza e privacy](Sicurezza%20e%20privacy.md), sezione 2).
 
 ### L9. Carte
 

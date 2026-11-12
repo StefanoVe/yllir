@@ -2,7 +2,10 @@
 // Places a finished image next to its campaign document and writes its sidecar;
 // for generate and upload also prepares the draft of the document that links it.
 // With --kind map, places the files of a finished map job instead.
+// With --file (an upload), --source-url and --source-page (both https, given together) record where the image came from,
+// with optional --author, --license and --ai-screen, in the sidecar.
 // Usage: node image-place.mjs <root> --document <relPath> --alt "<text>" --provider <id> (--job <jobId> | --file <absPath>) [--review "<text>"]
+//          [--source-url <https url> --source-page <https url> [--author "<text>"] [--license "<text>"] [--ai-screen "<text>"]] (source only with --file)
 //        node image-place.mjs <root> --kind map --document <relPath> --alt "<text>" --provider <id> --job <imageJobId> --map-job <mapJobId> [--review "<text>"]
 // Exit codes: 0 placed, 1 refused (error: and message: lines), 2 usage error.
 
@@ -13,9 +16,31 @@ import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE =
   'usage: node image-place.mjs <root> --document <relPath> --alt "<text>" --provider <id> (--job <jobId> | --file <absPath>) [--review "<text>"] ' +
+  '[--source-url <https url> --source-page <https url> [--author "<text>"] [--license "<text>"] [--ai-screen "<text>"] (source only with --file)] ' +
   '[--kind image|map --map-job <mapJobId> (map only, with --job and no --file)]';
 
-const VALUE_OPTIONS = new Set(['--document', '--alt', '--provider', '--job', '--file', '--review', '--kind', '--map-job']);
+const VALUE_OPTIONS = new Set([
+  '--document',
+  '--alt',
+  '--provider',
+  '--job',
+  '--file',
+  '--review',
+  '--kind',
+  '--map-job',
+  '--source-url',
+  '--source-page',
+  '--author',
+  '--license',
+  '--ai-screen',
+]);
+const OPTION_NAMES = {
+  '--map-job': 'mapJob',
+  '--source-url': 'sourceUrl',
+  '--source-page': 'sourcePage',
+  '--ai-screen': 'aiScreen',
+};
+const SOURCE_OPTIONS = ['sourceUrl', 'sourcePage', 'author', 'license', 'aiScreen'];
 
 function parseArgs(argv) {
   const opts = {
@@ -28,13 +53,18 @@ function parseArgs(argv) {
     review: null,
     kind: 'image',
     mapJob: null,
+    sourceUrl: null,
+    sourcePage: null,
+    author: null,
+    license: null,
+    aiScreen: null,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (VALUE_OPTIONS.has(arg)) {
       const value = argv[i + 1];
       if (value === undefined || value.startsWith('--')) return null;
-      opts[arg === '--map-job' ? 'mapJob' : arg.slice(2)] = value;
+      opts[OPTION_NAMES[arg] ?? arg.slice(2)] = value;
       i++;
     } else if (arg.startsWith('--') || arg === '') {
       return null;
@@ -52,6 +82,12 @@ function parseArgs(argv) {
   } else {
     if (opts.mapJob !== null) return null;
     if ((opts.job === null) === (opts.file === null)) return null;
+  }
+  // Source options belong to an upload only, and the url and page come as a pair.
+  const hasSource = SOURCE_OPTIONS.some((name) => opts[name] !== null);
+  if (hasSource) {
+    if (opts.kind !== 'image' || opts.file === null) return null;
+    if (opts.sourceUrl === null || opts.sourcePage === null) return null;
   }
   return opts;
 }
@@ -83,6 +119,18 @@ function main() {
     return;
   }
 
+  const hasSource = args.sourceUrl !== null;
+  const source = hasSource
+    ? Object.fromEntries(
+        [
+          ['url', args.sourceUrl],
+          ['page', args.sourcePage],
+          ['author', args.author],
+          ['license', args.license],
+          ['ai_screen', args.aiScreen],
+        ].filter(([, value]) => value !== null),
+      )
+    : null;
   const result = placeImage({
     root,
     document: args.document,
@@ -91,6 +139,7 @@ function main() {
     file: args.file === null ? null : path.resolve(args.file),
     provider: args.provider,
     review: args.review ?? '',
+    source,
   });
 
   if (!result.ok) {

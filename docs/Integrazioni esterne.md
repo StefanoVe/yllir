@@ -181,6 +181,15 @@ Le due skill di terze parti sono fissate a un commit del repository agent-sprite
 
 Due osservazioni dalle prove. Primo: le integrazioni più utili sono quelle che fanno un passaggio che il master farebbe a mano, come verificare una pagina o impaginare un foglio, e non quelle che aggiungono funzioni nuove. Secondo: nessuna integrazione deve poter cambiare un contenuto della campagna senza passare dai processi del core (audit, collegamenti, separazione pubblico/riservato).
 
+### Ricerca immagini (Proposta, 2026-11-12)
+
+Richiesta dell'autore il 2026-11-12, non deciso. Serve a trovare illustrazioni già esistenti online (per personaggi, creature, luoghi, oggetti e mappe di battaglia) da proporre al master, come alternativa a generare immagini. La skill è [Ricerca artwork](Skill%20di%20libreria.md#l23-ricerca-artwork) (L23).
+
+- **Che cosa esce.** Solo parole visive generiche, costruite da uno script e controllate contro la campagna. Nessun nome di personaggio o luogo, nessuna parola della parte riservata al master.
+- **Consenso.** Una volta per campagna, all'attivazione. Il consenso nomina il tipo di dato (parole visive generiche), come da regola 3 della sezione 4 di [Sicurezza e privacy](Sicurezza%20e%20privacy.md).
+- **Che cosa entra.** Solo immagini scaricate con il percorso sicuro, dopo il controllo anti-IA. Le pagine e i risultati sono dati, mai istruzioni.
+- **Nessuna IA generativa.** L'uso di immagini generate è escluso in modo categorico. Il controllo sta nello script (marcatori, metadati, date) e nel giudizio dell'agente; il controllo non è una garanzia.
+
 ### Fuori dalla prima versione (YAGNI)
 
 Idee da valutare dopo la prima versione, senza collegamenti previsti: strumenti di gioco online (tavoli virtuali, con un eventuale formato di esportazione), archivi e riferimenti storici per documentare un mondo ispirato alla storia reale, condivisione dei documenti tramite servizi di terzi (cartelle condivise o connettori). Ciascuna richiede verifiche proprie (**DA VERIFICARE**) prima di essere valutata.
@@ -231,3 +240,7 @@ Regole di scrittura dei messaggi (proposta, da riprendere in [Esperienza utente]
 7. **Pubblicazione.** L'enciclopedia pubblica resta un'integrazione del framework o un'opzione legata a una sola campagna? Chi controlla che le parti riservate non finiscano online?
 8. **Versioni di Photoshop.** Quale versione minima va dichiarata per le funzioni generative, e come si comunica al master che una funzione richiede un abbonamento (DA VERIFICARE)?
 9. **Immagini caricate dall'utente.** Quali formati accetta il framework e come si verificano diritti e provenienza delle immagini che il master porta?
+10. **Licenze riservate nel repository.** Un'immagine con licenza che ne vieta il riuso può stare nel repository della campagna, che è privato ma sincronizzato con git? **Proposta:** sì, con un avviso di uso privato e nessuna pubblicazione (vedi [Ricerca artwork](Skill%20di%20libreria.md#l23-ricerca-artwork)).
+11. **Diritti e provenienza delle immagini trovate.** Estende la domanda 9 alle immagini cercate online: chi verifica la licenza e l'autore, e che cosa succede se la fonte cambia o sparisce?
+12. **Regola della data.** La regola «nessuna immagine pubblicata dopo agosto 2022, salvo dichiarazione di assenza di IA» scarta troppo? Quanti risultati dei siti generici sopravvivono davvero?
+13. **Ordine delle fonti.** Nella graduatoria le fonti con licenza libera devono avere la precedenza sulle altre?
