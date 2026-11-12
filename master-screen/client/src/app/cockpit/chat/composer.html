@@ -8,6 +8,19 @@
     (keydown)="key($event)"
     (input)="resize($any($event.target))"
   ></textarea
+  ><select
+    class="model"
+    [value]="modelChoice()"
+    [disabled]="!api.session()"
+    [attr.aria-label]="i18n.t('liveModel.label')"
+    (change)="changeModel($event)"
+  >
+    @for (model of models; track model.choice) {
+      <option [value]="model.choice" [title]="i18n.t(model.description)">
+        {{ i18n.t(model.label) }}
+      </option>
+    }
+  </select
   ><button
     class="send"
     [title]="i18n.t('liveAgent.composer.send')"

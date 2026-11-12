@@ -36,11 +36,13 @@ import {
   linkSegment,
   padRect,
   percentBox,
+  summaryLines,
   textScale,
   unionBounds,
   withAspect,
 } from "./geometry";
-import type { Detail, Point, Size, View } from "./geometry";
+import type { CardText, Detail, Point, Size, View } from "./geometry";
+import { capitalizeParts } from "./labels";
 import {
   CanvasPointer,
   hasImageFiles,
@@ -63,7 +65,8 @@ interface ContextBar {
   highlighted: boolean;
 }
 
-const FIT_MARGIN = 48;
+/** Screen px between the desk and the viewport edges in the fit view. */
+const FIT_MARGIN = 24;
 const MINIMAP_RATIO = 180 / 120;
 const MINIMAP_MARGIN = 40;
 const KEY_PAN = 60;
@@ -80,6 +83,8 @@ const GRID_BASE_PX = 24;
 /** Canvas offset between several images dropped or pasted at once. */
 const DROP_OFFSET_PX = 24;
 const BAR_GAP_PX = 44;
+/** Gap between the header icons and the body, as in the card stylesheet. */
+const CARD_GAP = 6;
 const BAR_MARGIN_PX = 8;
 const HIT_WIDTH_PX = 14;
 const COLORS: CardColor[] = ["red", "amber", "green", "blue", "violet"];
@@ -154,7 +159,8 @@ export class CockpitCanvas {
   panX = signal(0);
   panY = signal(0);
   animating = signal(false);
-  minimapOpen = signal(true);
+  /** Closed by default: the minimap takes room, the toolbar button opens it. */
+  minimapOpen = signal(false);
   viewSize = signal<Size>({ width: 0, height: 0 });
 
   readonly markerId = `canvas-arrow-${canvasCount++}`;
@@ -209,6 +215,7 @@ export class CockpitCanvas {
     return { x1: start.x, y1: start.y, x2: to.x, y2: to.y };
   });
   readonly detail = computed<Detail>(() => detailLevel(this.zoom()));
+  protected readonly capitalizeParts = capitalizeParts;
   readonly textScale = computed(() => textScale(this.zoom()));
   readonly arrowSize = computed(() => 12 / this.zoom());
   readonly strokeWidth = computed(() => 2 / this.zoom());
@@ -536,6 +543,31 @@ export class CockpitCanvas {
     return (
       (card.kind === "npc" || card.kind === "enemy") && card.ref.type === "doc"
     );
+  }
+
+  /**
+   * Whole lines of the card summary that fit: the line clamp uses this count, so
+   * the last visible line is never cut in half. Compact cards stay at three lines.
+   */
+  protected cardSummaryLines(card: BoardModuleView): number {
+    const k = this.textScale();
+    const text: CardText = {
+      w: card.w,
+      h: card.h,
+      k,
+      title: card.content.title,
+      headIconsWidth:
+        (card.pinned ? 14 * k + CARD_GAP : 0) +
+        (card.content.missing ? 14 * k + CARD_GAP : 0) +
+        (this.musicOn() && card.kind === "music" ? 24 + CARD_GAP : 0),
+      hasThumb: !!card.content.image,
+      hasSubtitle: !!card.content.subtitle,
+      hasStats:
+        this.detail() === "full" && !!card.content.stats?.length,
+      hasFooter: this.canFight(card),
+    };
+    const lines = summaryLines(text);
+    return this.detail() === "compact" ? Math.min(3, lines) : lines;
   }
 
   protected fight(card: BoardModuleView, event: Event): void {

@@ -36,7 +36,7 @@ export function clampZoom(zoom: number): number {
 
 export function detailLevel(zoom: number): Detail {
   if (zoom < 0.45) return "icon";
-  return zoom < 0.9 ? "compact" : "full";
+  return zoom < 0.55 ? "compact" : "full";
 }
 
 /**
@@ -85,15 +85,31 @@ export function withAspect(rect: Rect, ratio: number): Rect {
   return { x: rect.x, y: cy - nextH / 2, w, h: nextH };
 }
 
-/** View that shows `bounds` centred with `margin`, zoomed in at most to 1. */
+/**
+ * Zoom range of the initial and "fit" view: the whole desk is shown when it fits
+ * at FIT_MIN_ZOOM or more, never past 100%. Below the minimum the view keeps the
+ * minimum and is panned, so card text stays readable.
+ */
+export const FIT_MIN_ZOOM = 0.6;
+export const FIT_MAX_ZOOM = 1;
+
+/**
+ * View that shows `bounds` from the top-left corner, `margin` screen px from the
+ * edges. Zoom is clamped to [FIT_MIN_ZOOM, FIT_MAX_ZOOM]: a small desk is not
+ * blown up past 100%, and a desk too large for the minimum zoom keeps the minimum
+ * and is panned.
+ */
 export function fitView(bounds: Rect, size: Size, margin: number): View {
   const fitX = (size.width - margin * 2) / Math.max(bounds.w, 1);
   const fitY = (size.height - margin * 2) / Math.max(bounds.h, 1);
-  const zoom = clampZoom(Math.min(1, fitX, fitY));
+  const zoom = Math.min(
+    FIT_MAX_ZOOM,
+    Math.max(FIT_MIN_ZOOM, Math.min(fitX, fitY)),
+  );
   return {
     zoom,
-    x: (size.width - bounds.w * zoom) / 2 - bounds.x * zoom,
-    y: (size.height - bounds.h * zoom) / 2 - bounds.y * zoom,
+    x: margin - bounds.x * zoom,
+    y: margin - bounds.y * zoom,
   };
 }
 
@@ -182,4 +198,64 @@ export function linkSegment(from: Rect, to: Rect): Segment {
   const start = borderPoint(from, center(to));
   const end = borderPoint(to, center(from));
   return { x1: start.x, y1: start.y, x2: end.x, y2: end.y };
+}
+
+/** Geometry of one card's text, in canvas units (font sizes already scaled by k). */
+export interface CardText {
+  w: number;
+  h: number;
+  /** Text scale: every font size is multiplied by it. */
+  k: number;
+  title: string;
+  /** Width taken by the icons beside the title, gaps included. */
+  headIconsWidth: number;
+  hasThumb: boolean;
+  hasSubtitle: boolean;
+  hasStats: boolean;
+  hasFooter: boolean;
+}
+
+/** Card paddings and gaps, as in the stylesheet. */
+const CARD_PAD = 10;
+const CARD_GAP = 6;
+const CARD_BORDER = 2;
+const CARD_HEAD_SIDES = 24;
+const KIND_CHIP_PX = 24;
+const TITLE_PX = 14;
+const TITLE_LINE = 1.25;
+/** Upper bound on the width of a title glyph (em): wraps earlier than the real font, which is safe. */
+const TITLE_GLYPH_EM = 0.6;
+const SUBTITLE_PX = 12;
+const SUBTITLE_LINE = 1.25;
+const SUMMARY_PX = 13;
+const SUMMARY_LINE = 1.45;
+const STATS_PX = 11;
+const FOOTER_BUTTON_PX = 32;
+/** Slack for sub-pixel rounding, so a line is never half shown. */
+const CARD_SAFETY_PX = 2;
+
+/** Lines the title takes: two at most, the second one ends in an ellipsis. */
+export function titleLines(card: CardText): number {
+  const width =
+    card.w - CARD_HEAD_SIDES - KIND_CHIP_PX * card.k - CARD_GAP - card.headIconsWidth;
+  const perLine = Math.max(1, Math.floor(width / (TITLE_PX * card.k * TITLE_GLYPH_EM)));
+  return [...card.title].length > perLine ? 2 : 1;
+}
+
+/**
+ * Whole lines of summary text that fit below the card header, subtitle and stats
+ * (the thumbnail takes what is left). A line is never half shown.
+ */
+export function summaryLines(card: CardText): number {
+  const k = card.k;
+  const head =
+    CARD_PAD * 2 +
+    Math.max(KIND_CHIP_PX * k, titleLines(card) * TITLE_PX * k * TITLE_LINE);
+  let used = head + CARD_PAD + CARD_BORDER + CARD_SAFETY_PX;
+  if (card.hasFooter) used += FOOTER_BUTTON_PX + CARD_PAD;
+  if (card.hasThumb) used += CARD_GAP;
+  if (card.hasSubtitle) used += CARD_GAP + SUBTITLE_PX * k * SUBTITLE_LINE;
+  if (card.hasStats) used += CARD_GAP + STATS_PX * k * 1.5 + 6;
+  const lineHeight = SUMMARY_PX * k * SUMMARY_LINE;
+  return Math.max(1, Math.floor((card.h - used) / lineHeight));
 }

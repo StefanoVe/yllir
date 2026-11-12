@@ -1,20 +1,37 @@
+:host {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 12px;
+  background: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
+}
+/* One rounded field: the text, the model choice and the send button share a row. */
 .composer {
-  padding: 10px 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
   display: flex;
   align-items: flex-end;
-  gap: 8px;
-  background: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
+  gap: 6px;
+  padding: 4px 4px 4px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+.composer:focus-within {
+  border-color: var(--color-focus);
 }
 .composer textarea {
   resize: none;
-  min-height: 38px;
+  box-sizing: border-box;
+  min-height: 40px;
   max-height: 144px;
   flex: 1;
   min-width: 0;
-  background: var(--color-surface);
+  background: transparent;
   border: 0;
-  border-radius: 6px;
-  padding: 10px 12px;
+  border-radius: 8px;
+  padding: 9px 8px;
   color: var(--color-text);
   font: inherit;
   line-height: 1.35;
@@ -22,26 +39,54 @@
   overflow: auto;
 }
 .composer textarea:focus-visible {
-  outline: 2px solid var(--color-border);
+  outline: none;
+}
+.model {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  height: 32px;
+  max-width: 96px;
+  border: 0;
+  border-radius: 6px;
+  padding: 0 6px;
+  margin-bottom: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.model:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+.model:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 .send {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
-  border-radius: 18px;
-  background: var(--color-text);
-  color: var(--color-bg);
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  margin-bottom: 4px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 .send:hover {
-  background: var(--color-text);
+  background: var(--color-accent-hover);
+}
+.send:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 .send:disabled {
   opacity: 0.35;
-}
-@media (max-width: 759px) {
-  .send {
-    width: 44px;
-    height: 44px;
-    min-width: 44px;
-  }
+  cursor: default;
 }

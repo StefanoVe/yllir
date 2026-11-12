@@ -1,15 +1,20 @@
 :host {
-  display: block;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
 }
 
+/* The column owns the height; the chat fills it, so the composer ends inside the card. */
 .chat {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   width: 100%;
   min-width: 0;
-  height: calc(100dvh - 120px);
+  flex: 1;
+  height: 100%;
   min-height: 360px;
 }
 
@@ -61,7 +66,7 @@
 
 .empty {
   width: 100%;
-  max-width: 36rem;
+  max-width: 760px;
   margin: auto;
   padding: var(--space-3) var(--space-1);
   text-align: center;
@@ -73,17 +78,26 @@
 }
 
 .chips {
-  display: flex;
-  flex-wrap: wrap;
-  max-width: 100%;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
   gap: var(--space-1);
+}
+
+/* Narrow windows: one column of suggestions. */
+@media (max-width: 899px) {
+  .chips {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* Suggestions read as quiet cards: a hairline, a faint shadow, no fill colour fight. */
 .chip {
-  width: 14rem;
-  max-width: 100%;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0;
   padding: 12px 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -273,12 +287,15 @@
 }
 
 .status {
-  min-height: 1.6em;
   display: flex;
   align-items: center;
   gap: var(--space-1);
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
+}
+
+.status:has(> *) {
+  min-height: 1.6em;
 }
 
 .activity {
@@ -330,16 +347,18 @@
 
 /* The composer is one floating card: the textarea on top, a toolbar under it. */
 .composer {
+  flex: none;
   width: 100%;
   min-width: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-0-5);
+  margin: 0 0 24px;
   padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--color-surface);
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--shadow-1);
   transition: border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
@@ -377,11 +396,12 @@
   justify-content: space-between;
   gap: var(--space-1);
   min-width: 0;
+  min-height: 40px;
 }
 
 .choices {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: var(--space-0-5);
   min-width: 0;
@@ -396,7 +416,7 @@
   align-items: center;
   gap: 4px;
   max-width: 100%;
-  height: 32px;
+  height: 36px;
   padding: 0 10px 0 12px;
   border: 1px solid transparent;
   border-radius: var(--radius-pill);

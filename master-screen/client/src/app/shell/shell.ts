@@ -44,8 +44,10 @@ export class Shell {
   readonly musicEnabled = computed(() => this.status.modules()?.music === true);
   readonly encyclopediaEnabled = computed(() => this.status.modules()?.encyclopedia === true);
   readonly printEnabled = computed(() => this.status.modules()?.print === true);
-  /** The bottom dock (mini player and suggestions) is shown only while it has something to show. */
-  readonly dockVisible = computed(() => this.music.current() !== null || this.musicApi.suggestions().length > 0);
+  /** The bottom bar is shown whenever music is on; it also shows while a track or a suggestion is there. */
+  readonly dockVisible = computed(
+    () => this.musicEnabled() || this.music.current() !== null || this.musicApi.suggestions().length > 0,
+  );
 
   private readonly url = toSignal(
     this.router.events.pipe(

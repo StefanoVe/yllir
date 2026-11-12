@@ -4,8 +4,31 @@
   min-width: 0;
   min-height: 0;
   height: 100%;
-  background: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
-  border-left: 0;
+  background: transparent;
+}
+/* Header row: same height and title size as the board header, so the two baselines line up. */
+.chat-head {
+  flex: none;
+  height: 72px;
+  min-height: 72px;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+}
+.chat-head h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+/* Empty thread: one quiet line, centred in the pane. */
+.chat-empty {
+  max-width: 32ch;
+  margin: auto;
+  text-align: center;
+  color: var(--color-text-muted);
+  line-height: 1.5;
 }
 .messages {
   padding: 18px 16px;

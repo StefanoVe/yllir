@@ -116,6 +116,11 @@ export class Settings {
     return this.t(option === 'system' ? 'theme.system' : option === 'light' ? 'theme.light' : 'theme.dark');
   }
 
+  /** Short label for the segmented control; the full label stays in titles and aria-labels. */
+  themeShortLabel(option: ThemePref): string {
+    return this.t(option === 'system' ? 'theme.systemShort' : option === 'light' ? 'theme.light' : 'theme.dark');
+  }
+
   isTheme(option: ThemePref): boolean {
     return this.theme.pref() === option;
   }

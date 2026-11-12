@@ -183,7 +183,7 @@ const icons = {
   template:
     '<lucide-icon [img]="image" [size]="size" [strokeWidth]="1.7" aria-hidden="true" />',
   styles: [
-    ":host{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;vertical-align:middle;pointer-events:none}",
+    ":host{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;vertical-align:middle;pointer-events:none;line-height:0}lucide-icon{display:block;line-height:0}:host ::ng-deep svg{display:block}",
   ],
 })
 export class Icon {

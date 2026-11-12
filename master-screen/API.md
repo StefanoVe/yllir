@@ -162,7 +162,8 @@ Errors: `{ "error": "<plain-language message>" }`, status 400 by default, 404 fo
 | Method and path | Request | Response |
 |---|---|---|
 | GET `/api/cockpit/sessions` | | list of sessions |
-| POST `/api/cockpit/sessions` | `{ title: 1..200 chars, provider?: "claude" }` (any other provider is refused) | 201 session view; opens the framework live session, or joins the one already open |
+| POST `/api/cockpit/sessions` | `{ title: 1..200 chars, provider?: "claude", model?: "haiku"\|"sonnet"\|"opus" }` (any other provider is refused; `model` missing = `haiku`, any other value = 400) | 201 session view; opens the framework live session, or joins the one already open. The stored `model` is the full id (`claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5`) |
+| PATCH `/api/cockpit/sessions/:id` | `{ model: "haiku"\|"sonnet"\|"opus" }` | session view; the next turn uses the new model, the conversation is kept; any other value = 400 |
 | GET `/api/cockpit/sessions/:id` | | session view (ledger and combat filled from the framework) |
 | DELETE `/api/cockpit/sessions/:id` | | `{ ok: true }`; 409 while a turn of the session is running |
 | GET `/api/cockpit/sessions/:id/events` | `Last-Event-ID` header or `lastEventId` query | SSE (see below) |

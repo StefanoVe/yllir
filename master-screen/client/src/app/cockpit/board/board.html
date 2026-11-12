@@ -14,6 +14,31 @@
   <div class="head-actions">
     @if(!api.connected()){<span class="reconnect">{{ i18n.t("liveAgent.reconnecting") }}</span>}
     <button
+      type="button"
+      class="pill-tool"
+      [class.on]="panel() === 'ledger'"
+      [title]="i18n.t('liveAgent.ledger.title')"
+      [attr.aria-label]="i18n.t('liveAgent.ledger.title')"
+      [attr.aria-pressed]="panel() === 'ledger'"
+      (click)="togglePanel('ledger')"
+    >
+      <ui-icon name="ledger" [size]="18" />
+      <span class="pill-label">{{ i18n.t("liveAgent.ledger.title") }}</span>
+      @if(activeLedger()){<span class="badge">{{activeLedger()}}</span>}
+    </button>
+    @if(s.state.combat){<button
+      type="button"
+      class="pill-tool"
+      [class.on]="panel() === 'combat'"
+      [title]="i18n.t('liveAgent.combat.title')"
+      [attr.aria-label]="i18n.t('liveAgent.combat.title')"
+      [attr.aria-pressed]="panel() === 'combat'"
+      (click)="togglePanel('combat')"
+    >
+      <ui-icon name="swords" [size]="18" />
+      <span class="pill-label">{{ i18n.t("liveAgent.combat.title") }}</span>
+    </button>}
+    <button
       class="icon-button"
       [title]="i18n.t('liveAgent.undoTitle', { label: api.lastGroup()?.actions?.map(a=>a.label)?.join(', ') || i18n.t('liveAgent.noAction') })"
       [attr.aria-label]="i18n.t('liveAgent.undoLast')"
@@ -64,29 +89,6 @@
     (addDoc)="startAddDoc($event)"
     (upload)="uploadImage($event)"
   />
-  <div class="canvas-tools" [class.shifted]="!!panel()">
-    <button
-      class="tool"
-      [class.on]="panel() === 'ledger'"
-      [title]="i18n.t('liveAgent.ledger.title')"
-      [attr.aria-label]="i18n.t('liveAgent.ledger.title')"
-      [attr.aria-pressed]="panel() === 'ledger'"
-      (click)="togglePanel('ledger')"
-    >
-      <ui-icon name="ledger" [size]="18" />
-      @if(activeLedger()){<span class="badge">{{activeLedger()}}</span>}
-    </button>
-    @if(s.state.combat){<button
-      class="tool"
-      [class.on]="panel() === 'combat'"
-      [title]="i18n.t('liveAgent.combat.title')"
-      [attr.aria-label]="i18n.t('liveAgent.combat.title')"
-      [attr.aria-pressed]="panel() === 'combat'"
-      (click)="togglePanel('combat')"
-    >
-      <ui-icon name="swords" [size]="18" /></button
-    >}
-  </div>
   @if(panel(); as open){
   <aside
     class="panel"

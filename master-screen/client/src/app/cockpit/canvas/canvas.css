@@ -189,15 +189,19 @@
   gap: 6px;
   flex-shrink: 0;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 10px 12px;
 }
 
+/* Title: up to two lines, then an ellipsis. The full name stays in the title attribute. */
 .card-title {
   flex: 1;
   min-width: 0;
   overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
   font-size: calc(14px * var(--k));
   font-weight: 600;
 }
@@ -247,29 +251,41 @@
   color: var(--color-accent);
 }
 
-.fight {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border-radius: 50%;
-  background: var(--color-surface-2);
-  color: var(--color-danger);
-}
-
-.fight:hover {
-  background: var(--color-selection);
-}
-
 .card-body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 0 10px 10px;
+  padding: 0 12px 10px;
   overflow: auto;
   overscroll-behavior: contain;
+}
+
+/* Footer of a fighting card: the fight button, right-aligned, its own row. */
+.card-foot {
+  flex: none;
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 12px 10px;
+}
+
+/* The fight button: a danger-tinted button with the swords only. */
+.card-foot .fight {
+  flex: none;
+  width: 100px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface));
+  color: var(--color-danger);
+}
+
+.card-foot .fight:hover {
+  background: color-mix(in srgb, var(--color-danger) 24%, var(--color-surface));
 }
 
 .thumb {
@@ -282,30 +298,31 @@
 }
 
 .subtitle {
+  flex: none;
   margin: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  line-height: 1.25;
   color: var(--color-text-muted);
   font-size: calc(12px * var(--k));
 }
 
+/* The summary shows whole lines only: the count is computed from the card size (cardSummaryLines). */
 .summary {
+  flex: none;
   margin: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines, 3);
   color: var(--color-text);
   font-size: calc(13px * var(--k));
   line-height: 1.45;
 }
 
-/* Mid zoom: the summary is trimmed to three lines. */
-.card[data-detail="compact"] .summary {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .stats {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
@@ -332,12 +349,34 @@
 .note-text {
   flex: 1;
   min-height: 0;
+  margin: 0;
   padding: 10px 12px;
+  box-sizing: border-box;
   overflow: auto;
   overscroll-behavior: contain;
   white-space: pre-wrap;
   font-size: calc(14px * var(--k));
   line-height: 1.45;
+  /* The scrollbar appears on hover only, thin and quiet. */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+.card.note:hover .note-text {
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+.note-text::-webkit-scrollbar {
+  width: 6px;
+}
+
+.note-text::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: transparent;
+}
+
+.card.note:hover .note-text::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
 }
 
 /* Map and image cards: the picture is the card, the title sits on a band. */

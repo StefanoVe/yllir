@@ -5,6 +5,7 @@ import type { StatusResponse } from '../../../shared/src/types.js';
 import { readCampaignSummary, readFrameworkVersion } from '../campaign.js';
 import type { Ctx } from '../context.js';
 import { wrap } from '../http.js';
+import { musicAvailable } from '../music/availability.js';
 
 /** True when the campaign folder is inside a git repository (git rev-parse succeeds). */
 function gitOk(campaignRoot: string): Promise<boolean> {
@@ -19,16 +20,17 @@ function gitOk(campaignRoot: string): Promise<boolean> {
 }
 
 export async function buildStatus(ctx: Ctx): Promise<StatusResponse> {
-  const [summary, frameworkVersion, git] = await Promise.all([
+  const [summary, frameworkVersion, git, music] = await Promise.all([
     readCampaignSummary(ctx),
     readFrameworkVersion(ctx.frameworkRoot),
     gitOk(ctx.campaignRoot),
+    musicAvailable(ctx),
   ]);
   return {
     ok: summary.ok,
     campaign: summary.campaign,
     frameworkVersion,
-    modules: summary.modules,
+    modules: { ...summary.modules, music },
     agent: ctx.agentStatus(),
     git: { ok: git },
   };

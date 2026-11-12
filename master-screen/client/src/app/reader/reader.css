@@ -9,7 +9,7 @@ ms-reader {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     gap: var(--space-2);
-    height: calc(100dvh - 3rem);
+    height: 100%;
   }
   &.pane > .pane-scroll { flex: 1 1 auto; overflow-y: auto; padding-right: 4px; }
   .pane-scroll { min-height: 0; min-width: 0; }
@@ -47,7 +47,7 @@ ms-reader {
   }
   .outline-title { margin: 0 0 var(--space-1); color: var(--color-text-muted); font-weight: 600; }
   .outline-link {
-    width: 100%; padding: 4px 8px; border: 0; border-left: 2px solid var(--color-border);
+    width: 100%; justify-content: flex-start; padding: 4px 8px; border: 0; border-left: 2px solid var(--color-border);
     background: transparent; color: var(--color-text-muted); text-align: left; font: inherit; cursor: pointer;
     &:hover { color: var(--color-text); }
     &.current { color: var(--color-text); font-weight: 700; border-left: 3px solid var(--color-accent); }

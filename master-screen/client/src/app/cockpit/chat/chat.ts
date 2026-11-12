@@ -88,6 +88,8 @@ export class Chat implements AfterViewChecked, OnDestroy {
   private resizeObserver?: ResizeObserver;
   /** While the DM is at the bottom, late growth (fonts, long replies) keeps the newest text in view. */
   private observeHeight(el: HTMLElement) {
+    // Test environments (jsdom) have no ResizeObserver: the pane then just does not follow growth.
+    if (typeof ResizeObserver === "undefined") return;
     this.resizeObserver ??= new ResizeObserver(() => {
       if (this.atBottom) el.scrollTop = el.scrollHeight;
     });

@@ -88,3 +88,11 @@ export function musicCampaign(yaml: string = MUSIC_ON_YAML): string {
     '.campaign/notes.md': '<!-- master -->\n### Musica\n- [Hidden](https://youtube.com/watch?v=HIDDENFILE1) — ignored\n<!-- /master -->\n',
   });
 }
+
+/** A campaign with a plain sheet and no soundtrack link anywhere. */
+export function silentCampaign(yaml: string = MUSIC_OFF_YAML): string {
+  return makeCampaign({
+    'campaign.yaml': yaml,
+    'Places/Porto/Porto.md': '# Porto di Vetro\n\nPublic description only, no music.\n',
+  });
+}

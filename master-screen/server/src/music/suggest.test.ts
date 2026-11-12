@@ -3,7 +3,7 @@ import { describe, it } from 'node:test';
 import type { Bus } from '../bus.js';
 import { createCtx, type Ctx } from '../context.js';
 import { suggestMusic } from './suggest.js';
-import { MUSIC_OFF_YAML, MUSIC_ON_YAML, musicCampaign, oldFramework, REAL_FRAMEWORK } from './test-support.js';
+import { MUSIC_OFF_YAML, MUSIC_ON_YAML, musicCampaign, oldFramework, REAL_FRAMEWORK, silentCampaign } from './test-support.js';
 
 interface Published {
   event: string;
@@ -33,7 +33,7 @@ describe('suggest_music tool', () => {
   });
 
   it('says the module is off, publishes nothing and writes no file', async () => {
-    const root = musicCampaign(MUSIC_OFF_YAML);
+    const root = silentCampaign(MUSIC_OFF_YAML);
     const { ctx, published } = ctxWith(root);
     const result = await suggestMusic(ctx, { query: 'nebbia' });
     assert.match(result.text, /music module is off/);

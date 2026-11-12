@@ -73,19 +73,20 @@ export function isStateChanging(method: string): boolean {
 }
 
 export interface SecurityOptions {
-  /** Campaign music module flag, read once at startup. */
-  music?: boolean;
+  /** Campaign music flag: a fixed value, or a function evaluated on every request. */
+  music?: boolean | (() => boolean);
   /** Campaign encyclopedia module flag, read once at startup. */
   encyclopedia?: boolean;
 }
 
 export function securityMiddleware(port: number, opts: SecurityOptions = {}): RequestHandler {
-  const csp = buildCsp({ music: opts.music === true, encyclopedia: opts.encyclopedia === true });
+  const musicOn = typeof opts.music === 'function' ? opts.music : () => opts.music === true;
+  const encyclopedia = opts.encyclopedia === true;
   return (req, res, next) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
       res.setHeader(name, value);
     }
-    res.setHeader('Content-Security-Policy', csp);
+    res.setHeader('Content-Security-Policy', buildCsp({ music: musicOn() === true, encyclopedia }));
     if (req.path === '/api' || req.path.startsWith('/api/')) {
       res.setHeader('Cache-Control', 'no-store');
     }

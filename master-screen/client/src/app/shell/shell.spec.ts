@@ -54,9 +54,17 @@ describe('Shell music entry', () => {
     expect(fixture.nativeElement.querySelector('a[href="/music"]')).toBeNull();
   });
 
-  it('does not show the dock when nothing is loaded', () => {
+  it('shows the music bar at the bottom when the module is on, even with nothing playing', () => {
     const fixture = setup(true);
-    expect(fixture.nativeElement.querySelector('.dock')).toBeNull();
+    expect(fixture.nativeElement.querySelector('ms-music-dock .dock')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('ms-music-dock .browse-btn')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('main.has-dock')).not.toBeNull();
+  });
+
+  it('shows no music bar when the module is off and nothing is loaded', () => {
+    const fixture = setup(false);
+    expect(fixture.nativeElement.querySelector('ms-music-dock .dock')).toBeNull();
+    expect(fixture.nativeElement.querySelector('main.has-dock')).toBeNull();
   });
 });
 

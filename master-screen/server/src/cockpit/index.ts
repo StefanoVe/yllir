@@ -192,7 +192,6 @@ export function createCockpit(options: CreateCockpitOptions) {
     resolve,
     live,
     provider: providerId,
-    model: options.provider.defaultModel,
   });
   // A change made from the terminal (session log, combat) shows on the desk at once.
   const unwatch = framework.watch?.(() => {

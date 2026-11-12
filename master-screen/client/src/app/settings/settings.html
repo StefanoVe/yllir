@@ -11,7 +11,7 @@
                 [attr.aria-label]="themeLabel(option.pref)" [title]="themeLabel(option.pref)" (click)="setTheme(option.pref)">
           <lucide-angular [img]="option.icon === 'monitor' ? icons.Monitor : option.icon === 'sun' ? icons.Sun : icons.Moon"
                           [size]="18" aria-hidden="true" />
-          <span>{{ themeLabel(option.pref) }}</span>
+          <span>{{ themeShortLabel(option.pref) }}</span>
         </button>
       }
     </div>
@@ -119,10 +119,10 @@
         <li>
           <span class="dot" [class.on]="row.on" aria-hidden="true"></span>
           <span class="module-name">{{ moduleLabel(row.id) }}</span>
-          <span class="muted">{{ row.on ? t('settings.on') : t('settings.off') }}</span>
+          <span class="state" [class.on]="row.on">{{ row.on ? t('settings.on') : t('settings.off') }}</span>
         </li>
       }
     </ul>
-    <p class="muted">{{ t('settings.modulesHint') }}</p>
+    <p class="muted">{{ t('settings.modulesNote') }}</p>
   </section>
 </div>

@@ -24,58 +24,125 @@
       </section>
     }
 
-    @if (player.current(); as track) {
-      <section class="player" [attr.aria-label]="label('music.playerLabel')">
-        <div class="now">
-          <span class="now-title" aria-live="polite">{{ track.title }}</span>
-          <span class="now-meta">
-            <span class="state" [class.is-error]="player.state() === 'error'">{{ stateText() }}</span>
-            <span class="sep" aria-hidden="true">·</span>
-            <a class="sheet-link" [routerLink]="docLink(track.docPath)" [attr.title]="label('music.openSheet')">{{ track.docTitle }}</a>
-          </span>
-          @if (player.error(); as errorKey) {
-            <span class="error" role="alert">{{ label(errorKey) }}</span>
-          }
-        </div>
+    <div class="bar">
+      @if (player.current(); as track) {
+        <section class="player" [attr.aria-label]="label('music.playerLabel')">
+          <div class="now">
+            <span class="now-title" aria-live="polite">{{ track.title }}</span>
+            <span class="now-meta">
+              <span class="state" [class.is-error]="player.state() === 'error'">{{ stateText() }}</span>
+              <span class="sep" aria-hidden="true">·</span>
+              <a class="sheet-link" [routerLink]="docLink(track.docPath)" [attr.title]="label('music.openSheet')">{{ track.docTitle }}</a>
+            </span>
+            @if (player.error(); as errorKey) {
+              <span class="error" role="alert">{{ label(errorKey) }}</span>
+            }
+          </div>
 
-        <div class="controls">
-          <button type="button" class="icon-btn" [disabled]="!player.hasPrevious()"
-                  [attr.aria-label]="label('music.previous')" [attr.title]="label('music.previous')" (click)="player.previous()">
-            <lucide-angular [img]="icons.SkipBack" [size]="18" aria-hidden="true" />
-          </button>
-          <button type="button" class="icon-btn primary" [attr.aria-label]="playPauseLabel()" [attr.title]="playPauseLabel()"
-                  (click)="player.toggle()">
-            <lucide-angular [img]="isBusy() ? icons.Pause : icons.Play" [size]="20" aria-hidden="true" />
-          </button>
-          <button type="button" class="icon-btn" [disabled]="!player.hasNext()"
-                  [attr.aria-label]="label('music.next')" [attr.title]="label('music.next')" (click)="player.next()">
-            <lucide-angular [img]="icons.SkipForward" [size]="18" aria-hidden="true" />
-          </button>
-        </div>
+          <div class="controls">
+            <button type="button" class="icon-btn" [disabled]="!player.hasPrevious()"
+                    [attr.aria-label]="label('music.previous')" [attr.title]="label('music.previous')" (click)="player.previous()">
+              <lucide-angular [img]="icons.SkipBack" [size]="18" aria-hidden="true" />
+            </button>
+            <button type="button" class="icon-btn primary" [attr.aria-label]="playPauseLabel()" [attr.title]="playPauseLabel()"
+                    (click)="player.toggle()">
+              <lucide-angular [img]="isBusy() ? icons.Pause : icons.Play" [size]="20" aria-hidden="true" />
+            </button>
+            <button type="button" class="icon-btn" [disabled]="!player.hasNext()"
+                    [attr.aria-label]="label('music.next')" [attr.title]="label('music.next')" (click)="player.next()">
+              <lucide-angular [img]="icons.SkipForward" [size]="18" aria-hidden="true" />
+            </button>
+          </div>
 
-        <div class="volume">
-          <lucide-angular [img]="volumeIcon()" [size]="16" aria-hidden="true" />
-          <input type="range" class="volume-input" min="0" max="100" step="1"
-                 [value]="player.volume()" [attr.aria-label]="label('music.volume')"
-                 [attr.aria-valuetext]="volumeLabel()" [attr.title]="volumeLabel()"
-                 (input)="onVolume($event)" />
-        </div>
+          <div class="volume">
+            <lucide-angular [img]="volumeIcon()" [size]="16" aria-hidden="true" />
+            <input type="range" class="volume-input" min="0" max="100" step="1"
+                   [value]="player.volume()" [attr.aria-label]="label('music.volume')"
+                   [attr.aria-valuetext]="volumeLabel()" [attr.title]="volumeLabel()"
+                   (input)="onVolume($event)" />
+          </div>
 
-        <div class="tools">
-          <button type="button" class="icon-btn" [class.on]="player.loop()" [attr.aria-pressed]="player.loop()"
-                  [attr.aria-label]="label('music.loop')" [attr.title]="label('music.loop')" (click)="player.toggleLoop()">
-            <lucide-angular [img]="icons.Repeat" [size]="18" aria-hidden="true" />
-          </button>
-          <button type="button" class="icon-btn" [disabled]="player.state() !== 'playing'"
-                  [attr.aria-label]="label('music.fadeOut')" [attr.title]="label('music.fadeOut')" (click)="player.fadeOut()">
-            <lucide-angular [img]="icons.Sunset" [size]="18" aria-hidden="true" />
-          </button>
-          <button type="button" class="icon-btn" [attr.aria-label]="label('music.stop')" [attr.title]="label('music.stop')"
-                  (click)="player.stop()">
-            <lucide-angular [img]="icons.X" [size]="18" aria-hidden="true" />
-          </button>
-        </div>
-      </section>
-    }
+          <div class="tools">
+            <button type="button" class="icon-btn" [class.on]="player.loop()" [attr.aria-pressed]="player.loop()"
+                    [attr.aria-label]="label('music.loop')" [attr.title]="label('music.loop')" (click)="player.toggleLoop()">
+              <lucide-angular [img]="icons.Repeat" [size]="18" aria-hidden="true" />
+            </button>
+            <button type="button" class="icon-btn" [disabled]="player.state() !== 'playing'"
+                    [attr.aria-label]="label('music.fadeOut')" [attr.title]="label('music.fadeOut')" (click)="player.fadeOut()">
+              <lucide-angular [img]="icons.Sunset" [size]="18" aria-hidden="true" />
+            </button>
+            <button type="button" class="icon-btn" [attr.aria-label]="label('music.stop')" [attr.title]="label('music.stop')"
+                    (click)="player.stop()">
+              <lucide-angular [img]="icons.X" [size]="18" aria-hidden="true" />
+            </button>
+          </div>
+        </section>
+      } @else {
+        <p class="idle">
+          <lucide-angular [img]="icons.Music" [size]="18" aria-hidden="true" />
+          <span>{{ label('music.dock.idle') }}</span>
+        </p>
+      }
+
+      <div class="browse-wrap">
+        <button #browseButton type="button" class="browse-btn" aria-haspopup="dialog"
+                [attr.aria-expanded]="browseOpen()" [attr.aria-label]="label('music.dock.browseAria')"
+                [attr.title]="label('music.dock.browseAria')" (click)="toggleBrowse()">
+          <lucide-angular [img]="icons.ListMusic" [size]="18" aria-hidden="true" />
+          <span>{{ label('music.dock.browse') }}</span>
+        </button>
+
+        @if (browseOpen()) {
+          <div class="popover" role="dialog" [attr.aria-label]="label('music.dock.browseTitle')">
+            <div class="pop-head">
+              <h2 class="pop-title">{{ label('music.dock.browseTitle') }}</h2>
+              <a class="library-link" routerLink="/music" (click)="closeBrowse(false)">{{ label('music.dock.openLibrary') }}</a>
+            </div>
+
+            <label class="sr-only" for="music-dock-search">{{ label('music.dock.searchLabel') }}</label>
+            <input #searchInput id="music-dock-search" type="search" class="pop-search"
+                   [placeholder]="label('music.dock.searchPlaceholder')" [value]="browseQuery()"
+                   (input)="onSearch($event)" />
+
+            <div class="pop-list">
+              @if (browseStatus() === 'loading') {
+                <p class="pop-note" role="status">{{ label('music.loading') }}</p>
+              } @else if (browseStatus() === 'error') {
+                <p class="pop-note is-error" role="alert">{{ browseError() }}</p>
+              } @else if (browseTracks().length === 0 && browseStatus() === 'done') {
+                <p class="pop-note">{{ label('music.dock.empty') }}</p>
+              } @else if (browseGroups().length === 0) {
+                <p class="pop-note">{{ label('music.dock.noMatch') }}</p>
+              } @else {
+                @for (group of browseGroups(); track group.docTitle) {
+                  <section class="group">
+                    <h3 class="group-title">{{ group.docTitle }}</h3>
+                    <ul class="rows">
+                      @for (item of group.tracks; track item.id) {
+                        <li class="row">
+                          <button type="button" class="row-play" [attr.aria-label]="playLabel(item)" [attr.title]="playLabel(item)"
+                                  (click)="playFromBrowse(item)">
+                            <lucide-angular [img]="item.provider === 'external' ? icons.ExternalLink : icons.Play" [size]="14" aria-hidden="true" />
+                          </button>
+                          <span class="row-text">
+                            <span class="row-title">{{ item.title }}</span>
+                            @if (item.mood) {
+                              <span class="row-mood">{{ item.mood }}</span>
+                            }
+                            @if (item.preferred) {
+                              <span class="row-badge">{{ label('music.preferred') }}</span>
+                            }
+                          </span>
+                        </li>
+                      }
+                    </ul>
+                  </section>
+                }
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
   </div>
 }

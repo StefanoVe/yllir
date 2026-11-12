@@ -236,6 +236,38 @@ button {
   transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
+/* Icons: centre them in their box instead of sitting on the text baseline. */
+lucide-icon,
+lucide-angular {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 0;
+  vertical-align: middle;
+}
+
+lucide-icon svg,
+lucide-angular svg {
+  display: block;
+}
+
+/* Element selector only (specificity 0,0,1): a component rule that sets its own display still wins. */
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  line-height: 1.2;
+}
+
+a:has(> lucide-angular),
+a:has(> ui-icon) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.55;

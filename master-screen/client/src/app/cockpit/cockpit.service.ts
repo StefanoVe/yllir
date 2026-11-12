@@ -21,6 +21,16 @@ function latestActiveGroup(history: ActionGroup[]) {
 
 const STORAGE_KEY = "yllir.cockpit.last-session";
 
+/** The short model choices of a live session; the server maps each one to a model id. */
+export type LiveModelChoice = "haiku" | "sonnet" | "opus";
+
+/** The short choice of a model id (matched by name); an unknown id counts as Haiku, the default. */
+export function modelChoiceOf(modelId: string): LiveModelChoice {
+  if (modelId.includes("opus")) return "opus";
+  if (modelId.includes("sonnet")) return "sonnet";
+  return "haiku";
+}
+
 /**
  * Talks to the cockpit API and keeps the open session. The open session has its own
  * event stream (`/api/cockpit/sessions/:id/events`); the browser reconnects it by itself
@@ -75,6 +85,20 @@ export class CockpitService implements ChatSource {
     // Only list it: opening a session is a separate step.
     await this.listSessions();
     return value;
+  }
+  /** Changes the model of the open session; the next turn uses it. */
+  async setModel(choice: LiveModelChoice) {
+    const s = this.session();
+    if (!s) return;
+    const value = await this.request<CockpitSessionView>(
+      `/api/cockpit/sessions/${encodeURIComponent(s.id)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model: choice }),
+      },
+    );
+    if (this.session()?.id === value.id) this.session.set(value);
   }
   /** Opens a session: loads it, follows its events and remembers it. */
   async select(id: string) {

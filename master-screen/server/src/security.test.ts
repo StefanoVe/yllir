@@ -204,3 +204,29 @@ describe('Content-Security-Policy with the encyclopedia module', () => {
     }
   });
 });
+
+describe('securityMiddleware music option as a function', () => {
+  it('allows the YouTube origins when the function returns true and not when it returns false', async () => {
+    let on = false;
+    const server = await startServer((port) => {
+      const app = express();
+      app.use(securityMiddleware(port, { music: () => on }));
+      app.get('/x', (_req, res) => {
+        res.json({ ok: true });
+      });
+      return app;
+    });
+    try {
+      const headers = { host: `127.0.0.1:${server.port}` };
+      const off = await request(server.port, { path: '/x', headers });
+      assert.doesNotMatch(String(off.headers['content-security-policy']), /youtube/);
+      on = true;
+      const onRes = await request(server.port, { path: '/x', headers });
+      const csp = String(onRes.headers['content-security-policy']);
+      assert.match(csp, /script-src 'self' https:\/\/www\.youtube\.com;/);
+      assert.match(csp, /frame-src https:\/\/www\.youtube-nocookie\.com/);
+    } finally {
+      await server.close();
+    }
+  });
+});

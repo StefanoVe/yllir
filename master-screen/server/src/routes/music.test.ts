@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 import type { MusicResponse } from '../../../shared/src/types.js';
 import { get, startApp, type Harness } from '../live/test-support.js';
-import { MUSIC_OFF_YAML, MUSIC_ON_YAML, musicCampaign, oldFramework, REAL_FRAMEWORK } from '../music/test-support.js';
+import { musicAvailable } from '../music/availability.js';
+import { MUSIC_OFF_YAML, MUSIC_ON_YAML, musicCampaign, oldFramework, REAL_FRAMEWORK, silentCampaign } from '../music/test-support.js';
 
 const harnesses: Harness[] = [];
 after(async () => {
@@ -12,9 +13,11 @@ after(async () => {
   }
 });
 
-async function start(yaml: string, framework: string = REAL_FRAMEWORK): Promise<Harness> {
-  const h = await startApp(musicCampaign(yaml), framework);
+async function start(yaml: string, framework: string = REAL_FRAMEWORK, campaign?: string): Promise<Harness> {
+  const h = await startApp(campaign ?? musicCampaign(yaml), framework);
   harnesses.push(h);
+  // The music cache is filled shortly after boot in the app; fill it now so the first request sees it.
+  await musicAvailable(h.ctx);
   return h;
 }
 
@@ -41,8 +44,8 @@ describe('GET /api/music/tracks', () => {
     assert.equal(combined.tracks[0].title, 'Nebbia');
   });
 
-  it('answers enabled false with no tracks when the module is off', async () => {
-    const h = await start(MUSIC_OFF_YAML);
+  it('answers enabled false with no tracks when the module is off and no document has a music item', async () => {
+    const h = await start(MUSIC_OFF_YAML, REAL_FRAMEWORK, silentCampaign(MUSIC_OFF_YAML));
     const res = await get(h, '/music/tracks');
     assert.deepEqual(res.json, { enabled: false, tracks: [] });
   });
@@ -57,11 +60,17 @@ describe('GET /api/music/tracks', () => {
 });
 
 describe('Content-Security-Policy follows the music flag', () => {
-  it('has no YouTube host when the module is off', async () => {
-    const h = await start(MUSIC_OFF_YAML);
+  it('has no YouTube host when the module is off and no document has a music item', async () => {
+    const h = await start(MUSIC_OFF_YAML, REAL_FRAMEWORK, silentCampaign(MUSIC_OFF_YAML));
     const csp = String((await get(h, '/status')).headers['content-security-policy']);
     assert.doesNotMatch(csp, /youtube|ytimg/);
     assert.doesNotMatch(csp, /frame-src/);
+  });
+
+  it('adds the YouTube allowances when the module is off but a document has a music item', async () => {
+    const h = await start(MUSIC_OFF_YAML);
+    const csp = String((await get(h, '/status')).headers['content-security-policy']);
+    assert.match(csp, /youtube-nocookie/);
   });
 
   it('adds exactly the three YouTube allowances when the module is on', async () => {

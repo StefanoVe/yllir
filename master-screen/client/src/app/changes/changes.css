@@ -97,27 +97,37 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
+/* One flat list row per document: no border, a hover tint, the open button on the right. */
 .file-row {
   display: flex;
   align-items: center;
   gap: 4px;
   min-width: 0;
+  padding-right: 4px;
+  border-radius: 8px;
+  transition: background-color var(--transition-fast);
+}
+
+.file-row:hover,
+.file-row:focus-within {
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
 }
 
 .file-toggle {
   display: flex;
   flex: 1;
   align-items: center;
+  justify-content: flex-start;
   gap: 6px;
   min-width: 0;
   max-width: 100%;
-  padding: 4px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-2);
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
   color: var(--color-text);
   font: inherit;
   font-size: var(--font-size-sm);
@@ -125,8 +135,13 @@
   cursor: pointer;
 }
 
-.file-toggle[aria-expanded='true'] {
-  border-color: var(--color-accent);
+.file-toggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.file-toggle[aria-expanded='true'] .file-name {
+  font-weight: 600;
 }
 
 .file-text {
@@ -172,6 +187,48 @@
   background: var(--color-surface);
   color: var(--color-text);
   cursor: pointer;
+}
+
+/* The open button of a document row is a ghost: it shows on hover or focus of its row. */
+.file-row .icon-link {
+  min-width: 32px;
+  min-height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-muted);
+  opacity: 0;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.file-row:hover .icon-link,
+.file-row:focus-within .icon-link,
+.file-row .icon-link:focus-visible {
+  opacity: 1;
+}
+
+.file-row .icon-link:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.file-row .icon-link:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Touch screens have no hover: the open button is always visible. */
+@media (hover: none) {
+  .file-row .icon-link {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-row,
+  .file-row .icon-link {
+    transition: none;
+  }
 }
 
 .icon-btn:disabled {

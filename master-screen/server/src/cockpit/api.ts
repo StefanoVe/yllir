@@ -6,7 +6,7 @@ import type {
 import { ActionError, parseAction } from "./actions.js";
 import { StoreError, type CockpitStore } from "./store.js";
 import { TurnManager } from "./turns.js";
-import { LIVE_MODELS } from "./providers/claude.js";
+import { LIVE_MODELS, type LiveModelChoice } from "./providers/claude.js";
 import { sessionView } from "./view.js";
 import type { CockpitBus } from "./bus.js";
 import type { CockpitLive } from "./live.js";
@@ -41,6 +41,16 @@ function asObject(value: unknown): Record<string, unknown> {
     throw new StoreError("Corpo JSON non valido");
   return value as Record<string, unknown>;
 }
+/** Maps the master's short model choice to the model id; a missing choice is Haiku. */
+function liveModelOf(value: unknown): string {
+  if (value === undefined) return LIVE_MODELS.haiku;
+  if (
+    typeof value !== "string" ||
+    !Object.prototype.hasOwnProperty.call(LIVE_MODELS, value)
+  )
+    throw new StoreError("Modello non valido");
+  return LIVE_MODELS[value as LiveModelChoice];
+}
 const errorResponse = (error: unknown) => {
   const status =
     error instanceof StoreError || error instanceof ActionError
@@ -59,9 +69,8 @@ export interface CockpitApiDeps {
   /** Ledger and combat go through it; state reads are filled from the framework. */
   live: CockpitLive;
   resolve: Parameters<typeof sessionView>[1];
-  /** The only provider of the cockpit, and its default model. */
+  /** The only provider of the cockpit. */
   provider: "claude";
-  model: string;
 }
 export function cockpitApi(deps: CockpitApiDeps) {
   return async (request: Request): Promise<Response | null> => {
@@ -76,7 +85,7 @@ export function cockpitApi(deps: CockpitApiDeps) {
         return json(await deps.store.list());
       if (url.pathname === sessionsRoute && request.method === "POST") {
         const input = asObject(await body(request));
-        // Claude is the only provider: a request for another one is refused, and the model is fixed.
+        // Claude is the only provider: a request for another one is refused.
         if (input.provider !== undefined && input.provider !== deps.provider)
           throw new StoreError("Provider non valido");
         if (
@@ -88,7 +97,7 @@ export function cockpitApi(deps: CockpitApiDeps) {
         const session = await deps.store.create({
           title: input.title,
           provider: deps.provider,
-          model: deps.model,
+          model: liveModelOf(input.model),
         });
         // The session opens the framework's live session (or joins the one already open).
         await deps.live.ensure(session.id).catch(() => {});
@@ -118,6 +127,17 @@ export function cockpitApi(deps: CockpitApiDeps) {
               deps.resolve,
             ),
           );
+        if (route === "" && request.method === "PATCH") {
+          const input = asObject(await body(request));
+          const model = liveModelOf(input.model);
+          await deps.store.setProviderSession(id, { model });
+          return json(
+            sessionView(
+              await deps.live.hydrate(await deps.store.get(id)),
+              deps.resolve,
+            ),
+          );
+        }
         if (route === "" && request.method === "DELETE") {
           if (deps.turns.hasRunningSession(id))
             throw new StoreError("Sessione con turno in esecuzione", 409);

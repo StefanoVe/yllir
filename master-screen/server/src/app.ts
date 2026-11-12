@@ -17,7 +17,7 @@ import { registerStatusRoutes } from './routes/status.js';
 import { createSiteRouter, registerEncyclopediaRoutes } from './routes/encyclopedia.js';
 import { registerPrintRoutes } from './routes/print.js';
 import { encyclopediaEnabledAtStartup } from './encyclopedia/config.js';
-import { musicEnabledAtStartup } from './music/config.js';
+import { musicAvailable, musicAvailableCached } from './music/availability.js';
 import { securityMiddleware } from './security.js';
 import { createCampaignCockpit } from './cockpit/wiring.js';
 import { webHandlerMiddleware } from './cockpit/http-bridge.js';
@@ -53,10 +53,12 @@ export function createApp(ctx: Ctx): express.Express {
   app.disable('x-powered-by');
   app.use(
     securityMiddleware(ctx.port, {
-      music: musicEnabledAtStartup(ctx.campaignRoot),
+      music: () => musicAvailableCached(ctx.campaignRoot),
       encyclopedia: encyclopediaEnabledAtStartup(ctx.campaignRoot),
     }),
   );
+  // Fill the music cache shortly after boot: a campaign with soundtrack links turns music on.
+  void musicAvailable(ctx);
   // The cockpit (live table) answers /api/cockpit and /mcp/cockpit. It is mounted before
   // express.json so its Web handlers read the raw request body, and after the security
   // middleware, so the Host, Origin and security headers apply to it too.

@@ -1,3 +1,8 @@
+@if (showHead()) {
+<header class="chat-head">
+  <h2>{{ i18n.t("liveBoard.chatTitle") }}</h2>
+</header>
+}
 <div class="messages" #messageList (scroll)="scrollChanged(messageList)">
   @if(api.session();as s){@for(m of s.messages;track m.id){
   <article
@@ -47,6 +52,8 @@
     </div>
     } }
   </article>
+  } @empty {
+  <p class="chat-empty">{{ i18n.t("liveBoard.chatEmpty") }}</p>
   }}@else if(placeholder()){<p class="muted empty">{{ placeholder() }}</p>
   }@if(newCount()){<button
     class="jump-bottom"

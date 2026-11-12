@@ -3,6 +3,9 @@ import { liveBoardEn } from './parts/live-board.en';
 import { combatEn } from './parts/combat.en';
 import { chatRichEn } from './parts/chat-rich.en';
 import { chatStepsEn } from './parts/chat-steps.en';
+import { musicUiEn } from './parts/music-ui.en';
+import { liveModelEn } from './parts/live-model.en';
+import { polishEn } from './parts/polish.en';
 
 export const en = {
   ...liveAgentEn,
@@ -10,6 +13,9 @@ export const en = {
   ...combatEn,
   ...chatRichEn,
   ...chatStepsEn,
+  ...musicUiEn,
+  ...liveModelEn,
+  ...polishEn,
   'nav.home': 'Home',
   'nav.search': 'Search',
   'nav.liveTable': 'Live table',

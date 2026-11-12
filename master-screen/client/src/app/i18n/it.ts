@@ -4,6 +4,9 @@ import { liveBoardIt } from './parts/live-board.it';
 import { combatIt } from './parts/combat.it';
 import { chatRichIt } from './parts/chat-rich.it';
 import { chatStepsIt } from './parts/chat-steps.it';
+import { musicUiIt } from './parts/music-ui.it';
+import { liveModelIt } from './parts/live-model.it';
+import { polishIt } from './parts/polish.it';
 
 export const it: Record<TranslationKey, string> = {
   ...liveAgentIt,
@@ -11,6 +14,9 @@ export const it: Record<TranslationKey, string> = {
   ...combatIt,
   ...chatRichIt,
   ...chatStepsIt,
+  ...musicUiIt,
+  ...liveModelIt,
+  ...polishIt,
   'nav.home': 'Home',
   'nav.search': 'Cerca',
   'nav.liveTable': 'Tavolo',

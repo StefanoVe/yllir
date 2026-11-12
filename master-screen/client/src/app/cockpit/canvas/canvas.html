@@ -169,18 +169,6 @@
           <span class="card-title" [title]="card.content.title"
             >{{ card.content.title }}</span
           >
-          @if (canFight(card)) {
-          <button
-            type="button"
-            class="fight"
-            [attr.title]="i18n.t('combat.fight')"
-            [attr.aria-label]="i18n.t('combat.fight')"
-            (click)="fight(card, $event)"
-            (dblclick)="$event.stopPropagation()"
-          >
-            <ui-icon name="swords" [size]="14" />
-          </button>
-          }
           @if (card.pinned) {
           <ui-icon class="pin" name="pin" [size]="14" />
           } @if (card.content.missing) {
@@ -212,9 +200,7 @@
           (keydown)="onEditKey($event)"
         ></textarea>
         } @else {
-        <div class="note-text">
-          {{ card.content.summary || card.content.title }}
-        </div>
+        <div class="note-text">{{ card.content.summary || card.content.title }}</div>
         } } @else if (!isImageCard(card) && detail() !== "icon") {
         <div class="card-body">
           @if (card.content.image) {
@@ -226,9 +212,9 @@
             draggable="false"
           />
           } @if (card.content.subtitle) {
-          <p class="subtitle">{{ card.content.subtitle }}</p>
+          <p class="subtitle">{{ capitalizeParts(card.content.subtitle) }}</p>
           } @if (card.content.summary) {
-          <p class="summary">{{ card.content.summary }}</p>
+          <p class="summary" [style.--lines]="cardSummaryLines(card)">{{ card.content.summary }}</p>
           } @if (detail() === "full" && card.content.stats?.length) {
           <ul class="stats">
             @for (stat of card.content.stats; track $index) {
@@ -237,6 +223,19 @@
           </ul>
           }
         </div>
+        } @if (card.kind !== "note" && canFight(card)) {
+        <footer class="card-foot">
+          <button
+            type="button"
+            class="fight"
+            [attr.title]="i18n.t('combat.fight')"
+            [attr.aria-label]="i18n.t('combat.fight')"
+            (click)="fight(card, $event)"
+            (dblclick)="$event.stopPropagation()"
+          >
+            <ui-icon name="swords" [size]="20" />
+          </button>
+        </footer>
         }
         <span class="resize-handle" aria-hidden="true"></span>
       </article>
