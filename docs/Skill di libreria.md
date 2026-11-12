@@ -67,12 +67,12 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Deciso (indice). Non implementata in 0.30.0 |
 | [Mappe di luogo e di battaglia](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Creare mappe con livelli separati, per luoghi e scontri. | Deciso (indice; modalità `map` dello strumento `images`, Deciso 2026-11-11). Implementata in 0.41.0 per mappe di luogo e di battaglia |
 | [Mappe del mondo](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Modificare una carta del mondo senza alterarne la geometria. | Deciso (indice). Non implementata in 0.30.0 |
-| [Scontri](#l12-scontri) (`combat-tracker`) | Libreria, con adattatore | Tenere lo stato di uno scontro per il master: iniziativa, PF, fasi, condizioni, risorse dei nemici. | Deciso (indice). Non implementata in 0.30.0: la skill non esiste |
+| [Scontri](#l12-scontri) (`combat-tracker`) | Libreria, con adattatore | Tenere lo stato di uno scontro per il master: iniziativa, PF, fasi, condizioni, risorse dei nemici. | Deciso (indice). Implementata (2026-11-12) |
 | [Bilanciamento degli incontri](#l15-bilanciamento-degli-incontri) (`encounter-balancer`) | Libreria, su richiesta | Ribilanciare scontri e prove quando il master lo chiede, per esempio se cambia il gruppo. | Deciso (indice). Non implementata in 0.30.0 |
 | [Economia](#l16-economia) (`economy-manager`) | Libreria, chiamata dal core | Mantenere il documento di economia del mondo e far sì che prezzi, salari e ricompense delle schede lo rispettino. | Deciso (indice). Non implementata in 0.30.0 |
 | [Dottore della campagna](#l17-dottore-della-campagna) (`campaign-doctor`) | Libreria, su richiesta | Analizzare l'intera campagna, riportare problemi narrativi, logici e strutturali e proporre soluzioni. | Deciso (indice). Non implementata in 0.30.0 |
 | [Manutenzione della continuità](#l19-manutenzione-della-continuità) (`continuity-keeper`) | Motore (rinomina, spostamento, cancellazione) più libreria sottile chiamata dal core (unione, divisione, retcon) | Rinominare, unire, dividere, spostare e cancellare soggetti, e correggere un fatto stabilito, propagando il cambiamento a tutta la campagna. | Deciso (indice); divisione in motore e skill sottile approvata dall'autore (2026-11-12). Implementata in 0.44.0. Il motore accetta già le cancellazioni nel lotto (`--deletes`) |
-| [Registro di sessione](#l18-registro-di-sessione) (`session-log`) | Libreria, durante la sessione live | Registrare fatti, decisioni, intenzioni e fili aperti della partita, anche senza master screen. | Deciso (indice, estratto dal master screen). Non implementata in 0.30.0 |
+| [Registro di sessione](#l18-registro-di-sessione) (`session-log`) | Libreria, durante la sessione live | Registrare fatti, decisioni, intenzioni e fili aperti della partita, anche senza master screen. | Deciso (indice, estratto dal master screen). Implementata (2026-11-12) |
 | [Ricerca musicale](#l13-ricerca-musicale) (`music-search`) | Libreria, in autorun alla creazione di un luogo | Proporre più tracce di sottofondo (soprattutto video di ambience) e colonne sonore adatte a un luogo. | Deciso (indice, nice to have). Non implementata in 0.30.0 |
 
 ### Processi del core, moduli e strumenti di output
@@ -330,7 +330,7 @@ Non ancora implementata in 0.30.0. La Riprogettazione non la tocca: la decisione
 ### L12. Scontri
 
 - **Scopo:** tenere lo stato di uno scontro per il master (iniziativa, PF, fasi, condizioni, risorse dei nemici), senza tirare dadi e senza scegliere tattiche.
-- **Stato:** non implementata in 0.30.0: la skill `combat-tracker` non esiste. Le operazioni dell'adattatore per lo scontro (`init_encounter`, `record_event`, `advance_turn`) restano previste (vedi [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md)).
+- **Stato:** implementata (2026-11-12) come skill `combat-tracker`: lo stato dello scontro sta in `.campaign/state/live/`, si modifica con comandi di script senza tirare dadi, e le regole D&D 2024 sono nell'adattatore, nel file indicato dal setting `encounter_ops` (`encounter.mjs` in `modules/systems/dnd-2024/`), mentre il master screen ne mostra la vista in diretta (vedi [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md)).
 - **Avvio:** dal core, quando il master dichiara l'inizio di uno scontro; durante la sessione live.
 - **Input → output:** schede dei nemici, dati oneshot, comandi del master → file di stato dello scontro, tre tabelle (iniziativa, statistiche, opzioni).
 - **Deterministico:** tutto lo stato, in un file dati (non in prosa): ordinamento per iniziativa, applicazione di danni e guarigioni, soglie di fase, scadenze delle condizioni, round. Nessun tiro di dadi nel framework se non richiesto da un adattatore.
@@ -447,7 +447,7 @@ Non ancora implementata in 0.30.0. La Riprogettazione non la tocca: la decisione
 ### L18. Registro di sessione
 
 - **Scopo:** tenere il registro della partita in corso (fatti accaduti, decisioni dei giocatori, intenzioni, fili aperti) e consegnarlo al processo «dopo la sessione», che ne ricava la cronaca.
-- **Stato:** non implementata in 0.30.0. Non va confuso con la nota sul lavoro in corso (`.campaign/state/work-note.md`), che il motore aggiorna a ogni salvataggio per riprendere il lavoro (Riprogettazione, decisione 15).
+- **Stato:** implementata (2026-11-12) come skill `session-log`: registra fatti, decisioni, intenzioni e fili aperti della partita in `.campaign/state/live/` con comandi di script, consegna il testo al processo «dopo la sessione» a fine partita, e il master screen ne mostra la stessa vista in diretta. Non va confuso con la nota sul lavoro in corso (`.campaign/state/work-note.md`), che il motore aggiorna a ogni salvataggio per riprendere il lavoro (Riprogettazione, decisione 15).
 - **Avvio:** dal core, quando il master apre una sessione live; vive per tutta la sessione.
 - **Input → output:** messaggi del master durante il gioco → voci strutturate in `.campaign/state/`; a fine sessione, la bozza della pagina di `Cronaca/`.
 - **Deterministico:** formato delle voci, ordine temporale, collegamento alla scena e ai soggetti citati.

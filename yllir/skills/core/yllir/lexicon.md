@@ -39,7 +39,13 @@ Use only the words in the language column of the campaign: the Italian column fo
 | Character sheet manager | «Schede dei personaggi» | «Character sheets» |
 | Canon research | «Che cosa dice la campagna» | «What the campaign says» |
 | Combat tracker | «Scontro» | «Combat» |
+| Fight (a fight the master declares) | «Scontro» | «Combat» |
+| Initiative | «Iniziativa» | «Initiative» |
+| Turn | «Turno» | «Turn» |
+| Round | «Round» | «Round» |
+| Condition | «Condizione» | «Condition» |
 | Session log | «Registro della partita» | «Game log» |
+| Open thread | «Filo aperto» | «Open thread» |
 | Derived index | «Mappa» o «Enciclopedia» | «Map» or «Encyclopedia» |
 | Subject index | Non visibile | Not visible |
 | Aliases | «Altri nomi» | «Other names» |
@@ -68,7 +74,7 @@ Use only the words in the language column of the campaign: the Italian column fo
 
 ## Never say
 
-Never write these words, in any language, in a message to the master or in a document meant for players: skill, script, git, commit, repository, YAML, frontmatter, metadata block, Markdown, sub-agent, model, Haiku, Claude, hook, MCP, template, prompt, JSON, plugin, draft, batch, provenance field, codes of saved versions (for example a1b2c3d), text in backticks, and the names of terminal commands (for example `node`, `mkdir`, `git`, `cat`).
+Never write these words, in any language, in a message to the master or in a document meant for players: skill, script, git, commit, repository, YAML, frontmatter, metadata block, Markdown, sub-agent, model, Haiku, Claude, hook, MCP, template, prompt, JSON, plugin, draft, batch, state, state file, op, tracker, provenance field, codes of saved versions (for example a1b2c3d), text in backticks, and the names of terminal commands (for example `node`, `mkdir`, `git`, `cat`).
 
 ## Changes to the canon
 

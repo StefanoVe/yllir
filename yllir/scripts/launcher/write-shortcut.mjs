@@ -19,9 +19,20 @@ function escapeSh(value) {
   return String(value).replace(/[\\"$`]/g, '\\$&');
 }
 
-/** Escapes a value for a batch file: a literal percent sign is doubled. */
+/**
+ * Escapes a path for a double-quoted `set "FW=..."` line of a batch file. A literal
+ * percent sign is doubled. The template never enables delayed expansion, so `!` is safe.
+ * Quotes and line breaks cannot appear in a Windows path and are refused.
+ */
 function escapeCmd(value) {
-  return String(value).replace(/%/g, '%%');
+  const text = String(value);
+  if (/["\r\n\0]/.test(text)) throw new Error('the framework path cannot be written into a Windows shortcut');
+  return text.replace(/%/g, '%%');
+}
+
+/** Escapes a message for an `echo` line inside a parenthesised block of a batch file. */
+function escapeCmdEcho(value) {
+  return String(value).replace(/[%^&|<>()]/g, (c) => (c === '%' ? '%%' : `^${c}`));
 }
 
 /** A desktop Exec value: one quoted argument, with the escapes the spec requires. */
@@ -87,7 +98,8 @@ function plan(platform, lang, campaignRoot, frameworkRoot) {
         file: `${names.open}.cmd`,
         template: 'windows-shortcut.cmd',
         mode: 0o644,
-        values: { ...common, FRAMEWORK_DEFAULT: escapeCmd(frameworkRoot), NOT_FOUND: escapeCmd(names.notFound) },
+        eol: '\r\n',
+        values: { ...common, FRAMEWORK_DEFAULT: escapeCmd(frameworkRoot), NOT_FOUND: escapeCmdEcho(names.notFound) },
       },
     ];
   }
@@ -122,7 +134,9 @@ export function writeShortcut({ campaignRoot, frameworkRoot, language = 'en', pl
 
   let created = false;
   for (const item of files) {
-    const body = render(fs.readFileSync(path.join(TEMPLATES, item.template), 'utf8'), item.values);
+    let body = render(fs.readFileSync(path.join(TEMPLATES, item.template), 'utf8'), item.values);
+    // cmd.exe needs CRLF line endings: a batch file with bare LF lines is misread.
+    if (item.eol) body = body.replace(/\r?\n/g, item.eol);
     if (writeOne(path.join(root, item.file), body, item.mode, platform)) created = true;
   }
   return { path: path.join(root, files[0].file), created };

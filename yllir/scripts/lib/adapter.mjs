@@ -89,7 +89,7 @@ function validate(adapter, folderId, folder) {
   const errors = [];
   const error = (code, field, message) => errors.push({ code, path: field, message });
   if (!isMapping(adapter)) return [{ code: 'bad-type', path: '', message: 'adapter manifest must be a mapping' }];
-  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'creature_sheet', 'checks', 'item_sheet', 'tracking', 'do_not'];
+  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not'];
   for (const key of Object.keys(adapter)) if (!allowed.includes(key)) error('unknown-key', key, `"${key}" is not a setting of an adapter manifest`);
   if (typeof adapter.id !== 'string' || !SLUG_RE.test(adapter.id)) error('bad-value', 'id', 'id must be a lowercase slug');
   if (adapter.id !== folderId) error('id-mismatch', 'id', `id must match the adapter folder ${folderId}`);

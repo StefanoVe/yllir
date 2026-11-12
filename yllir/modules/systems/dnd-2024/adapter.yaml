@@ -15,6 +15,7 @@ headings:
     it: Effetti
     en: Effects
 encounters: turn-based
+encounter_ops: encounter.mjs
 battle_grid:
   square: 5
   unit: ft

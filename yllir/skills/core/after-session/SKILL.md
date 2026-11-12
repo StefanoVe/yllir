@@ -2,7 +2,7 @@
 name: after-session
 description: Core process. Records one evening that was played as a chronicle page, faithful only to what the master says, then applies the consequences the master stated on the sheets, statuses and timeline and proposes the rest, all in one batch.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/today.mjs" *), Bash(node */scripts/today.mjs *), Read, Write, Edit, Agent, Skill, Glob, Grep
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/today.mjs" *), Bash(node */scripts/today.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/session-log/scripts/session-log.mjs" *), Read, Write, Edit, Agent, Skill, Glob, Grep
 ---
 
 # After session
@@ -33,7 +33,7 @@ You are the AUTHOR. Record the evening in two phases, and write both in one batc
 3. If it is unclear which session was played, ask ONE question that names the candidate sessions by their names, and stop.
 4. For each played session, every id in its `depends_on` must appear in the `played` list of an earlier chronicle page. If one does not, and the master did not say to record it anyway, ask ONE question: name the session and the missing prerequisite, and ask whether to record it anyway. Stop. If the master says yes, record it and say so in the message.
 
-**Step 4 — Phase 1: the chronicle page.** Write `<CHRONICLE FOLDER>/<DATE>.md` in the campaign language. Use Italian headings `## Accaduto` and `## Fili aperti` for `it`; `## What happened` and `## Open threads` for `en`; translate them for any other language.
+**Step 4 — Phase 1: the chronicle page.** If a live session log exists, run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/session-log/scripts/session-log.mjs" source .` from the campaign root and use its `markdown` as a starting point for the events and open threads; if it fails, go on without it. Stay faithful ONLY to what the master says, here or in the log's entries: the log is a help, not a source of truth, and an entry the master does not confirm stays a proposal, never a fact of the page. Write `<CHRONICLE FOLDER>/<DATE>.md` in the campaign language. Use Italian headings `## Accaduto` and `## Fili aperti` for `it`; `## What happened` and `## Open threads` for `en`; translate them for any other language.
 
 ```markdown
 <!-- yllir

@@ -26,6 +26,9 @@ Questo documento descrive il master screen: la parte del framework che il master
 - **Agente (Deciso, 2026-11-12).** Il server parla con Claude tramite Claude Agent SDK. Un server MCP locale espone solo gli strumenti del framework, con un token valido per il solo turno; nessuna shell libera. Vedi [Architettura proposta](#architettura-proposta), componente 2.
 - **Prototipo (Deciso, 2026-11-12).** Esiste un prototipo dell'autore, fuori dal repository. Ne va portata solo la parte di sessione live; il resto si riprogetta secondo questo documento.
 - **Fasi e sessione live (Deciso, 2026-11-12).** Le fasi di rilascio restano. Si parte dalla fase 1: chat, pannello «cosa è cambiato», «torna a com'era», ricerca e lettura con marcatura pubblico/master, impostazioni essenziali. La sessione live (tela, registro, combattimento, musica) viene dopo. Combattimento e musica sono skill di libreria non ancora realizzate ([L12 Scontri](Skill%20di%20libreria.md#l12-scontri), [L13 Ricerca musicale](Skill%20di%20libreria.md#l13-ricerca-musicale)): il master screen ne è solo una vista.
+- **Piattaforme (Deciso, 2026-11-12).** Il master screen gira su macOS e Windows. Linux non è un obiettivo della fase 1 (il launcher ha i file per Linux ma non è provato).
+- **Approvazione delle modifiche (Deciso, 2026-11-12).** Il master non approva le modifiche prima: compaiono subito nel pannello «cosa è cambiato» e si annullano dopo con «torna a com'era». Nessuna approvazione preventiva, nemmeno per i file del canone.
+- **Vista per i giocatori (Deciso, 2026-11-12).** Per ora non c'è. L'anteprima «vista giocatori» (nasconde il blocco riservato) resta solo un controllo del master.
 - **Interfaccia (Deciso, 2026-11-12).** Moderna e semplice da usare, ma abbastanza funzionale. È coerente con le icone con tooltip decise sopra.
 
 ### Strumenti della sessione live estratti (Deciso)
@@ -186,8 +189,6 @@ Nota: se più funzioni entrano nel framework, serve un modello comune per le imm
 ## Questioni aperte
 
 - Quali funzioni confluiscono nel master screen (enciclopedia pubblica, atlante, vedute, carte nautiche) e con quale opzione, fra A, B e C per ciascuna.
-- Esiste una vista per i giocatori? Non è prevista nella prima specifica. Le schede pubbliche sono già adatte a una vista condivisa, ma è una scelta di prodotto.
-- Piattaforma: alcune funzioni (musica, vedute, carte nautiche) potrebbero dipendere dal sistema operativo. Il framework deve girare anche altrove? Qual è il minimo accettabile per la fase 1?
-- Autonomia dell'agente: le modifiche compaiono in tempo reale, ma il master le approva dopo o prima? Serve un'approvazione esplicita per i file del canone?
+- Piattaforma: alcune funzioni (musica, vedute, carte nautiche) potrebbero dipendere dal sistema operativo; la fase 1 è per macOS e Windows (deciso), il resto si valuta modulo per modulo.
 - Marcatura pubblico/master: il formato è definito in `Configurazione.md`, ma il master screen deve applicarlo anche ai file scritti dall'agente. Chi controlla che un blocco riservato non esca in una vista pubblica?
 - Parità fra master screen e terminale: quali operazioni devono esistere in entrambi, e quali sono solo del master screen (per esempio il pannello delle modifiche)?
