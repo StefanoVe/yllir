@@ -70,6 +70,7 @@ export const en = {
   'reader.sideOpen': 'Open side by side',
   'reader.sideClose': 'Close the side-by-side view',
   'reader.sideClosePane': 'Close this pane',
+  'reader.diagramError': 'This diagram could not be drawn.',
   'reader.sideEmpty': 'Ctrl or Cmd-click a link to open a document here.',
   'reader.openSide': 'Open side by side',
   'reader.outline': 'Contents',

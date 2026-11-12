@@ -14,6 +14,16 @@ ms-doc-body {
   .block-master { padding-top: var(--space-2); }
   .mark-icon { display: inline-flex; padding: 2px; }
 
+  /* Mermaid diagrams: centred, scrolling sideways when wider than the column. */
+  .block-body .ms-diagram {
+    overflow-x: auto;
+    margin: var(--space-2) 0;
+    padding: var(--space-1) 0;
+    text-align: center;
+  }
+  .block-body .ms-diagram svg { display: block; margin: 0 auto; height: auto; }
+  .block-body .ms-diagram-error { font-size: var(--font-size-sm); color: var(--color-text-muted); }
+
   .block-body {
     h1, h2, h3, h4 { margin: var(--space-3) 0 var(--space-1); scroll-margin-top: var(--space-2); }
     /* Links use the accent token, never the browser's blue or purple. Master blocks are tinted with accent: still AA. */

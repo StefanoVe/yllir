@@ -21,6 +21,13 @@
   --color-focus: #2563eb;
   --color-danger: #b42318;
   --color-selection: #c9d9f7;
+  --color-danger-contrast: #ffffff;
+
+  /* Diff colours (added and removed lines), readable on the surfaces above. */
+  --color-diff-add: #1a7f37;
+  --color-diff-del: #b42318;
+  --color-diff-add-bg: rgb(46 160 67 / 0.16);
+  --color-diff-del-bg: rgb(207 34 46 / 0.12);
 
   /* Layered soft shadows: a hairline plus a diffuse one. */
   --shadow-1: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 1px rgb(16 24 40 / 0.04);
@@ -81,6 +88,12 @@
     --color-focus: #8ab4ff;
     --color-danger: #ff8a80;
     --color-selection: #3a4f7a;
+    --color-danger-contrast: #0c1424;
+
+    --color-diff-add: #7ee787;
+    --color-diff-del: #ff8a80;
+    --color-diff-add-bg: rgb(46 160 67 / 0.22);
+    --color-diff-del-bg: rgb(248 81 73 / 0.16);
 
     --shadow-1: 0 1px 2px rgb(0 0 0 / 0.45);
     --shadow-2: 0 2px 4px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.45);
@@ -107,6 +120,12 @@
   --color-focus: #8ab4ff;
   --color-danger: #ff8a80;
   --color-selection: #3a4f7a;
+  --color-danger-contrast: #0c1424;
+
+  --color-diff-add: #7ee787;
+  --color-diff-del: #ff8a80;
+  --color-diff-add-bg: rgb(46 160 67 / 0.22);
+  --color-diff-del-bg: rgb(248 81 73 / 0.16);
 
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.45);
   --shadow-2: 0 2px 4px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.45);

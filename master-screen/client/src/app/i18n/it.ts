@@ -72,6 +72,7 @@ export const it: Record<TranslationKey, string> = {
   'reader.sideOpen': 'Apri affiancato',
   'reader.sideClose': 'Chiudi la vista affiancata',
   'reader.sideClosePane': 'Chiudi questo pannello',
+  'reader.diagramError': 'Impossibile disegnare questo diagramma.',
   'reader.sideEmpty': 'Ctrl o Cmd e clic su un link per aprire qui un documento.',
   'reader.openSide': 'Apri affiancato',
   'reader.outline': 'Indice',

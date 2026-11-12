@@ -179,31 +179,11 @@
   cursor: default;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .diff {
-    --diff-add: #7ee787;
-    --diff-del: #ff8a80;
-    --diff-add-bg: rgb(46 160 67 / 0.22);
-    --diff-del-bg: rgb(248 81 73 / 0.16);
-  }
-}
-
-:root[data-theme='dark'] .diff {
-  --diff-add: #7ee787;
-  --diff-del: #ff8a80;
-  --diff-add-bg: rgb(46 160 67 / 0.22);
-  --diff-del-bg: rgb(248 81 73 / 0.16);
-}
-
 .diff-wrap {
   margin: 4px 0 0;
 }
 
 .diff {
-  --diff-add: #1a7f37;
-  --diff-del: #b42318;
-  --diff-add-bg: rgb(46 160 67 / 0.16);
-  --diff-del-bg: rgb(207 34 46 / 0.12);
   max-height: 260px;
   overflow: auto;
   border: 1px solid var(--color-border);
@@ -232,20 +212,20 @@
 }
 
 .row[data-kind='add'] {
-  background: var(--diff-add-bg);
+  background: var(--color-diff-add-bg);
 }
 
 .row[data-kind='add'] .sign {
-  color: var(--diff-add);
+  color: var(--color-diff-add);
   font-weight: 700;
 }
 
 .row[data-kind='del'] {
-  background: var(--diff-del-bg);
+  background: var(--color-diff-del-bg);
 }
 
 .row[data-kind='del'] .sign {
-  color: var(--diff-del);
+  color: var(--color-diff-del);
   font-weight: 700;
 }
 

@@ -17,6 +17,8 @@ In `server/`: `npm ci`, `npm run typecheck`, `npm test`, `npm run build`, `npm r
 
 Run the built server: `node dist/server.mjs --campaign <campaign folder> --framework <yllir folder> [--port N] [--open]`.
 
+Build notes: Critical CSS inlining is off: its onload handler is blocked by the server's script-src 'self' policy.
+
 ## Release
 
 - `VERSION` holds `MAJOR.MINOR` (edit it by hand to change the line). CI appends the number of commits that touched `master-screen/`: `scripts/version.sh` prints the result.

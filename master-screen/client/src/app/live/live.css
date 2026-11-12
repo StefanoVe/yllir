@@ -166,7 +166,7 @@ button:disabled {
 
 .danger {
   background: var(--color-danger);
-  color: #ffffff;
+  color: var(--color-danger-contrast);
 }
 
 .ghost {
