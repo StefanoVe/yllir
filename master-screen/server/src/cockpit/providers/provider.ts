@@ -7,6 +7,8 @@ export interface TurnInput {
   systemPrompt: string;
   userPrompt: string;
   mcp: { url: string; token: string };
+  /** MCP tool names the model may call in this turn. */
+  tools: readonly string[];
   resume?: string;
 }
 

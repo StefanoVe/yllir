@@ -16,7 +16,7 @@ import type { CockpitSession, ProviderId } from "../../../shared/src/cockpit-typ
 import { CockpitLive } from "./live.js";
 import { unavailableFramework, type CockpitFramework } from "./framework.js";
 import { readCampaignConfig, type CampaignConfig } from "./campaign-config.js";
-import { buildSystemPrompt } from "./prompt.js";
+import { buildCombatSystemPrompt, buildSystemPrompt } from "./prompt.js";
 import type { SheetDeps } from "./authoring.js";
 
 export interface CreateCockpitOptions {
@@ -176,6 +176,10 @@ export function createCockpit(options: CreateCockpitOptions) {
     getPlotGraph,
     mcpUrl: `http://127.0.0.1:${options.port}/mcp/cockpit`,
     systemPrompt: buildSystemPrompt({
+      language: campaign.language,
+      systemName: campaign.systemName,
+    }),
+    combatSystemPrompt: buildCombatSystemPrompt({
       language: campaign.language,
       systemName: campaign.systemName,
     }),

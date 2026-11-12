@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { CockpitStore } from "./store.js";
 import { CockpitBus } from "./bus.js";
-import { createCockpitTools, type ToolContext } from "./tools.js";
+import { COCKPIT_TOOL_NAMES, createCockpitTools, type ToolContext } from "./tools.js";
 import { CockpitLive } from "./live.js";
 import { createFakeFramework } from "./test-helpers/fake-framework.js";
 import { fakeKindOf } from "./fake-ports.js";
@@ -161,6 +161,7 @@ async function setup(docs: Map<string, Detail>, maps: MapAsset[] = []) {
   const context: ToolContext = {
     sessionId: session.id,
     turnId: "turn-1",
+    tools: COCKPIT_TOOL_NAMES,
     onActivity: () => {},
     setGroupId(id) {
       context.groupId = id;

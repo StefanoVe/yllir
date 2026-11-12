@@ -1,11 +1,9 @@
 import { Component, computed, inject, OnDestroy, signal } from "@angular/core";
 import { Icon } from "../support/icon";
-import { CockpitService } from "../cockpit.service";
+import { ChatSource, type ChatThreadView } from "./chat-source";
 import { I18n, type TranslationKey } from "../../i18n";
 import type { Turn } from "@shared/cockpit-types";
-export function activeTurn(
-  session: import("@shared/cockpit-types").CockpitSessionView | null,
-): Turn | null {
+export function activeTurn(session: ChatThreadView | null): Turn | null {
   return (
     session?.turns.find((t) => t.status === "running") ||
     session?.turns.find((t) => t.status === "queued") ||
@@ -47,7 +45,7 @@ export function turnLabel(turn: Turn, translate: (key: TranslationKey) => string
   styleUrl: "./turn-status.css",
 })
 export class TurnStatus implements OnDestroy {
-  api = inject(CockpitService);
+  api = inject(ChatSource);
   readonly i18n = inject(I18n);
   tick = signal(0);
   turn = computed(() => activeTurn(this.api.session()));

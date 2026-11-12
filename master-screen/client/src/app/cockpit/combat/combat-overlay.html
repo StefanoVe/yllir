@@ -64,7 +64,13 @@
         <ui-icon [name]="chatOpen() ? 'right' : 'left'" [size]="14" />
       </button>
       @if (chatOpen()) {
-      <cockpit-chat class="chat" [openSource]="openSource" />
+      <cockpit-chat
+        class="chat"
+        [openSource]="openSource"
+        [placeholder]="combat() ? '' : i18n.t('combat.chat.waiting')"
+        [alwaysCompose]="!!combat()"
+        [showHead]="false"
+      />
       }
     </aside>
   </div>

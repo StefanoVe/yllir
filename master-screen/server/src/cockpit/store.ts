@@ -230,6 +230,8 @@ export interface CombatMeta {
     string,
     { source?: SourceRef; phase?: string; tempHp?: number; maxHp?: number }
   >;
+  /** Combat thread of this fight. */
+  threadId?: string;
 }
 /** Per cockpit session, in `live.json`. The ledger and combat themselves live in the framework. */
 export interface LiveSide {
@@ -364,6 +366,19 @@ export class CockpitStore {
     await writeFile(tmp, JSON.stringify(map), { mode: 0o600 });
     await rename(tmp, path.join(dir, "undo.json"));
   }
+  /** Every readable session of the container, combat threads included. */
+  private async readAll(): Promise<CockpitSession[]> {
+    const root = await this.safeContainer();
+    const entries = await readdir(root, { withFileTypes: true });
+    const out: CockpitSession[] = [];
+    for (const e of entries) {
+      if (!e.isDirectory() || e.isSymbolicLink()) continue;
+      try {
+        out.push(await this.read(await this.dir(e.name)));
+      } catch {}
+    }
+    return out;
+  }
   async list(): Promise<CockpitSessionSummary[]> {
     const root = await this.safeContainer();
     const entries = await readdir(root, { withFileTypes: true });
@@ -372,6 +387,7 @@ export class CockpitStore {
       if (!e.isDirectory() || e.isSymbolicLink()) continue;
       try {
         const s = await this.read(await this.dir(e.name));
+        if (s.kind === "combat") continue;
         out.push({
           id: s.id,
           title: s.title,
@@ -387,6 +403,8 @@ export class CockpitStore {
     title: string;
     provider: ProviderId;
     model: string;
+    kind?: "table" | "combat";
+    parentId?: string;
   }): Promise<CockpitSession> {
     if (
       !input.title?.trim() ||
@@ -396,6 +414,12 @@ export class CockpitStore {
       input.provider !== "claude"
     )
       throw new StoreError("Dati sessione non validi");
+    if (input.kind === "combat") {
+      if (typeof input.parentId !== "string" || !input.parentId.trim())
+        throw new StoreError("Dati sessione non validi");
+    } else if (input.parentId !== undefined) {
+      throw new StoreError("Dati sessione non validi");
+    }
     const id = randomUUID();
     const dir = path.join(await this.safeContainer(), id);
     await mkdir(dir, { mode: 0o700 });
@@ -409,6 +433,7 @@ export class CockpitStore {
       provider: input.provider,
       model: input.model,
       state: emptyState(),
+      ...(input.kind === "combat" ? { kind: "combat" as const, parentId: input.parentId } : {}),
       messages: [],
       turns: [],
       history: [],
@@ -420,13 +445,28 @@ export class CockpitStore {
   async get(id: string) {
     return this.enqueue(id, async () => this.read(await this.dir(id)));
   }
+  /** Combat threads of a cockpit session, newest first. */
+  async threads(parentId: string): Promise<CockpitSession[]> {
+    const found = (await this.readAll()).filter(
+      (s) => s.kind === "combat" && s.parentId === parentId,
+    );
+    return found.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }
   async delete(id: string) {
-    return this.enqueue(id, async () => {
+    // Collected before the parent's queue entry, so the children can be deleted after it.
+    const children =
+      (await this.readAll().catch(() => [])).filter(
+        (s) => s.kind === "combat" && s.parentId === id,
+      ).map((s) => s.id);
+    await this.enqueue(id, async () => {
       const dir = await this.dir(id);
       const s = await this.read(dir);
       await rm(dir, { recursive: true });
       this.onChange?.(s, { kind: "deleted" });
     });
+    for (const childId of children) {
+      await this.delete(childId).catch(() => {});
+    }
   }
   async apply(
     id: string,

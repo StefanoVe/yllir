@@ -40,6 +40,8 @@ export interface ToolContext {
   sessionId: string;
   turnId: string;
   groupId?: string;
+  /** Names of the tools this turn may call; the MCP endpoint lists only these. */
+  tools: readonly string[];
   onActivity(label: string): void;
   setGroupId(id: string): void;
 }
@@ -197,6 +199,20 @@ export const COCKPIT_TOOL_NAMES = [
   "music_stop",
   "open_source",
 ] as const;
+/** Tools of the combat thread: the combat, the battle screen, reading sheets and the session log. */
+export const COMBAT_TOOL_NAMES = [
+  "search_docs", "read_doc", "ledger_note",
+  "combat_start", "combat_add", "combat_update", "combat_remove",
+  "combat_turn", "combat_notes", "combat_end",
+  "find_battle_map", "battle_map_set", "battle_move",
+] as const satisfies readonly (typeof COCKPIT_TOOL_NAMES)[number][];
+const COMBAT_ONLY = new Set<string>([
+  "combat_start", "combat_add", "combat_update", "combat_remove",
+  "combat_turn", "combat_notes", "combat_end",
+  "find_battle_map", "battle_map_set", "battle_move",
+]);
+/** Tools of the table agent: everything except the combat and the battle screen. */
+export const TABLE_TOOL_NAMES = COCKPIT_TOOL_NAMES.filter((name) => !COMBAT_ONLY.has(name));
 const tool = (
   name: string,
   description: string,

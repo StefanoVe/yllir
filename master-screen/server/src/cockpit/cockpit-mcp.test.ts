@@ -10,7 +10,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { CockpitStore } from "./store.js";
 import { CockpitBus } from "./bus.js";
-import { createCockpitTools, type ToolContext } from "./tools.js";
+import { COCKPIT_TOOL_NAMES, createCockpitTools, type ToolContext } from "./tools.js";
 import { createResolver } from "./resolvers.js";
 import { TurnTokens, mcpHandler } from "./mcp.js";
 import { webHandlerServer } from "./http-bridge.js";
@@ -76,6 +76,7 @@ test("MCP streamable HTTP autentica token turno e vincola la sessione", async ()
   let context: ToolContext = {
     sessionId: first.id,
     turnId: "turn",
+    tools: COCKPIT_TOOL_NAMES,
     onActivity: () => {},
     setGroupId() {},
   };
@@ -116,6 +117,68 @@ test("MCP streamable HTTP autentica token turno e vincola la sessione", async ()
     body: "{}",
   });
   expect(revoked.status).toBe(401);
+  bus.close();
+  await store.close();
+});
+
+test("tools/list lists only the tools of the turn", async () => {
+  root = await mkdtemp(path.join(tmpdir(), "cockpit-mcp-tools-"));
+  const store = new CockpitStore(root);
+  const session = await store.create({ title: "Uno", provider: "claude", model: "m" });
+  const doc: Detail = {
+    path: "NPCs/Ada.md",
+    title: "Ada",
+    category: "NPCs",
+    area: "",
+    scope: "Campagna",
+    master: false,
+    raw: "# Ada",
+    html: "",
+    headings: [{ id: "ada", title: "Ada", line: 1 }],
+  };
+  const docs = new Map([[doc.path, doc]]);
+  const bus = new CockpitBus();
+  const tracks = new Map();
+  const resolve = createResolver({ archive: { docs }, maps: () => [], tracks });
+  const fake = createFakeFramework();
+  const live = new CockpitLive(store, fake.framework);
+  const tools = createCockpitTools({
+    store,
+    live,
+    categories: { kindOf: fakeKindOf, folderFor: () => null, playersFolder: () => "Players" },
+    archive: { docs, search: () => ({ hits: [], total: 0 }) },
+    maps: () => [],
+    tracks,
+    getPlotGraph: () => ({ source: "", nodes: [], groups: [], edges: [], unresolved: [] }),
+    resolve,
+    bus,
+    music: { search: async () => [], request: async () => ({}) } as never,
+  });
+  const tokens = new TurnTokens();
+  const token = tokens.issue({
+    sessionId: session.id,
+    turnId: "turn",
+    tools: ["search_docs"],
+    onActivity: () => {},
+    setGroupId() {},
+  });
+  const handler = mcpHandler({ tokens, tools });
+  server = await listenLoopback(
+    webHandlerServer(
+      async (request) =>
+        (await handler(request)) || new Response("not found", { status: 404 }),
+    ),
+  );
+  const url = new URL("/mcp/cockpit", server.url);
+  const transport = new StreamableHTTPClientTransport(url, {
+    requestInit: { headers: { Authorization: `Bearer ${token}` } },
+  });
+  const client = new Client({ name: "mcp-test", version: "1.0.0" });
+  await client.connect(transport);
+  const listed = await client.listTools();
+  expect(listed.tools.map((item) => item.name)).toEqual(["search_docs"]);
+  await client.close();
+  tokens.revoke(token);
   bus.close();
   await store.close();
 });

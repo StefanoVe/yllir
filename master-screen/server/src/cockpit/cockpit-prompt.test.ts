@@ -1,10 +1,17 @@
 import { test } from "node:test";
 import { expect } from "./test-helpers/expect.js";
-import type { CockpitSession, ChatMessage } from "../../../shared/src/cockpit-types.js";
+import type {
+  CockpitSession,
+  CockpitState,
+  ChatMessage,
+} from "../../../shared/src/cockpit-types.js";
 import {
   SYSTEM_PROMPT,
+  buildCombatSystemPrompt,
+  buildCombatUserPrompt,
   buildSystemPrompt,
   buildUserPrompt,
+  combatLine,
   languageName,
 } from "./prompt.js";
 import { emptyState } from "./actions.js";
@@ -98,4 +105,63 @@ test("il prompt di sistema nomina il sistema di gioco solo se è noto e non cita
     expect(prompt).not.toContain("Dungeons");
     expect(prompt).not.toContain("<!-- cockpit -->");
   }
+});
+
+test("il prompt di sistema del tavolo non ha strumenti di combattimento e rimanda alla chat dello scontro", () => {
+  const prompt = buildSystemPrompt({ language: "it", systemName: null });
+  expect(prompt).not.toContain("combat_turn");
+  expect(prompt).not.toContain("battle_move");
+  expect(prompt).toContain("combat chat");
+});
+
+test("il prompt della chat di scontro nomina la lingua e i suoi strumenti", () => {
+  const prompt = buildCombatSystemPrompt({ language: "it", systemName: null });
+  expect(prompt).toContain("Italian");
+  expect(prompt).toContain("combat_turn");
+  expect(prompt).toContain("ledger_note");
+  expect(prompt).not.toContain("The game system is");
+});
+
+test("il digest di scontro riporta la linea COMBAT del tavolo o 'none active' e il nuovo messaggio", () => {
+  const combat = {
+    title: "Imboscata",
+    round: 2,
+    activeId: "c1",
+    participants: [
+      { id: "c1", name: "Ada", kind: "pc", initiative: 15, conditions: [] },
+    ],
+    notes: "",
+  } as unknown as NonNullable<CockpitState["combat"]>;
+  const table = {
+    id: "table",
+    title: "Tavolo",
+    provider: "claude",
+    model: "m",
+    createdAt: "",
+    updatedAt: "",
+    revision: 0,
+    state: { ...emptyState(), combat },
+    history: [],
+    messages: [],
+    turns: [],
+  } as unknown as CockpitSession;
+  const thread = { ...table, id: "thread", state: emptyState(), messages: [] } as unknown as CockpitSession;
+  const message: ChatMessage = {
+    id: "msg-combat",
+    role: "dm",
+    text: "Ada colpisce",
+    at: "",
+    turnId: "t",
+    status: "complete",
+  };
+  const withCombat = buildCombatUserPrompt(table, thread, message);
+  expect(withCombat).toContain(combatLine(combat));
+  expect(withCombat).toContain("NEW MASTER MESSAGE (msg-combat): Ada colpisce");
+  const withoutCombat = buildCombatUserPrompt(
+    { ...table, state: emptyState() } as unknown as CockpitSession,
+    thread,
+    message,
+  );
+  expect(withoutCombat).toContain("COMBAT: none active");
+  expect(withoutCombat).toContain("msg-combat");
 });

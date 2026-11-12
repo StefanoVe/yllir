@@ -12,6 +12,7 @@ import { CockpitService } from "./cockpit.service";
 import type { SourceRef } from "@shared/cockpit-types";
 import { Board } from "./board/board";
 import { Chat } from "./chat/chat";
+import { ChatSource } from "./chat/chat-source";
 import { TurnStatus, activeTurn } from "./chat/turn-status";
 import { DocumentModal } from "./modals/document-modal";
 import { SessionModal } from "./modals/session-modal";
@@ -34,6 +35,7 @@ const MAX_CHAT = 640;
   imports: [Board, Chat, TurnStatus, Icon, DocumentModal, SessionModal, CockpitViewer, CombatOverlay],
   templateUrl: "./cockpit.html",
   styleUrl: "./cockpit.css",
+  providers: [{ provide: ChatSource, useExisting: CockpitService }],
 })
 export class Cockpit implements OnInit, OnDestroy {
   api = inject(CockpitService);

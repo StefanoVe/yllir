@@ -47,7 +47,8 @@
     </div>
     } }
   </article>
-  }}@if(newCount()){<button
+  }}@else if(placeholder()){<p class="muted empty">{{ placeholder() }}</p>
+  }@if(newCount()){<button
     class="jump-bottom"
     [title]="i18n.t('liveAgent.chat.jumpBottom')"
     [attr.aria-label]="i18n.t('liveAgent.chat.jumpBottomAria', { n: newCount() })"
@@ -68,4 +69,4 @@
 </div>
 } @if(api.session()){<cockpit-turn-status
   class="desktop-turn"
-/><cockpit-composer (send)="send($event)" />}
+/>}@if(api.session() || alwaysCompose()){<cockpit-composer (send)="send($event)" />}

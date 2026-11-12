@@ -100,6 +100,8 @@ function installServer(options: { battle: BattleView | null; stats?: Record<stri
         const found = options.stats?.[decodeURIComponent(stat[1]!)];
         return found ? json(found) : json({ error: 'not found' }, 404);
       }
+      if (url === '/api/cockpit/sessions/s1/combat/thread' && method === 'POST') return json({ threadId: 'th1' });
+      if (url === '/api/cockpit/sessions/th1' && method === 'GET') return json({ id: 'th1', messages: [], turns: [] });
       if (url.endsWith('/actions') || url.endsWith('/messages')) return json({});
       return json({ error: 'not found' }, 404);
     }),
@@ -134,6 +136,8 @@ describe('Combat overlay', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    // The combat chat follows the combat thread through its own event stream.
+    vi.stubGlobal('EventSource', class { close() {} });
     Element.prototype.setPointerCapture = () => undefined;
     Element.prototype.releasePointerCapture = () => undefined;
   });
@@ -317,7 +321,7 @@ describe('Combat overlay', () => {
 
     root.querySelector<HTMLButtonElement>('.find-map')!.click();
     await settle(fixture);
-    const message = calls.find((call) => call.url === '/api/cockpit/sessions/s1/messages');
+    const message = calls.find((call) => call.url === '/api/cockpit/sessions/th1/messages');
     expect((message?.body as { text: string }).text).toBe('Find and set the battle map of the current place.');
   });
 });

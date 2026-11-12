@@ -144,13 +144,13 @@ The live table (cockpit) has its own turn manager, `server/src/cockpit/turns.ts`
 
 ## Live table (cockpit)
 
-Route `/live`. The live table is the cockpit: a board (a free canvas with document, image and note cards, scene frames and arrows), the current scene, the session log, the combat overlay, and one chat thread with the assistant per cockpit session. While the master plays, the assistant arranges the board, keeps the log and runs the combat on the master's words. The cockpit was imported from the author's prototype and adapted to the master screen (theme, campaign language, framework libraries). Claude is the only provider. The code is in `server/src/cockpit/` (agent side, tools, turns, store, REST, MCP), `server/src/cockpit-host/` (the adapters that connect it to this server: archive, maps, music, categories, engine, battle), `server/src/routes/battle.ts` (battle endpoints) and `client/src/app/cockpit/` (screen, board, chat, combat overlay). `server/src/cockpit/ports.ts` is the only interface between the cockpit and the rest of the server.
+Route `/live`. The live table is the cockpit: a board (a free canvas with document, image and note cards, scene frames and arrows), the current scene, the session log, the combat overlay, and one chat thread with the table assistant per cockpit session, plus a separate combat thread per fight with its own assistant. While the master plays, the assistant arranges the board, keeps the log and runs the combat on the master's words. The cockpit was imported from the author's prototype and adapted to the master screen (theme, campaign language, framework libraries). Claude is the only provider. The code is in `server/src/cockpit/` (agent side, tools, turns, store, REST, MCP), `server/src/cockpit-host/` (the adapters that connect it to this server: archive, maps, music, categories, engine, battle), `server/src/routes/battle.ts` (battle endpoints) and `client/src/app/cockpit/` (screen, board, chat, combat overlay). `server/src/cockpit/ports.ts` is the only interface between the cockpit and the rest of the server.
 
 ### State
 
 Operational state, never canon, always under `.campaign/`.
 
-- Cockpit, one folder per cockpit session: `.campaign/state/live/cockpit/<uuid>/`. Files: `session.json` (chat messages, turns, revision, action groups), `undo.json` (board and scene snapshots of the last 50 undo groups), `live.json` (the framework session the cockpit is bound to, the ledger and combat links, and the sheets created at this session), `tools.jsonl` (tool calls of the turns), `files/` (images the master added).
+- Cockpit, one folder per cockpit session: `.campaign/state/live/cockpit/<uuid>/`. Files: `session.json` (chat messages, turns, revision, action groups), `undo.json` (board and scene snapshots of the last 50 undo groups), `live.json` (the framework session the cockpit is bound to, the ledger and combat links, and the sheets created at this session), `tools.jsonl` (tool calls of the turns), `files/` (images the master added). A combat thread is stored in its own folder of the same kind, `.campaign/state/live/cockpit/<uuid>/`, with `kind: "combat"` and `parentId` (the table session); the fight's `CombatMeta.threadId` lives in the table's `live.json`.
 - Framework, shared with the terminal and the Claude app: `.campaign/state/live/active.json` (`{ "sessionId": "<id>" | null }`, the open session), and per session `.campaign/state/live/<sessionId>/`: `session.json` and `log.json` (the session log, written by the `session-log` library), `combat.json` (the combat, written by the `combat-tracker` library), `battle.json` (the battle screen: map and chip positions, with a `revision`, written by this server atomically).
 
 The cockpit does not write the log or the combat files by hand: each change goes through the framework library (`session-log` for the log, `combat-tracker` for the combat). Every read of a cockpit session fills them from the libraries before the state is sent, so the terminal and the screen show the same thing. A change made in the terminal (a log entry, a combat step) is watched on disk and pushed to the open screen. The board, the scene and the chat stay in the cockpit folder.
@@ -168,12 +168,15 @@ Errors: `{ "error": "<plain-language message>" }`, status 400 by default, 404 fo
 | GET `/api/cockpit/sessions/:id/events` | `Last-Event-ID` header or `lastEventId` query | SSE (see below) |
 | POST `/api/cockpit/sessions/:id/messages` | `{ text: 1..8000 chars, clientId?: string }` | 202 `{ turnId, messageId }`; a repeated `clientId` returns the same turn |
 | POST `/api/cockpit/sessions/:id/turns/:turnId/cancel` | | `{ ok: true }` |
+| POST `/api/cockpit/sessions/:id/combat/thread` | | `{ threadId }`: the thread of the active fight, created when missing (default model Haiku); 409 when no fight is active; 400 when `:id` is itself a thread |
 | POST `/api/cockpit/sessions/:id/actions` | `{ actions: 1..20 CockpitAction }` | `{ revision, group }`; the master's own board edits, one undo group for the whole request |
 | POST `/api/cockpit/sessions/:id/layout` | `{ items: 1..300 }` (geometry only) | `{ revision }`; no undo group |
 | POST `/api/cockpit/sessions/:id/undo` | `{ groupId }`, must be the newest group not yet undone | `{ revision }`; 409 otherwise |
 | POST `/api/cockpit/sessions/:id/files` | raw image body, `Content-Type` `image/png`, `image/jpeg`, `image/webp` or `image/gif` | 201 `{ name }` |
 | GET `/api/cockpit/sessions/:id/files/:name` | | the image (cached, immutable) |
 | GET `/api/cockpit/runtime?sessionId=` | | status of the Claude provider and, when `sessionId` is given, of that session's turn |
+
+A combat thread accepts the ordinary session routes (GET, events, messages, cancel, PATCH model, DELETE); `actions`, `files` upload, `undo` and `layout` answer 409. A message to a thread whose fight is over is refused with 409 "Lo scontro è finito: la sua chat è chiusa". Threads are not listed by `GET /api/cockpit/sessions`, and deleting a table session deletes its threads.
 
 Error messages are plain language, in the campaign language, with no stack trace or file path.
 
@@ -185,11 +188,11 @@ Error messages are plain language, in the campaign language, with no stack trace
 
 - `POST /mcp/cockpit` is the MCP endpoint (streamable HTTP, JSON responses, one server per request). It is outside `/api`.
 - Each turn gets its own random token (32 bytes, base64url). The token is valid only while that turn runs and is revoked when the turn ends. A request needs `Authorization: Bearer <token>`; without a valid token it gets 401. The `Host` header must be `127.0.0.1` or `localhost`, otherwise 403.
-- The Claude provider receives this URL and the token of its own turn only. The endpoint lists only the cockpit tools below.
+- The Claude provider receives this URL and the token of its own turn only. Each turn token carries its own tool list, and the endpoint lists only the tools of that turn. A table turn gets every cockpit tool below except the combat and battle-screen ones (`combat_*`, `find_battle_map`, `battle_map_set`, `battle_move`). A combat-thread turn gets exactly `search_docs`, `read_doc`, `ledger_note`, `combat_start`, `combat_add`, `combat_update`, `combat_remove`, `combat_turn`, `combat_notes`, `combat_end`, `find_battle_map`, `battle_map_set` and `battle_move`.
 
 ### Agent tools
 
-These are the tools of `COCKPIT_TOOL_NAMES` (`server/src/cockpit/tools.ts`), in the campaign language in their descriptions.
+These are the tools of `COCKPIT_TOOL_NAMES` (`server/src/cockpit/tools.ts`), in the campaign language in their descriptions. The list is split by turn: the table has the tools below, and a combat thread has the tools under "Combat thread tools" at the end of this section.
 
 Reading the campaign:
 - `search_docs`: finds names or themes in the sources the master can see (up to 12 hits).
@@ -223,14 +226,20 @@ Session log (framework library `session-log`):
 - `ledger_update`: merges fragments, corrects an entry, resolves it or drops it.
 - `ledger_remove`: removes a wrong or outdated entry.
 
-Combat (framework library `combat-tracker`):
-- `combat_start`, `combat_add`, `combat_update`, `combat_remove`, `combat_turn`, `combat_notes`, `combat_end`: the combat state, as the master declares it. Nothing is rolled and no tactics are chosen. Player characters carry only name and initiative. The turn advances only on an explicit order.
+Music:
+- `music_play`, `music_stop`: only when the master explicitly asks.
 
-Battle screen and music:
+The table agent has none of the combat tools (`combat_*`) nor the battle-screen tools (`find_battle_map`, `battle_map_set`, `battle_move`): a fight starts only from the swords button of the overlay, and the master's stop button ends it.
+
+#### Combat thread tools
+
+A combat thread has these tools and no others. Their changes go to the parent table session (log entries and combat), with the combat system prompt and a digest of the place, the party, the combat line and the thread's last messages.
+- `search_docs`, `read_doc`: as above.
+- `ledger_note`: as above; it may cite the dm messages of the thread as evidence.
+- `combat_start`, `combat_add`, `combat_update`, `combat_remove`, `combat_turn`, `combat_notes`, `combat_end`: the combat state (framework library `combat-tracker`), as the master declares it. Nothing is rolled and no tactics are chosen. Player characters carry only name and initiative. The turn advances only on an explicit order.
 - `find_battle_map`: battle maps of the campaign, filtered by the place (title or path of the sheet that holds them), with grid size when known.
 - `battle_map_set`: shows a battle map on the battle screen of the open session.
 - `battle_move`: moves a combatant's chip to a grid cell, only when the master says where it is.
-- `music_play`, `music_stop`: only when the master explicitly asks.
 
 ### Undo
 
@@ -275,9 +284,9 @@ Player-character category: the sheets of the category in `campaign.yaml` `struct
 
 - Each document card of an NPC or an enemy on the board has a swords button. It opens the full-screen combat overlay. Player characters have no button.
 - Step 1, initiative popup: the player characters come from `GET /api/battle/players`, each with an initiative field; the creature cards come from the board. Any other character or creature card can be ticked, and each ticked creature is an ally or an enemy (a click switches it). Starting the combat sends `combat.start` through the cockpit.
-- Step 2, battle view: when the open session has a battle map and the preference "show battle maps" is on (default on, saved per campaign), the map is shown with a chip for each combatant; otherwise the combatants are listed in initiative order. Chips are dragged inside the map and saved with `PUT /api/battle`. A button asks the assistant to find the battle map of the scene. The round and the current turn are shown; the stop button ends the combat.
+- Step 2, battle view: when the open session has a battle map and the preference "show battle maps" is on (default on, saved per campaign), the map is shown with a chip for each combatant; otherwise the combatants are listed in initiative order. Chips are dragged inside the map and saved with `PUT /api/battle`. A button writes a request to find the battle map of the scene into the combat chat. The round and the current turn are shown; the stop button ends the combat.
 - Hovering or focusing a chip shows a tooltip with the initiative and, for creatures, the stats and actions from `GET /api/battle/stats/:id`.
-- A floating chat on the right is the same chat thread of the session. The assistant applies what the master says with the combat tools.
+- A floating chat on the right is the fight's own chat thread (the combat thread), not the table thread. Before the fight starts it shows that the combat chat starts with the fight. Its assistant applies what the master says with the combat tools only, and the chat closes when the fight is no longer the active one.
 - The overlay opens by itself only when a combat starts while the live table is on screen, and stays closed once the master closes it.
 
 ## Music (phase 3)

@@ -460,3 +460,31 @@ test("se il riordino automatico fallisce il turno resta completato", async () =>
     .flatMap((group) => group.actions.map((action) => action.type));
   expect(types).toEqual(["link.add"]);
 });
+
+test("un turno sulla chat di scontro usa gli strumenti di combattimento, il modello del thread e il digest del tavolo", async () => {
+  const h = await setup([{ type: "event", event: { type: "text", text: "annotato" } }]);
+  const thread = await h.store.create({
+    title: "Scontro",
+    provider: "claude",
+    model: "fake-haiku",
+    kind: "combat",
+    parentId: h.session.id,
+  });
+  const submitted = await h.turns.submit(thread.id, "Ada colpisce il bandito");
+  await waitForTurn(h.store, thread.id, submitted.turnId, ["done"]);
+  const input = h.provider.received[0]!;
+  expect(input.tools).toContain("combat_turn");
+  expect(input.tools).not.toContain("board_place");
+  expect(input.model).toBe("fake-haiku");
+  expect(input.userPrompt).toContain("NEW MASTER MESSAGE");
+  expect(input.userPrompt).toContain("PLACE:");
+});
+
+test("un turno sulla sessione del tavolo non riceve gli strumenti di combattimento", async () => {
+  const h = await setup([{ type: "event", event: { type: "text", text: "ok" } }]);
+  const submitted = await h.turns.submit(h.session.id, "Il gruppo entra in taverna");
+  await waitForTurn(h.store, h.session.id, submitted.turnId, ["done"]);
+  const input = h.provider.received[0]!;
+  expect(input.tools).not.toContain("combat_turn");
+  expect(input.tools).toContain("board_place");
+});

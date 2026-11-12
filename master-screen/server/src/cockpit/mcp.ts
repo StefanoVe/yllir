@@ -44,6 +44,7 @@ export function mcpHandler(deps: McpHandlerDeps) {
 
     const server = new McpServer({ name: "cockpit", version: "1.0.0" });
     for (const tool of deps.tools) {
+      if (!context.tools.includes(tool.name)) continue;
       server.registerTool(
         tool.name,
         { description: tool.description, inputSchema: tool.inputSchema },

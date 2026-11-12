@@ -89,16 +89,81 @@ export function combatOf(state: CombatState, meta: CombatMeta | null): Combat {
     activeId: state.active ? (state.order[state.turn] ?? null) : null,
     participants: ordered.map((p) => combatantOf(p, meta?.participants[p.id])),
     notes: meta?.notes ?? "",
+    ...(meta?.threadId ? { threadId: meta.threadId } : {}),
   };
 }
 
 const sameRef = (a: SourceRef, b: SourceRef) => a.path === b.path && a.anchor === b.anchor;
 
 export class CockpitLive {
+  private threadTasks = new Map<string, Promise<string>>();
+
   constructor(
     private store: CockpitStore,
     private framework: CockpitFramework,
   ) {}
+
+  /**
+   * The combat thread of the active fight of a table session, created when missing.
+   * Refused with 409 when no fight is active. Concurrent calls share one creation.
+   */
+  async combatThread(tableId: string, model: string): Promise<string> {
+    const running = this.threadTasks.get(tableId);
+    if (running) return running;
+    const task = (async () => {
+      const state = await this.framework.combat.get();
+      if (!state.ok) throw new StoreError(state.error.message, 409);
+      if (!state.combat?.active) throw new StoreError("Nessun combattimento attivo", 409);
+      const table = await this.store.get(tableId);
+      if (table.kind === "combat") throw new StoreError("Non è una sessione del tavolo", 400);
+      const side = await this.store.sideGet(tableId);
+      if (side.combat?.threadId) {
+        try {
+          await this.store.get(side.combat.threadId);
+          return side.combat.threadId;
+        } catch {
+          // The remembered thread is gone: a new one is created below.
+        }
+      }
+      const thread = await this.store.create({
+        title: (side.combat?.title || "Scontro").slice(0, 200),
+        provider: "claude",
+        model,
+        kind: "combat",
+        parentId: tableId,
+      });
+      await this.store.sideUpdate(tableId, (next) => ({
+        ...next,
+        combat: {
+          ...(next.combat ?? { title: "Scontro", notes: "", participants: {} }),
+          threadId: thread.id,
+        },
+      }));
+      return thread.id;
+    })();
+    this.threadTasks.set(tableId, task);
+    try {
+      return await task;
+    } finally {
+      this.threadTasks.delete(tableId);
+    }
+  }
+
+  /** True when the thread is the chat of the fight that is active now. */
+  async isOpenThread(thread: CockpitSession): Promise<boolean> {
+    if (thread.kind !== "combat" || !thread.parentId) return false;
+    const state = await this.framework.combat.get();
+    if (!state.ok || !state.combat?.active) return false;
+    return (await this.store.sideGet(thread.parentId)).combat?.threadId === thread.id;
+  }
+
+  /** Dm message ids of the table session and of its combat threads: the valid evidence. */
+  private async knownEvidence(sessionId: string, session: CockpitSession): Promise<Set<string>> {
+    const known = new Set(session.messages.filter((m) => m.role === "dm").map((m) => m.id));
+    for (const thread of await this.store.threads(sessionId))
+      for (const m of thread.messages) if (m.role === "dm") known.add(m.id);
+    return known;
+  }
 
   /**
    * Attaches a cockpit session to the framework's active live session, opening one titled after
@@ -165,8 +230,7 @@ export class CockpitLive {
     sessionId: string,
     entry: Extract<CockpitAction, { type: "ledger.add" }>["entry"],
   ): Promise<ActionSummary> {
-    const session = await this.store.get(sessionId);
-    const known = new Set(session.messages.filter((m) => m.role === "dm").map((m) => m.id));
+    const known = await this.knownEvidence(sessionId, await this.store.get(sessionId));
     if (!entry.evidence.length || entry.evidence.some((id) => !known.has(id)))
       throw new StoreError("Prova riferita a un messaggio DM inesistente");
     const kind = toLogKind(entry.kind);
@@ -194,8 +258,7 @@ export class CockpitLive {
     id: string,
     patch: Extract<CockpitAction, { type: "ledger.update" }>["patch"],
   ): Promise<ActionSummary> {
-    const session = await this.store.get(sessionId);
-    const known = new Set(session.messages.filter((m) => m.role === "dm").map((m) => m.id));
+    const known = await this.knownEvidence(sessionId, await this.store.get(sessionId));
     if ((patch.addEvidence ?? []).some((evidence) => !known.has(evidence)))
       throw new StoreError("Prova riferita a un messaggio DM inesistente");
     const list = await this.framework.log.list();

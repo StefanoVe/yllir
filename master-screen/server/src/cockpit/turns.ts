@@ -10,12 +10,21 @@ import type {
 } from "../../../shared/src/cockpit-types.js";
 import type { CockpitStore } from "./store.js";
 import type { CockpitBus } from "./bus.js";
-import type { Provider, ProviderEvent } from "./providers/provider.js";
+import type { Provider, ProviderEvent, TurnInput } from "./providers/provider.js";
 import type { Resolver } from "./view.js";
 import type { TurnTokens } from "./mcp.js";
-import type { ToolContext } from "./tools.js";
+import {
+  COMBAT_TOOL_NAMES,
+  TABLE_TOOL_NAMES,
+  type ToolContext,
+} from "./tools.js";
 import type { PlotGraph } from "./ports.js";
-import { buildSystemPrompt, buildUserPrompt } from "./prompt.js";
+import {
+  buildCombatSystemPrompt,
+  buildCombatUserPrompt,
+  buildSystemPrompt,
+  buildUserPrompt,
+} from "./prompt.js";
 
 const DEFAULT_IDLE_TIMEOUT_MS = 90_000;
 const DEFAULT_TURN_TIMEOUT_MS = 300_000;
@@ -53,12 +62,15 @@ export interface TurnManagerDeps {
   mcpUrl: string;
   /** System prompt of the campaign (language and game system). English without a campaign. */
   systemPrompt?: string;
+  /** System prompt of combat threads. */
+  combatSystemPrompt?: string;
   /** Fills the ledger and combat of a session from the framework before the digest is built. */
   hydrate?: (session: CockpitSession) => Promise<CockpitSession>;
   idleTimeoutMs?: number;
   turnTimeoutMs?: number;
 }
 const DEFAULT_SYSTEM_PROMPT = buildSystemPrompt({ language: "en", systemName: null });
+const DEFAULT_COMBAT_SYSTEM_PROMPT = buildCombatSystemPrompt({ language: "en", systemName: null });
 export class TurnManager {
   private queues = new Map<string, QueuedTurn[]>();
   private running = new Map<string, RunningTurn>();
@@ -186,6 +198,13 @@ export class TurnManager {
       this.running.delete(sessionId);
       return;
     }
+    const combatThread =
+      providerSession.kind === "combat" && providerSession.parentId
+        ? providerSession.parentId
+        : undefined;
+    /** The session whose state the tools change: the table for a combat thread. */
+    const stateSessionId = combatThread ?? sessionId;
+    const toolNames = combatThread ? COMBAT_TOOL_NAMES : TABLE_TOOL_NAMES;
     const provider = this.deps.providers[providerSession.provider];
     if (!provider) {
       await this.finishError(job, "Provider non configurato");
@@ -263,8 +282,9 @@ export class TurnManager {
       get groupId() {
         return run.groupId;
       },
-      sessionId,
+      sessionId: stateSessionId,
       turnId,
+      tools: toolNames,
       onActivity: (label) => {
         const activity: TurnActivity = { kind: "tool", label };
         if (!sameActivity(run.activity, activity)) {
@@ -286,28 +306,50 @@ export class TurnManager {
       let attempt = 0;
       while (true) {
         const stored = await this.deps.store.get(sessionId);
-        const latest = this.deps.hydrate
-          ? await this.deps.hydrate(stored)
-          : stored;
-        const userMessage = latest.messages.find(
-          (item) => item.id === messageId,
-        )!;
-        const source = latest.state.position.source;
-        const plotNeighbors = source
-          ? this.plotNeighbors(source.path, source.anchor)
-          : undefined;
-        const input = {
-          sessionId,
-          turnId,
-          model: latest.model,
-          systemPrompt: this.deps.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
-          userPrompt: buildUserPrompt(latest, userMessage, {
-            resolve: this.deps.resolve,
-            ...(plotNeighbors ? { plotNeighbors } : {}),
-          }),
-          mcp: { url: this.deps.mcpUrl, token },
-          ...(resume ? { resume } : {}),
-        };
+        let input: TurnInput;
+        if (combatThread) {
+          const table = this.deps.hydrate
+            ? await this.deps.hydrate(await this.deps.store.get(combatThread))
+            : await this.deps.store.get(combatThread);
+          const userMessage = stored.messages.find(
+            (item) => item.id === messageId,
+          )!;
+          input = {
+            sessionId,
+            turnId,
+            model: stored.model,
+            systemPrompt:
+              this.deps.combatSystemPrompt ?? DEFAULT_COMBAT_SYSTEM_PROMPT,
+            userPrompt: buildCombatUserPrompt(table, stored, userMessage),
+            mcp: { url: this.deps.mcpUrl, token },
+            tools: COMBAT_TOOL_NAMES,
+            ...(resume ? { resume } : {}),
+          };
+        } else {
+          const latest = this.deps.hydrate
+            ? await this.deps.hydrate(stored)
+            : stored;
+          const userMessage = latest.messages.find(
+            (item) => item.id === messageId,
+          )!;
+          const source = latest.state.position.source;
+          const plotNeighbors = source
+            ? this.plotNeighbors(source.path, source.anchor)
+            : undefined;
+          input = {
+            sessionId,
+            turnId,
+            model: latest.model,
+            systemPrompt: this.deps.systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+            userPrompt: buildUserPrompt(latest, userMessage, {
+              resolve: this.deps.resolve,
+              ...(plotNeighbors ? { plotNeighbors } : {}),
+            }),
+            mcp: { url: this.deps.mcpUrl, token },
+            tools: TABLE_TOOL_NAMES,
+            ...(resume ? { resume } : {}),
+          };
+        }
         try {
           const iterator = provider
             .run(input, controller.signal)
@@ -371,14 +413,14 @@ export class TurnManager {
         agentMessage.text = content;
       } else {
         agentMessage.status = "complete";
-        if (run.groupId)
+        if (run.groupId && !combatThread)
           await this.arrangeAfterStructuralChanges(
             sessionId,
             turnId,
             run.groupId,
           );
         const actions = this.groupActions(
-          await this.deps.store.get(sessionId),
+          await this.deps.store.get(stateSessionId),
           turnId,
         );
         agentMessage.actions = actions;

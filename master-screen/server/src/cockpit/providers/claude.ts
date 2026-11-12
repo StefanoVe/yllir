@@ -8,12 +8,19 @@ import {
   type SDKMessage,
 } from "@anthropic-ai/claude-agent-sdk";
 import type { ProviderStatus } from "../../../../shared/src/cockpit-types.js";
-import { COCKPIT_TOOL_NAMES } from "../tools.js";
 import { findClaudeCode } from "../../agent/claude-provider.js";
 import type { Provider, ProviderEvent, TurnInput } from "./provider.js";
 
-/** The model the prototype uses for Claude: the default of every new session. */
-const DEFAULT_MODEL = "claude-sonnet-5-5";
+/** The short choices the master can pick for a live session, and the model id each one maps to. */
+export const LIVE_MODELS = {
+  haiku: "claude-haiku-5-5",
+  sonnet: "claude-sonnet-5-5",
+  opus: "claude-opus-5-5",
+} as const;
+export type LiveModelChoice = keyof typeof LIVE_MODELS;
+
+/** The default of every new session: the cheapest and fastest choice. */
+const DEFAULT_MODEL = LIVE_MODELS.haiku;
 const STATUS_CACHE_MS = 30_000;
 const STATUS_FAILURE_CACHE_MS = 5_000;
 const STATUS_TIMEOUT_MS = 5_000;
@@ -139,7 +146,7 @@ export class ClaudeProvider implements Provider {
           },
         },
         strictMcpConfig: true,
-        allowedTools: COCKPIT_TOOL_NAMES.map((name) => `mcp__cockpit__${name}`),
+        allowedTools: input.tools.map((name) => `mcp__cockpit__${name}`),
         permissionMode: "dontAsk",
         settingSources: [],
         cwd: await this.cwdPromise,

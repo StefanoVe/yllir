@@ -6,6 +6,7 @@ import type {
 import { ActionError, parseAction } from "./actions.js";
 import { StoreError, type CockpitStore } from "./store.js";
 import { TurnManager } from "./turns.js";
+import { LIVE_MODELS } from "./providers/claude.js";
 import { sessionView } from "./view.js";
 import type { CockpitBus } from "./bus.js";
 import type { CockpitLive } from "./live.js";
@@ -105,6 +106,11 @@ export function cockpitApi(deps: CockpitApiDeps) {
       if (match) {
         const id = decodeURIComponent(match[1]!);
         const route = match[2] || "";
+        // Table-only routes: a combat thread refuses them.
+        const refuseThread = async (sessionId: string) => {
+          if ((await deps.store.get(sessionId)).kind === "combat")
+            throw new StoreError("Non disponibile nella chat dello scontro", 409);
+        };
         if (route === "" && request.method === "GET")
           return json(
             sessionView(
@@ -131,6 +137,10 @@ export function cockpitApi(deps: CockpitApiDeps) {
             ),
           }));
         }
+        if (route === "combat/thread" && request.method === "POST")
+          return json({
+            threadId: await deps.live.combatThread(id, LIVE_MODELS.haiku),
+          });
         if (route === "messages" && request.method === "POST") {
           const input = asObject(await body(request));
           if (
@@ -146,6 +156,9 @@ export function cockpitApi(deps: CockpitApiDeps) {
             (typeof input.clientId !== "string" || input.clientId.length > 200)
           )
             throw new StoreError("clientId non valido");
+          const target = await deps.store.get(id);
+          if (target.kind === "combat" && !(await deps.live.isOpenThread(target)))
+            throw new StoreError("Lo scontro è finito: la sua chat è chiusa", 409);
           return json(
             await deps.turns.submit(
               id,
@@ -161,6 +174,7 @@ export function cockpitApi(deps: CockpitApiDeps) {
           return json({ ok: true });
         }
         if (route === "actions" && request.method === "POST") {
+          await refuseThread(id);
           const input = asObject(await body(request));
           if (
             !Array.isArray(input.actions) ||
@@ -188,6 +202,7 @@ export function cockpitApi(deps: CockpitApiDeps) {
           });
         }
         if (route === "files" && request.method === "POST") {
+          await refuseThread(id);
           const length = Number(request.headers.get("content-length") || 0);
           if (length > MAX_IMAGE_BYTES)
             throw new StoreError("Immagine troppo grande", 413);
@@ -216,6 +231,7 @@ export function cockpitApi(deps: CockpitApiDeps) {
           });
         }
         if (route === "undo" && request.method === "POST") {
+          await refuseThread(id);
           const input = asObject(await body(request));
           if (typeof input.groupId !== "string")
             throw new StoreError("groupId non valido");
@@ -223,6 +239,7 @@ export function cockpitApi(deps: CockpitApiDeps) {
           return json({ revision: session.revision });
         }
         if (route === "layout" && request.method === "POST") {
+          await refuseThread(id);
           const input = asObject(await body(request));
           if (
             !Array.isArray(input.items) ||

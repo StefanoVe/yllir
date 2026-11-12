@@ -10,7 +10,7 @@ import {
   signal,
 } from "@angular/core";
 import { Icon } from "../support/icon";
-import { CockpitService } from "../cockpit.service";
+import { ChatSource } from "./chat-source";
 import type { SourceRef } from "@shared/cockpit-types";
 import { MODULE_KINDS, LEDGER_ICONS } from "../board/module-kinds";
 import { TurnStatus } from "./turn-status";
@@ -49,9 +49,15 @@ export function renderMessageMarkdown(text: string) {
   styleUrl: "./chat.css",
 })
 export class Chat implements AfterViewChecked, OnDestroy {
-  api: CockpitService;
+  readonly api = inject(ChatSource);
   readonly i18n = inject(I18n);
   openSource = input<(source: SourceRef) => void>(() => {});
+  /** Shown instead of the messages while the thread does not exist yet. */
+  placeholder = input<string>("");
+  /** Shows the composer even without a thread: the thread is then created by the first message. */
+  alwaysCompose = input(false);
+  /** False hides the chat's own header (the combat overlay has its own). */
+  showHead = input(true);
   messagesArrived = output<number>();
   expandedActions = signal("");
   newCount = signal(0);
@@ -59,9 +65,6 @@ export class Chat implements AfterViewChecked, OnDestroy {
   private seen = 0;
   private signature = "";
   @ViewChild("messageList") list?: ElementRef<HTMLElement>;
-  constructor(api: CockpitService) {
-    this.api = api;
-  }
   ngAfterViewChecked() {
     const messages = this.api.session()?.messages || [];
     const signature = messages.map((m) => `${m.id}:${m.text.length}`).join("|");

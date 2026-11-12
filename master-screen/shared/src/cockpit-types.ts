@@ -173,6 +173,8 @@ export interface Combat {
   activeId: string | null;
   participants: Combatant[];
   notes: string;
+  /** The combat thread (the fight's own chat), once its chat has started. */
+  threadId?: string;
 }
 
 // ───────────────────────────── State ─────────────────────────────
@@ -374,6 +376,10 @@ export interface CockpitSession {
   providerSessionId?: string;
   /** Id of the framework live session (session log and combat) this cockpit session is attached to. */
   liveSessionId?: string;
+  /** Kind of agent session. Missing means table (the cockpit itself). */
+  kind?: "table" | "combat";
+  /** Combat threads only: the cockpit session whose combat this thread runs. */
+  parentId?: string;
   state: CockpitState;
   messages: ChatMessage[];
   /** Recent turns only (last ~20); the active/queued ones are always present. */

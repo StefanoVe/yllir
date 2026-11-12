@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from "@angular/core";
 import { I18n } from "../i18n";
+import { ChatSource } from "./chat/chat-source";
 import type {
   CockpitEvent,
   CockpitSessionSummary,
@@ -26,7 +27,7 @@ const STORAGE_KEY = "yllir.cockpit.last-session";
  * and sends Last-Event-ID, so missed events are replayed.
  */
 @Injectable({ providedIn: "root" })
-export class CockpitService {
+export class CockpitService implements ChatSource {
   session = signal<CockpitSessionView | null>(null);
   sessions = signal<CockpitSessionSummary[]>([]);
   /** False while the browser is reconnecting the session stream. */
