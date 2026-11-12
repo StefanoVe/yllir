@@ -1,0 +1,33 @@
+<h1>{{ label('search.title') }}</h1>
+
+<div class="field-wrap">
+  <input #input class="field" type="search" role="combobox" autocomplete="off" spellcheck="false" autofocus
+         aria-autocomplete="list" [attr.aria-expanded]="entries().length > 0" [attr.aria-controls]="listId"
+         [attr.aria-activedescendant]="entries().length > 0 ? optionId(cursor()) : null"
+         [attr.aria-label]="label('search.inputLabel')" [attr.placeholder]="label('search.placeholder')"
+         [value]="query.text()" (input)="onInput($any($event.target).value)" (keydown)="onKeydown($event)" />
+</div>
+
+@if (query.status() === 'loading') {
+  <p class="state" role="status">{{ label('search.loading') }}</p>
+} @else if (query.status() === 'error') {
+  <p class="state" role="alert">{{ query.error() }}</p>
+}
+
+@if (entries().length > 0) {
+  @if (query.text().trim() === '') {
+    <h2 class="group-title">{{ label('search.browse') }}</h2>
+  }
+  <div class="results" [attr.id]="listId" role="listbox" [attr.aria-label]="label('search.results')">
+    @for (entry of entries(); track entry.path + entry.group; let i = $index) {
+      <ms-search-row [entry]="entry" [query]="query.text().trim()" [id]="optionId(i)"
+                     [selected]="i === cursor()" (opened)="open(i)" (hovered)="active.set(i)" />
+    }
+  </div>
+} @else if (query.text().trim() === '') {
+  <p class="state">{{ label('search.emptyBrowse') }}</p>
+} @else if (query.status() === 'done') {
+  <p class="state">{{ label('search.noResults') }}</p>
+}
+
+<p class="hint">{{ label('search.hint') }}</p>

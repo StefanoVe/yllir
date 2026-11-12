@@ -6,15 +6,18 @@ import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import {
   browserCommand,
+  buildChildEnv,
   findLiveServer,
   isPidAlive,
   lockPath,
   message,
   normalizeLang,
   parseArgs,
+  parseClaudeLookup,
   parseReadyLine,
   readCampaignLanguage,
   readLock,
+  resolveUserClaudePath,
 } from './launch-lib.mjs';
 
 function tempDir(t) {
@@ -151,4 +154,72 @@ test('browserCommand picks the opener of each platform', () => {
   assert.deepEqual(browserCommand('http://127.0.0.1:1', 'darwin'), { cmd: 'open', args: ['http://127.0.0.1:1'] });
   assert.equal(browserCommand('http://127.0.0.1:1', 'win32').cmd, 'explorer.exe');
   assert.equal(browserCommand('http://127.0.0.1:1', 'linux').cmd, 'xdg-open');
+});
+
+test('parseClaudeLookup takes the last line of the login shell output, ignoring profile noise', () => {
+  const exists = (file) => file === '/home/u/.nvm/versions/node/v20/bin/claude';
+  const out = 'welcome banner\nnvm: loaded\n/home/u/.nvm/versions/node/v20/bin/claude\n';
+  assert.equal(parseClaudeLookup(out, { platform: 'linux', exists }), '/home/u/.nvm/versions/node/v20/bin/claude');
+});
+
+test('parseClaudeLookup rejects relative, alias-like and missing results', () => {
+  const exists = () => true;
+  assert.equal(parseClaudeLookup('claude\n', { platform: 'darwin', exists }), null);
+  assert.equal(parseClaudeLookup('', { platform: 'darwin', exists }), null);
+  assert.equal(parseClaudeLookup('/x/claude\n', { platform: 'darwin', exists: () => false }), null);
+  assert.equal(parseClaudeLookup(undefined, { platform: 'darwin', exists }), null);
+});
+
+test('parseClaudeLookup on Windows takes the first existing absolute line of where', () => {
+  const exists = (file) => file === 'C:\\npm\\claude.cmd';
+  const out = 'INFO: not here\r\nC:\\npm\\claude.cmd\r\nC:\\other\\claude.exe\r\n';
+  assert.equal(parseClaudeLookup(out, { platform: 'win32', exists }), 'C:\\npm\\claude.cmd');
+});
+
+test('resolveUserClaudePath runs the login shell with argv, not a shell string', async () => {
+  const calls = [];
+  const execFake = (file, args, options) => {
+    calls.push({ file, args, options });
+    return Promise.resolve('/home/u/.local/bin/claude\n');
+  };
+  const found = await resolveUserClaudePath({
+    platform: 'linux',
+    env: { SHELL: '/usr/bin/bash' },
+    execFile: execFake,
+    exists: () => true,
+  });
+  assert.equal(found, '/home/u/.local/bin/claude');
+  assert.equal(calls[0].file, '/usr/bin/bash');
+  assert.deepEqual(calls[0].args, ['-ilc', 'command -v claude']);
+  assert.equal(calls[0].options.timeout, 5000);
+});
+
+test('resolveUserClaudePath falls back to zsh and uses where on Windows', async () => {
+  const calls = [];
+  const execFake = (file, args) => {
+    calls.push([file, args]);
+    return Promise.resolve(null);
+  };
+  assert.equal(await resolveUserClaudePath({ platform: 'darwin', env: {}, execFile: execFake, exists: () => true }), null);
+  await resolveUserClaudePath({ platform: 'win32', env: {}, execFile: execFake, exists: () => true });
+  assert.deepEqual(calls[0], ['/bin/zsh', ['-ilc', 'command -v claude']]);
+  assert.deepEqual(calls[1], ['where', ['claude']]);
+});
+
+test('buildChildEnv puts the Node directory first on PATH and sets YLLIR_CLAUDE_PATH', () => {
+  const env = { PATH: '/usr/bin:/bin', HOME: '/h' };
+  const out = buildChildEnv({ env, claudePath: '/h/.local/bin/claude', nodeDir: '/h/.yllir/node/bin' });
+  assert.equal(out.PATH, '/h/.yllir/node/bin:/usr/bin:/bin');
+  assert.equal(out.YLLIR_CLAUDE_PATH, '/h/.local/bin/claude');
+  assert.equal(out.HOME, '/h');
+  assert.equal(env.PATH, '/usr/bin:/bin', 'the input env is not changed');
+  assert.equal('YLLIR_CLAUDE_PATH' in env, false);
+});
+
+test('buildChildEnv omits YLLIR_CLAUDE_PATH when nothing was found and uses ; on Windows', () => {
+  const out = buildChildEnv({ env: { Path: 'C:\\Windows' }, claudePath: null, nodeDir: 'C:\\node', platform: 'win32' });
+  assert.equal(out.Path, 'C:\\node;C:\\Windows');
+  assert.equal('YLLIR_CLAUDE_PATH' in out, false);
+  const empty = buildChildEnv({ env: {}, nodeDir: '/n', platform: 'linux' });
+  assert.equal(empty.PATH, '/n');
 });

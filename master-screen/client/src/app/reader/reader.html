@@ -1,0 +1,108 @@
+<div class="pane-scroll" #scroller>
+  @if (compact()) {
+    <header class="pane-bar">
+      <span class="pane-title">{{ doc()?.title ?? path() }}</span>
+      <button type="button" class="tool" [attr.aria-label]="label('reader.sideClosePane')" [title]="label('reader.sideClosePane')"
+              (click)="closeRequested.emit()">
+        <lucide-angular [img]="icons.X" [size]="20" aria-hidden="true" />
+      </button>
+    </header>
+  } @else {
+    <header class="toolbar">
+      <button type="button" class="tool" [attr.aria-label]="label('reader.back')" [title]="label('reader.back')" (click)="goBack()">
+        <lucide-angular [img]="icons.ArrowLeft" [size]="20" aria-hidden="true" />
+      </button>
+      <span class="spacer"></span>
+      @if (path() !== '') {
+        <button type="button" class="tool" [class.on]="isFavourite()" [attr.aria-pressed]="isFavourite()"
+                [attr.aria-label]="isFavourite() ? label('reader.unfavourite') : label('reader.favourite')"
+                [title]="isFavourite() ? label('reader.unfavourite') : label('reader.favourite')" (click)="toggleFavourite()">
+          <lucide-angular [img]="icons.Star" [size]="20" aria-hidden="true" />
+        </button>
+      }
+      <button type="button" class="tool" [class.on]="split()" [attr.aria-pressed]="split()"
+              [attr.aria-label]="split() ? label('reader.sideClose') : label('reader.sideOpen')"
+              [title]="split() ? label('reader.sideClose') : label('reader.sideOpen')" (click)="toggleSide()">
+        <lucide-angular [img]="icons.Columns2" [size]="20" aria-hidden="true" />
+      </button>
+    </header>
+  }
+
+  @if (path() === '') {
+    <p class="notice">{{ label('reader.noDocument') }}</p>
+  } @else if (error(); as message) {
+    <p class="notice" role="alert">{{ message }}</p>
+  } @else if (doc(); as d) {
+    <div class="layout">
+      @if (!compact() && outline().length > 0) {
+        <div class="outline-select">
+          <label>
+            <span class="sr-only">{{ label('reader.outlineSelect') }}</span>
+            <select (change)="jumpTo($any($event.target).value)">
+              <option value="">{{ label('reader.outlineSelect') }}</option>
+              @for (heading of outline(); track heading.id) {
+                <option [value]="heading.id" [selected]="heading.id === activeId()">{{ heading.text }}</option>
+              }
+            </select>
+          </label>
+        </div>
+      }
+
+      <article class="article" (click)="onArticleClick($event)">
+        @if (showsTitle(d)) {
+          <h1 class="doc-title">{{ d.title }}</h1>
+        }
+
+        @if (showsPublicNotice(d)) {
+          <p class="notice wide" role="note">
+            {{ d.masterOnly ? label('reader.masterOnlyNotice') : label('reader.emptyPublic') }}
+          </p>
+        } @else {
+          @if (d.masterOnly) {
+            <p class="flag">{{ label('reader.masterOnlyDoc') }}</p>
+          }
+          <ms-doc-body [blocks]="d.blocks" />
+        }
+
+        @if (d.backlinks.length > 0) {
+          <section class="backlinks">
+            <h2>{{ label('reader.backlinks') }}</h2>
+            <ul>
+              @for (link of d.backlinks; track link.path) {
+                <li>
+                  <a class="doc-link" [attr.href]="docHref(link.path)" (click)="onDocLink($event, link.path, false)">{{ link.title }}</a>
+                  @if (!compact()) {
+                    <button type="button" class="tool small" [attr.aria-label]="label('reader.openSide')" [title]="label('reader.openSide')"
+                            (click)="onSideIcon($event, link.path)">
+                      <lucide-angular [img]="icons.Columns2" [size]="16" aria-hidden="true" />
+                    </button>
+                  }
+                </li>
+              }
+            </ul>
+          </section>
+        }
+      </article>
+
+      @if (!compact() && outline().length > 0) {
+        <aside class="outline" [attr.aria-label]="label('reader.outline')">
+          <p class="outline-title">{{ label('reader.outline') }}</p>
+          <ul class="outline-list">
+            @for (heading of outline(); track heading.id) {
+              <li [style.padding-left.rem]="(heading.level - 1) * 0.75">
+                <button type="button" class="outline-link" [class.current]="heading.id === activeId()"
+                        [attr.aria-current]="heading.id === activeId() ? 'location' : null" (click)="jumpTo(heading.id)">{{ heading.text }}</button>
+              </li>
+            }
+          </ul>
+        </aside>
+      }
+    </div>
+  } @else {
+    <p class="notice" role="status">{{ label('reader.loading') }}</p>
+  }
+</div>
+
+@if (!compact() && side() !== null) {
+  <ms-reader [docPath]="side() ?? ''" [compact]="true" (closeRequested)="closeSide()" />
+}

@@ -1,0 +1,240 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  width: 100%;
+  min-width: 0;
+  height: calc(100dvh - 120px);
+  min-height: 360px;
+}
+
+/* On phones the rail is a bottom bar: the composer must end above it. */
+@media (max-width: 719px) {
+  .chat {
+    height: calc(100dvh - var(--rail-mobile-height) - var(--space-3) - env(safe-area-inset-bottom, 0px));
+    min-height: 320px;
+  }
+}
+
+.notice {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+.messages-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+}
+
+.empty {
+  width: 100%;
+  max-width: 36rem;
+  margin: auto;
+  text-align: center;
+}
+
+.empty-title {
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  justify-content: center;
+  gap: var(--space-1);
+}
+
+.chip {
+  max-width: 100%;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.chip:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+
+.chip:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.msg {
+  max-width: 80%;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  align-self: flex-start;
+}
+
+.msg.master {
+  align-self: flex-end;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.msg.flash {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.jump {
+  position: absolute;
+  right: var(--space-1);
+  bottom: var(--space-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-2);
+  cursor: pointer;
+}
+
+.status {
+  min-height: 1.6em;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.activity {
+  flex: 1;
+  min-width: 0;
+}
+
+.failed {
+  color: var(--color-danger);
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.composer {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-1);
+}
+
+.input {
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  min-height: 44px;
+  max-height: 40vh;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  resize: none;
+  overflow-y: auto;
+}
+
+.input:disabled {
+  opacity: 0.6;
+}
+
+.icon-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.icon-btn.send {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .dot {
+    animation: none;
+    opacity: 1;
+  }
+}

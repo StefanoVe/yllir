@@ -1,0 +1,18 @@
+<div class="home" [class.collapsed]="changesCollapsed()">
+  <section class="chat-column" [attr.aria-label]="i18n.t('chat.title')">
+    <ms-chat />
+  </section>
+
+  <aside class="changes-column">
+    <header class="changes-head">
+      <h2 class="changes-title">{{ i18n.t('home.changes') }}</h2>
+      <button type="button" class="toggle" [attr.aria-expanded]="!changesCollapsed()"
+              (click)="toggleChanges()">
+        {{ changesCollapsed() ? i18n.t('home.expandChanges') : i18n.t('home.collapseChanges') }}
+      </button>
+    </header>
+    <div class="changes-body" [hidden]="changesCollapsed()">
+      <ms-changes />
+    </div>
+  </aside>
+</div>

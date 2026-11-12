@@ -10,11 +10,13 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   browserCommand,
+  buildChildEnv,
   findLiveServer,
   message,
   parseArgs,
   parseReadyLine,
   readCampaignLanguage,
+  resolveUserClaudePath,
 } from './launch-lib.mjs';
 
 const FRAMEWORK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -36,12 +38,12 @@ function openBrowser(url) {
 }
 
 /** Starts the server, waits for its READY line and resolves to the exit code. */
-function runServer(serverFile, campaign, lang) {
+function runServer(serverFile, campaign, lang, env) {
   return new Promise((resolve) => {
     const child = spawn(
       process.execPath,
       [serverFile, '--campaign', campaign, '--framework', FRAMEWORK_ROOT, '--open', '--exit-when-closed'],
-      { stdio: ['ignore', 'pipe', 'inherit'] },
+      { stdio: ['ignore', 'pipe', 'inherit'], env },
     );
     let ready = false;
     let settled = false;
@@ -124,7 +126,10 @@ async function main(argv) {
     openBrowser(live);
     return 0;
   }
-  return runServer(serverFile, campaign, lang);
+  // A double-clicked shortcut has a minimal PATH: resolve Claude Code as the user's shell does.
+  const claudePath = await resolveUserClaudePath();
+  const env = buildChildEnv({ env: process.env, claudePath, nodeDir: path.dirname(process.execPath) });
+  return runServer(serverFile, campaign, lang, env);
 }
 
 const code = await main(process.argv.slice(2));

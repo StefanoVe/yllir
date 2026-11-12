@@ -1,0 +1,73 @@
+<div class="chat">
+  @if (agent(); as current) {
+    @if (!current.available) {
+      <p class="notice" role="note">{{ current.reason || t('chat.unavailable') }}</p>
+    }
+  }
+
+  @if (loadError(); as error) {
+    <p class="error" role="alert">{{ error }}</p>
+  }
+
+  <div class="messages-wrap">
+    <div class="messages" #list tabindex="0" role="log" [attr.aria-label]="t('chat.log')" (scroll)="onScroll()">
+      @if (loaded() && messages().length === 0) {
+        <div class="empty">
+          <p class="empty-title">{{ t('chat.empty') }}</p>
+          <div class="chips">
+            @for (key of examples; track key) {
+              <button type="button" class="chip" [disabled]="!agentAvailable()" (click)="useExample(key)">
+                {{ t(key) }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      @for (message of messages(); track message.id) {
+        <article class="msg" [class.master]="message.role === 'master'" [class.agent]="message.role === 'agent'"
+                 [class.pending]="message.pending" [attr.data-message-id]="message.id">
+          <span class="sr-only">{{ roleLabel(message.role) }}:</span>
+          <p class="text">{{ message.text }}</p>
+        </article>
+      }
+    </div>
+
+    @if (jumpVisible()) {
+      <button type="button" class="jump" [title]="t('chat.jumpToLatest')" [attr.aria-label]="t('chat.jumpToLatest')"
+              (click)="jumpToLatest()">
+        <lucide-angular [img]="icons.ArrowDown" [size]="18" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  <div class="status" aria-live="polite" [attr.aria-label]="t('chat.status')">
+    @if (activeTurn(); as turn) {
+      <span class="dot" aria-hidden="true"></span>
+      <span class="activity">{{ turn.activity || t('chat.working') }}</span>
+      <button type="button" class="icon-btn stop" [title]="t('chat.stop')" [attr.aria-label]="t('chat.stop')"
+              (click)="stop()">
+        <lucide-angular [img]="icons.Square" [size]="14" aria-hidden="true" />
+      </button>
+    } @else if (failedTurn(); as turn) {
+      <span class="failed">{{ turn.error || t('chat.turnFailed') }}</span>
+    }
+    @if (stopError(); as error) {
+      <span class="failed">{{ error }}</span>
+    }
+  </div>
+
+  <form class="composer" (submit)="$event.preventDefault(); send()">
+    <textarea #composer rows="1" class="input" [value]="draft()" [disabled]="!agentAvailable()"
+              [placeholder]="t('chat.placeholder')" [attr.aria-label]="t('chat.composer')"
+              (input)="onInput($any($event.target))" (keydown)="onComposerKeydown($event)"></textarea>
+    <button type="submit" class="icon-btn send" [disabled]="!canSend()" [title]="t('chat.send')"
+            [attr.aria-label]="t('chat.send')">
+      <lucide-angular [img]="icons.Send" [size]="18" aria-hidden="true" />
+    </button>
+  </form>
+
+  @if (sendError(); as error) {
+    <p class="error" role="alert">{{ error }}</p>
+  }
+</div>

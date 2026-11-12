@@ -1,0 +1,119 @@
+<h1>{{ t('settings.title') }}</h1>
+
+<div class="cards">
+  <section class="card" aria-labelledby="settings-appearance">
+    <h2 id="settings-appearance">{{ t('settings.appearance') }}</h2>
+
+    <p class="label" id="settings-theme-label">{{ t('nav.theme') }}</p>
+    <div class="segmented" role="group" aria-labelledby="settings-theme-label">
+      @for (option of themeOptions; track option.pref) {
+        <button type="button" class="segment" [class.active]="isTheme(option.pref)" [attr.aria-pressed]="isTheme(option.pref)"
+                [attr.aria-label]="themeLabel(option.pref)" [title]="themeLabel(option.pref)" (click)="setTheme(option.pref)">
+          <lucide-angular [img]="option.icon === 'monitor' ? icons.Monitor : option.icon === 'sun' ? icons.Sun : icons.Moon"
+                          [size]="18" aria-hidden="true" />
+          <span>{{ themeLabel(option.pref) }}</span>
+        </button>
+      }
+    </div>
+
+    <label class="label" for="settings-text-size">{{ t('settings.textSize') }}: {{ scaleLabel() }}</label>
+    <input id="settings-text-size" class="range" type="range" [min]="scaleMin" [max]="scaleMax" [step]="scaleStep"
+           [value]="textScale()" [attr.aria-valuetext]="scaleLabel()" (input)="onScale($any($event.target).value)" />
+    <p class="muted">{{ t('settings.textSizeHint') }}</p>
+  </section>
+
+  <section class="card" aria-labelledby="settings-checks">
+    <div class="card-head">
+      <h2 id="settings-checks">{{ t('settings.checks') }}</h2>
+      <button type="button" class="icon-btn" [disabled]="checking()"
+              [attr.aria-label]="checking() ? t('settings.checking') : t('settings.checkAgain')"
+              [title]="checking() ? t('settings.checking') : t('settings.checkAgain')" (click)="runChecks()">
+        <lucide-angular [img]="checking() ? icons.LoaderCircle : icons.RefreshCw" [size]="18" aria-hidden="true"
+                        [class.spin]="checking()" />
+      </button>
+    </div>
+
+    @if (checkError(); as message) {
+      <p class="error" role="alert">{{ message }}</p>
+    }
+
+    @if (checks(); as result) {
+      <ul class="summary">
+        @for (line of lines(); track $index) {
+          <li [class.warn]="line.broken">{{ line.text }}</li>
+        }
+      </ul>
+      @if (checkedTime() !== '') {
+        <p class="muted">{{ t('settings.checkedAt', { time: checkedTime() }) }}</p>
+      }
+
+      @if (result.brokenLinks.length > 0) {
+        <details>
+          <summary>{{ t('settings.brokenList') }} ({{ result.brokenLinks.length }})</summary>
+          <ul class="plain">
+            @for (link of result.brokenLinks; track $index) {
+              <li>{{ linkLine(link.from, link.to) }}</li>
+            }
+          </ul>
+        </details>
+      }
+      @if (result.sketches.length > 0) {
+        <details>
+          <summary>{{ t('settings.sketchesList') }} ({{ result.sketches.length }})</summary>
+          <ul class="plain">
+            @for (path of result.sketches; track path) {
+              <li>{{ path }}</li>
+            }
+          </ul>
+        </details>
+      }
+      @if (result.exclusions.length > 0) {
+        <details>
+          <summary>{{ t('settings.exclusionsList') }} ({{ result.exclusions.length }})</summary>
+          <ul class="plain">
+            @for (item of result.exclusions; track $index) {
+              <li>{{ item }}</li>
+            }
+          </ul>
+        </details>
+      }
+    } @else if (checkError() === null) {
+      <p class="muted" role="status">{{ t('settings.loading') }}</p>
+    }
+  </section>
+
+  <section class="card" aria-labelledby="settings-about">
+    <h2 id="settings-about">{{ t('settings.about') }}</h2>
+    <dl class="facts">
+      <dt>{{ t('settings.campaign') }}</dt>
+      <dd>{{ campaign()?.name ?? '' }}</dd>
+      <dt>{{ t('settings.version') }}</dt>
+      <dd>{{ framework() }}</dd>
+      <dt>{{ t('settings.assistant') }}</dt>
+      <dd>
+        @if (agent()?.available) {
+          {{ t('settings.agentReady') }}
+        } @else {
+          {{ t('settings.agentUnavailable') }}
+          @if (agent()?.reason; as reason) {
+            <span class="muted block">{{ reason }}</span>
+          }
+        }
+      </dd>
+    </dl>
+  </section>
+
+  <section class="card" aria-labelledby="settings-modules">
+    <h2 id="settings-modules">{{ t('settings.modules') }}</h2>
+    <ul class="modules">
+      @for (row of moduleRows(); track row.id) {
+        <li>
+          <span class="dot" [class.on]="row.on" aria-hidden="true"></span>
+          <span class="module-name">{{ moduleLabel(row.id) }}</span>
+          <span class="muted">{{ row.on ? t('settings.on') : t('settings.off') }}</span>
+        </li>
+      }
+    </ul>
+    <p class="muted">{{ t('settings.modulesHint') }}</p>
+  </section>
+</div>

@@ -1,0 +1,68 @@
+name: master-screen
+
+on:
+  push:
+    branches: [main]
+    paths: ['master-screen/**', '.github/workflows/master-screen.yml']
+  pull_request:
+    paths: ['master-screen/**', '.github/workflows/master-screen.yml']
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # contents: write is only used by the commit-back step, which runs on push to main.
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Server install, typecheck, test and build
+        working-directory: master-screen/server
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Client install, build and tests
+        if: hashFiles('master-screen/client/package.json') != ''
+        working-directory: master-screen/client
+        run: |
+          npm ci
+          npm run build
+          npm run test:unit
+
+      - name: Assemble yllir/master-screen
+        run: |
+          set -euo pipefail
+          # Client output folder, from master-screen/client/angular.json when present (default below).
+          CLIENT_OUT=master-screen/client/dist/client/browser
+          OUT=yllir/master-screen
+          test -f master-screen/dist/server.mjs
+          test -d "$CLIENT_OUT"
+          rm -rf "$OUT"
+          mkdir -p "$OUT/public"
+          cp master-screen/dist/server.mjs "$OUT/server.mjs"
+          cp -R "$CLIENT_OUT/." "$OUT/public/"
+          git rev-parse --short=7 HEAD > "$OUT/VERSION"
+
+      - name: Commit the rebuilt screen
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add yllir/master-screen
+          if git diff --cached --quiet; then
+            echo "The rebuilt screen is unchanged."
+          else
+            git commit -m "master-screen: rebuild [skip ci]"
+            git push
+          fi

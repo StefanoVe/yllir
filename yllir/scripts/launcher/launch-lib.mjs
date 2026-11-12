@@ -2,6 +2,7 @@
 // messages, the single-instance lock check and the READY line of the server.
 // Used by launch.mjs; no side effects except the reads named below.
 
+import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -165,4 +166,75 @@ export function browserCommand(url, platform = process.platform) {
   if (platform === 'darwin') return { cmd: 'open', args: [url] };
   if (platform === 'win32') return { cmd: 'explorer.exe', args: [url] };
   return { cmd: 'xdg-open', args: [url] };
+}
+
+/** True when the path is an existing regular file. */
+function isExistingFile(file) {
+  try {
+    return fs.statSync(file).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The Claude Code path from the output of `command -v claude` (POSIX: only the last
+ * non-empty line counts, so noise printed by the shell profile is ignored) or of
+ * `where claude` (Windows: the first line that is an existing file). Returns an
+ * absolute existing file or null. Never throws.
+ */
+export function parseClaudeLookup(output, { platform = process.platform, exists = isExistingFile } = {}) {
+  const lines = String(output ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '');
+  const candidates = platform === 'win32' ? lines : lines.slice(-1);
+  const flavour = platform === 'win32' ? path.win32 : path.posix;
+  for (const candidate of candidates) {
+    if (flavour.isAbsolute(candidate) && exists(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Finds Claude Code the way the user's terminal does: runs the login shell once
+ * (`-ilc 'command -v claude'`, no shell string) on macOS and Linux, `where claude` on
+ * Windows. Failures and timeouts give null. `execFile` is injectable for tests.
+ */
+export function resolveUserClaudePath({
+  platform = process.platform,
+  env = process.env,
+  execFile = execFileCallback,
+  exists = isExistingFile,
+} = {}) {
+  const run = platform === 'win32'
+    ? execFile('where', ['claude'], { timeout: 5000, windowsHide: true })
+    : execFile(env.SHELL || '/bin/zsh', ['-ilc', 'command -v claude'], { timeout: 5000 });
+  return run.then((stdout) => parseClaudeLookup(stdout, { platform, exists }));
+}
+
+/** execFile as a promise of stdout; any failure resolves to null. */
+export function execFileCallback(file, args, options) {
+  return new Promise((resolve) => {
+    try {
+      execFile(file, args, options, (err, stdout) => resolve(err ? null : String(stdout)));
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+/**
+ * The environment of the server process: PATH gets the directory of the running Node
+ * first (so a `#!/usr/bin/env node` Claude script finds node), and YLLIR_CLAUDE_PATH
+ * carries the Claude Code path when one was found. The input env is not changed.
+ */
+export function buildChildEnv({ env = {}, claudePath = null, nodeDir, platform = process.platform }) {
+  const out = { ...env };
+  const sep = platform === 'win32' ? ';' : ':';
+  const key = Object.keys(out).find((name) => name.toUpperCase() === 'PATH') ?? 'PATH';
+  const current = out[key] ?? '';
+  out[key] = [nodeDir, current].filter((part) => part !== undefined && part !== '').join(sep);
+  if (claudePath) out.YLLIR_CLAUDE_PATH = claudePath;
+  return out;
 }

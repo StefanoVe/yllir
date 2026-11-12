@@ -1,0 +1,44 @@
+<div class="shell">
+  <nav class="rail" [attr.aria-label]="label('shell.mainNav')">
+    <a class="rail-item" routerLink="/" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: true }"
+       [attr.aria-label]="i18n.t('nav.home')" [title]="i18n.t('nav.home')">
+      <lucide-angular [img]="icons.MessageSquare" [size]="20" aria-hidden="true" />
+    </a>
+    <button type="button" class="rail-item" aria-haspopup="dialog" [class.active]="palette.open()"
+            [attr.aria-label]="i18n.t('nav.search')" [title]="i18n.t('nav.search')" (click)="palette.show()">
+      <lucide-angular [img]="icons.Search" [size]="20" aria-hidden="true" />
+    </button>
+    <a class="rail-item" routerLink="/settings" routerLinkActive="active" ariaCurrentWhenActive="page"
+       [attr.aria-label]="i18n.t('nav.settings')" [title]="i18n.t('nav.settings')">
+      <lucide-angular [img]="icons.Settings" [size]="20" aria-hidden="true" />
+    </a>
+    <button type="button" class="rail-item" [class.active]="viewMode.viewMode() === 'public'"
+            [attr.aria-pressed]="viewMode.viewMode() === 'public'"
+            [attr.aria-label]="previewLabel()" [title]="previewLabel()"
+            (click)="viewMode.toggle()">
+      <lucide-angular [img]="viewMode.viewMode() === 'public' ? icons.EyeOff : icons.Eye" [size]="20" aria-hidden="true" />
+    </button>
+    <button type="button" class="rail-item"
+            [attr.aria-label]="themeLabel()" [title]="themeLabel()"
+            (click)="theme.cycle()">
+      <lucide-angular [img]="icons.SunMoon" [size]="20" aria-hidden="true" />
+    </button>
+  </nav>
+
+  <main class="main" id="main" tabindex="-1">
+    @if (viewMode.viewMode() === 'public') {
+      <p class="preview-banner" role="status">
+        <lucide-angular [img]="icons.EyeOff" [size]="16" aria-hidden="true" />
+        <span>{{ label('shell.previewBanner') }}</span>
+      </p>
+    }
+    @if (!live.connected()) {
+      <p class="offline" role="status">{{ i18n.t('shell.offline') }}</p>
+    }
+    <router-outlet />
+  </main>
+</div>
+
+@if (palette.open()) {
+  <ms-palette />
+}

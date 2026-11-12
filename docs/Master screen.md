@@ -1,6 +1,6 @@
 # Master screen
 
-**Stato:** Bozza di progetto
+**Stato:** Bozza di progetto. Fase 1 implementata (2026-11-12): sorgente in `master-screen/`, build in `yllir/master-screen/`; sessione live, combattimento, musica e stampa ancora da fare.
 
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
 Allineato alla [Riprogettazione](Riprogettazione.md) (2026-11-11) e alle decisioni dell'autore del 2026-11-12.

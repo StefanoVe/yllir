@@ -1,0 +1,74 @@
+ms-reader {
+  display: block;
+  min-width: 0;
+
+  &.pane { display: flex; flex-direction: column; min-height: 0; }
+  &.compact { border-left: 1px solid var(--color-border); padding-left: var(--space-2); }
+  &.split {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    gap: var(--space-2);
+    height: calc(100dvh - 3rem);
+  }
+  &.pane > .pane-scroll { flex: 1 1 auto; overflow-y: auto; padding-right: 4px; }
+  .pane-scroll { min-height: 0; min-width: 0; }
+
+  .toolbar, .pane-bar { display: flex; align-items: center; gap: var(--space-1); margin-bottom: var(--space-2); }
+  .pane-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+  .spacer { flex: 1; }
+
+  .tool {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 40px; height: 40px;
+    border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+    background: var(--color-surface); color: var(--color-text-muted); cursor: pointer;
+    &:hover { color: var(--color-text); background: var(--color-surface-2); }
+    &.on { color: var(--color-accent); background: var(--color-accent-soft); border-color: var(--color-accent); }
+    &.on lucide-angular svg { fill: currentColor; }
+    &.small { width: 28px; height: 28px; border-color: transparent; background: transparent; margin-left: 6px; }
+  }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 72ch) 14rem; justify-content: center; gap: var(--space-3); align-items: start; }
+  .article { min-width: 0; max-width: 72ch; line-height: 1.7; }
+  .doc-title { font-size: var(--font-size-lg); margin-bottom: var(--space-2); }
+  .doc-link { color: var(--color-accent); }
+  .flag { margin: 0 0 var(--space-2); color: var(--color-text-muted); font-size: var(--font-size-sm); font-style: italic; }
+  .notice { margin: var(--space-2) 0; padding: var(--space-2); border-radius: var(--radius-md); background: var(--color-surface-2); color: var(--color-text-muted); }
+  .notice.wide { max-width: none; text-align: center; }
+  .backlinks { margin-top: var(--space-4); padding-top: var(--space-2); border-top: 1px solid var(--color-border);
+    h2 { font-size: var(--font-size-sm); color: var(--color-text-muted); }
+    ul { list-style: none; margin: 0; padding: 0; }
+    li { display: flex; align-items: center; min-height: 32px; }
+  }
+
+  .outline { position: sticky; top: var(--space-2); max-height: calc(100dvh - 2 * var(--space-2)); overflow-y: auto; font-size: var(--font-size-sm);
+    ul, li { list-style: none; margin: 0; padding: 0; }
+  }
+  .outline-title { margin: 0 0 var(--space-1); color: var(--color-text-muted); font-weight: 600; }
+  .outline-link {
+    width: 100%; padding: 4px 8px; border: 0; border-left: 2px solid var(--color-border);
+    background: transparent; color: var(--color-text-muted); text-align: left; font: inherit; cursor: pointer;
+    &:hover { color: var(--color-text); }
+    &.current { color: var(--color-text); font-weight: 700; border-left: 3px solid var(--color-accent); }
+  }
+
+  .outline-select { display: none; margin-bottom: var(--space-2);
+    select { width: 100%; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); font: inherit; }
+  }
+}
+
+@media (max-width: 899px) {
+  ms-reader {
+    .layout { grid-template-columns: minmax(0, 1fr); }
+    .outline { display: none; }
+    .outline-select { display: block; }
+  }
+}
+
+@media (max-width: 719px) {
+  ms-reader {
+    &.split { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; height: auto; }
+    &.compact { border-left: 0; padding-left: 0; border-top: 1px solid var(--color-border); padding-top: var(--space-2); }
+  }
+}
