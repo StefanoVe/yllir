@@ -204,6 +204,21 @@ test('a dry-run never clears a stale pending sheet-migration marker', async () =
   assert.equal(read(dir, '.campaign/state/update.yaml'), state);
 });
 
+test('an up-to-date campaign has no news field', async () => {
+  const dir = makeCurrentCampaign();
+  const result = await updateCampaign(dir);
+  assert.equal(result.status, 'up-to-date');
+  assert.equal('news' in result, false);
+});
+
+test('an updated campaign carries a news field that is a string or null, and never fails the update', async () => {
+  const dir = makeCampaign();
+  setVersion(dir, OLD);
+  const result = await updateCampaign(dir, { today: '2026-11-09' });
+  assert.equal(result.status, 'updated');
+  assert.ok(result.news === null || typeof result.news === 'string');
+});
+
 test('a campaign made with an older version is updated: the update version, then the format version', async () => {
   const dir = makeCampaign();
   setVersion(dir, OLD);

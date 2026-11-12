@@ -257,6 +257,8 @@ Esempio di voce per il master:
 
 Regole del changelog per il master: ogni voce dice se tocca i contenuti (sì/no), se richiede una decisione, e quanti documenti coinvolge. Nessuna voce che non ha un effetto per il master viene mostrata fuori dal changelog tecnico.
 
+Le novità per il master si mostrano due volte. Nell'avviso, prima di aggiornare, compaiono tutte le versioni fra quella installata e quella pubblicata. Di nuovo, dopo l'allineamento, compaiono tutte le versioni fra la vecchia versione della campagna e quella installata. Entrambe le letture usano i file in `news/`.
+
 ## Confini con il resto del framework
 
 - La verifica dei rilasci e delle migrazioni è descritta in [Robustezza e test](Robustezza%20e%20test.md): ogni migrazione ha una coppia di campagne d’esempio, prima e dopo, e ogni rilascio è provato dalla versione più vecchia supportata fino all’ultima.

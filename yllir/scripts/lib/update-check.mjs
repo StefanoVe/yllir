@@ -12,8 +12,10 @@ import { parseYamlLite } from './yaml-lite.mjs';
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
 const NOTICE_PATH = '.campaign/state/update-notice.yaml';
 const CONFIG_PATH = 'campaign.yaml';
-const NEWS_LIMIT = 4000;
+const ENTRY_LIMIT = 2000;
+const TOTAL_LIMIT = 8000;
 const SEMVER_RE = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
+const NEWS_NAME_RE = /^(.+)\.md$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const LANG_RE = /^[a-z]{2,3}(-[a-z0-9]+)?$/i;
 const HEADER = 'YLLIR UPDATE AVAILABLE (for the assistant, not for the master)';
@@ -68,7 +70,7 @@ export function checkUpdate(campaignRoot, options = {}) {
     return {
       installed,
       published,
-      news: readNews(path.resolve(sourceDir), published, language),
+      news: collectNews(path.resolve(sourceDir), installed, published, language),
     };
   }, null);
 }
@@ -140,17 +142,67 @@ function readNoticeMemory(root) {
   return parsed.data;
 }
 
-/** News text for the version: the language variant when it exists, else the plain file. */
-function readNews(sourceDir, version, language) {
+/**
+ * News for every published version after fromVersion, up to and including toVersion,
+ * oldest first. For each version the language variant is used when it exists,
+ * else the plain file. Never throws: any failure gives null.
+ * @returns {string | null}
+ */
+export function collectNews(sourceDir, fromVersion, toVersion, language) {
+  return attempt(() => {
+    const newsDir = path.join(sourceDir, 'news');
+    const versions = new Set();
+    for (const name of fs.readdirSync(newsDir)) {
+      const version = newsVersionOf(name);
+      if (version !== null) {
+        versions.add(version);
+      }
+    }
+    const inRange = [...versions]
+      .filter((v) => compareVersions(v, fromVersion) === 1 && compareVersions(v, toVersion) !== 1)
+      .sort((a, b) => compareVersions(a, b));
+    const entries = [];
+    for (const version of inRange) {
+      const text = newsTextFor(newsDir, version, language);
+      if (text !== null) {
+        entries.push(text);
+      }
+    }
+    const joined = entries.join('\n\n').slice(0, TOTAL_LIMIT).trim();
+    return joined === '' ? null : joined;
+  }, null);
+}
+
+/** Version of a news file name (X.Y.Z.md or X.Y.Z.<lang>.md), or null when the name is not one. */
+function newsVersionOf(name) {
+  const match = NEWS_NAME_RE.exec(name);
+  if (match === null) {
+    return null;
+  }
+  const base = match[1];
+  if (parseVersion(base) !== null) {
+    return base;
+  }
+  const dot = base.lastIndexOf('.');
+  if (dot < 0) {
+    return null;
+  }
+  const version = base.slice(0, dot);
+  const lang = base.slice(dot + 1);
+  return parseVersion(version) !== null && LANG_RE.test(lang) ? version : null;
+}
+
+/** Trimmed text of one version's news: the language variant when it exists, else the plain file. */
+function newsTextFor(newsDir, version, language) {
   const candidates = [];
   if (typeof language === 'string' && LANG_RE.test(language)) {
-    candidates.push(`news/${version}.${language}.md`);
+    candidates.push(`${version}.${language}.md`);
   }
-  candidates.push(`news/${version}.md`);
-  for (const rel of candidates) {
-    const text = readTextSafe(path.join(sourceDir, rel));
+  candidates.push(`${version}.md`);
+  for (const name of candidates) {
+    const text = readTextSafe(path.join(newsDir, name));
     if (text !== null) {
-      const news = text.trim().slice(0, NEWS_LIMIT).trim();
+      const news = text.trim().slice(0, ENTRY_LIMIT).trim();
       return news === '' ? null : news;
     }
   }

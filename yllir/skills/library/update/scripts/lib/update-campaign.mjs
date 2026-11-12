@@ -18,6 +18,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { checkFingerprints, generateInstructions } from '../../../../../scripts/lib/instructions.mjs';
+import { collectNews } from '../../../../../scripts/lib/update-check.mjs';
 import { UPDATE_STATE_PATH, formatUpdateState, parseUpdateState } from '../../../../../scripts/lib/update-state.mjs';
 import { listVersions, restore, saveManualChanges, saveVersion, status } from '../../../../../scripts/lib/versions.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
@@ -47,7 +48,11 @@ const STATE_FIELDS = ['status', 'from_version', 'to_version', 'restore_point', '
  *   world_migration_files: string[],
  *   details: Record<string, { status: string, changed: string[], skipped: object[], errors: object[] }>,
  *   errors: Array<{ code: string, message: string, file?: string, line?: number | null }>,
+ *   news?: string | null,
  * }} UpdateResult
+ * `news` is set only when status is 'updated': the framework news between the campaign's
+ * old version (from) and the installed one (to), in the campaign language, or null when
+ * there is none or it cannot be read. A news failure never changes the status.
  */
 
 /**
@@ -332,6 +337,7 @@ async function runUpdate(root, out, { dryRun, resume, today, registryDir }) {
         }
         writeUpdateState(root, { ...state, status: 'completed', completed_on: today, migrations: run.statuses });
         out.status = 'updated';
+        out.news = readNews(root, out);
         return out;
       }
       out.errors = run.errors;
@@ -418,6 +424,19 @@ function readYamlOrNull(file) {
   if (text === null) return null;
   const parsed = parseYamlLite(text);
   return parsed.errors.length > 0 ? null : parsed.data;
+}
+
+/** The framework news for an updated campaign (see UpdateResult.news). Never throws. */
+function readNews(root, out) {
+  try {
+    if (typeof out.from !== 'string' || out.from === '') return null;
+    const config = readYamlOrNull(path.join(root, CONFIG_PATH));
+    const language = typeof config?.language?.main === 'string' ? config.language.main : null;
+    const news = collectNews(path.dirname(PLUGIN_JSON), out.from, out.to, language);
+    return typeof news === 'string' ? news : null;
+  } catch {
+    return null;
+  }
 }
 
 function readCampaignVersion(root) {

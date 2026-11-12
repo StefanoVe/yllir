@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { checkUpdate, compareVersions, formatUpdateNotice, recordNotice } from './update-check.mjs';
+import { checkUpdate, collectNews, compareVersions, formatUpdateNotice, recordNotice } from './update-check.mjs';
 import { parseYamlLite } from './yaml-lite.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
@@ -202,12 +202,19 @@ describe('checkUpdate', () => {
     });
   });
 
-  test('news is trimmed and cut to 4000 characters', () => {
+  test('news is trimmed and cut to 2000 characters per version', () => {
     const root = campaignWithMemory();
     const source = publishedSource('1.1.0', { '1.1.0.md': `  ${'a'.repeat(5000)}  \n` });
     const news = checkUpdate(root, { sourceDir: source, installed: '1.0.0', today: TODAY, language: 'it' }).news;
-    assert.equal(news.length, 4000);
-    assert.equal(news, 'a'.repeat(4000));
+    assert.equal(news.length, 2000);
+    assert.equal(news, 'a'.repeat(2000));
+  });
+
+  test('news for every version in the range is shown, not only the published one', () => {
+    const root = campaignWithMemory();
+    const source = publishedSource('1.2.0', { '1.1.0.md': 'Uno', '1.2.0.md': 'Due' });
+    const result = checkUpdate(root, { sourceDir: source, installed: '1.0.0', today: TODAY, language: 'it' });
+    assert.equal(result.news, 'Uno\n\nDue');
   });
 
   test('a notice already shown today gives null', () => {
@@ -267,6 +274,90 @@ describe('checkUpdate', () => {
     const before = listFiles(root);
     checkUpdate(root, { sourceDir: source, installed: '1.0.0', today: TODAY });
     assert.deepEqual(listFiles(root), before);
+  });
+});
+
+describe('collectNews', () => {
+  test('includes versions after from and up to and including to, oldest first', () => {
+    const source = publishedSource('1.3.0', {
+      '1.0.0.md': 'Vecchia',
+      '1.1.0.md': 'Uno',
+      '1.10.0.md': 'Dieci',
+      '1.2.0.md': 'Due',
+      '1.3.0.md': 'Tre',
+      '1.4.0.md': 'Oltre',
+    });
+    assert.equal(collectNews(path.join(source), '1.0.0', '1.3.0', null), 'Uno\n\nDue\n\nTre');
+    assert.equal(collectNews(source, '1.1.0', '1.10.0', null), 'Due\n\nTre\n\nOltre\n\nDieci');
+  });
+
+  test('the from version itself is excluded', () => {
+    const source = publishedSource('1.1.0', { '1.1.0.md': 'Già visto' });
+    assert.equal(collectNews(source, '1.1.0', '1.1.0', null), null);
+  });
+
+  test('the language variant is used when it exists, else the plain file', () => {
+    const source = publishedSource('1.2.0', {
+      '1.1.0.md': 'Uno plain',
+      '1.1.0.it.md': 'Uno italiano',
+      '1.2.0.md': 'Due plain',
+    });
+    assert.equal(collectNews(source, '1.0.0', '1.2.0', 'it'), 'Uno italiano\n\nDue plain');
+    assert.equal(collectNews(source, '1.0.0', '1.2.0', 'de'), 'Uno plain\n\nDue plain');
+  });
+
+  test('with language null a language-only file is skipped', () => {
+    const source = publishedSource('1.1.0', { '1.1.0.it.md': 'Solo italiano' });
+    assert.equal(collectNews(source, '1.0.0', '1.1.0', null), null);
+    assert.equal(collectNews(source, '1.0.0', '1.1.0', 'it'), 'Solo italiano');
+  });
+
+  test('ordering is by version, not by text of the file names', () => {
+    const source = publishedSource('1.10.0', { '1.9.0.md': 'Nove', '1.10.0.md': 'Dieci' });
+    assert.equal(collectNews(source, '1.0.0', '1.10.0', null), 'Nove\n\nDieci');
+  });
+
+  test('null when there is no news in range or no news folder', () => {
+    const empty = publishedSource('1.1.0');
+    assert.equal(collectNews(empty, '1.0.0', '1.1.0', 'it'), null);
+    const outside = publishedSource('2.0.0', { '3.0.0.md': 'Futura' });
+    assert.equal(collectNews(outside, '1.0.0', '2.0.0', 'it'), null);
+    assert.equal(collectNews(path.join(tempDir(), 'missing'), '1.0.0', '1.1.0', 'it'), null);
+  });
+
+  test('empty entries are dropped', () => {
+    const source = publishedSource('1.2.0', { '1.1.0.md': '   \n', '1.2.0.md': 'Due' });
+    assert.equal(collectNews(source, '1.0.0', '1.2.0', null), 'Due');
+  });
+
+  test('invalid file names are ignored', () => {
+    const source = publishedSource('1.1.0', {
+      'notes.md': 'nope',
+      '1.1.md': 'nope',
+      'v1.1.0.md': 'nope',
+      '1.1.0.txt': 'nope',
+      '1.1.0.it.md.bak': 'nope',
+      '1.1.0.123.md': 'nope',
+      '1.1.0.md': 'Valida',
+    });
+    assert.equal(collectNews(source, '1.0.0', '1.1.0', 'it'), 'Valida');
+  });
+
+  test('each entry is capped at 2000 characters and the total at 8000', () => {
+    const source = publishedSource('1.5.0', {
+      '1.1.0.md': 'a'.repeat(3000),
+      '1.2.0.md': 'b'.repeat(3000),
+      '1.3.0.md': 'c'.repeat(3000),
+      '1.4.0.md': 'd'.repeat(3000),
+      '1.5.0.md': 'e'.repeat(3000),
+    });
+    const news = collectNews(source, '1.0.0', '1.5.0', null);
+    assert.equal(news.length, 8000);
+    assert.equal(news.slice(0, 2000), 'a'.repeat(2000));
+  });
+
+  test('a failure gives null and does not throw', () => {
+    assert.equal(collectNews(undefined, '1.0.0', '1.1.0', 'it'), null);
   });
 });
 
