@@ -165,3 +165,42 @@ describe('Content-Security-Policy matrix', () => {
     }
   });
 });
+
+describe('Content-Security-Policy with the encyclopedia module', () => {
+  const base = buildCsp({ music: false });
+  const enc = buildCsp({ music: false, encyclopedia: true });
+  const both = buildCsp({ music: true, encyclopedia: true });
+  const musicOnly = buildCsp({ music: true });
+
+  it('encyclopedia off is the unchanged main policy', () => {
+    assert.equal(buildCsp({ music: false, encyclopedia: false }), base);
+    assert.doesNotMatch(base, /frame-src/);
+  });
+
+  it('encyclopedia on adds exactly one frame-src self and nothing else', () => {
+    assert.equal(enc, `${base}; frame-src 'self'`);
+  });
+
+  it('music and encyclopedia share one frame-src directive', () => {
+    assert.equal(both, `${musicOnly}`.replace('frame-src https://www.youtube-nocookie.com', "frame-src 'self' https://www.youtube-nocookie.com"));
+    assert.equal(both.match(/frame-src/g)?.length, 1);
+    assert.doesNotMatch(both, /\*/);
+  });
+
+  it('the middleware sends the policy of both flags', async () => {
+    const server = await startServer((port) => {
+      const app = express();
+      app.use(securityMiddleware(port, { music: false, encyclopedia: true }));
+      app.get('/x', (_req, res) => {
+        res.json({ ok: true });
+      });
+      return app;
+    });
+    try {
+      const res = await request(server.port, { path: '/x', headers: { host: `127.0.0.1:${server.port}` } });
+      assert.equal(res.headers['content-security-policy'], enc);
+    } finally {
+      await server.close();
+    }
+  });
+});

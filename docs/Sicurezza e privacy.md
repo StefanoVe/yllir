@@ -125,7 +125,7 @@ Se trova qualcosa, **blocca il salvataggio** e lo dice in una frase: «Ho trovat
 | Fornitore di immagini via API di terzi | Descrizione pubblica verificata; immagini pubbliche di riferimento; chiave del servizio (dal portachiavi, non nel contenuto) | Servizio scelto dal master | Solo per le immagini richieste | All'attivazione del servizio, con il costo da verificare (**DA VERIFICARE**) |
 | Photoshop (con le funzioni generative) | Immagine interessata dall'operazione generativa | Servizio di Adobe per la sola operazione generativa; il resto resta sul computer | Solo per le operazioni generative | All'attivazione, con la precisazione che le funzioni generative inviano l'immagine |
 | Generazione locale | Nulla verso l'esterno, dopo l'installazione | Solo il computer del master | Sempre | Nessuno, ma va verificato che non ci siano servizi remoti (**DA VERIFICARE**) |
-| Pubblicazione dell'enciclopedia (servizio di hosting) | Solo le voci pubbliche e le carte già generate; il servizio registra gli accessi secondo le proprie regole (**DA VERIFICARE**) | Servizio di hosting scelto | Solo quando il master pubblica | All'attivazione, una volta (**Deciso**). Ogni pubblicazione è una richiesta del master e va confermata (sezione 5) |
+| Pubblicazione dell'enciclopedia (servizio di hosting, non ancora scelto) | Solo le voci pubbliche e le carte già generate; il servizio registra gli accessi secondo le proprie regole (**DA VERIFICARE**) | Servizio di hosting scelto | Solo quando il master pubblica | All'attivazione, una volta (**Deciso**). Ogni pubblicazione è una richiesta del master e va confermata (sezione 5). Per ora non esiste: l'enciclopedia è solo locale (decisione dell'autore, 2026-11-12) |
 | Repository git remoto privato dell'utente (facoltativo) | Tutto lo storico della cartella: anche riservato, schede dei giocatori, chiavi se finite lì | Repository remoto che l'utente tiene privato | Quando è attivo, con le versioni salvate | All'attivazione, una volta (**Deciso**). È una copia dell'utente, non un servizio del framework |
 | Cartelle sincronizzate con servizi cloud | Copia dell'intera cartella della campagna, riservato compreso | Servizio di sincronizzazione | Continuamente, per come è configurato il sistema | Il framework avvisa al primo avvio e consiglia di non usare cartelle sincronizzate (vedi [Esperienza utente](Esperienza%20utente.md)) |
 | Condivisione di documenti (handout ai giocatori) | Solo i file che il master sceglie | Servizio di condivisione scelto | Solo quando il master lo chiede | All'attivazione, una volta (**Deciso**). Ogni invio è una scelta del master |
@@ -159,6 +159,8 @@ Il consenso si può revocare con una frase; la revoca ferma gli invii futuri e l
 
 Nelle uscite pubbliche la parte riservata non compare, nemmeno il titolo di una scheda interamente riservata (vedi [Architettura](Architettura.md), sezione 3).
 
+**Testi protetti da codice (Proposta, 2026-11-12).** Un testo pubblico può essere chiuso da un codice. Nel sito è cifrato (AES-256-GCM, con chiave derivata da PBKDF2): né il testo né il codice compaiono nel sito. Il controllo avviene nel browser: è una protezione dalla lettura casuale, non sicurezza reale, perché chi ha il codice legge il testo e chi ha il file del sito può provare i codici offline. I codici stanno solo nel blocco riservato, sotto `### Codici`.
+
 ### 5.2 Controllo deterministico prima di ogni pubblicazione
 
 **Proposta.** Prima di ogni pubblicazione o di ogni invio di un'uscita pubblica, uno script esegue questi controlli. Se uno fallisce, la pubblicazione non parte e il framework dice che cosa correggere.
@@ -171,6 +173,8 @@ Nelle uscite pubbliche la parte riservata non compare, nemmeno il titolo di una 
 6. Nessun collegamento dell'uscita punta a una nota riservata, cioè a un'ancora del tipo `scheda.md#master`.
 7. L'uscita non contiene riferimenti ai nomi dei giocatori come persone: non si dice «il giocatore di X» né si attribuiscono scelte reali a una persona.
 8. Il framework mostra al master un'anteprima e un riepilogo in frasi di che cosa è cambiato rispetto all'uscita precedente.
+
+**Decisione dell'autore (2026-11-12).** I controlli girano a ogni generazione, non solo prima di una pubblicazione. Finché non esiste un elenco dei giocatori (questione aperta 9), i controlli 4 (nomi reali dei giocatori) e 7 (riferimenti ai giocatori come persone) sono saltati: il framework lo dichiara.
 
 I controlli dicono che cosa è stato verificato. Il framework non dichiara la pubblicazione «sicura» se uno dei controlli non è stato eseguito (vedi [Principi](Principi.md), principio 7).
 

@@ -35,5 +35,13 @@ export const routes: Routes = [
     path: 'music',
     loadComponent: () => import('./music/music-library').then((m) => m.MusicLibrary),
   },
+  {
+    path: 'encyclopedia',
+    loadComponent: () => import('./encyclopedia/encyclopedia').then((m) => m.EncyclopediaPage),
+  },
+  {
+    path: 'print',
+    loadComponent: () => import('./print/print').then((m) => m.PrintPage),
+  },
   { path: '**', redirectTo: '' },
 ];

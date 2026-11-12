@@ -1,8 +1,8 @@
-import { Component, HostListener, computed, effect, inject, untracked } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Music, MessageSquare, Search, Settings, SunMoon } from 'lucide-angular';
+import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Music, MessageSquare, Printer, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
 import { filter, map } from 'rxjs';
 import { LiveService } from '../core/live.service';
 import { MusicApiService } from '../music/music-api.service';
@@ -34,10 +34,16 @@ export class Shell {
   private readonly titleService = inject(Title);
   private readonly music = inject(MusicPlayerService);
   private readonly musicApi = inject(MusicApiService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  readonly icons = { MessageSquare, Dices, GitBranch, Music, Search, Settings, Eye, EyeOff, SunMoon };
-  /** The music entry shows only when the module is on for this campaign. */
+  readonly icons = { MessageSquare, Dices, GitBranch, Music, BookOpen, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
+  /** The connection notice shows only after the stream has been down for a while, so load and blips do not flash it. */
+  readonly showOffline = signal(false);
+  private offlineTimer: ReturnType<typeof setTimeout> | undefined;
+  /** Module entries show only when the module is on for this campaign. */
   readonly musicEnabled = computed(() => this.status.modules()?.music === true);
+  readonly encyclopediaEnabled = computed(() => this.status.modules()?.encyclopedia === true);
+  readonly printEnabled = computed(() => this.status.modules()?.print === true);
   /** The bottom dock (mini player and suggestions) is shown only while it has something to show. */
   readonly dockVisible = computed(() => this.music.current() !== null || this.musicApi.suggestions().length > 0);
 
@@ -60,6 +66,25 @@ export class Shell {
       this.i18n.language();
       untracked(() => this.titleService.setTitle(this.titleFor(url, name)));
     });
+    // Show the connection notice only after 4 seconds offline; hide it at once when connected.
+    effect(() => {
+      const up = this.live.connected();
+      untracked(() => {
+        clearTimeout(this.offlineTimer);
+        this.offlineTimer = undefined;
+        if (up) {
+          this.showOffline.set(false);
+        } else {
+          this.offlineTimer = setTimeout(() => this.showOffline.set(true), 4000);
+        }
+      });
+    });
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.offlineTimer));
+    // On a phone the rail scrolls sideways: keep the current page's icon in view after each navigation.
+    effect(() => {
+      this.url();
+      untracked(() => setTimeout(() => this.keepActiveRailItemInView()));
+    });
   }
 
   /** Theme button label, for example "Theme: Light". */
@@ -81,10 +106,20 @@ export class Shell {
     const path = url.split(/[?#]/)[0];
     const page = path === '/' ? this.i18n.t('nav.home') : path.startsWith('/search') ? this.i18n.t('nav.search') : path.startsWith('/settings') ? this.i18n.t('nav.settings')
       : path.startsWith('/live') ? this.i18n.t('nav.liveTable') : path.startsWith('/plot') ? this.i18n.t('nav.plot')
-      : path.startsWith('/music') ? this.i18n.t('nav.music') : '';
+      : path.startsWith('/music') ? this.i18n.t('nav.music')
+      : path.startsWith('/encyclopedia') ? this.i18n.t('nav.encyclopedia') : path.startsWith('/print') ? this.i18n.t('nav.print') : '';
     if (path.startsWith('/doc/')) return campaign;
     if (page === '') return campaign;
     return campaign === '' ? page : `${page} · ${campaign}`;
+  }
+
+  /** Scrolls the rail (bottom bar on phones) so the active entry is visible. Does nothing when there is no rail. */
+  private keepActiveRailItemInView(): void {
+    const rail = (this.host.nativeElement as HTMLElement).querySelector<HTMLElement>('.rail');
+    const active = rail?.querySelector<HTMLElement>('.rail-item.active');
+    if (!rail || !active || rail.scrollWidth <= rail.clientWidth) return;
+    const left = active.offsetLeft - (rail.clientWidth - active.offsetWidth) / 2;
+    rail.scrollLeft = Math.max(0, left);
   }
 
   /** Ctrl/Cmd+K toggles the command palette from anywhere. */

@@ -1,5 +1,3 @@
-<h2 class="title">{{ s.text('panels.combat.title') }}</h2>
-
 @if (!active()) {
   <section class="empty">
     <p class="state">{{ s.text('panels.combat.empty') }}</p>
@@ -196,11 +194,10 @@
           }
         </div>
 
-        <label class="notes">
-          <span class="sr-only">{{ s.text('panels.combat.notesLabel', { name: c.name }) }}</span>
+        <div class="notes">
           <input type="text" class="notes-input" [value]="c.notes ?? ''" [placeholder]="s.text('panels.combat.notes')"
-                 (change)="setNote(c, $any($event.target).value)" />
-        </label>
+                 [attr.aria-label]="s.text('panels.combat.notesLabel', { name: c.name })" (change)="setNote(c, $any($event.target).value)" />
+        </div>
 
         <div class="quick">
           <input #amount type="text" inputmode="numeric" class="amount" [attr.aria-label]="s.text('panels.combat.amount')"

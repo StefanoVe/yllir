@@ -1,6 +1,7 @@
 <aside class="dock" [class.open]="open()" [attr.aria-label]="s.copy('live.dock.label')">
   @if (open()) {
     <section class="content" [attr.aria-label]="labelOf(tab())">
+      <header class="panel-head">{{ labelOf(tab()) }}</header>
       @switch (tab()) {
         @case ('combat') { <ms-live-combat [snapshot]="snapshot()" /> }
         @case ('lookup') { <ms-live-lookup /> }
@@ -11,9 +12,15 @@
   <nav class="bar" [attr.aria-label]="s.copy('live.dock.label')">
     @for (t of tabs; track t.id) {
       <button type="button" class="tab" [class.active]="open() && tab() === t.id"
-        [attr.aria-pressed]="open() && tab() === t.id" [attr.aria-label]="s.copy(t.label)" [title]="s.copy(t.label)"
+        [attr.aria-pressed]="open() && tab() === t.id"
+        [attr.aria-label]="badgeOf(t.id) ? s.copy(t.label) + ', ' + badgeOf(t.id) : s.copy(t.label)" [title]="s.copy(t.label)"
         (click)="tabSelect.emit(t.id)">
-        <lucide-angular [img]="t.icon" [size]="20" aria-hidden="true" />
+        <span class="pill" aria-hidden="true">
+          <lucide-angular [img]="t.icon" [size]="20" aria-hidden="true" />
+        </span>
+        @if (badgeOf(t.id)) {
+          <span class="badge" aria-hidden="true">{{ badgeOf(t.id) }}</span>
+        }
       </button>
     }
     <button type="button" class="tab collapse" [attr.aria-label]="open() ? s.copy('live.dock.collapse') : s.copy('live.dock.expand')"

@@ -18,6 +18,18 @@
         <lucide-angular [img]="icons.Music" [size]="20" aria-hidden="true" />
       </a>
     }
+    @if (encyclopediaEnabled()) {
+      <a class="rail-item" routerLink="/encyclopedia" routerLinkActive="active" ariaCurrentWhenActive="page"
+         [attr.aria-label]="i18n.t('nav.encyclopedia')" [title]="i18n.t('nav.encyclopedia')">
+        <lucide-angular [img]="icons.BookOpen" [size]="20" aria-hidden="true" />
+      </a>
+    }
+    @if (printEnabled()) {
+      <a class="rail-item" routerLink="/print" routerLinkActive="active" ariaCurrentWhenActive="page"
+         [attr.aria-label]="i18n.t('nav.print')" [title]="i18n.t('nav.print')">
+        <lucide-angular [img]="icons.Printer" [size]="20" aria-hidden="true" />
+      </a>
+    }
     <button type="button" class="rail-item" aria-haspopup="dialog" [class.active]="palette.open()"
             [attr.aria-label]="i18n.t('nav.search')" [title]="i18n.t('nav.search')" (click)="palette.show()">
       <lucide-angular [img]="icons.Search" [size]="20" aria-hidden="true" />
@@ -46,8 +58,11 @@
         <span>{{ label('shell.previewBanner') }}</span>
       </p>
     }
-    @if (!live.connected()) {
-      <p class="offline" role="status">{{ i18n.t('shell.offline') }}</p>
+    @if (showOffline()) {
+      <p class="offline" role="status">
+        <lucide-angular [img]="icons.WifiOff" [size]="16" aria-hidden="true" />
+        <span>{{ i18n.t('shell.offline') }}</span>
+      </p>
     }
     <router-outlet />
   </main>

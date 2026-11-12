@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
+import MarkdownIt from 'markdown-it';
 import type { ChatMessage, ChatResponse, Turn } from '@shared/types';
 import { LucideAngularModule, ArrowDown, Dices, Send, Square } from 'lucide-angular';
 import { ApiService, isApiFailure } from '../core/api.service';
@@ -37,6 +38,17 @@ import { docUrl } from './doc-link';
 /** Distance from the bottom (px) under which the list still follows new messages. */
 const NEAR_BOTTOM_PX = 48;
 const EXAMPLE_KEYS: readonly TranslationKey[] = ['chat.example.1', 'chat.example.2', 'chat.example.3'];
+/** Messages of the same speaker closer than this share one header. */
+const GROUP_GAP_MS = 5 * 60 * 1000;
+
+/** Marks the first message of each group (same speaker, close in time) so only it shows a header. */
+function groupRows<T extends ChatMessage>(messages: readonly T[]): { message: T; head: boolean }[] {
+  return messages.map((message, index) => {
+    const previous = messages[index - 1];
+    const gap = previous ? Date.parse(message.at) - Date.parse(previous.at) : Number.NaN;
+    return { message, head: !previous || previous.role !== message.role || !(gap < GROUP_GAP_MS) };
+  });
+}
 
 /** The conversation with the assistant: messages, composer and the status line of the current turn. */
 @Component({
@@ -80,6 +92,9 @@ export class Chat implements OnInit {
     () => this.agentAvailable() && this.draft().trim().length > 0 && !this.sending(),
   );
   readonly messages = computed(() => this.state().messages);
+  readonly rows = computed(() => groupRows(this.messages()));
+  /** Assistant text is Markdown. html is off, so raw HTML in the text is escaped; Angular sanitizes the rest. */
+  private readonly markdown = new MarkdownIt({ html: false, linkify: false, typographer: false });
   readonly activeTurn = computed<Turn | null>(() => {
     const turn = this.state().turn;
     return isActiveTurn(turn) ? turn : null;
@@ -203,6 +218,16 @@ export class Chat implements OnInit {
 
   roleLabel(role: ChatMessage['role']): string {
     return this.t(role === 'master' ? 'chat.you' : 'chat.assistant');
+  }
+
+  renderMarkdown(text: string): string {
+    return this.markdown.render(text);
+  }
+
+  timeLabel(at: string): string {
+    const date = new Date(at);
+    if (Number.isNaN(date.getTime())) return '';
+    return new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(date);
   }
 
   private update(change: (state: ChatState) => ChatState): void {

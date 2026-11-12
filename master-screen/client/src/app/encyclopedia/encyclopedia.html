@@ -1,0 +1,107 @@
+<h1>{{ t('enc.title') }}</h1>
+
+@if (loadError(); as message) {
+  <p class="alert" role="alert">{{ message }}</p>
+}
+
+@if (!status() && !loadError()) {
+  <p class="muted" role="status">{{ t('enc.loading') }}</p>
+}
+
+@if (status()) {
+  @if (!enabled()) {
+    <p class="notice" role="status">{{ t('enc.off') }}</p>
+  } @else {
+    <p class="muted">{{ t('enc.intro') }}</p>
+
+    <section class="card" aria-label="{{ t('enc.build') }}">
+      <button type="button" class="primary" [disabled]="building()" [attr.aria-busy]="building()" (click)="build()">
+        <lucide-angular [img]="building() ? icons.LoaderCircle : icons.Hammer" [size]="18" aria-hidden="true"
+                        [class.spin]="building()" />
+        <span>{{ building() ? t('enc.building') : t('enc.build') }}</span>
+      </button>
+      @if (building()) {
+        <p class="muted" role="status">{{ t('enc.buildingNote') }}</p>
+      }
+      @if (buildError(); as message) {
+        <div class="alert" role="alert">
+          <p class="strong">{{ message }}</p>
+          <p>{{ t('enc.nothingChanged') }}</p>
+        </div>
+      }
+    </section>
+
+    @if (report(); as r) {
+      <section class="card" aria-labelledby="enc-report-title">
+        <h2 id="enc-report-title">{{ t('enc.reportTitle') }}</h2>
+        <p>{{ entriesText(r.entries) }}</p>
+
+        @if (r.excluded.length > 0) {
+          <p>{{ excludedText(r.excluded.length) }}</p>
+          <details>
+            <summary>{{ t('enc.excludedList') }}</summary>
+            <ul class="plain">
+              @for (item of r.excluded; track $index) {
+                <li>{{ lineText(item.path, item.reason) }}</li>
+              }
+            </ul>
+          </details>
+        }
+
+        <h3>{{ t('enc.checks') }}</h3>
+        <ul class="checks">
+          @for (check of r.checks; track $index) {
+            <li class="check" [attr.data-status]="check.status">
+              <lucide-angular [img]="checkIcon(check.status)" [size]="18" aria-hidden="true" />
+              <span class="check-status">{{ checkText(check.status) }}</span>
+              <span class="check-message">{{ check.message }}</span>
+            </li>
+          }
+        </ul>
+
+        @if (r.warnings.length > 0) {
+          <h3>{{ t('enc.warnings') }}</h3>
+          <ul class="plain">
+            @for (warning of r.warnings; track $index) {
+              <li class="warning">
+                <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
+                <span>{{ lineText(warning.path, warning.message) }}</span>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+    }
+
+    <section class="card" aria-labelledby="enc-preview-title">
+      <h2 id="enc-preview-title">{{ t('enc.previewHeading') }}</h2>
+      @if (built()) {
+        <p>
+          <a class="link" href="/enc/" target="_blank" rel="noopener">
+            <lucide-angular [img]="icons.ExternalLink" [size]="16" aria-hidden="true" />
+            <span>{{ t('enc.preview') }}</span>
+          </a>
+        </p>
+        <iframe class="preview" src="/enc/" sandbox="allow-scripts allow-same-origin" loading="lazy"
+                [title]="t('enc.previewTitle')"></iframe>
+      } @else {
+        <p class="muted">{{ t('enc.empty') }}</p>
+      }
+    </section>
+
+    <section class="card" aria-labelledby="enc-address-title">
+      <h2 id="enc-address-title">{{ t('enc.baseUrl') }}</h2>
+      @if (baseUrl() !== '') {
+        <p class="address"><code>{{ baseUrl() }}</code></p>
+      } @else {
+        <p class="muted">{{ t('enc.noBaseUrl') }}</p>
+      }
+      <p class="muted">{{ t('enc.baseUrlHint') }}</p>
+    </section>
+
+    <p class="muted note">
+      <lucide-angular [img]="icons.Info" [size]="16" aria-hidden="true" />
+      <span>{{ t('enc.publishing') }}</span>
+    </p>
+  }
+}

@@ -3,16 +3,24 @@
     <ms-chat />
   </section>
 
-  <aside class="changes-column">
-    <header class="changes-head">
-      <h2 class="changes-title">{{ i18n.t('home.changes') }}</h2>
-      <button type="button" class="toggle" [attr.aria-expanded]="!changesCollapsed()"
-              (click)="toggleChanges()">
-        {{ changesCollapsed() ? i18n.t('home.expandChanges') : i18n.t('home.collapseChanges') }}
+  <aside class="changes-column" [class.collapsed]="changesCollapsed()">
+    @if (changesCollapsed()) {
+      <button type="button" class="tab" [attr.aria-expanded]="false" [title]="i18n.t('home.expandChanges')"
+              [attr.aria-label]="i18n.t('home.expandChanges')" (click)="toggleChanges()">
+        <lucide-angular [img]="icons.History" [size]="18" aria-hidden="true" />
+        <span class="tab-label" aria-hidden="true">{{ i18n.t('home.changes') }}</span>
+        <span class="badge" aria-hidden="true">{{ changeCount() }}</span>
       </button>
-    </header>
+    } @else {
+      <header class="changes-head">
+        <h2 class="changes-title">{{ i18n.t('home.changes') }}</h2>
+        <button type="button" class="toggle" [attr.aria-expanded]="true" (click)="toggleChanges()">
+          {{ i18n.t('home.collapseChanges') }}
+        </button>
+      </header>
+    }
     <div class="changes-body" [hidden]="changesCollapsed()">
-      <ms-changes />
+      <ms-changes [compact]="narrow()" (countChange)="changeCount.set($event)" />
     </div>
   </aside>
 </div>

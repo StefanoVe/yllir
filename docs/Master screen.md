@@ -1,6 +1,6 @@
 # Master screen
 
-**Stato:** Bozza di progetto. Fasi 1, 2 e musica (fase 3) implementate (2026-11-12): sorgente in `master-screen/`, pacchetto pubblicato come release di GitHub dalla CI e scaricato dal launcher; chat, modifiche con annullamento, lettura e ricerca, tavolo live (tela, registro, scontri), mappa della trama, player musicale. Stampa ancora da fare.
+**Stato:** Bozza di progetto. Fasi 1, 2 e musica (fase 3) implementate (2026-11-12): sorgente in `master-screen/`, pacchetto pubblicato come release di GitHub dalla CI e scaricato dal launcher; chat, modifiche con annullamento, lettura e ricerca, tavolo live (tela, registro, scontri), mappa della trama, player musicale, enciclopedia locale (generazione e anteprima, senza pubblicazione) e stampa (fogli PDF con QR, stato di stampa, carte con Photoshop o renderer Node).
 
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
 Allineato alla [Riprogettazione](Riprogettazione.md) (2026-11-11) e alle decisioni dell'autore del 2026-11-12.
@@ -29,7 +29,7 @@ Questo documento descrive il master screen: la parte del framework che il master
 - **Piattaforme (Deciso, 2026-11-12).** Il master screen gira su macOS e Windows. Linux non è un obiettivo della fase 1 (il launcher ha i file per Linux ma non è provato).
 - **Approvazione delle modifiche (Deciso, 2026-11-12).** Il master non approva le modifiche prima: compaiono subito nel pannello «cosa è cambiato» e si annullano dopo con «torna a com'era». Nessuna approvazione preventiva, nemmeno per i file del canone.
 - **Vista per i giocatori (Deciso, 2026-11-12).** Per ora non c'è. L'anteprima «vista giocatori» (nasconde il blocco riservato) resta solo un controllo del master.
-- **Enciclopedia pubblica (Deciso, 2026-11-12): opzione A.** È una sezione del master screen che genera e pubblica il sito statico. Il sito è il bersaglio dei QR della stampa, quindi gli indirizzi si legano a un identificativo stabile e non al nome del file. Servizio di hosting, dominio e credenziali restano da decidere.
+- **Enciclopedia pubblica (Deciso, 2026-11-12): opzione A.** È una sezione del master screen che genera il sito statico e lo mostra in anteprima. Il sito è il bersaglio dei QR della stampa, quindi gli indirizzi si legano a un identificativo stabile e non al nome del file. **Solo in locale per ora** (decisione dell'autore, 2026-11-12): il sito si genera in `.campaign/cache/encyclopedia/` e non viene pubblicato; nessuna credenziale e nessun dominio. La pubblicazione su un host resta da decidere.
 - **Interfaccia (Deciso, 2026-11-12).** Moderna e semplice da usare, ma abbastanza funzionale. È coerente con le icone con tooltip decise sopra.
 
 ### Strumenti della sessione live estratti (Deciso)
@@ -104,6 +104,7 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 - Fogli 5×7 e A4 con retro QR, fogli-bacheca perforabili per gli annunci, uscita in PDF e PNG; CMYK solo per le tipografie che lo chiedono.
 - Anteprima prima di generare. Il PDF si scarica o si apre dal master screen.
 - I QR puntano alla voce pubblica della carta. Un indirizzo ricavato dal nome del file si rompe al primo cambio di nome: rinominare un oggetto già stampato romperebbe i QR sulle copie esistenti. Il framework deve legare l'indirizzo a un identificativo stabile, non al nome.
+- Niente programmi esterni per la stampa (decisione dell'autore, 2026-11-12). Il renderer predefinito è Photoshop tramite MCP; quando Photoshop manca si usa un renderer Node, che disegna il layout vettoriale direttamente nei fogli PDF. Le librerie per QR e PDF sono vendorizzate nel framework. Fogli e carte si generano in `.campaign/cache/print/`.
 
 ## Principi di interfaccia
 
@@ -172,9 +173,9 @@ Per ciascuna ci sono tre possibilità:
 
 | Funzione | Cosa farebbe | Opzione | Pro | Contro |
 |---|---|---|---|---|
-| Enciclopedia pubblica | Un sito statico con una voce per ogni oggetto, carte consultabili, mappe e testi protetti da codice, pubblicato su un dominio. Sarebbe il bersaglio dei QR della stampa. | A. Sezione del master screen che genera e pubblica | Un solo strumento per il master; il QR resta coerente con la scheda | Il master screen diventa anche un editor pubblico; la pubblicazione richiede un hosting e delle credenziali |
-| | | B. Modulo di pubblicazione richiamato | Parte pubblica separata e riutilizzabile per altri GDR | Un altro strumento da capire; la sincronizzazione dei cambi va progettata |
-| | | C. Strumento separato | Nessun lavoro nel framework | Il master usa due strumenti; il QR dipende da un progetto esterno al framework |
+| Enciclopedia pubblica | Un sito statico con una voce per ogni oggetto, carte consultabili, mappe e testi protetti da codice, pubblicato su un dominio. Sarebbe il bersaglio dei QR della stampa. | A. Sezione del master screen che genera il sito (**scelta**, 2026-11-12) | Un solo strumento per il master; il QR resta coerente con la scheda | Il master screen diventa anche un editor pubblico; la pubblicazione richiede un hosting e delle credenziali (per ora non attiva) |
+| | | B. Modulo di pubblicazione richiamato (*non scelta*) | Parte pubblica separata e riutilizzabile per altri GDR | Un altro strumento da capire; la sincronizzazione dei cambi va progettata |
+| | | C. Strumento separato (*non scelta*) | Nessun lavoro nel framework | Il master usa due strumenti; il QR dipende da un progetto esterno al framework |
 | Atlante | Un sito statico con mappa interattiva e sinossi delle terre, scritte a partire dalle schede. | A. Pannello di consultazione con mappa | Mappa e trama nello stesso posto; riusa l'indice dei documenti | Richiede coordinate verificate su una mappa e sinossi da tenere aggiornate a mano |
 | | | B. Modulo di pubblicazione | Stessa architettura dell'enciclopedia | Si sovrappone alla mappa della trama; due viste dello stesso mondo |
 | | | C. Progetto a sé | Nessun costo per il framework | Perde il collegamento con la trama e con le schede |
@@ -190,6 +191,7 @@ Nota: se più funzioni entrano nel framework, serve un modello comune per le imm
 ## Questioni aperte
 
 - Quali altre funzioni confluiscono nel master screen (atlante, vedute, carte nautiche) e con quale opzione, fra A, B e C per ciascuna. L'enciclopedia pubblica è decisa (opzione A).
+- Pubblicazione dell'enciclopedia: servizio di hosting, dominio e conservazione del token. Finché non c'è, il sito resta locale in `.campaign/cache/encyclopedia/`.
 - Piattaforma: alcune funzioni (musica, vedute, carte nautiche) potrebbero dipendere dal sistema operativo; la fase 1 è per macOS e Windows (deciso), il resto si valuta modulo per modulo.
 - Marcatura pubblico/master: il formato è definito in `Configurazione.md`, ma il master screen deve applicarlo anche ai file scritti dall'agente. Chi controlla che un blocco riservato non esca in una vista pubblica?
 - Parità fra master screen e terminale: quali operazioni devono esistere in entrambi, e quali sono solo del master screen (per esempio il pannello delle modifiche)?

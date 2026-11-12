@@ -1,33 +1,43 @@
+/* The shell fills the viewport exactly. Only the main area scrolls, so the rail never moves. */
 .shell {
   display: grid;
   grid-template-columns: var(--rail-width) minmax(0, 1fr);
-  min-height: 100vh;
-  min-height: 100dvh;
+  grid-template-rows: minmax(0, 1fr);
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .rail {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
+  min-height: 0;
   padding: var(--space-2) 0;
+  overflow-y: auto;
   background: var(--color-surface);
   border-right: 1px solid var(--color-border);
 }
 
 .rail-item {
+  position: relative;
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 48px;
+  height: 48px;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
   text-decoration: none;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-base), color var(--transition-base), box-shadow var(--transition-base);
 }
 
 .rail-item:hover {
@@ -35,12 +45,26 @@
   color: var(--color-text);
 }
 
+.rail-item:active {
+  background: var(--color-border);
+}
+
+/* Active: a pill behind the icon, plus an indicator bar on the rail edge (not colour alone). */
 .rail-item.active {
   background: var(--color-accent-soft);
   color: var(--color-accent);
-  /* A bar as well as the colour, so the current page is clear without colour. */
-  box-shadow: inset 3px 0 0 var(--color-accent);
   font-weight: 700;
+}
+
+.rail-item.active::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 25%;
+  bottom: 25%;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-accent);
 }
 
 .rail-item:focus-visible {
@@ -48,22 +72,42 @@
   outline-offset: 2px;
 }
 
+/* Groups: home, table, plot, music | search, settings | preview, theme (pushed to the bottom). */
+.rail > .rail-item:nth-last-child(4)::after,
+.rail > .rail-item:nth-last-child(2)::after {
+  content: "";
+  position: absolute;
+  top: calc(var(--space-1) * -1 - 1px);
+  left: 14px;
+  right: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.rail > .rail-item:nth-last-child(2) {
+  margin-top: auto;
+}
+
 .preview-banner {
   display: flex;
   align-items: center;
   gap: var(--space-1);
   margin: 0 0 var(--space-2);
-  padding: 6px var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border: 1px solid var(--color-accent);
   border-radius: var(--radius-sm);
   background: var(--color-accent-soft);
   color: var(--color-text);
   font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-1);
 }
 
+/* The main area is the only scroll container, so the page scrolls inside the fixed shell. */
 .main {
+  position: relative;
   min-width: 0;
-  padding: var(--space-3) var(--space-2);
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-3);
   outline: none;
 }
 
@@ -72,13 +116,40 @@
   padding-bottom: 150px;
 }
 
+/* A status toast over the top of the content: it never moves the layout. */
 .offline {
-  margin: 0 0 var(--space-2);
+  position: fixed;
+  top: var(--space-2);
+  left: calc(var(--rail-width) + var(--space-2));
+  z-index: 50;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  max-width: calc(100vw - var(--rail-width) - 2 * var(--space-2));
   padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
   color: var(--color-text-muted);
+  box-shadow: var(--shadow-2);
   font-size: var(--font-size-sm);
+  animation: toast-in var(--transition-base) both;
+}
+
+.offline lucide-angular {
+  color: var(--color-danger);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @media (max-width: 719px) {
@@ -96,10 +167,26 @@
     flex-direction: row;
     justify-content: space-between;
     gap: 0;
-    padding: var(--space-1) var(--space-1);
+    /* Up to ten entries: on narrow phones the bar scrolls sideways, snapping to each icon. */
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    padding: var(--space-1);
     border-right: 0;
     border-top: 1px solid var(--color-border);
     padding-bottom: calc(var(--space-1) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Groups are not drawn on the bottom bar. */
+  .rail > .rail-item:nth-last-child(4)::after,
+  .rail > .rail-item:nth-last-child(2)::after {
+    display: none;
+  }
+
+  .rail > .rail-item:nth-last-child(2) {
+    margin-top: 0;
   }
 
   .rail-item:active,
@@ -109,12 +196,29 @@
   }
 
   .rail-item.active {
-    box-shadow: inset 0 3px 0 var(--color-accent);
+    background: var(--color-accent-soft);
   }
 
-  /* Seven entries must fit a 360 px phone: 40 px each, no gaps. */
+  .rail-item.active::before {
+    left: 25%;
+    right: 25%;
+    top: auto;
+    bottom: -8px;
+    width: auto;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+  }
+
+  .rail::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Entries are 40 px each, no gaps. Eight fit a 360 px phone; more scroll. */
   .rail-item {
+    flex: 0 0 40px;
     width: 40px;
+    height: 40px;
+    scroll-snap-align: center;
   }
 
   .main {
@@ -125,5 +229,14 @@
 
   .main.has-dock {
     padding-bottom: 230px;
+  }
+
+  .offline {
+    left: var(--space-2);
+    right: var(--space-2);
+    max-width: none;
+    width: max-content;
+    margin: 0 auto;
+    top: calc(var(--space-1) + env(safe-area-inset-top, 0px));
   }
 }

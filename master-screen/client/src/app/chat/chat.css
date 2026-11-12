@@ -51,8 +51,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-1);
+  gap: 4px;
+  padding: var(--space-2) var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
 }
 
@@ -60,6 +60,7 @@
   width: 100%;
   max-width: 36rem;
   margin: auto;
+  padding: var(--space-3) var(--space-1);
   text-align: center;
 }
 
@@ -73,7 +74,7 @@
   flex-wrap: wrap;
   max-width: 100%;
   justify-content: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
 }
 
 .chip {
@@ -98,17 +99,43 @@
   cursor: default;
 }
 
+.msg-head {
+  align-self: flex-start;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin: var(--space-2) var(--space-1) 2px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.msg-head:first-child {
+  margin-top: 0;
+}
+
+.msg-head.master {
+  align-self: flex-end;
+}
+
+.msg-head .who {
+  font-weight: 600;
+}
+
 .msg {
-  max-width: 80%;
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-md);
+  max-width: min(70%, 42rem);
+  min-width: 6rem;
+  box-sizing: border-box;
+  padding: 10px 14px;
+  border-radius: 16px 16px 16px 4px;
   background: var(--color-surface-2);
   color: var(--color-text);
+  line-height: 1.5;
   align-self: flex-start;
 }
 
 .msg.master {
   align-self: flex-end;
+  border-radius: 16px 16px 4px 16px;
   background: var(--color-accent);
   color: var(--color-accent-contrast);
 }
@@ -122,6 +149,90 @@
   margin: 0;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.text.md {
+  white-space: normal;
+}
+
+.md > :first-child {
+  margin-top: 0;
+}
+
+.md > :last-child {
+  margin-bottom: 0;
+}
+
+.md p {
+  margin: 0 0 0.5em;
+}
+
+.md ul,
+.md ol {
+  margin: 0 0 0.5em;
+  padding-left: 1.3em;
+}
+
+.md li + li {
+  margin-top: 2px;
+}
+
+.md strong {
+  font-weight: 600;
+}
+
+.md code {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--color-surface);
+  font-size: 0.9em;
+}
+
+.md pre {
+  overflow-x: auto;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.md pre code {
+  padding: 0;
+  background: none;
+}
+
+.md table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+  margin: 0 0 0.5em;
+  font-size: var(--font-size-sm);
+}
+
+.md th,
+.md td {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.md a,
+.md a:visited {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.md a:hover {
+  color: var(--color-accent-hover);
+}
+
+/* On the accent-coloured master bubble, the accent link would vanish: use the contrast colour there. */
+.msg.master .md a,
+.msg.master .md a:visited,
+.msg.master .md a:hover {
+  color: var(--color-accent-contrast);
 }
 
 .jump {
@@ -192,18 +303,25 @@
   min-width: 0;
   min-height: 44px;
   max-height: 40vh;
-  padding: 10px 12px;
+  padding: 11px 16px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-radius: 22px;
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
+  line-height: 1.4;
   resize: none;
   overflow-y: auto;
 }
 
+.input:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
 .input:disabled {
   opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .icon-btn {
@@ -235,9 +353,30 @@
 }
 
 .icon-btn.send {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-accent-contrast);
+}
+
+.icon-btn.send:focus-visible,
+.icon-btn.stop:focus-visible,
+.jump:focus-visible,
+.chip:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.icon-btn.stop {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+
+.jump:hover {
+  background: var(--color-surface-2);
 }
 
 .icon-btn:disabled {

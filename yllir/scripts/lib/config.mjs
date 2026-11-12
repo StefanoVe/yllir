@@ -11,7 +11,13 @@ import { listAdapters, pluginRootFromHere } from './adapter.mjs';
 const FILE = 'campaign.yaml';
 // allow_model_imagination is no longer read: it is accepted with any value and ignored
 // (the migration removes it from older campaigns).
-const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit', 'allow_model_imagination'];
+const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit', 'encyclopedia', 'print', 'allow_model_imagination'];
+const ENCYCLOPEDIA_KEYS = ['title', 'base_url'];
+const PRINT_KEYS = ['format', 'cmyk', 'renderer'];
+const PRINT_FORMATS = ['5x7', 'a4'];
+const PRINT_RENDERERS = ['auto', 'photoshop', 'node'];
+const ENCYCLOPEDIA_TITLE_MAX = 120;
+const ENCYCLOPEDIA_URL_MAX = 200;
 const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];
 const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only', 'external'];
 const MODULE_KEYS = ['print', 'encyclopedia', 'master_screen', 'music'];
@@ -294,6 +300,60 @@ function validateTopLevel(r, config, campaignRoot) {
 
   const audit = mappingField(r, config, '', 'audit');
   if (audit !== null) validateAudit(r, audit);
+
+  const encyclopedia = mappingField(r, config, '', 'encyclopedia');
+  if (encyclopedia !== null) validateEncyclopedia(r, encyclopedia);
+
+  const print = mappingField(r, config, '', 'print');
+  if (print !== null) validatePrint(r, print);
+}
+
+/**
+ * encyclopedia (optional): title of the public site and the base address its QR codes point to.
+ * base_url is an http or https address with no query, no fragment and no credentials; the
+ * validated value is stored with exactly one trailing slash.
+ */
+function validateEncyclopedia(r, encyclopedia) {
+  checkUnknownKeys(r, encyclopedia, 'encyclopedia', ENCYCLOPEDIA_KEYS);
+  if (checkText(r, encyclopedia, 'encyclopedia', 'title', { nonEmpty: true }) &&
+    encyclopedia.title.length > ENCYCLOPEDIA_TITLE_MAX) {
+    r.error('bad-value', 'encyclopedia.title', `encyclopedia.title must be at most ${ENCYCLOPEDIA_TITLE_MAX} characters`);
+  }
+  if (checkText(r, encyclopedia, 'encyclopedia', 'base_url', { nonEmpty: true })) {
+    const value = encyclopedia.base_url;
+    const at = 'encyclopedia.base_url';
+    const problem = baseUrlProblem(value);
+    if (problem !== null) {
+      r.error('bad-value', at, `${at} ${problem}`);
+    } else {
+      encyclopedia.base_url = `${value.replace(/\/+$/, '')}/`;
+    }
+  }
+}
+
+/** Why a base address is not usable, or null when it is valid. */
+function baseUrlProblem(value) {
+  if (value.length > ENCYCLOPEDIA_URL_MAX) return `must be at most ${ENCYCLOPEDIA_URL_MAX} characters`;
+  if (value.includes('?') || value.includes('#')) return 'must have no query and no fragment';
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return 'must be a full http or https address, such as https://example.org/campaign/';
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return 'must start with http:// or https://';
+  if (url.username !== '' || url.password !== '') return 'must have no user name or password';
+  return null;
+}
+
+/** print (optional): defaults of the printing module (format, cmyk, renderer). */
+function validatePrint(r, print) {
+  checkUnknownKeys(r, print, 'print', PRINT_KEYS);
+  checkEnum(r, print, 'print', 'format', PRINT_FORMATS);
+  if (Object.hasOwn(print, 'cmyk') && typeof print.cmyk !== 'boolean') {
+    r.error('bad-type', 'print.cmyk', 'print.cmyk must be true or false');
+  }
+  checkEnum(r, print, 'print', 'renderer', PRINT_RENDERERS);
 }
 
 function validateCampaign(r, campaign) {

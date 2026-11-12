@@ -1,4 +1,4 @@
-import { Component, DestroyRef, Input, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, Input, OnInit, computed, inject, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import type { ChangeGroup, ChangedFile, ChangesResponse, FileDiff, FileStatus } from '@shared/types';
@@ -52,6 +52,9 @@ export class Changes implements OnInit {
 
   readonly icons = { ExternalLink, MessageSquare, Undo2, X };
 
+  /** Number of change groups, for the badge of the collapsed panel. */
+  readonly countChange = output<number>();
+
   readonly groups = signal<ChangeGroup[]>([]);
   readonly loaded = signal(false);
   readonly loadError = signal<string | null>(null);
@@ -85,6 +88,7 @@ export class Changes implements OnInit {
     try {
       const response: ChangesResponse = await this.api.changes();
       this.groups.set(response.groups);
+      this.countChange.emit(response.groups.length);
       this.loadError.set(null);
       this.now.set(Date.now());
     } catch {
@@ -126,6 +130,18 @@ export class Changes implements OnInit {
 
   isDoc(path: string): boolean {
     return path.toLowerCase().endsWith('.md');
+  }
+
+  /** Friendly name: the file name without its extension. */
+  docTitle(path: string): string {
+    const name = path.split('/').pop() ?? path;
+    return name.replace(/\.[^./]+$/, '') || name;
+  }
+
+  /** The last folder only, or null for a file at the root. */
+  folderOf(path: string): string | null {
+    const parts = path.split('/');
+    return parts.length > 1 ? parts[parts.length - 2] : null;
   }
 
   link(path: string): string {

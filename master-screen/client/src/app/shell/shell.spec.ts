@@ -11,7 +11,11 @@ import { FakeYouTubePlayer } from '../music/testing';
 import { Shell } from './shell';
 
 function setup(music: boolean): ComponentFixture<Shell> {
-  const modules = signal<Record<ModuleId, boolean>>({ music, print: false, encyclopedia: false });
+  return setupModules({ music, print: false, encyclopedia: false });
+}
+
+function setupModules(flags: Record<ModuleId, boolean>): ComponentFixture<Shell> {
+  const modules = signal<Record<ModuleId, boolean>>(flags);
   const status = {
     campaign: signal({ name: 'Test campaign', slug: 'test', language: 'en' }),
     modules,
@@ -53,5 +57,33 @@ describe('Shell music entry', () => {
   it('does not show the dock when nothing is loaded', () => {
     const fixture = setup(true);
     expect(fixture.nativeElement.querySelector('.dock')).toBeNull();
+  });
+});
+
+describe('Shell encyclopedia and print entries', () => {
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('shows the encyclopedia and print icons only when their modules are on', () => {
+    const fixture = setupModules({ music: false, print: true, encyclopedia: true });
+    const encyclopedia = fixture.nativeElement.querySelector('a[href="/encyclopedia"]') as HTMLAnchorElement | null;
+    const print = fixture.nativeElement.querySelector('a[href="/print"]') as HTMLAnchorElement | null;
+    expect(encyclopedia?.getAttribute('aria-label')).toBe('Encyclopedia');
+    expect(encyclopedia?.getAttribute('title')).toBe('Encyclopedia');
+    expect(print?.getAttribute('aria-label')).toBe('Print');
+    expect(print?.getAttribute('title')).toBe('Print');
+  });
+
+  it('hides each icon when its own module is off', () => {
+    const fixture = setupModules({ music: false, print: false, encyclopedia: true });
+    expect(fixture.nativeElement.querySelector('a[href="/encyclopedia"]')).not.toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/print"]')).toBeNull();
+  });
+
+  it('hides both icons when both modules are off', () => {
+    const fixture = setupModules({ music: true, print: false, encyclopedia: false });
+    expect(fixture.nativeElement.querySelector('a[href="/encyclopedia"]')).toBeNull();
+    expect(fixture.nativeElement.querySelector('a[href="/print"]')).toBeNull();
   });
 });

@@ -1,8 +1,10 @@
 .home {
   display: grid;
   grid-template-columns: minmax(0, 1fr) min(360px, 36vw);
-  gap: var(--space-3);
-  align-items: start;
+  gap: var(--space-2);
+  /* The shell's main area already pads the page; the two columns fill what is left. */
+  height: calc(100dvh - var(--space-3) * 2);
+  min-height: 0;
 }
 
 .home.collapsed {
@@ -12,9 +14,25 @@
 .chat-column,
 .changes-column {
   min-width: 0;
+  min-height: 0;
+}
+
+.chat-column {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+}
+
+.chat-column > * {
+  flex: 1;
+  min-height: 0;
 }
 
 .changes-column {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -23,10 +41,13 @@
 }
 
 .changes-head {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .changes-title {
@@ -46,13 +67,59 @@
   white-space: nowrap;
 }
 
+/* Only the list scrolls; the header stays in place. */
 .changes-body {
+  flex: 1;
+  min-height: 0;
   margin-top: var(--space-2);
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
+.tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 160px;
+  padding: var(--space-2) 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.tab-label {
+  writing-mode: vertical-rl;
+  font-size: var(--font-size-sm);
+}
+
+.badge {
+  min-width: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: 0.75rem;
+  line-height: 22px;
+  text-align: center;
+}
+
+/* Narrow screens: the panel stacks below the chat, in its own height. */
 @media (max-width: 719px) {
   .home,
   .home.collapsed {
     grid-template-columns: minmax(0, 1fr);
+    height: auto;
+  }
+
+  .chat-column {
+    min-height: 60vh;
+  }
+
+  .changes-body {
+    max-height: 60vh;
   }
 }

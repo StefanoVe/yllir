@@ -100,6 +100,15 @@ modules:                         # facoltativo. Solo moduli veri, ciascuno attiv
   master_screen: false           # facoltativo. Strumento grafico locale del master.
   music: false                   # facoltativo. Ricerca di sottofondi e colonne sonore.
 
+encyclopedia:                    # facoltativo. Impostazioni dell'enciclopedia pubblica; si usano solo con modules.encyclopedia: true.
+  title: testo                   # facoltativo. Titolo del sito. Se manca, si usa campaign.name (Proposta).
+  base_url: http://localhost/    # facoltativo. Indirizzo di base del sito: le voci stanno a <base_url>/e/<id>/ e i QR lo usano. Predefinito: http://localhost/ (solo locale, Deciso 2026-11-12).
+
+print:                           # facoltativo. Impostazioni dei fogli di stampa; si usano solo con modules.print: true.
+  format: 5x7 | a4               # facoltativo. Formato dei fogli. Predefinito: 5x7 (Proposta).
+  cmyk: false                    # facoltativo. Se vero, i file sono in CMYK, solo per le tipografie che lo chiedono. Predefinito: falso (Proposta).
+  renderer: auto | photoshop | node  # facoltativo. auto usa Photoshop tramite MCP se è presente, altrimenti il renderer Node. Predefinito: auto (Deciso 2026-11-12 per il renderer; il valore di default è Proposta).
+
 allow_model_imagination: null    # accettata e ignorata (Implementato in 0.30.0). Qualunque valore è accettato; la migrazione la toglie. Vedi sotto.
 ```
 
@@ -286,6 +295,7 @@ La validazione è uno script deterministico, non un giudizio dell'agente. Contro
 - il formato di `campaign.slug`, `campaign.created` e `language.main`;
 - il formato di `campaign.seed`: nome di un file `.md` relativo alla radice, senza `..` (il file può non esistere ancora);
 - le chiavi ammesse: una chiave sconosciuta è un errore. `allow_model_imagination` è ammessa con qualunque valore e ignorata;
+- le impostazioni dell'enciclopedia e della stampa (decisione dell'autore, 2026-11-12): `encyclopedia.base_url` è `http` o `https`, senza query (`?`) né frammento (`#`); `print.format`, `print.cmyk` e `print.renderer` accettano solo i valori dello schema;
 - l'unicità degli `id` di categoria e l'esistenza delle cartelle dichiarate in `structure` (solo quelle: il validatore non controlla altro);
 - l'esistenza dell'adattatore e dei profili di stile citati;
 - la coerenza delle carte: `cards: true` ha senso solo su una categoria di tipo `oggetti`;

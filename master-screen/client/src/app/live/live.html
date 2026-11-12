@@ -6,6 +6,7 @@
   }
 } @else if (state.session() === null) {
   <section class="empty" aria-labelledby="live-empty-heading">
+    <span class="empty-icon" aria-hidden="true"><lucide-angular [img]="icons.Radio" [size]="28" /></span>
     <h1 id="live-empty-heading">{{ s.copy('live.empty.heading') }}</h1>
     <p class="lead">{{ s.copy('live.empty.text') }}</p>
     <form class="start" (submit)="$event.preventDefault(); start()">
@@ -23,6 +24,7 @@
 } @else {
   @if (state.session(); as session) {
     <header class="bar">
+      <span class="status-pill"><span class="dot" aria-hidden="true"></span>{{ s.copy('live.session.status') }}</span>
       <h1 class="title" [title]="session.title">{{ session.title }}</h1>
       <span class="spacer"></span>
       @if (confirmingEnd()) {
@@ -30,9 +32,10 @@
         <button type="button" class="danger" [disabled]="state.busy()" (click)="endNow()">{{ s.copy('live.session.yes') }}</button>
         <button type="button" class="ghost" (click)="confirmingEnd.set(false)">{{ s.copy('live.session.no') }}</button>
       } @else {
-        <button type="button" class="icon" [disabled]="state.busy()"
+        <button type="button" class="danger-secondary" [disabled]="state.busy()"
           [attr.aria-label]="s.copy('live.session.stop')" [title]="s.copy('live.session.stop')" (click)="confirmingEnd.set(true)">
-          <lucide-angular [img]="icons.Square" [size]="18" aria-hidden="true" />
+          <lucide-angular [img]="icons.Square" [size]="14" aria-hidden="true" />
+          <span>{{ s.copy('live.session.endLabel') }}</span>
         </button>
       }
     </header>

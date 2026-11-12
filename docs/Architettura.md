@@ -85,7 +85,7 @@ La tabella riassume chi può chiamare chi. Le righe del motore e dell'autore son
 | Revisore di lotto | Solo lettura dei file forniti (bozze, canone, seme, piano geografico) | Scrittura, domande dirette al master | Nulla: restituisce un esito, che l'autore registra per il motore |
 | Skill di libreria | Altre skill dichiarate, script | Il core, i moduli | I soli contenuti dichiarati |
 | Moduli di sistema e di stile | Solo le interfacce del core e le operazioni dichiarate | Altri moduli direttamente, la libreria | Il solo stato del proprio modulo |
-| Moduli di output | Lettura della sola parte pubblica dei contenuti | Scrittura nei contenuti del canone | Solo la propria uscita (cartella dedicata in `Uscite/`) |
+| Moduli di output | Lettura della sola parte pubblica dei contenuti | Scrittura nei contenuti del canone | Solo la propria uscita (enciclopedia e stampa in `.campaign/cache/encyclopedia/` e `.campaign/cache/print/`, **Deciso** 2026-11-12; altre uscite in `Uscite/`, **Proposta**) |
 
 Due regole trasversali:
 
@@ -179,7 +179,7 @@ mia-campagna/
   Giocatori/                     Proposta: personaggi giocanti, tutto riservato al master
   Fonti/                         Originali acquisiti (foto, PDF, scansioni)
   Appunti/                       Proposta: spunti e bozze fuori dal canone
-  Uscite/                        Proposta: tutto ciò che si rigenera (enciclopedia, fogli di stampa, viste per luogo)
+  Uscite/                        Proposta: ciò che si rigenera e non è ancora deciso, per esempio le viste per luogo (enciclopedia e fogli di stampa stanno in .campaign/cache/, Deciso 2026-11-12)
 ```
 
 Note sulla struttura:
@@ -207,7 +207,7 @@ Ripetere le stesse aree in più categorie, con lo stesso nome da mantenere allin
 |---|---|---|
 | Nome di un soggetto | Il titolo `#` della scheda | Nome del file, voci dell'enciclopedia, testo dei link |
 | Forme alternative del nome | `aliases` nei metadati | Indice dei soggetti (`.campaign/cache/subjects.json`), che non si scrive a mano |
-| Identità stabile | `id` nei metadati in testa alla scheda | Route dell'enciclopedia, QR delle carte (**Proposta**) |
+| Identità stabile | `id` nei metadati in testa alla scheda | Route dell'enciclopedia, `<base_url>/e/<id>/` (**Deciso** 2026-11-12); QR delle carte (**Proposta**) |
 | Tipo di soggetto | `kind` nei metadati (**Implementato in 0.30.0**) | Regole di creazione, controlli del grafo, indice del mondo |
 | Modello della scheda (solo per le categorie con più modelli) | `template` nei metadati | Validazione della forma della scheda |
 | Relazione fra soggetti | `relations`, con il tipo (appartenenza, parentela, alleanza, rivalità, dipendenza) | Indice del mondo, pacchetto di contesto |
@@ -308,7 +308,8 @@ Il framework distingue i tipi di dati che vivono in luoghi diversi. La regola ge
 | Stato di lavoro (nota sul lavoro in corso, esiti del motore) | `.campaign/state/` | Il motore (a ogni `commit`) | L'autore, il riepilogo all'avvio | Aggiornato a ogni scrittura; non è canone |
 | Bozze del lotto in preparazione | `.campaign/drafts/` (ignorata da git) | L'autore e gli esecutori economici | Il motore | Sostituite a ogni lotto; cancellabili |
 | Derivati (indice dei soggetti, indice del mondo, file principali delle sessioni) | `.campaign/cache/` e i file di sessione in `Trama/` | Il motore | L'autore, il core | Rigenerati dopo ogni scrittura; si possono cancellare (**Implementato in 0.30.0**) |
-| Derivati di uscita (enciclopedia, fogli di stampa, viste per luogo) | `Uscite/` (**Proposta**) | Script deterministici | Il master | Rigenerati dopo ogni scrittura |
+| Derivati di uscita: enciclopedia e fogli di stampa | `.campaign/cache/encyclopedia/` e `.campaign/cache/print/`, nella cache git-ignorata (**Deciso**, 2026-11-12) | Il motore e le skill `encyclopedia` e `print` | Il master, nel master screen | Rigenerati a ogni build; si possono cancellare |
+| Derivati di uscita: viste per luogo | `Uscite/` (**Proposta**) | Script deterministici | Il master | Rigenerati dopo ogni scrittura |
 | Versioni salvate | Storico git della cartella della campagna, invisibile al master | Il motore, dopo ogni `commit` riuscito | Solo il ripristino | Mai modificate (**Implementato in 0.30.0**) |
 | Pacchetto del framework | Installazione del plugin di Claude Code | Solo il distributore | Il core | Sostituito dall'aggiornamento, senza toccare la campagna |
 

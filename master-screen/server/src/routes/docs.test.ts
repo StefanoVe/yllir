@@ -61,6 +61,24 @@ sketch: true
 # Ruins
 `;
 
+const BEACON = `<!-- yllir
+id: beacon
+kind: place
+provenance: master
+-->
+# Beacon
+
+The beacon stands on the cliff.
+
+<!-- master -->
+## Master
+
+### Indicazioni per il master
+
+Its lamp hides the vellumkey code.
+<!-- /master -->
+`;
+
 const pathTraversalTarget = (base: string) => `../${base}/x.md`;
 
 function apiFor(ctx: Ctx): express.Express {
@@ -92,6 +110,7 @@ describe('docs routes', () => {
     await write('seed.md', '# World Seed\n\nThe zephyrite vein runs under everything.\n');
     await write('places/harbor.md', HARBOR);
     await write('places/ruins.md', RUINS);
+    await write('places/beacon.md', BEACON);
     await write('keep.md', '# The Keep\n\nThe keep stands above the Oakvale, facing the Océan.\n');
     await write('raw.md', '# Raw\n\n<img src=x onerror=alert(1)>\n\n<script>alert(1)</script>\n');
     await write('secrets/npc.md', '# Quillon\n\nThe smuggler Quillon keeps a ledger of zephyrite.\n');
@@ -276,6 +295,25 @@ describe('docs routes', () => {
     const master = await search('quillon');
     assert.ok(master.hits.some((hit) => hit.path === 'places/harbor.md' && hit.masterOnly === false));
     assert.ok(master.hits.some((hit) => hit.path === 'secrets/npc.md' && hit.masterOnly === true));
+  });
+
+  it('the closing master marker never renders as literal text', async () => {
+    const master = await readDoc('places/beacon.md');
+    const html = master.blocks.map((block) => block.html).join('');
+    assert.match(html, /vellumkey/);
+    assert.ok(!html.includes('&lt;!--'), 'a comment rendered as text');
+    assert.ok(!/master\s*--/.test(html), 'closing marker rendered as text');
+    const pub = await readDoc('places/beacon.md', 'public');
+    assert.ok(!JSON.stringify(pub).includes('vellumkey'));
+  });
+
+  it('search snippets of the master block contain no marker', async () => {
+    const res = await search('vellumkey');
+    const hit = res.hits.find((h) => h.path === 'places/beacon.md');
+    assert.ok(hit, 'master block text is searchable in the master view');
+    assert.ok(hit.snippet.includes('vellumkey'));
+    assert.ok(!/<!--|master\s*-->/.test(hit.snippet), hit.snippet);
+    assert.deepEqual((await search('vellumkey', 'public')).hits, []);
   });
 
   it('a new document appears in search after the campaign changes', async () => {

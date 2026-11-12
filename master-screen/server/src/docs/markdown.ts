@@ -36,15 +36,30 @@ export const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif
  */
 export function splitDocument(body: string, masterOnly: boolean, marker: string): Part[] {
   if (masterOnly) {
-    const source = body.split(marker).join('');
+    const source = stripFramingComments(body.split(marker).join(''));
     return source.trim() === '' ? [] : [{ kind: 'master', source }];
   }
   const at = body.indexOf(marker);
-  if (at < 0) return [{ kind: 'public', source: body }];
+  if (at < 0) return [{ kind: 'public', source: stripFramingComments(body) }];
   return [
-    { kind: 'public', source: body.slice(0, at) },
-    { kind: 'master', source: body.slice(at + marker.length).split(marker).join('') },
+    { kind: 'public', source: stripFramingComments(body.slice(0, at)) },
+    { kind: 'master', source: stripFramingComments(body.slice(at + marker.length).split(marker).join('')) },
   ];
+}
+
+// The closing master marker, alone on its line or inline, and any HTML comment that
+// stands alone on a line. The renderer has HTML off, so such comments would otherwise
+// show as literal text in the page and in search snippets.
+const CLOSING_MASTER_LINE = /^[ \t]*<!--[ \t]*\/master[ \t]*-->[ \t]*(?:\r?\n|$)/gm;
+const CLOSING_MASTER_INLINE = /<!--[ \t]*\/master[ \t]*-->/g;
+const COMMENT_LINE = /^[ \t]*<!--[^\n]*?-->[ \t]*(?:\r?\n|$)/gm;
+
+/** Removes framework comments from a part's source. Never changes which text is public. */
+export function stripFramingComments(source: string): string {
+  return source
+    .replace(CLOSING_MASTER_LINE, '')
+    .replace(CLOSING_MASTER_INLINE, '')
+    .replace(COMMENT_LINE, '');
 }
 
 /** The parts a view may show: the public view keeps only public parts, none for master-only. */
@@ -252,8 +267,9 @@ export function renderParts(parts: Part[], opts: RenderOptions): RenderResult {
   const headings: Heading[] = [];
   const blocks: RenderedBlock[] = [];
   for (const part of parts) {
-    if (part.source.trim() === '') continue;
-    const tokens = md.parse(part.source, {});
+    const source = stripFramingComments(part.source);
+    if (source.trim() === '') continue;
+    const tokens = md.parse(source, {});
     for (let i = 0; i < tokens.length; i++) {
       const token = tokens[i];
       if (token.type !== 'heading_open') continue;

@@ -1,19 +1,42 @@
 import type { DocBlock } from '@shared/types';
 
+/** Separator for block boundaries, replaced by a line break at the end. Private-use character, never in real text. */
+const SEP = '';
+const EXCERPT_MAX = 220;
+
 /** Text only: the textContent of the markup, collapsed to one line and cut to `max` characters. Never returns markup. */
 export function plainText(html: string): string {
-  // Block boundaries become spaces, so "<h2>Alia</h2><p>text" reads "Alia text", not "Aliatext".
   const spaced = html.replace(/<\/?(p|h[1-6]|li|div|br|tr|td|th|blockquote|section|article|ul|ol|table)\b[^>]*>/gi, ' ');
-  if (typeof DOMParser === 'undefined') return spaced.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-  const parsed = new DOMParser().parseFromString(spaced, 'text/html');
-  return (parsed.body.textContent ?? '').replace(/\s+/g, ' ').trim();
+  return decodeText(spaced.replace(/<[^>]*>/g, ' ')).replace(/\s+/g, ' ').trim();
 }
 
-/** Excerpt of the first public block of a document. A master-only document has no public block, so it gives ''. */
-export function firstPublicExcerpt(blocks: readonly DocBlock[], max = 240): string {
+/** Decodes entities of tag-free text. The result is text, never markup. */
+function decodeText(text: string): string {
+  if (typeof DOMParser === 'undefined') {
+    return text.replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+  }
+  return new DOMParser().parseFromString(text, 'text/html').body.textContent ?? '';
+}
+
+/**
+ * Card excerpt of the first public block: the body text only, without a leading heading (the title is
+ * shown in the card header), one line per paragraph, cut after about 220 characters with an ellipsis.
+ * A master-only document has no public block, so it gives ''.
+ */
+export function firstPublicExcerpt(blocks: readonly DocBlock[], max = EXCERPT_MAX): string {
   const block = blocks.find((b) => b.kind === 'public');
   if (!block) return '';
-  const text = plainText(block.html);
+  const body = block.html
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, ' ')
+    .replace(/^\s*<h[1-6]\b[^>]*>[\s\S]*?<\/h[1-6]\s*>/i, '');
+  const marked = body
+    .replace(/<br\s*\/?>/gi, SEP)
+    .replace(/<\/?(p|h[1-6]|li|div|blockquote|section|article|ul|ol|table|tr|pre)\b[^>]*>/gi, SEP);
+  const paragraphs = decodeText(marked.replace(/<[^>]*>/g, ''))
+    .split(SEP)
+    .map((part) => part.replace(/\s+/g, ' ').trim())
+    .filter((part) => part.length > 0);
+  const text = paragraphs.join('\n');
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 

@@ -46,3 +46,6 @@ mark {
   border-radius: 2px;
   box-shadow: 0 0 0 1px var(--color-accent);
 }
+
+/* UI polish: highlighted match and muted path */
+:host { border-radius: var(--radius-md); }

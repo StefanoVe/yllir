@@ -248,3 +248,47 @@
     height: 36px;
   }
 }
+
+/* UI polish: floating rounded mini player, volume slider, button states */
+.player {
+  border-radius: 999px;
+  padding: 8px var(--space-2) 8px var(--space-2);
+  box-shadow: var(--shadow-2);
+  background: color-mix(in srgb, var(--color-surface) 94%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  gap: var(--space-1) var(--space-2);
+}
+
+.now-title { font-size: 0.95rem; }
+
+.now-meta { font-size: 0.8125rem; }
+
+.tray { border-radius: var(--radius-lg); }
+
+.chip { transition: background-color var(--transition-fast), border-color var(--transition-fast); }
+.chip:hover { border-color: var(--color-accent); }
+
+.volume-input {
+  height: 6px;
+  width: 96px;
+  border-radius: 999px;
+}
+
+.icon-btn { border-radius: 999px; }
+.icon-btn:hover:not(:disabled) { background: var(--color-surface-2); }
+.icon-btn:active:not(:disabled) { transform: scale(0.94); }
+.icon-btn.primary { width: 44px; height: 44px; box-shadow: var(--shadow-1); }
+.icon-btn.primary:active:not(:disabled) { filter: brightness(0.94); }
+.icon-btn:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+.icon-btn { transition: background-color var(--transition-fast), transform var(--transition-fast); }
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn, .chip { transition: none; }
+  .icon-btn:active:not(:disabled) { transform: none; }
+}
+
+@media (max-width: 719px) {
+  .player { border-radius: var(--radius-lg); }
+}

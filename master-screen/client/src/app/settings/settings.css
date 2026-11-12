@@ -211,3 +211,51 @@ summary {
     display: none;
   }
 }
+
+/* UI polish: cards, segmented control, check rows */
+:host h1 { font-size: var(--font-size-lg); letter-spacing: -0.01em; }
+
+.cards { gap: var(--space-2); }
+
+.card {
+  border-radius: var(--radius-lg);
+  transition: border-color var(--transition-fast);
+}
+
+.card:hover { border-color: color-mix(in srgb, var(--color-accent) 35%, var(--color-border)); }
+
+.card h2 { display: flex; align-items: center; gap: 8px; font-size: var(--font-size-md); font-weight: 700; }
+
+.card h2 lucide-angular { color: var(--color-accent); }
+
+.segmented { border: 1px solid var(--color-border); }
+
+.segment { min-height: 44px; }
+
+.segment:hover:not(.active) { color: var(--color-text); }
+
+.segment:focus-visible, .icon-btn:focus-visible, .range:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.range { height: 6px; }
+
+.modules li {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+
+.dot { width: 12px; height: 12px; }
+
+.icon-btn { transition: background-color var(--transition-fast), transform var(--transition-fast); }
+.icon-btn:hover:not(:disabled) { background: var(--color-surface-2); }
+.icon-btn:active:not(:disabled) { transform: scale(0.96); }
+
+.error, .summary .warn { display: inline-flex; align-items: center; gap: 6px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+  .card, .icon-btn { transition: none; }
+}

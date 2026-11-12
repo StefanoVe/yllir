@@ -64,7 +64,7 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | [Gestione dei PNG](#l14-gestione-dei-png) (`npc-manager`) | Processi del core e motore; skill rimossa | Creare e mantenere personaggi non giocanti, nemici e venditori con schede sempre standardizzate. | Deciso (indice). Skill rimossa; controlli implementati in 0.30.0 |
 | [Artwork](#l8-artwork) (`artwork`) | Libreria, chiamata dal core | Dipingere una creatura o un personaggio partendo da una descrizione verificata, e collegare il dipinto alla scheda. | Deciso (indice). Non implementata in 0.30.0 |
 | [Ricerca artwork](#l23-ricerca-artwork) (`artwork-search`) | Libreria, chiamata dal core | Trovare illustrazioni esistenti online, senza IA generativa, e proporne al master al massimo tre, con lo sfondo tolto da quella scelta. | Proposta (richiesta dell'autore, 2026-11-12). Non implementata |
-| [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Deciso (indice). Non implementata in 0.30.0 |
+| [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Deciso (indice). Prima implementazione (2026-11-12) come skill `cards`; il percorso con Photoshop MCP, predefinito, non è verificato nei test |
 | [Mappe di luogo e di battaglia](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Creare mappe con livelli separati, per luoghi e scontri. | Deciso (indice; modalità `map` dello strumento `images`, Deciso 2026-11-11). Implementata in 0.41.0 per mappe di luogo e di battaglia |
 | [Mappe del mondo](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Modificare una carta del mondo senza alterarne la geometria. | Deciso (indice). Non implementata in 0.30.0 |
 | [Scontri](#l12-scontri) (`combat-tracker`) | Libreria, con adattatore | Tenere lo stato di uno scontro per il master: iniziativa, PF, fasi, condizioni, risorse dei nemici. | Deciso (indice). Implementata (2026-11-12) |
@@ -81,8 +81,8 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 |---|---|---|---|
 | Sessione live | Core | È il processo che il master vive al tavolo. La realizzazione tecnica (chat, registro, pannelli) appartiene al master screen. | Proposta |
 | Master screen | Strumento locale unico | Interfaccia locale unica per chat con l'agente, consultazione, sessione live, musica e stampa. Si costruisce dopo la prima versione. | Deciso (strumento unico); forma Proposta |
-| Stampa (`print`) | Modulo opzionale (output fisici) | Fogli di carte (5×7 o A4) e fogli-bacheca, con retro e codici QR, in RGB o CMYK. | Proposta |
-| Enciclopedia pubblica | Modulo opzionale (output digitale) | Pagina statica consultabile dai giocatori, costruita da schede con segnaposto e da carte in formato compresso. | Proposta |
+| Stampa (`print`) | Modulo opzionale (output fisici) | Fogli di carte (5×7 o A4) e fogli-bacheca, con retro e codici QR, in RGB o CMYK. | Prima implementazione (2026-11-12) come skill `print` (L10), con renderer Node e PDF |
+| Enciclopedia pubblica | Modulo opzionale (output digitale) | Pagina statica consultabile dai giocatori, costruita da schede con segnaposto e da carte in formato compresso. | Deciso (2026-11-12, opzione A). Prima implementazione: skill `encyclopedia`, generazione locale con anteprima nel master screen, senza pubblicazione |
 | Atlante | Modulo opzionale (output digitale del master) | Indice dei luoghi su una carta, con dati scritti nella configurazione. | Proposta |
 | Musica | Modulo opzionale, nel master screen | Colonna sonora di scene e sessioni. | Proposta |
 | Stile per output web | Modulo opzionale | Profilo grafico per le pagine di enciclopedia e master screen. Una skill esterna di design per siti web (design-taste-frontend) è un candidato da valutare in quel contesto. | Proposta |
@@ -271,6 +271,8 @@ Non ancora implementata in 0.30.0. La Riprogettazione non la tocca: la decisione
 
 ### L9. Carte
 
+- **Stato (2026-11-12):** prima implementazione come skill `cards`. Il percorso con Photoshop MCP, predefinito, non è verificato nei test. Quando Photoshop manca, il ripiego è il renderer Node (decisione dell'autore, 2026-11-12).
+
 - **Scopo:** creare la carta illustrata di un oggetto (titolo, illustrazione, testo) o di un annuncio, con il sorgente a livelli accanto all'esportazione.
 - **Avvio:** dal core, dopo la creazione o la revisione di una scheda. Mai in autorun.
 - **Input → output:** parte pubblica della scheda (con limite temporale), profilo grafico → coppia PNG e PSD nella `img/` della categoria.
@@ -292,8 +294,10 @@ Non ancora implementata in 0.30.0. La Riprogettazione non la tocca: la decisione
 
 ### L10. Stampa
 
+- **Stato (2026-11-12):** implementata come skill `print`, con renderer Node e PDF; nessun programma esterno per la stampa. Lo stato `print` delle carte cambia solo su indicazione del master, scritta tramite il motore.
+
 - **Scopo:** produrre fogli di carte (5×7 o A4) e fogli-bacheca, con retro e QR, in RGB o CMYK.
-- **Avvio:** solo dal core, su richiesta del master. Non modifica lo stato delle carte: `print` passa a `printed` solo per indicazione dell'autore.
+- **Avvio:** solo dal core, su richiesta del master. Non modifica lo stato delle carte: `print` passa a `printed` solo per indicazione dell'autore, scritta tramite il motore.
 - **Input → output:** carte e metadato `print` → PNG o TIFF, PDF, indice con posto e QR, rapporto con carte escluse e senza QR.
 - **Deterministico:** tutto. Il giudizio riguarda solo quali carte includere.
 - **Modello:** superato dalla decisione 16.

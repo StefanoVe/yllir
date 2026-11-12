@@ -183,3 +183,47 @@ h1 {
     flex-wrap: wrap;
   }
 }
+
+/* UI polish: track rows, preferred badge, now-playing equaliser (CSS only) */
+.track {
+  align-items: center;
+  padding: 10px 12px 10px 10px;
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
+}
+
+.track:hover { border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border)); }
+
+.track-title { font-size: 0.975rem; }
+
+.badge.preferred { background: var(--color-accent-soft); }
+
+.badge.playing {
+  position: relative;
+  padding-left: 18px;
+}
+
+.badge.playing::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 8px;
+  height: 10px;
+  transform: translateY(-50%);
+  background:
+    linear-gradient(var(--color-accent-contrast), var(--color-accent-contrast)) 0 100% / 2px 100% no-repeat,
+    linear-gradient(var(--color-accent-contrast), var(--color-accent-contrast)) 3px 100% / 2px 100% no-repeat,
+    linear-gradient(var(--color-accent-contrast), var(--color-accent-contrast)) 6px 100% / 2px 100% no-repeat;
+  animation: eq 900ms ease-in-out infinite alternate;
+  transform-origin: bottom;
+}
+
+@keyframes eq {
+  from { clip-path: inset(40% 0 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge.playing::before { animation: none; clip-path: none; }
+  .track { transition: none; }
+}

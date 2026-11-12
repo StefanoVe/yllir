@@ -13,6 +13,9 @@ import { registerLiveRoutes } from './routes/live.js';
 import { registerMusicRoutes } from './routes/music.js';
 import { registerPlotRoutes } from './routes/plot.js';
 import { registerStatusRoutes } from './routes/status.js';
+import { createSiteRouter, registerEncyclopediaRoutes } from './routes/encyclopedia.js';
+import { registerPrintRoutes } from './routes/print.js';
+import { encyclopediaEnabledAtStartup } from './encyclopedia/config.js';
 import { musicEnabledAtStartup } from './music/config.js';
 import { securityMiddleware } from './security.js';
 
@@ -45,7 +48,12 @@ function errorHandler(ctx: Ctx): express.ErrorRequestHandler {
 export function createApp(ctx: Ctx): express.Express {
   const app = express();
   app.disable('x-powered-by');
-  app.use(securityMiddleware(ctx.port, { music: musicEnabledAtStartup(ctx.campaignRoot) }));
+  app.use(
+    securityMiddleware(ctx.port, {
+      music: musicEnabledAtStartup(ctx.campaignRoot),
+      encyclopedia: encyclopediaEnabledAtStartup(ctx.campaignRoot),
+    }),
+  );
   app.use(express.json({ limit: '64kb' }));
 
   const api = express.Router();
@@ -57,10 +65,14 @@ export function createApp(ctx: Ctx): express.Express {
   registerLiveRoutes(api, ctx);
   registerPlotRoutes(api, ctx);
   registerMusicRoutes(api, ctx);
+  registerEncyclopediaRoutes(api, ctx);
+  registerPrintRoutes(api, ctx);
   app.use('/api', api);
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'There is no such action.' });
   });
+  // The built encyclopedia site, same origin, read-only. Answers every /enc request itself.
+  app.use('/enc', createSiteRouter(ctx));
 
   const indexFile = path.join(PUBLIC_DIR, 'index.html');
   if (fs.existsSync(indexFile)) {

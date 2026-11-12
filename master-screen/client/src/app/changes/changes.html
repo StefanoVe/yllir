@@ -20,11 +20,35 @@
   @for (group of groups(); track group.id) {
     <li class="group" [class.undone]="group.undone" [attr.data-group-id]="group.id">
       <header class="group-head">
-        <time class="time" [attr.datetime]="group.at" [title]="absolute(group.at)">{{ relative(group.at) }}</time>
-        @if (group.undone) {
-          <span class="tag">{{ t('changes.undone') }}</span>
+        <div class="group-meta">
+          <time class="time" [attr.datetime]="group.at" [title]="absolute(group.at)">{{ relative(group.at) }}</time>
+          @if (group.undone) {
+            <span class="tag">{{ t('changes.undone') }}</span>
+          }
+        </div>
+
+        @if (!compact) {
+          @if (group.isUndo) {
+            <span class="undo-mark" role="img" [title]="t('changes.undoMark')" [attr.aria-label]="t('changes.undoMark')">
+              <lucide-angular [img]="icons.Undo2" [size]="16" aria-hidden="true" />
+            </span>
+          } @else if (group.id === undoTarget() && !group.undone) {
+            @if (confirmingId() === group.id) {
+              <p class="confirm">
+                <span>{{ t('changes.undoConfirm') }}</span>
+                <button type="button" class="text-btn" [disabled]="undoBusy() !== null" (click)="confirmUndo(group.id)">{{ t('changes.yes') }}</button>
+                <button type="button" class="text-btn" (click)="cancelUndo()">{{ t('changes.no') }}</button>
+              </p>
+            } @else {
+              <button type="button" class="icon-btn" [title]="t('changes.undo')" [attr.aria-label]="t('changes.undo')"
+                      [disabled]="undoBusy() !== null" (click)="askUndo(group.id)">
+                <lucide-angular [img]="icons.Undo2" [size]="16" aria-hidden="true" />
+              </button>
+            }
+          }
         }
       </header>
+
       <p class="summary">{{ group.summary }}</p>
 
       @if (!compact) {
@@ -38,7 +62,12 @@
                     <span class="status" role="img" [attr.aria-label]="statusLabel(file.status)" [title]="statusLabel(file.status)">
                       <lucide-angular [img]="statusIcon(file.status)" [size]="14" aria-hidden="true" />
                     </span>
-                    <span class="file-name">{{ file.path }}</span>
+                    <span class="file-text">
+                      <span class="file-name" [title]="file.path">{{ docTitle(file.path) }}</span>
+                      @if (folderOf(file.path); as folder) {
+                        <span class="file-folder" [title]="folder">{{ folder }}</span>
+                      }
+                    </span>
                   </button>
                   @if (isDoc(file.path)) {
                     <a class="icon-link" [routerLink]="link(file.path)" [title]="t('changes.openDocument')"
@@ -82,30 +111,11 @@
           </ul>
         }
 
-        <div class="actions">
-          @if (group.chatMessageId; as messageId) {
+        @if (group.chatMessageId; as messageId) {
+          <div class="actions">
             <button type="button" class="text-link" (click)="showInChat(messageId)">{{ t('changes.showInChat') }}</button>
-          }
-
-          @if (group.isUndo) {
-            <span class="undo-mark" role="img" [title]="t('changes.undoMark')" [attr.aria-label]="t('changes.undoMark')">
-              <lucide-angular [img]="icons.Undo2" [size]="16" aria-hidden="true" />
-            </span>
-          } @else if (group.id === undoTarget() && !group.undone) {
-            @if (confirmingId() === group.id) {
-              <p class="confirm">
-                <span>{{ t('changes.undoConfirm') }}</span>
-                <button type="button" class="text-btn" [disabled]="undoBusy() !== null" (click)="confirmUndo(group.id)">{{ t('changes.yes') }}</button>
-                <button type="button" class="text-btn" (click)="cancelUndo()">{{ t('changes.no') }}</button>
-              </p>
-            } @else {
-              <button type="button" class="icon-btn" [title]="t('changes.undo')" [attr.aria-label]="t('changes.undo')"
-                      [disabled]="undoBusy() !== null" (click)="askUndo(group.id)">
-                <lucide-angular [img]="icons.Undo2" [size]="16" aria-hidden="true" />
-              </button>
-            }
-          }
-        </div>
+          </div>
+        }
       }
     </li>
   }

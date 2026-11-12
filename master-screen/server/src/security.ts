@@ -5,16 +5,23 @@ import type { RequestHandler } from 'express';
 export interface CspOptions {
   /** The music module is on: YouTube (IFrame API loader, player frame, thumbnails) only. */
   music: boolean;
+  /** The encyclopedia module is on: the reader embeds the same-origin built site (`frame-src 'self'`). */
+  encyclopedia?: boolean;
 }
 
 /**
  * The Content-Security-Policy. With music on it adds exactly the YouTube allowances of the
  * API contract and nothing else: no wildcards, no extra `unsafe-*` values.
  */
-export function buildCsp({ music }: CspOptions): string {
+export function buildCsp({ music, encyclopedia = false }: CspOptions): string {
   const scriptSrc = music ? "script-src 'self' https://www.youtube.com" : "script-src 'self'";
   const imgSrc = music ? "img-src 'self' data: https://i.ytimg.com" : "img-src 'self' data:";
-  const frameSrc = music ? ['frame-src https://www.youtube-nocookie.com'] : [];
+  // One frame-src directive for every module that frames something.
+  const frames = [
+    ...(encyclopedia ? ["'self'"] : []),
+    ...(music ? ['https://www.youtube-nocookie.com'] : []),
+  ];
+  const frameSrc = frames.length > 0 ? [`frame-src ${frames.join(' ')}`] : [];
   return [
     "default-src 'self'",
     scriptSrc,
@@ -68,10 +75,12 @@ export function isStateChanging(method: string): boolean {
 export interface SecurityOptions {
   /** Campaign music module flag, read once at startup. */
   music?: boolean;
+  /** Campaign encyclopedia module flag, read once at startup. */
+  encyclopedia?: boolean;
 }
 
 export function securityMiddleware(port: number, opts: SecurityOptions = {}): RequestHandler {
-  const csp = buildCsp({ music: opts.music === true });
+  const csp = buildCsp({ music: opts.music === true, encyclopedia: opts.encyclopedia === true });
   return (req, res, next) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
       res.setHeader(name, value);

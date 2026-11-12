@@ -1,0 +1,201 @@
+<h1>{{ t('print.title') }}</h1>
+
+@if (loadError(); as message) {
+  <p class="alert" role="alert">{{ message }}</p>
+}
+
+@if (!status() && !loadError()) {
+  <p class="muted" role="status">{{ t('print.loading') }}</p>
+}
+
+@if (status(); as current) {
+  @if (!current.enabled) {
+    <p class="notice" role="status">{{ t('print.off') }}</p>
+  } @else {
+    @if (!current.encyclopediaEnabled) {
+      <p class="warning-row" role="status">
+        <lucide-angular [img]="icons.TriangleAlert" [size]="18" aria-hidden="true" />
+        <span>{{ t('print.encyclopediaOff') }}</span>
+      </p>
+    }
+    <p class="muted">{{ t('print.qrNote', { url: current.baseUrl }) }}</p>
+
+    <section class="card toolbar" aria-label="{{ t('print.format') }}">
+      <label class="field-row">
+        <span>{{ t('print.format') }}</span>
+        <select (change)="onFormat($any($event.target).value)">
+          <option value="5x7" [selected]="format() === '5x7'">{{ t('print.format5x7') }}</option>
+          <option value="a4" [selected]="format() === 'a4'">{{ t('print.formatA4') }}</option>
+        </select>
+      </label>
+      <label class="check-row">
+        <input type="checkbox" [checked]="cmyk()" (change)="cmyk.set(!cmyk())" />
+        <span>{{ t('print.cmyk') }}</span>
+      </label>
+      <p class="hint">{{ t('print.cmykHint') }}</p>
+    </section>
+
+    <div class="list-tools">
+      <label class="field-row">
+        <span>{{ t('print.filter') }}</span>
+        <select (change)="onFilter($any($event.target).value)">
+          @for (option of filterOptions; track option.value) {
+            <option [value]="option.value" [selected]="filter() === option.value">{{ t(option.key) }}</option>
+          }
+        </select>
+      </label>
+      <button type="button" class="ghost" (click)="selectShown()">{{ t('print.selectAll') }}</button>
+      <button type="button" class="ghost" (click)="clearSelection()" [disabled]="selectedCount() === 0">
+        {{ t('print.selectNone') }}
+      </button>
+      <span class="muted" role="status">{{ t('print.selectedCount', { count: selectedCount() }) }}</span>
+    </div>
+
+    @if (visible().length === 0) {
+      <p class="muted">{{ emptyText() }}</p>
+    } @else {
+      <ul class="rows">
+        @for (card of visible(); track card.id) {
+          <li class="row" [attr.data-state]="card.print ?? 'none'">
+            <div class="row-main">
+              <input type="checkbox" class="pick" [checked]="isSelected(card.id)" (change)="toggle(card.id)"
+                     [attr.aria-label]="t('print.selectCard', { title: card.title })" />
+              <div class="row-text">
+                <span class="row-title">{{ card.title }}</span>
+                <span class="row-meta">
+                  <span>{{ card.category }}</span>
+                  @if (card.personal) {
+                    <span class="personal">
+                      <lucide-angular [img]="icons.User" [size]="14" aria-hidden="true" />
+                      <span>{{ t('print.personal') }}</span>
+                    </span>
+                  }
+                  @if (!card.hasImage) {
+                    <span>{{ t('print.noImage') }}</span>
+                  }
+                </span>
+              </div>
+              <span class="chip">
+                <lucide-angular [img]="stateIcon(card.print)" [size]="14" aria-hidden="true" />
+                <span>{{ stateText(card.print) }}</span>
+              </span>
+              <button type="button" class="icon-btn" [attr.aria-expanded]="menuId() === card.id"
+                      [attr.aria-controls]="'print-menu-' + card.id"
+                      [attr.aria-label]="t('print.actions', { title: card.title })" [attr.title]="t('print.actions', { title: card.title })"
+                      (click)="toggleMenu(card.id)">
+                <lucide-angular [img]="icons.EllipsisVertical" [size]="18" aria-hidden="true" />
+              </button>
+            </div>
+
+            @if (card.personal) {
+              <label class="copies">
+                <span>{{ t('print.copies') }}</span>
+                <input type="number" inputmode="numeric" [min]="minCopies" [max]="maxCopies" step="1"
+                       [value]="copyCount(card.id)" [attr.aria-label]="t('print.copiesFor', { title: card.title })"
+                       (change)="onCopies(card.id, $event)" />
+              </label>
+            }
+
+            @if (menuId() === card.id) {
+              <div class="menu" [id]="'print-menu-' + card.id">
+                <label class="field-row">
+                  <span>{{ t('print.setState') }}</span>
+                  <select [disabled]="busyId() === card.id" (change)="onStateChange(card, $event)">
+                    <option value="" disabled hidden [selected]="card.print === null">{{ t('print.state.none') }}</option>
+                    <option value="to-print" [selected]="card.print === 'to-print'">{{ t('print.state.toPrint') }}</option>
+                    <option value="printed" [selected]="card.print === 'printed'">{{ t('print.state.printed') }}</option>
+                    <option value="reprint" [selected]="card.print === 'reprint'">{{ t('print.state.reprint') }}</option>
+                  </select>
+                </label>
+
+                @if (confirmId() === card.id) {
+                  <div class="confirm">
+                    <p>{{ t('print.confirmPrinted', { title: card.title }) }}</p>
+                    <div class="actions">
+                      <button type="button" class="primary" (click)="confirmPrinted(card)">{{ t('print.confirmYes') }}</button>
+                      <button type="button" class="ghost" (click)="cancelPrinted()">{{ t('print.cancel') }}</button>
+                    </div>
+                  </div>
+                }
+
+                <button type="button" class="ghost" [disabled]="busyId() === card.id" (click)="makeImage(card)">
+                  <lucide-angular [img]="busyId() === card.id ? icons.LoaderCircle : icons.Images" [size]="16" aria-hidden="true"
+                                  [class.spin]="busyId() === card.id" />
+                  <span>{{ busyId() === card.id ? t('print.makingImage') : t('print.makeImage') }}</span>
+                </button>
+              </div>
+            }
+
+            @if (cardError()[card.id]; as message) {
+              <p class="alert" role="alert">{{ message }}</p>
+            }
+          </li>
+        }
+      </ul>
+    }
+
+    <section class="sheets" aria-labelledby="print-sheets-title">
+      <h2 id="print-sheets-title" class="sr-only">{{ t('print.makeSheets') }}</h2>
+      <button type="button" class="primary" [disabled]="selectedCount() === 0 || making()" [attr.aria-busy]="making()"
+              (click)="makeSheets()">
+        <lucide-angular [img]="making() ? icons.LoaderCircle : icons.Printer" [size]="18" aria-hidden="true"
+                        [class.spin]="making()" />
+        <span>{{ making() ? t('print.makingSheets') : t('print.makeSheets') }}</span>
+      </button>
+      @if (selectedCount() === 0) {
+        <p class="muted">{{ t('print.needSelection') }}</p>
+      }
+
+      @if (sheetError(); as message) {
+        <p class="alert" role="alert">{{ message }}</p>
+      }
+
+      @if (sheetResult(); as result) {
+        <div class="card" aria-live="polite">
+          @if (result.ok) {
+            <p>{{ pagesText(result.pages) }}</p>
+            @if (result.fileUrl) {
+              <p>
+                <a class="link" [href]="result.fileUrl" target="_blank" rel="noopener">
+                  <lucide-angular [img]="icons.Printer" [size]="16" aria-hidden="true" />
+                  <span>{{ t('print.openPdf') }}</span>
+                </a>
+              </p>
+            }
+            @if (pdfSrc(); as src) {
+              <object class="pdf" type="application/pdf" [data]="src" [attr.aria-label]="t('print.pdfPreview')">
+                <p class="muted">{{ t('print.pdfFallback') }}</p>
+              </object>
+            }
+          } @else {
+            <p class="alert" role="alert">{{ t('print.sheetsFailed') }}</p>
+          }
+
+          @if (result.excluded.length > 0) {
+            <p>{{ excludedText(result.excluded.length) }}</p>
+            <details>
+              <summary>{{ t('print.excludedList') }}</summary>
+              <ul class="plain">
+                @for (item of result.excluded; track $index) {
+                  <li>{{ excludedLine(item) }}</li>
+                }
+              </ul>
+            </details>
+          }
+
+          @if (result.warnings.length > 0) {
+            <h3>{{ t('print.warnings') }}</h3>
+            <ul class="plain">
+              @for (warning of result.warnings; track $index) {
+                <li class="warning">
+                  <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
+                  <span>{{ warning.message }}</span>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      }
+    </section>
+  }
+}

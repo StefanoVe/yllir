@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, effect, inject, signal, untracked } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { LucideAngularModule, Square } from 'lucide-angular';
+import { LucideAngularModule, Radio, Square } from 'lucide-angular';
 import { LiveStateService } from './live-api.service';
 import { LiveCanvas } from './canvas/canvas';
 import { LiveDock, type DockTab } from './dock/dock';
@@ -30,7 +30,7 @@ export function parseDockParam(value: string | null): DockTab | null {
 export class LiveComponent {
   readonly state = inject(LiveStateService);
   readonly s = inject(LiveStrings);
-  readonly icons = { Square };
+  readonly icons = { Square, Radio };
 
   readonly title = signal('');
   readonly confirmingEnd = signal(false);

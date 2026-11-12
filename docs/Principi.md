@@ -68,6 +68,7 @@ Il pubblico di riferimento è il master che non ha mai usato un'intelligenza art
 - Gli agenti che lavorano sul canone vedono anche il blocco riservato, perché devono controllarlo: l'autore, il revisore di lotto (che giudica i segreti finiti nel testo pubblico) e, quando è richiesto, l'audit di continuità (Riprogettazione, sezione 1).
 - Per gli esecutori economici che scrivono le schede, la regola non è ancora decisa: vedi Questioni aperte.
 - Non lo ricevono mai: i revisori di testi destinati ai giocatori (enciclopedia, carte, riepiloghi), i fornitori di immagini, le ricerche web (Riprogettazione, decisione 10: una ricerca non riceve mai il blocco riservato) e i servizi di pubblicazione. Le uscite pubbliche leggono solo la parte pubblica.
+- L'enciclopedia pubblica non include il seme della campagna né le categorie interamente riservate, nemmeno il loro titolo (decisione dell'autore, 2026-11-12).
 - Un contenuto riservato diventa pubblico solo con un'azione esplicita del master, cioè lo spostamento del testo fuori dal blocco.
 - Un rimando da un testo pubblico a una nota riservata punta alla nota con un'ancora (per esempio `scheda.md#master`), ma non ne riporta il contenuto.
 - Il motore verifica il blocco riservato in ogni scrittura: un blocco non chiuso o un segreto nella parte pubblica segnalato dal revisore blocca la scrittura (**Implementato in 0.30.0** per il controllo del blocco; il controllo dei segreti nel testo pubblico è affidato al revisore di lotto, Riprogettazione, sezione 1).

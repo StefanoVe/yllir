@@ -31,11 +31,22 @@
         </div>
       }
 
-      @for (message of messages(); track message.id) {
-        <article class="msg" [class.master]="message.role === 'master'" [class.agent]="message.role === 'agent'"
-                 [class.pending]="message.pending" [attr.data-message-id]="message.id">
-          <span class="sr-only">{{ roleLabel(message.role) }}:</span>
-          <p class="text">{{ message.text }}</p>
+      @for (row of rows(); track row.message.id) {
+        @if (row.head) {
+          <header class="msg-head" [class.master]="row.message.role === 'master'">
+            <span class="who">{{ roleLabel(row.message.role) }}</span>
+            @if (timeLabel(row.message.at); as time) {
+              <time [attr.datetime]="row.message.at">{{ time }}</time>
+            }
+          </header>
+        }
+        <article class="msg" [class.master]="row.message.role === 'master'" [class.agent]="row.message.role === 'agent'"
+                 [class.grouped]="!row.head" [class.pending]="row.message.pending" [attr.data-message-id]="row.message.id">
+          @if (row.message.role === 'master') {
+            <p class="text">{{ row.message.text }}</p>
+          } @else {
+            <div class="text md" [innerHTML]="renderMarkdown(row.message.text)"></div>
+          }
         </article>
       }
     </div>

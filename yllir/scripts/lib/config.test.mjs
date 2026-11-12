@@ -526,3 +526,60 @@ test('campaign.seed rejects paths outside the campaign, other extensions and non
   assert.deepEqual(pairsOf(errorsOf(withSeed('""'))), ['bad-value campaign.seed']);
   assert.deepEqual(pairsOf(errorsOf(withSeed('[Seme.md]'))), ['bad-type campaign.seed']);
 });
+
+test('encyclopedia and print are optional mappings; a valid pair is accepted', () => {
+  const yaml = `${MINIMAL}encyclopedia:\n  title: "Atlante di Calvane"\n  base_url: "https://example.org/calvane"\nprint:\n  format: a4\n  cmyk: true\n  renderer: node\n`;
+  const result = validateConfig(makeCampaign(yaml));
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.ok, true);
+  assert.equal(result.config.encyclopedia.title, 'Atlante di Calvane');
+  assert.equal(result.config.print.format, 'a4');
+  assert.equal(result.config.print.cmyk, true);
+  assert.equal(result.config.print.renderer, 'node');
+});
+
+test('encyclopedia.base_url is stored with exactly one trailing slash', () => {
+  const plain = validateConfig(makeCampaign(`${MINIMAL}encyclopedia:\n  base_url: "https://example.org/calvane"\n`));
+  assert.equal(plain.config.encyclopedia.base_url, 'https://example.org/calvane/');
+  const many = validateConfig(makeCampaign(`${MINIMAL}encyclopedia:\n  base_url: "http://localhost///"\n`));
+  assert.deepEqual(many.errors, []);
+  assert.equal(many.config.encyclopedia.base_url, 'http://localhost/');
+});
+
+test('encyclopedia.title is text of at most 120 characters', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  title: ""\n`)), ['bad-value encyclopedia.title']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  title: 12\n`)), ['bad-type encyclopedia.title']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  title: "${'a'.repeat(120)}"\n`)), []);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  title: "${'a'.repeat(121)}"\n`)), [
+    'bad-value encyclopedia.title',
+  ]);
+});
+
+test('encyclopedia.base_url must be an http or https address without query, fragment or credentials', () => {
+  const bad = (value) => pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  base_url: "${value}"\n`));
+  assert.deepEqual(bad('ftp://example.org/'), ['bad-value encyclopedia.base_url']);
+  assert.deepEqual(bad('not a url'), ['bad-value encyclopedia.base_url']);
+  assert.deepEqual(bad('https://example.org/?x=1'), ['bad-value encyclopedia.base_url']);
+  assert.deepEqual(bad('https://example.org/#top'), ['bad-value encyclopedia.base_url']);
+  assert.deepEqual(bad('https://user:secret@example.org/'), ['bad-value encyclopedia.base_url']);
+  assert.deepEqual(bad(`https://example.org/${'a'.repeat(200)}`), ['bad-value encyclopedia.base_url']);
+  assert.deepEqual(bad('https://example.org/ok'), []);
+  assert.deepEqual(bad(''), ['bad-value encyclopedia.base_url']);
+});
+
+test('unknown keys inside encyclopedia and print are reported', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  colour: red\n`)), ['unknown-key encyclopedia.colour']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print:\n  dpi: 300\n`)), ['unknown-key print.dpi']);
+});
+
+test('print values are checked for enumerations and type', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print:\n  format: letter\n`)), ['bad-value print.format']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print:\n  cmyk: yes\n`)), ['bad-type print.cmyk']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print:\n  renderer: gimp\n`)), ['bad-value print.renderer']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print:\n  renderer: photoshop\n  cmyk: false\n`)), []);
+});
+
+test('encyclopedia and print must be mappings', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia: yes\n`)), ['bad-type encyclopedia']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print: a4\n`)), ['bad-type print']);
+});

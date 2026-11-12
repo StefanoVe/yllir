@@ -175,3 +175,32 @@ Module `music` of campaign.yaml (`modules.music: true`). When it is off: no `/ap
 - SSE `music` `{tracks, reason?}`: the agent suggests music by SHOWING it; nothing plays by itself. Published by the in-process agent tool `suggest_music` (input `{query?: string, doc?: string, reason?: string}`; the server resolves it with the same search and publishes at most 5 tracks; an empty result publishes nothing and the tool says so).
 - CSP: when music is on, add exactly `frame-src https://www.youtube-nocookie.com` and `script-src 'self' https://www.youtube.com` (the IFrame API loader) and `img-src` for `https://i.ytimg.com`; nothing else. Master text is never sent anywhere: the browser only loads the video id.
 - Client: a persistent mini player in the shell (survives route changes), a library page `/music` (search, by sheet, preferred first), suggestion chips when a `music` event arrives (click = play, never auto-play), controls: play/pause, volume, loop, fade out (and fade in on start), next/previous within the list; YouTube through the IFrame API (`youtube-nocookie.com`, `origin` set, `enablejsapi=1`, controls hidden, one hidden player instance reused); other hosts show an 'Open' button that opens the link in a new tab (`rel=noopener`). Player state shown is what the player reported (no optimistic state). Volume and loop preference saved per campaign in localStorage. Works with the tab in the background.
+
+## Encyclopedia and print (modules `encyclopedia` and `print`)
+
+Decided by the author (2026-11-12): option A (a section of the master screen generates the static site); hosting is LOCAL ONLY for now (no publication, no credentials: `publishing` is always `not-configured`); entries cover objects, places and characters (public part only; fully master-only categories and the seed never appear, title included); locked texts open with a code, checked in the browser; cards are made with the Photoshop MCP when it is available and otherwise with a Node renderer.
+
+Generated output goes to `<campaign>/.campaign/cache/encyclopedia/` and `<campaign>/.campaign/cache/print/` (git-ignored, always regenerable, never canon).
+
+campaign.yaml (validated by the framework `config.mjs`): `modules.encyclopedia`, `modules.print` (existing booleans) plus two optional top-level mappings: `encyclopedia: { title?: string, base_url?: string(http/https URL, no query, no fragment, trailing slash optional) }` and `print: { format?: "5x7"|"a4", cmyk?: boolean, renderer?: "auto"|"photoshop"|"node" }` (defaults: format 5x7, cmyk false, renderer auto). `encyclopedia.base_url` defaults to `http://localhost/` and is what QR codes point to.
+
+Stable addresses: an entry lives at `<base_url>/e/<id>/` where `<id>` is the sheet's metadata id (never the file name). Ids listed in a sheet's `merged_ids` redirect to the surviving entry; ids in the retired-ids registry show a plain "no longer available" page.
+
+Framework CLIs (JSON on stdout and a final `exit: <code>` line, 0 ok, 1 domain error, 2 usage; all fail closed):
+- `node <fw>/skills/library/encyclopedia/scripts/encyclopedia.mjs <build|status> <root>`: `build` generates the whole site into a temp folder and swaps it atomically into `.campaign/cache/encyclopedia/` only when every pre-publish check passes; stdout is an `EncyclopediaReport`. `status` prints `{ built, report|null }` from the saved `report.json`.
+- `node <fw>/skills/library/print/scripts/print.mjs <list|state|render-card|sheets> <root> [options]`: `list` -> `{ cards: PrintCard[], renderer, format, cmyk, baseUrl }`; `state --id <id> --state to-print|printed|reprint` changes the sheet's `print` metadata THROUGH the engine write cycle (draft + `engine.mjs commit`), never by direct write; `render-card --id <id> [--renderer auto|photoshop|node]` writes `img/<base>.png` in the category's img folder; `sheets [--ids a,b] [--format 5x7|a4] [--copies <id>=<n>,...] [--cmyk true|false]` writes `.campaign/cache/print/sheets-<timestamp>.pdf` (front pages and QR backs) and prints a `PrintSheetResult` with `file` relative to the campaign.
+
+Server endpoints (under `/api`; both modules answer `{enabled:false,...}` with no work when off):
+
+| Method and path | Request | Response |
+|---|---|---|
+| GET `/encyclopedia` | | `EncyclopediaStatus` |
+| POST `/encyclopedia/build` | | `EncyclopediaReport` (409 plain message when a check fails; body still carries the report) |
+| GET `/enc/*` | | the built static site, same origin, read-only, `Content-Security-Policy: sandbox allow-scripts allow-same-origin`-free: serve with the site's own strict CSP (`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:`) |
+| GET `/print` | | `PrintStatus` |
+| POST `/print/state` | `{ id, state: PrintState }` | `PrintStatus` |
+| POST `/print/render` | `{ id, renderer? }` | `PrintStatus` |
+| POST `/print/sheets` | `{ ids?: string[], format?, copies?: Record<string,number>, cmyk? }` | `PrintSheetResult` |
+| GET `/print/files/:name` | | the generated PDF (name validated `^sheets-[0-9TZ-]+\.pdf$`, `Content-Disposition: inline`) |
+
+The server only runs the CLIs through `execFile` (never a shell), one build or sheet job at a time (409 plain message if busy), a 120 s timeout, and publishes SSE `files` when canon files change as it already does. Client: route `/encyclopedia` (build button, report with the checks as plain sentences, an Open-preview link and an embedded preview, base address shown with a hint that it can be changed in the campaign settings through the assistant, and a calm note that publishing is not configured) and route `/print` (card list with a state chip per card using icon + text, select all/none, personal-card copies per character, generate-sheets button, PDF link opening inline, per-card render button); rail icons only when the module is on.
