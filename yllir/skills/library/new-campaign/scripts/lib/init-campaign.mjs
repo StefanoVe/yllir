@@ -10,6 +10,7 @@ import { generateInstructions } from '../../../../../scripts/lib/instructions.mj
 import { validateConfig } from '../../../../../scripts/lib/config.mjs';
 import { listAdapters, pluginRootFromHere } from '../../../../../scripts/lib/adapter.mjs';
 import { slugify } from '../../../../../scripts/lib/normalize.mjs';
+import { installShortcut } from './shortcut.mjs';
 
 const FILE = 'campaign.yaml';
 const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];
@@ -119,14 +120,28 @@ export function initCampaign(root, { name, language, register, world, descriptio
     return { created: [], slug, errors: check.errors };
   }
 
-  // 7. Created paths.
+  // 7. The master screen shortcut. Never fails the campaign: a failure is reported in shortcut.
+  const shortcut = writeShortcutSafely(dir, language);
+
+  // 8. Created paths.
   const created = [
     FILE,
     ...(repo.created ? ['.git'] : []),
     '.gitignore',
     ...generated.written,
   ];
-  return { created: [...new Set(created)], slug, errors: [] };
+  return { created: [...new Set(created)], slug, errors: [], shortcut };
+}
+
+/** Writes the shortcut and ignores it in git; any error becomes shortcut.error. */
+function writeShortcutSafely(dir, language) {
+  try {
+    const result = installShortcut(dir, { language });
+    if (!result.created || result.path === null) return { created: false };
+    return { created: true, path: path.basename(result.path) };
+  } catch (err) {
+    return { created: false, error: err?.message ?? String(err) };
+  }
 }
 
 /** Undefined or blank text counts as not given; other non-text is false. */

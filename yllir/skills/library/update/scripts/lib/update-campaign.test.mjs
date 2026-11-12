@@ -216,10 +216,12 @@ test('a campaign made with an older version is updated: the update version, then
   assert.ok(result.rewritten.includes('.campaign/version.yaml'));
   assert.match(read(dir, '.campaign/version.yaml'), new RegExp(`^framework_version: "${INSTALLED}"$`, 'm'));
   const versions = listVersions(dir, { limit: 100 });
-  assert.equal(versions.length, before + 2);
-  assert.equal(versions[0].message, 'Aggiornamento del formato della campagna');
-  assert.equal(versions[1].message, `Updated Yllir to ${INSTALLED}`);
-  assert.equal(versions[1].kind, 'framework');
+  // The shortcut-v1 ignore rules are saved last, as a version of their own.
+  assert.equal(versions.length, before + 3);
+  assert.equal(versions[0].message, `Updated Yllir to ${INSTALLED}`);
+  assert.equal(versions[1].message, 'Aggiornamento del formato della campagna');
+  assert.equal(versions[2].message, `Updated Yllir to ${INSTALLED}`);
+  assert.equal(versions[2].kind, 'framework');
   assert.equal(result.migrations['world-graph-v1'], 'complete');
   assert.ok(result.world_migration_files.includes('Seme del mondo.md'));
   const state = read(dir, '.campaign/state/update.yaml');
@@ -283,10 +285,12 @@ test('pending master changes are saved as a manual version before the update', a
   const result = await updateCampaign(dir);
   assert.equal(result.status, 'updated');
   const log = git(dir, 'log', '--format=%s').split('\n');
-  assert.equal(log[0], 'Aggiornamento del formato della campagna');
-  assert.equal(log[1], `Updated Yllir to ${INSTALLED}`);
-  assert.equal(log[2], `Saved manual changes before updating Yllir to ${INSTALLED}`);
-  assert.match(git(dir, 'show', '--name-only', '--format=', 'HEAD~2'), /Trama\/session\.md/);
+  // The shortcut-v1 ignore rules are saved last, so the manual version is the fourth from the top.
+  assert.equal(log[0], `Updated Yllir to ${INSTALLED}`);
+  assert.equal(log[1], 'Aggiornamento del formato della campagna');
+  assert.equal(log[2], `Updated Yllir to ${INSTALLED}`);
+  assert.equal(log[3], `Saved manual changes before updating Yllir to ${INSTALLED}`);
+  assert.match(git(dir, 'show', '--name-only', '--format=', 'HEAD~3'), /Trama\/session\.md/);
 });
 
 test('a dry run reports the plan and writes nothing at all', async () => {
@@ -454,9 +458,12 @@ test('an old-layout campaign is migrated to the session folders in one saved ver
   assert.equal(fs.existsSync(path.join(dir, 'Trama/Ombre/Sessione 1.md')), false);
   assert.match(read(dir, 'Trama/Sessione 1/Sessione 1.md'), /^arc: "Ombre"$/m);
   assert.match(read(dir, 'Trama/Sessione 1/Eventi/Fuga.md'), /^Nella notte\.$/m);
-  assert.equal(listVersions(dir, { limit: 2 })[1].message, `Updated Yllir to ${INSTALLED}`);
-  assert.equal(listVersions(dir, { limit: 1 })[0].message, 'Aggiornamento del formato della campagna');
-  assert.match(git(dir, 'show', '--name-only', '--format=', 'HEAD~1', '--', 'Trama'), /Trama\/Sessione 1\/Sessione 1\.md/);
+  // The shortcut-v1 ignore rules are saved last, after the format version.
+  assert.deepEqual(
+    listVersions(dir, { limit: 3 }).map((entry) => entry.message),
+    [`Updated Yllir to ${INSTALLED}`, 'Aggiornamento del formato della campagna', `Updated Yllir to ${INSTALLED}`],
+  );
+  assert.match(git(dir, 'show', '--name-only', '--format=', 'HEAD~2', '--', 'Trama'), /Trama\/Sessione 1\/Sessione 1\.md/);
 
   const map = plotMap(dir);
   assert.deepEqual(map.errors, []);

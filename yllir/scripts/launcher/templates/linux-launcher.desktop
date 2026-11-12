@@ -1,0 +1,7 @@
+# yllir-shortcut v1
+[Desktop Entry]
+Type=Application
+Name={{NAME}}
+Exec={{EXEC}}
+Path={{CAMPAIGN}}
+Terminal=true

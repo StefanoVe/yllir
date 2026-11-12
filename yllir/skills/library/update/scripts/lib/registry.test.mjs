@@ -71,13 +71,13 @@ globalThis.__log = [];
 
 // ---------------------------------------------------------------- the real registry
 
-test('the registry of the framework lists the six migrations in their order', () => {
+test('the registry of the framework lists the nine migrations in their order', () => {
   const registry = loadRegistry();
   assert.deepEqual(registry.errors, []);
   assert.equal(registry.supported_from, '0.0.0');
   assert.deepEqual(
     registry.migrations.map((m) => m.id),
-    ['session-layout-v1', 'category-first-geography-v1', 'item-descriptions-v1', 'item-knowledge-v1', 'statistics-tables-v1', 'world-graph-v1', 'metadata-comment-v1', 'scene-checks-v1'],
+    ['session-layout-v1', 'category-first-geography-v1', 'item-descriptions-v1', 'item-knowledge-v1', 'statistics-tables-v1', 'world-graph-v1', 'metadata-comment-v1', 'scene-checks-v1', 'shortcut-v1'],
   );
   const world = registry.migrations.find((m) => m.id === 'world-graph-v1');
   assert.equal(world.needed, 'detect');

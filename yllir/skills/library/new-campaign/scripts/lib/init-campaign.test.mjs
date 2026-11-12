@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { initCampaign } from './init-campaign.mjs';
+import { shortcutFileName } from './shortcut.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { validateConfig } from '../../../../../scripts/lib/config.mjs';
 import { stripExitLine } from '../../../../../scripts/lib/cli-exit.mjs';
@@ -226,4 +227,32 @@ test('init-campaign CLI accepts --adapter and refuses an unknown adapter with ex
   assert.equal(ok.status, 0, ok.stderr);
   const config = parseYamlLite(fs.readFileSync(path.join(dir, 'campaign.yaml'), 'utf8')).data;
   assert.equal(config.system.adapter, 'dnd-2024');
+});
+
+test('the master screen shortcut is written for the campaign language and git never sees it', { skip: !['darwin', 'linux', 'win32'].includes(process.platform) }, () => {
+  for (const language of ['it', 'en']) {
+    const dir = tmp();
+    const result = initCampaign(dir, { ...GOOD, language });
+    assert.deepEqual(result.errors, []);
+    assert.equal(result.shortcut.created, true);
+    const name = shortcutFileName(language);
+    assert.equal(result.shortcut.path, name);
+    const file = path.join(dir, name);
+    assert.ok(fs.readFileSync(file, 'utf8').includes('yllir-shortcut v1'));
+    if (process.platform !== 'win32') assert.ok((fs.statSync(file).mode & 0o111) !== 0, 'executable');
+
+    assert.match(git(dir, 'check-ignore', name), new RegExp(name.replace(/[.*]/g, '\\$&')));
+    const untracked = git(dir, 'status', '--porcelain', '--untracked-files=all');
+    assert.equal(untracked.includes(name), false, 'the shortcut is not in git status');
+    assert.match(fs.readFileSync(path.join(dir, '.gitignore'), 'utf8'), /^Apri master screen\.\*$/m);
+  }
+});
+
+test('init-campaign CLI prints the shortcut field in its JSON', () => {
+  const dir = tmp();
+  const run = spawnSync(process.execPath, [CLI, dir, '--name', 'Cenere', '--language', 'en', '--register', 'plain'], { encoding: 'utf8' });
+  assert.equal(run.status, 0, run.stderr);
+  const result = JSON.parse(stripExitLine(run.stdout));
+  assert.equal(typeof result.shortcut, 'object');
+  assert.equal(typeof result.shortcut.created, 'boolean');
 });
