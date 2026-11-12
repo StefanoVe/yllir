@@ -473,3 +473,127 @@ export function validateState(adapter, state) {
   if (!turnOk) errors.push({ code: 'turn-out-of-range', message: 'the turn points outside the initiative order' });
   return errors;
 }
+
+// Public summary of a stat block, for the tooltip of a combatant. Reads the sheet's
+// statistics tables (ability rows, armour class, hit points, speed) and every entry
+// under the action headings. The master-only block is removed first, so it never
+// comes back.
+const MASTER_BLOCK = /<!--\s*master\s*-->[\s\S]*?<!--\s*\/master\s*-->/g;
+const MASTER_OPEN = /<!--\s*master\s*-->[\s\S]*$/;
+const ACTION_HEADINGS = new Set([
+  'azioni', 'azioni bonus', 'reazioni', 'azioni leggendarie',
+  'actions', 'bonus actions', 'reactions', 'legendary actions',
+]);
+// Labels the adapter does not list: initiative and challenge rating, in both languages.
+const EXTRA_STAT_LABELS = {
+  initiative: ['iniziativa', 'bonus di iniziativa', 'initiative', 'initiative bonus'],
+  cr: ['gs', 'grado di sfida', 'cr', 'challenge rating'],
+};
+const STAT_ORDER = ['ac', 'hp', 'speed', 'initiative', 'str', 'dex', 'con', 'int', 'wis', 'cha', 'cr'];
+
+// Markdown to plain text: links become their text, emphasis markers go.
+function plainText(text) {
+  return text
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/\*+/g, '')
+    .replace(/(^|[\s(])_+(?=\S)/g, '$1')
+    .replace(/(?<=\S)_+(?=$|[\s.,;:!?)])/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+const normaliseLabel = (text) => plainText(text).replace(/:$/, '').toLowerCase();
+
+// Maps every label the sheet may use (Italian or English) to the adapter field id.
+function labelMap(adapter) {
+  const map = new Map();
+  const add = (labels, id) => {
+    for (const label of labels) {
+      if (typeof label === 'string' && label !== '') map.set(normaliseLabel(label), id);
+    }
+  };
+  for (const field of adapter?.creature_sheet?.required ?? []) add([field.label_it, field.label_en], field.id);
+  for (const [id, labels] of Object.entries(EXTRA_STAT_LABELS)) add(labels, id);
+  return map;
+}
+
+// First table row for each known label: `| CA | 15 (armatura) |` gives ac.
+function statRows(lines, labels) {
+  const found = new Map();
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('|')) continue;
+    const cells = trimmed.replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
+    if (cells.length < 2) continue;
+    const id = labels.get(normaliseLabel(cells[0]));
+    const value = plainText(cells[1]);
+    if (!id || value === '' || found.has(id)) continue;
+    found.set(id, { label: plainText(cells[0]), value });
+  }
+  return found;
+}
+
+// A paragraph starting with a bold name: `***Name.*** text`, `**Name.** text`, or a list item of that form.
+function actionFromParagraph(text) {
+  const match = /^(?:[-+*]\s+)?(\*{2,3}|_{2,3})(.+?)\1\s*(.*)$/.exec(text);
+  if (!match) return null;
+  const name = plainText(match[2]).replace(/[\s.:!?]+$/, '').trim();
+  if (name === '') return null;
+  return { name, text: plainText(match[3]) };
+}
+
+// Every action paragraph under an action heading, in document order.
+function actionEntries(lines) {
+  const actions = [];
+  let inActions = false;
+  let paragraph = [];
+  const flush = () => {
+    if (inActions && paragraph.length > 0) {
+      const entry = actionFromParagraph(paragraph.join(' '));
+      if (entry) actions.push(entry);
+    }
+    paragraph = [];
+  };
+  for (const raw of lines) {
+    const heading = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(raw);
+    if (heading) {
+      flush();
+      inActions = ACTION_HEADINGS.has(normaliseLabel(heading[1]));
+      continue;
+    }
+    if (raw.trim() === '') {
+      flush();
+      continue;
+    }
+    if (inActions) paragraph.push(raw.trim());
+  }
+  flush();
+  return actions;
+}
+
+/**
+ * Summary of a stat block for the tooltip. `lines` are the rows found in the statistics
+ * tables, in a fixed order, with the label as the sheet writes it and the value as the
+ * sheet writes it, in plain text. `actions` are the entries under the action headings.
+ * The master-only block is removed before anything is read. Never throws: unexpected
+ * input gives empty lists.
+ * @param {object} adapter the parsed adapter.yaml of the game system
+ * @param {string} markdown the sheet, Markdown
+ * @returns {{lines: {label: string, value: string}[], actions: {name: string, text: string}[]}}
+ */
+export function statSummary(adapter, markdown) {
+  try {
+    if (typeof markdown !== 'string') return { lines: [], actions: [] };
+    const visible = markdown.replace(MASTER_BLOCK, '').replace(MASTER_OPEN, '');
+    const lines = visible.split(/\r?\n/);
+    const rows = statRows(lines, labelMap(adapter));
+    const summary = [];
+    for (const id of STAT_ORDER) {
+      const row = rows.get(id);
+      if (row) summary.push({ label: row.label, value: row.value });
+    }
+    return { lines: summary, actions: actionEntries(lines) };
+  } catch {
+    return { lines: [], actions: [] };
+  }
+}

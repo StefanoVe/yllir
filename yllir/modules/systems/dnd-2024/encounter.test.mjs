@@ -11,6 +11,7 @@ import {
   recordEvent,
   advanceTurn,
   validateState,
+  statSummary,
 } from './encounter.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -416,5 +417,216 @@ describe('the PC at zero and a defeated enemy in the same fight', () => {
     state = apply(state, { op: 'next' });
     assert.equal(state.order[state.turn], 'c-1');
     assert.equal(state.combatants[0].defeated, undefined);
+  });
+});
+
+describe('statSummary', () => {
+  const ITALIAN = `---
+id: guardiano-sintetico
+kind: creature
+template: enemy
+---
+# Guardiano sintetico
+
+## Natura
+
+Una statua di pietra che cammina.
+
+## Statistiche
+
+### Caratteristiche
+
+| Caratteristica | Valore |
+| --- | --- |
+| CA | 15 (armatura di pietra) |
+| PF | 52 |
+| Velocità | 9 m |
+| Iniziativa | +1 |
+| FOR | 18 (+4) |
+| DES | 8 (-1) |
+| COS | 16 (+3) |
+| INT | 3 (-4) |
+| SAG | 10 (+0) |
+| CAR | 5 (-3) |
+| GS | 2 |
+
+### Attacchi e capacità
+
+| Attacco o capacità | Dettagli |
+| --- | --- |
+| Pugno | +6, 1d8 + 4 |
+
+## Azioni
+
+***Pugno pesante.*** Il guardiano colpisce con [il braccio](https://example.test/braccio) di pietra.
+
+**Sasso lanciato.** Gittata 30 m, *1d6* danni.
+
+## Azioni bonus
+
+**Scatto.** Il guardiano si sposta di 3 m.
+
+## Reazioni
+
+**Parata.** Quando è colpito in mischia, riduce il danno di 2.
+
+## Azioni leggendarie
+
+**Passo pesante.** Il guardiano si sposta di 1,5 m.
+
+<!-- master -->
+## Master
+
+### Indicazioni per il master
+
+***Segreto del master.*** Non deve apparire mai.
+<!-- /master -->
+`;
+
+  const ENGLISH = `---
+id: stone-guard
+kind: creature
+template: enemy
+---
+# Stone guard
+
+## Nature
+
+A statue that walks.
+
+## Statistics
+
+### Characteristics
+
+| Characteristic | Value |
+| --- | --- |
+| AC | 15 |
+| HP | 52 |
+| Speed | 9 m |
+| Initiative | +1 |
+| STR | 18 (+4) |
+| DEX | 8 (-1) |
+| CON | 16 (+3) |
+| INT | 3 (-4) |
+| WIS | 10 (+0) |
+| CHA | 5 (-3) |
+| CR | 2 |
+
+## Actions
+
+***Heavy fist.*** The guard strikes with its stone arm.
+
+## Bonus Actions
+
+**Dash.** The guard moves 3 m.
+
+## Reactions
+
+**Parry.** When hit in melee, it reduces the damage by 2.
+
+## Legendary Actions
+
+**Heavy step.** The guard moves 1.5 m.
+`;
+
+  const MASTER_ONLY = `# Sentinella
+
+## Statistiche
+
+| Caratteristica | Valore |
+| --- | --- |
+| CA | 12 |
+| PF | 20 |
+
+## Azioni
+
+**Colpo visibile.** Un colpo di spada.
+
+<!-- master -->
+## Master
+
+## Azioni
+
+**Colpo segreto.** Non deve comparire.
+
+### Indicazioni per il master
+
+Solo per il master.
+<!-- /master -->
+`;
+
+  test('reads the Italian sheet: labels as written, ability rows, initiative and CR', () => {
+    const summary = statSummary(REAL, ITALIAN);
+    assert.deepEqual(summary.lines, [
+      { label: 'CA', value: '15 (armatura di pietra)' },
+      { label: 'PF', value: '52' },
+      { label: 'Velocità', value: '9 m' },
+      { label: 'Iniziativa', value: '+1' },
+      { label: 'FOR', value: '18 (+4)' },
+      { label: 'DES', value: '8 (-1)' },
+      { label: 'COS', value: '16 (+3)' },
+      { label: 'INT', value: '3 (-4)' },
+      { label: 'SAG', value: '10 (+0)' },
+      { label: 'CAR', value: '5 (-3)' },
+      { label: 'GS', value: '2' },
+    ]);
+  });
+
+  test('collects every action paragraph under the action headings, with plain text', () => {
+    const { actions } = statSummary(REAL, ITALIAN);
+    assert.deepEqual(actions, [
+      { name: 'Pugno pesante', text: 'Il guardiano colpisce con il braccio di pietra.' },
+      { name: 'Sasso lanciato', text: 'Gittata 30 m, 1d6 danni.' },
+      { name: 'Scatto', text: 'Il guardiano si sposta di 3 m.' },
+      { name: 'Parata', text: 'Quando è colpito in mischia, riduce il danno di 2.' },
+      { name: 'Passo pesante', text: 'Il guardiano si sposta di 1,5 m.' },
+    ]);
+  });
+
+  test('reads the English sheet with the English headings and labels', () => {
+    const summary = statSummary(REAL, ENGLISH);
+    assert.deepEqual(summary.lines.slice(0, 4), [
+      { label: 'AC', value: '15' },
+      { label: 'HP', value: '52' },
+      { label: 'Speed', value: '9 m' },
+      { label: 'Initiative', value: '+1' },
+    ]);
+    assert.deepEqual(summary.lines.find((line) => line.label === 'STR'), { label: 'STR', value: '18 (+4)' });
+    assert.deepEqual(summary.lines.find((line) => line.label === 'CR'), { label: 'CR', value: '2' });
+    assert.deepEqual(summary.actions.map((action) => action.name), [
+      'Heavy fist', 'Dash', 'Parry', 'Heavy step',
+    ]);
+    assert.equal(summary.actions[0].text, 'The guard strikes with its stone arm.');
+  });
+
+  test('never returns anything from the master-only block, even an action heading inside it', () => {
+    const summary = statSummary(REAL, MASTER_ONLY);
+    assert.deepEqual(summary.actions, [{ name: 'Colpo visibile', text: 'Un colpo di spada.' }]);
+    const text = JSON.stringify(summary);
+    assert.equal(text.includes('Colpo segreto'), false);
+    assert.equal(text.includes('Solo per il master'), false);
+    assert.equal(text.includes('Segreto del master'), false);
+  });
+
+  test('an unclosed master block is removed to the end of the sheet', () => {
+    const open = '## Azioni\n\n**Visibile.** Testo.\n\n<!-- master -->\n**Nascosto.** Non deve comparire.\n';
+    assert.deepEqual(statSummary(REAL, open).actions, [{ name: 'Visibile', text: 'Testo.' }]);
+  });
+
+  test('a creature without statistics gives empty lists', () => {
+    const creature = '# Capra\n\n## Natura\n\nUn animale.\n\n## Statistiche\n\nNessuna statistica: non combatte.\n';
+    assert.deepEqual(statSummary(REAL, creature), { lines: [], actions: [] });
+  });
+
+  test('garbage input never throws and gives empty lists', () => {
+    const empty = { lines: [], actions: [] };
+    assert.deepEqual(statSummary(REAL, undefined), empty);
+    assert.deepEqual(statSummary(REAL, null), empty);
+    assert.deepEqual(statSummary(REAL, 42), empty);
+    assert.deepEqual(statSummary(REAL, {}), empty);
+    assert.deepEqual(statSummary(REAL, ''), empty);
+    assert.deepEqual(statSummary(REAL, '| | |\n|||\n**\n## Azioni\n****'), empty);
+    assert.deepEqual(statSummary(undefined, '| CA | 12 |'), { lines: [], actions: [] });
+    assert.deepEqual(statSummary(null, null), empty);
   });
 });

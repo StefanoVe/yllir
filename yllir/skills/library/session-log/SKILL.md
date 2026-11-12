@@ -47,7 +47,7 @@ Do NOT record these:
 
 If you are not sure whether a message is a fact, do not record it.
 
-To record, run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/session-log/scripts/session-log.mjs" add . --kind <kind> --text "<text>"`.
+To record, run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/session-log/scripts/session-log.mjs" add . --kind <kind> --text "<text>" --by agent`.
 - The text is the master's own words, shortened only as far as needed, in the campaign language. Keep the master's names. Keep it short: one sentence.
 - Add `--scene "<campaign path>"` only when the master clearly named the scene being played and you know its path. Add `--subjects "<ids>"` only for ids you know exactly from the campaign. Never guess either.
 - Run one command per entry.
