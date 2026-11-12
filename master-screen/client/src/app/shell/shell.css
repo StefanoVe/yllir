@@ -89,8 +89,9 @@
     position: sticky;
     bottom: 0;
     flex-direction: row;
-    justify-content: space-around;
-    padding: var(--space-1) var(--space-2);
+    justify-content: space-between;
+    gap: 0;
+    padding: var(--space-1) var(--space-1);
     border-right: 0;
     border-top: 1px solid var(--color-border);
     padding-bottom: calc(var(--space-1) + env(safe-area-inset-bottom, 0px));
@@ -104,6 +105,11 @@
 
   .rail-item.active {
     box-shadow: inset 0 3px 0 var(--color-accent);
+  }
+
+  /* Seven entries must fit a 360 px phone: 40 px each, no gaps. */
+  .rail-item {
+    width: 40px;
   }
 
   .main {

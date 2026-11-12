@@ -1,0 +1,151 @@
+<h2 class="title">{{ s.text('panels.log.title') }}</h2>
+
+@if (!session()) {
+  <p class="state" role="note">{{ s.text('panels.log.noSession') }}</p>
+}
+
+<details class="threads" open>
+  <summary>{{ s.text('panels.log.openThreads') }} ({{ threads().length }})</summary>
+  @if (threads().length === 0) {
+    <p class="state">{{ s.text('panels.log.noOpenThreads') }}</p>
+  }
+  <ul class="entries">
+    @for (entry of threads(); track entry.id) {
+      <ng-container *ngTemplateOutlet="entryRow; context: { $implicit: entry }"></ng-container>
+    }
+  </ul>
+</details>
+
+@if (runs().length > 0) {
+  <ol class="timeline">
+    @for (run of runs(); track $index) {
+      <li class="run" [attr.data-kind]="run.kind">
+        <ul class="entries" [attr.aria-label]="kindText(run.kind)">
+          @for (entry of run.entries; track entry.id) {
+            <ng-container *ngTemplateOutlet="entryRow; context: { $implicit: entry }"></ng-container>
+          }
+        </ul>
+      </li>
+    }
+  </ol>
+} @else if (!hasEntries()) {
+  <p class="state empty">{{ s.text('panels.log.empty') }}</p>
+}
+
+<form class="composer" [attr.aria-label]="s.text('panels.log.composer')" (submit)="$event.preventDefault(); submit()">
+  <div class="kinds" role="group" [attr.aria-label]="s.text('panels.log.kindLabel')">
+    @for (k of kinds; track k) {
+      <button type="button" class="kind-btn" [class.on]="kind() === k" [attr.aria-pressed]="kind() === k"
+              [attr.aria-label]="kindText(k)" [title]="kindText(k)" (click)="pickKind(k)">
+        <lucide-angular [img]="kindIcon(k)" [size]="16" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  <textarea #composer class="input" rows="1" [disabled]="!session()" [value]="draft()"
+            [placeholder]="s.text('panels.log.composerPlaceholder')" [attr.aria-label]="s.text('panels.log.composer')"
+            (input)="onDraftInput($event)" (keydown)="onDraftKeydown($event)"></textarea>
+
+  <div class="scene-row">
+    @if (sceneRef(); as scene) {
+      <span class="chip" [attr.title]="s.text('panels.log.sceneOf', { scene: sceneName(scene) })">
+        {{ sceneName(scene) }}
+        <button type="button" class="chip-x" [attr.aria-label]="s.text('panels.log.clearScene')" [title]="s.text('panels.log.clearScene')" (click)="clearScene()">
+          <lucide-angular [img]="icons.X" [size]="14" aria-hidden="true" />
+        </button>
+      </span>
+    } @else {
+      <button type="button" class="icon" [attr.aria-expanded]="scenePicking()" [attr.aria-label]="s.text('panels.log.pickScene')"
+              [title]="s.text('panels.log.pickScene')" (click)="toggleScenePicker()">
+        <lucide-angular [img]="icons.MapIcon" [size]="16" aria-hidden="true" />
+      </button>
+    }
+  </div>
+
+  @if (scenePicking()) {
+    <div class="picker">
+      <input type="search" class="field" [placeholder]="s.text('panels.log.sceneSearch')" [attr.aria-label]="s.text('panels.log.sceneSearch')"
+             (input)="onSceneInput($event)" />
+      @if (sceneSearch.text().trim() !== '' && sceneSearch.status() === 'done' && sceneSearch.hits().length === 0) {
+        <p class="state">{{ s.text('panels.log.noSceneResults') }}</p>
+      }
+      <ul class="hits">
+        @for (hit of sceneSearch.hits(); track hit.path) {
+          <li><button type="button" class="hit" (click)="pickScene(hit.path)">{{ hit.title }}</button></li>
+        }
+      </ul>
+    </div>
+  }
+
+  <div class="foot">
+    @if (pending.errorFor('add'); as message) {
+      <p class="error" role="alert">{{ message }}</p>
+    }
+    <button type="submit" class="primary" [disabled]="!canSubmit()" [attr.aria-busy]="pending.isBusy('add')">
+      {{ s.text('panels.common.add') }}
+    </button>
+  </div>
+</form>
+
+<ng-template #entryRow let-entry>
+  <li class="entry" [class.resolved]="entry.resolved === true" [attr.data-id]="entry.id" [attr.aria-busy]="entryBusy(entry.id)">
+    <span class="kind" role="img" [attr.aria-label]="kindText(entry.kind)" [attr.title]="kindText(entry.kind)">
+      <lucide-angular [img]="kindIcon(entry.kind)" [size]="16" aria-hidden="true" />
+    </span>
+
+    <div class="body">
+      @if (isEditing(entry.id)) {
+        <textarea class="edit" rows="1" [attr.data-edit-id]="entry.id" [value]="editing()?.text ?? ''"
+                  [attr.aria-label]="s.text('panels.log.edit')" [attr.title]="s.text('panels.log.editHint')"
+                  (input)="onEditInput($event)" (keydown)="onEditKeydown($event, entry.id)"></textarea>
+      } @else {
+        <button type="button" class="text" [title]="s.text('panels.log.editHint')" (click)="startEdit(entry)">{{ entry.text }}</button>
+      }
+
+      <div class="meta">
+        @if (entry.by === 'agent') {
+          <span class="by" [attr.title]="s.text('panels.log.byAgentTitle')">{{ s.text('panels.log.byAgent') }}</span>
+        }
+        @if (entry.scene) {
+          <span class="scene" [attr.title]="s.text('panels.log.sceneOf', { scene: sceneName(entry.scene) })">{{ sceneName(entry.scene) }}</span>
+        }
+        @if (entry.kind === 'thread' && entry.resolved === true) {
+          <span>{{ s.text('panels.log.resolved') }}</span>
+        }
+        <time [attr.datetime]="entry.at">{{ time(entry.at) }}</time>
+      </div>
+
+      @if (entryError(entry.id); as message) {
+        <p class="error" role="alert">{{ message }}</p>
+      }
+
+      @if (confirmDelete() === entry.id) {
+        <div class="confirm" role="group">
+          <span>{{ s.text('panels.log.confirmDelete') }}</span>
+          <button type="button" class="danger" (click)="remove(entry.id)">{{ s.text('panels.common.yes') }}</button>
+          <button type="button" (click)="cancelDelete()">{{ s.text('panels.common.no') }}</button>
+        </div>
+      }
+    </div>
+
+    <div class="actions">
+      @if (entry.kind === 'thread') {
+        @if (entry.resolved === true) {
+          <button type="button" class="icon" [attr.aria-label]="s.text('panels.log.reopen')" [title]="s.text('panels.log.reopen')"
+                  [disabled]="entryBusy(entry.id)" (click)="setResolved(entry, false)">
+            <lucide-angular [img]="icons.RotateCcw" [size]="16" aria-hidden="true" />
+          </button>
+        } @else {
+          <button type="button" class="icon" [attr.aria-label]="s.text('panels.log.resolve')" [title]="s.text('panels.log.resolve')"
+                  [disabled]="entryBusy(entry.id)" (click)="setResolved(entry, true)">
+            <lucide-angular [img]="icons.Check" [size]="16" aria-hidden="true" />
+          </button>
+        }
+      }
+      <button type="button" class="icon" [attr.aria-label]="s.text('panels.log.delete')" [title]="s.text('panels.log.delete')"
+              [disabled]="entryBusy(entry.id)" (click)="askDelete(entry.id)">
+        <lucide-angular [img]="icons.Trash2" [size]="16" aria-hidden="true" />
+      </button>
+    </div>
+  </li>
+</ng-template>

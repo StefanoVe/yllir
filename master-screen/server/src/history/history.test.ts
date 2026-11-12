@@ -4,11 +4,55 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { createCtx } from '../context.js';
-import { loadHistory, cleanSubject, summarize } from './groups.js';
+import { canonFiles, loadHistory, cleanSubject, isHiddenPath, summarize } from './groups.js';
 import { diff, isCleanCanon, parseUnifiedDiff, resolveCommit, showFiles } from './git.js';
 import { makeRepo, CAMPAIGN_YAML_EN, type TestRepo } from './test-repo.js';
 
 const REAL_FRAMEWORK = fileURLToPath(new URL('../../../../yllir', import.meta.url));
+
+describe('history: hidden paths', () => {
+  it('hides framework state, assistant settings, root instruction files and shortcuts', () => {
+    const hidden = [
+      '.campaign/state/notes.json',
+      '.git/config',
+      'CLAUDE.md',
+      'AGENTS.md',
+      '.gitignore',
+      '.gitattributes',
+      '.claude/settings.json',
+      '.claude/settings.local.json',
+      '.claude/memory/MEMORY.md',
+      'Apri master screen.command',
+      'Apri master screen.bat',
+      'Open master screen.command',
+    ];
+    for (const p of hidden) assert.equal(isHiddenPath(p), true, p);
+  });
+
+  it('keeps canon documents, same names in subfolders, and near misses visible', () => {
+    const visible = [
+      'sheets/hero.md',
+      'docs/CLAUDE.md',
+      'sheets/AGENTS.md',
+      'sub/.gitignore',
+      'sub/.claude/settings.json',
+      'claude.md',
+      'agents.md',
+      'claude/CLAUDE.md.bak',
+      'Apri master screen',
+      'Apri master screen/readme.md',
+      'apri master screen.command',
+      'Open master screen.md/x',
+      '.claudeignore',
+    ];
+    for (const p of visible) assert.equal(isHiddenPath(p), false, p);
+  });
+
+  it('a rename from a hidden path into canon is an addition', () => {
+    const files = canonFiles([{ path: 'sheets/hero.md', status: 'renamed', from: 'CLAUDE.md' }]);
+    assert.deepEqual(files, [{ path: 'sheets/hero.md', status: 'added' }]);
+  });
+});
 
 describe('history: groups, diff and association', () => {
   let repo: TestRepo;
@@ -144,6 +188,39 @@ describe('history: groups, diff and association', () => {
     assert.equal(await isCleanCanon(repo.root), true);
     repo.write('sheets/unsaved.md', 'x');
     assert.equal(await isCleanCanon(repo.root), false);
+  });
+
+  it('ignores edits to hidden technical files in the undo guard', async () => {
+    repo.write('CLAUDE.md', '# instructions\n');
+    repo.write('.claude/settings.json', '{}\n');
+    repo.write('Apri master screen.command', 'x\n');
+    assert.equal(await isCleanCanon(repo.root, isHiddenPath), true);
+    repo.write('CLAUDE.md', '# instructions, edited\n');
+    assert.equal(await isCleanCanon(repo.root, isHiddenPath), true);
+    assert.equal(await isCleanCanon(repo.root), false);
+    repo.write('sub/CLAUDE.md', 'nested\n');
+    assert.equal(await isCleanCanon(repo.root, isHiddenPath), false);
+  });
+
+  it('lists only the document of a commit that also touches CLAUDE.md and settings', async () => {
+    repo.write('sheets/hero.md', '# Hero\n\nThree\n');
+    repo.write('CLAUDE.md', '# edited\n');
+    repo.write('.claude/settings.json', '{"a":1}\n');
+    repo.write('.gitignore', 'node_modules/\n');
+    const sha = repo.commit('Updated the hero with notes');
+    const items = await loadHistory(ctxFor(repo.root));
+    const group = items.find((item) => item.group.id === sha)?.group;
+    assert.deepEqual(group?.files, [{ path: 'sheets/hero.md', status: 'modified' }]);
+    assert.equal(group?.summary, 'Updated the hero with notes');
+  });
+
+  it('does not list a commit that touches only hidden technical files', async () => {
+    repo.write('.claude/settings.json', '{"permissions":{}}\n');
+    repo.write('CLAUDE.md', '# edited\n');
+    repo.commit('Changed the assistant settings');
+    const items = await loadHistory(ctxFor(repo.root));
+    assert.equal(items.length, 3);
+    assert.ok(items.every((item) => item.subject !== 'Changed the assistant settings'));
   });
 
   it('attaches a chat message to the groups of its turn range only', async () => {

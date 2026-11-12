@@ -1,4 +1,11 @@
 <div class="chat">
+  @if (liveOpen()) {
+    <div class="chat-tools">
+      <a class="icon-btn live-link" routerLink="/live" [title]="t('chat.liveLink')" [attr.aria-label]="t('chat.liveLink')">
+        <lucide-angular [img]="icons.Dices" [size]="18" aria-hidden="true" />
+      </a>
+    </div>
+  }
   @if (agent(); as current) {
     @if (!current.available) {
       <p class="notice" role="note">{{ current.reason || t('chat.unavailable') }}</p>

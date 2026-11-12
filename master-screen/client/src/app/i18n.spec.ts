@@ -46,9 +46,9 @@ describe('i18n', () => {
     expect(Object.keys(itDict).filter((key) => !english.has(key))).toEqual([]);
   });
 
-  it('has every key that the code uses through t(), label() or i18n.t()', () => {
+  it('has every key that the code uses through t(), label(), i18n.t(), copy() or text()', () => {
     const known = new Set<string>(Object.keys(en));
-    const pattern = /(?:\bt|\blabel|i18n\.t)\(\s*'([^']+)'/g;
+    const pattern = /(?:\bt|\blabel|i18n\.t|\.copy|\.text)\(\s*'([^']+)'/g;
     const files = sourceFiles();
     expect(files.length).toBeGreaterThan(20);
     const missing = new Set<string>();
@@ -59,6 +59,30 @@ describe('i18n', () => {
       }
     }
     expect([...missing]).toEqual([]);
+  });
+
+  it('has every live, panel and plot key that appears as a quoted string anywhere in the code', () => {
+    // Keys chosen through a ternary or a map (for example a dock tab label) are not caught by the call
+    // patterns above, so every quoted live.*, panels.* or plot.* string is checked as well.
+    const known = new Set<string>(Object.keys(en));
+    const pattern = /'((?:live|panels|plot)\.[A-Za-z0-9.]+)'/g;
+    const missing = new Set<string>();
+    for (const file of sourceFiles()) {
+      for (const match of readFileSync(file, 'utf8').matchAll(pattern)) {
+        if (!known.has(match[1])) missing.add(`${file}: ${match[1]}`);
+      }
+    }
+    expect([...missing]).toEqual([]);
+  });
+
+  it('declares each key once in the source of each dictionary', () => {
+    for (const lang of ['en', 'it']) {
+      const text = readFileSync(join(APP_DIR, 'i18n', `${lang}.ts`), 'utf8');
+      const keys = [...text.matchAll(/^\s*'([^']+)':/gm)].map((match) => match[1]);
+      const seen = new Set<string>();
+      const duplicates = keys.filter((key) => (seen.has(key) ? true : (seen.add(key), false)));
+      expect(duplicates).toEqual([]);
+    }
   });
 
   it('maps campaign languages to it or en, defaulting to en', () => {

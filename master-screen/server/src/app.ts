@@ -9,6 +9,8 @@ import { registerChangesRoutes } from './routes/changes.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerDocsRoutes } from './routes/docs.js';
 import { registerEventsRoutes } from './routes/events.js';
+import { registerLiveRoutes } from './routes/live.js';
+import { registerPlotRoutes } from './routes/plot.js';
 import { registerStatusRoutes } from './routes/status.js';
 import { securityMiddleware } from './security.js';
 
@@ -50,6 +52,8 @@ export function createApp(ctx: Ctx): express.Express {
   registerDocsRoutes(api, ctx);
   registerChangesRoutes(api, ctx);
   registerChatRoutes(api, ctx);
+  registerLiveRoutes(api, ctx);
+  registerPlotRoutes(api, ctx);
   app.use('/api', api);
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'There is no such action.' });

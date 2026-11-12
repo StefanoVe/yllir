@@ -1,0 +1,24 @@
+<aside class="dock" [class.open]="open()" [attr.aria-label]="s.copy('live.dock.label')">
+  @if (open()) {
+    <section class="content" [attr.aria-label]="labelOf(tab())">
+      @switch (tab()) {
+        @case ('combat') { <ms-live-combat [snapshot]="snapshot()" /> }
+        @case ('lookup') { <ms-live-lookup /> }
+        @default { <ms-live-log [snapshot]="snapshot()" /> }
+      }
+    </section>
+  }
+  <nav class="bar" [attr.aria-label]="s.copy('live.dock.label')">
+    @for (t of tabs; track t.id) {
+      <button type="button" class="tab" [class.active]="open() && tab() === t.id"
+        [attr.aria-pressed]="open() && tab() === t.id" [attr.aria-label]="s.copy(t.label)" [title]="s.copy(t.label)"
+        (click)="tabSelect.emit(t.id)">
+        <lucide-angular [img]="t.icon" [size]="20" aria-hidden="true" />
+      </button>
+    }
+    <button type="button" class="tab collapse" [attr.aria-label]="open() ? s.copy('live.dock.collapse') : s.copy('live.dock.expand')"
+      [title]="open() ? s.copy('live.dock.collapse') : s.copy('live.dock.expand')" (click)="toggle.emit()">
+      <lucide-angular [img]="open() ? icons.PanelRightClose : icons.PanelRightOpen" [size]="20" aria-hidden="true" />
+    </button>
+  </nav>
+</aside>

@@ -71,4 +71,92 @@ export type LiveEvent =
   | { event: 'delta'; data: { messageId: string; text: string } }       // streamed agent text, appended
   | { event: 'turn'; data: Turn }
   | { event: 'open'; data: { path: string } }                           // the agent asks the screen to open a document
-  | { event: 'status'; data: StatusResponse };
+  | { event: 'status'; data: StatusResponse }
+  | { event: 'live'; data: { revision: string } };
+
+// ---------------------------------------------------------------------------
+// Live session (phase 2). State files live in <campaign>/.campaign/state/live/.
+// The log and the combat state are owned by the framework skills `session-log`
+// and `combat-tracker`; the board is owned by the master-screen server.
+// ---------------------------------------------------------------------------
+
+export type LogKind = 'fact' | 'decision' | 'intention' | 'thread';
+
+export interface LogEntry {
+  id: string;                 // e.g. "e-0007", stable, never reused inside a session
+  at: string;                 // ISO time
+  kind: LogKind;              // fact: happened; decision: players chose; intention: players/NPCs plan; thread: open thread
+  text: string;
+  scene?: string;             // campaign-relative path of the scene document it belongs to
+  subjects?: string[];        // subject ids mentioned
+  resolved?: boolean;         // only for kind 'thread'
+  by: 'master' | 'agent';
+}
+
+export interface LiveSession {
+  id: string;                 // "2026-11-12" or "2026-11-12-2"
+  title: string;
+  startedAt: string;
+  endedAt?: string;
+  sessionRef?: string;        // campaign-relative path of the plot session main file, if any
+}
+
+export type Side = 'pc' | 'ally' | 'enemy';
+export interface ConditionState { id: string; duration: string; rounds?: number; note?: string }
+export interface Combatant {
+  id: string;                 // "c-1"...
+  name: string;
+  side: Side;
+  initiative: number | null;
+  hp?: number; hpMax?: number; tempHp?: number; ac?: number;
+  conditions: ConditionState[];
+  resources: Record<string, number>;
+  notes?: string;
+  sheet?: string;             // campaign-relative path of the creature or character sheet
+  hidden?: boolean;           // not yet revealed to the players (master view only matters here)
+  defeated?: boolean;
+}
+export interface CombatState {
+  active: boolean;
+  round: number;              // 0 before the first turn
+  turn: number;               // index into `order`
+  order: string[];            // combatant ids in initiative order
+  combatants: Combatant[];
+  events: { at: string; text: string }[]; // short plain-language history, newest last, max 200
+  revision: number;
+}
+
+export type CombatOp =
+  | { op: 'start' }
+  | { op: 'add'; name: string; side: Side; initiative?: number | null; hp?: number; hpMax?: number; ac?: number; sheet?: string; hidden?: boolean; resources?: Record<string, number>; notes?: string }
+  | { op: 'remove'; id: string }
+  | { op: 'initiative'; id: string; value: number }
+  | { op: 'damage'; id: string; amount: number }
+  | { op: 'heal'; id: string; amount: number }
+  | { op: 'condition-add'; id: string; condition: string; duration?: string; rounds?: number; note?: string }
+  | { op: 'condition-remove'; id: string; condition: string }
+  | { op: 'resource'; id: string; resource: string; delta?: number; value?: number }
+  | { op: 'note'; id: string; text: string }
+  | { op: 'reveal'; id: string }
+  | { op: 'next' }
+  | { op: 'end' };
+
+export type BoardCardKind = 'document' | 'image' | 'note';
+export interface BoardCard { id: string; kind: BoardCardKind; ref?: string; text?: string; x: number; y: number; w: number; h: number; z: number; frame?: string }
+export interface BoardFrame { id: string; title: string; x: number; y: number; w: number; h: number }
+export interface BoardArrow { id: string; from: string; to: string; label?: string } // card or frame ids
+export interface Board { revision: number; cards: BoardCard[]; frames: BoardFrame[]; arrows: BoardArrow[] }
+
+export interface LiveSnapshot {
+  session: LiveSession | null;           // null when no live session is open
+  log: LogEntry[];
+  combat: CombatState | null;
+  board: Board;
+  revision: string;                      // changes whenever anything above changes
+}
+
+export interface PlotNode { id: string; kind: 'session' | 'scene'; title: string; path: string; session?: string; status?: string }
+export interface PlotEdge { from: string; to: string; kind: 'depends' | 'order' } // 'depends' = declared depends_on; 'order' = only file order
+export interface PlotResponse { nodes: PlotNode[]; edges: PlotEdge[] }
+
+// SSE additions: { event: 'live'; data: { revision: string } } means "refetch GET /api/live".

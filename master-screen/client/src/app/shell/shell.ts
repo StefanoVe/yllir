@@ -2,7 +2,7 @@ import { Component, HostListener, computed, effect, inject, untracked } from '@a
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { LucideAngularModule, Eye, EyeOff, MessageSquare, Search, Settings, SunMoon } from 'lucide-angular';
+import { LucideAngularModule, Dices, Eye, EyeOff, GitBranch, MessageSquare, Search, Settings, SunMoon } from 'lucide-angular';
 import { filter, map } from 'rxjs';
 import { LiveService } from '../core/live.service';
 import { PrefsService } from '../core/prefs.service';
@@ -30,7 +30,7 @@ export class Shell {
   private readonly status = inject(StatusService);
   private readonly titleService = inject(Title);
 
-  readonly icons = { MessageSquare, Search, Settings, Eye, EyeOff, SunMoon };
+  readonly icons = { MessageSquare, Dices, GitBranch, Search, Settings, Eye, EyeOff, SunMoon };
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -70,7 +70,8 @@ export class Shell {
 
   titleFor(url: string, campaign: string): string {
     const path = url.split(/[?#]/)[0];
-    const page = path === '/' ? this.i18n.t('nav.home') : path.startsWith('/search') ? this.i18n.t('nav.search') : path.startsWith('/settings') ? this.i18n.t('nav.settings') : '';
+    const page = path === '/' ? this.i18n.t('nav.home') : path.startsWith('/search') ? this.i18n.t('nav.search') : path.startsWith('/settings') ? this.i18n.t('nav.settings')
+      : path.startsWith('/live') ? this.i18n.t('nav.liveTable') : path.startsWith('/plot') ? this.i18n.t('nav.plot') : '';
     if (path.startsWith('/doc/')) return campaign;
     if (page === '') return campaign;
     return campaign === '' ? page : `${page} · ${campaign}`;

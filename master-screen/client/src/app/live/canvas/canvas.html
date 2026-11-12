@@ -1,0 +1,78 @@
+<div class="stage">
+  <div #viewport class="viewport" role="region" tabindex="0" [attr.aria-label]="s.copy('live.canvas.label')"
+    [style.background-size]="gridSize()" [style.background-position]="gridPosition()"
+    (keydown)="onKeydown($event)" (keyup)="onKeyup($event)" (dragover)="onDragOver($event)" (drop)="onDrop($event)">
+    <div class="world" [style.transform]="worldTransform()">
+      <svg class="arrows" aria-hidden="true" focusable="false">
+        <defs>
+          <marker id="live-arrowhead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" class="arrow-head" />
+          </marker>
+        </defs>
+        @for (a of arrows(); track a.id) {
+          <path class="arrow" [class.selected]="isSelected('arrow', a.id)" [attr.d]="a.d" marker-end="url(#live-arrowhead)" />
+          <path class="arrow-hit" data-no-pan [attr.d]="a.d" (pointerdown)="onArrowPress($event, a.id)" />
+          @if (a.label) {
+            <text class="arrow-label" [attr.x]="a.mid.x" [attr.y]="a.mid.y - 8" text-anchor="middle">{{ a.label }}</text>
+          }
+        }
+      </svg>
+
+      @for (f of doc().frames; track f.id) {
+        <ms-live-frame [frame]="f" [x]="rectOf(f.id).x" [y]="rectOf(f.id).y" [w]="rectOf(f.id).w" [h]="rectOf(f.id).h"
+          [selected]="isSelected('frame', f.id)" [linkMode]="linking()"
+          (press)="onItemPress('frame', f.id, $event)" (focused)="setSelection('frame', f.id)"
+          (titleChange)="onFrameTitle(f.id, $event)" />
+      }
+
+      @for (c of doc().cards; track c.id) {
+        <ms-live-card [card]="c" [x]="rectOf(c.id).x" [y]="rectOf(c.id).y" [w]="rectOf(c.id).w" [h]="rectOf(c.id).h"
+          [selected]="isSelected('card', c.id)" [linkMode]="linking()"
+          (press)="onItemPress('card', c.id, $event)" (focused)="setSelection('card', c.id)"
+          (textChange)="setNoteText(c.id, $event)" />
+      }
+
+      @if (selectedArrow(); as a) {
+        <input class="arrow-edit" data-no-pan type="text" [value]="a.label"
+          [attr.aria-label]="s.copy('live.arrow.label')" [placeholder]="s.copy('live.arrow.label')"
+          [style.left.px]="a.mid.x" [style.top.px]="a.mid.y + 12" (input)="onArrowLabel(a.id, $event)" />
+      }
+    </div>
+  </div>
+
+  <div class="overlay top" data-no-pan>
+    <ms-live-canvas-toolbar [linkActive]="linking()" [imageActive]="imageOpen()" [documentActive]="pickerOpen()"
+      [status]="status()" [percent]="percent()" (command)="onCommand($event)" />
+  </div>
+
+  @if (pickerOpen()) {
+    <div class="popover" data-no-pan>
+      <ms-live-doc-picker (picked)="onPicked($event)" (closed)="pickerOpen.set(false)" />
+    </div>
+  }
+
+  @if (imageOpen()) {
+    <form class="popover image-form" data-no-pan (submit)="$event.preventDefault(); submitImage(field.value)">
+      <label class="image-label">
+        <span>{{ s.copy('live.image.label') }}</span>
+        <input #field class="image-field" type="text" autocomplete="off" [placeholder]="s.copy('live.image.placeholder')" />
+      </label>
+      <p class="help">{{ s.copy('live.image.help') }}</p>
+      @if (imageError()) {
+        <p class="error" role="alert">{{ imageError() }}</p>
+      }
+      <button type="submit" class="primary">{{ s.copy('live.image.add') }}</button>
+    </form>
+  }
+
+  @if (hint()) {
+    <p class="hint" role="status">{{ hint() }}</p>
+  }
+
+  @if (notice()) {
+    <div class="notice" role="status" data-no-pan>
+      <span>{{ notice() }}</span>
+      <button type="button" class="close" [attr.aria-label]="s.copy('live.notice.dismiss')" [title]="s.copy('live.notice.dismiss')" (click)="dismissNotice()">×</button>
+    </div>
+  }
+</div>

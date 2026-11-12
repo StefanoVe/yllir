@@ -1,0 +1,45 @@
+<article class="card" tabindex="0" data-live-card data-no-pan
+  [attr.data-live-id]="card().id"
+  [attr.aria-label]="label()"
+  [class.selected]="selected()"
+  [class.link-target]="linkMode()"
+  [class.note]="card().kind === 'note'"
+  [style.transform]="transform()"
+  [style.width.px]="w()"
+  [style.height.px]="h()"
+  [style.z-index]="card().z"
+  (pointerdown)="onBody($event)"
+  (focus)="focused.emit()">
+  <header class="head" data-drag-handle [attr.title]="s.copy('live.card.move')" (pointerdown)="onHeader($event)">
+    @switch (card().kind) {
+      @case ('document') { <lucide-angular [img]="icons.FileText" [size]="16" aria-hidden="true" /> }
+      @case ('image') { <lucide-angular [img]="icons.Image" [size]="16" aria-hidden="true" /> }
+      @default { <lucide-angular [img]="icons.StickyNote" [size]="16" aria-hidden="true" /> }
+    }
+    <span class="title">{{ title() }}</span>
+    @if (card().kind === 'document') {
+      <a class="open" [routerLink]="docLink()" [attr.aria-label]="s.copy('live.card.open')" [title]="s.copy('live.card.open')">
+        <lucide-angular [img]="icons.ExternalLink" [size]="16" aria-hidden="true" />
+      </a>
+    }
+  </header>
+  <div class="body">
+    @switch (card().kind) {
+      @case ('document') {
+        @if (preview().state === 'missing') {
+          <p class="muted">{{ s.copy('live.card.missing') }}</p>
+        } @else {
+          <p class="excerpt">{{ preview().excerpt }}</p>
+        }
+      }
+      @case ('image') {
+        <img class="picture" [src]="imageSrc()" alt="" draggable="false" loading="lazy" />
+      }
+      @default {
+        <textarea class="note-text" [value]="card().text ?? ''" (input)="onNoteInput($event)"
+          [attr.aria-label]="s.copy('live.card.noteLabel')" [placeholder]="s.copy('live.card.notePlaceholder')"></textarea>
+      }
+    }
+  </div>
+  <span class="grip" data-no-pan [attr.title]="s.copy('live.card.resize')" (pointerdown)="onGrip($event)" aria-hidden="true"></span>
+</article>

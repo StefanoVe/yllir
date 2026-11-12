@@ -189,6 +189,52 @@ describe('changes routes', () => {
     assert.equal(open.events.length, 0);
   });
 
+  it('hides technical files from the diff of a commit that also touches a document', async () => {
+    const { repo } = baseRepo();
+    repo.write('sheets/villain.md', 'villain, edited\n');
+    repo.write('CLAUDE.md', '# instructions\n');
+    repo.write('AGENTS.md', '# agents\n');
+    repo.write('.claude/settings.json', '{}\n');
+    const sha = repo.commit('Edited the villain with notes');
+    open = await harness(repo);
+    const res = await get(open, `/changes/${sha.slice(0, 7)}/diff`);
+    assert.equal(res.status, 200);
+    const body = res.json as { files: Array<{ path: string }> };
+    assert.deepEqual(body.files.map((f) => f.path), ['sheets/villain.md']);
+    const groups = (await get(open, '/changes')).json as { groups: Array<{ id: string; files: unknown[] }> };
+    assert.deepEqual(groups.groups[0].files, [{ path: 'sheets/villain.md', status: 'modified' }]);
+  });
+
+  it('does not list a commit that touches only .claude/settings.json', async () => {
+    const { repo } = baseRepo();
+    repo.write('.claude/settings.json', '{"permissions":{}}\n');
+    repo.commit('Changed the assistant settings');
+    open = await harness(repo);
+    const groups = (await get(open, '/changes')).json as { groups: Array<{ summary: string }> };
+    assert.deepEqual(
+      groups.groups.map((g) => g.summary),
+      ['Added the villain sheet', 'Updated the hero', 'Created the hero sheet'],
+    );
+  });
+
+  it('undoes a group while CLAUDE.md has unsaved edits', async () => {
+    const { repo } = baseRepo();
+    repo.write('CLAUDE.md', '# instructions\n');
+    repo.commit('Added the instructions file');
+    repo.write('CLAUDE.md', '# instructions, edited but not saved as a change\n');
+    repo.write('AGENTS.md', 'draft\n');
+    open = await harness(repo);
+    const res = await post(open, '/changes/undo', {});
+    assert.equal(res.status, 200);
+    assert.equal((res.json as { ok: boolean }).ok, true);
+    assert.equal(fs.existsSync(path.join(repo.root, 'sheets/villain.md')), false);
+    assert.equal(repo.git('log', '-1', '--format=%s'), 'Undo: Added the villain sheet');
+    assert.equal(
+      fs.readFileSync(path.join(repo.root, 'CLAUDE.md'), 'utf8'),
+      '# instructions, edited but not saved as a change\n',
+    );
+  });
+
   it('runs simultaneous undos one at a time, each on its own group', async () => {
     const { repo, commits } = baseRepo();
     open = await harness(repo);

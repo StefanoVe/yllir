@@ -25,12 +25,28 @@ interface TurnRecord {
   toSha: string;
 }
 
-/** Canon files only. A rename from .campaign/ into canon is an addition. */
+/** Technical files at the campaign root (case-sensitive names). Subfolders with the same names are canon. */
+const HIDDEN_ROOT_FILES = new Set(['CLAUDE.md', 'AGENTS.md', '.gitignore', '.gitattributes']);
+/** Root shortcut files written by new-campaign and the shortcut migration, e.g. "Apri master screen.command". */
+const HIDDEN_SHORTCUT = /^(?:Apri master screen|Open master screen)\.[^/]+$/;
+
+/**
+ * The single list of paths the master never sees: framework state (.campaign/, .git/), the
+ * assistant settings (.claude/ at the root), CLAUDE.md, AGENTS.md, .gitignore, .gitattributes
+ * and the master screen shortcuts at the root. Hidden paths are left out of the change list,
+ * of the diffs and of the undo guard.
+ */
+export function isHiddenPath(p: string): boolean {
+  if (isLocalPath(p) || p.startsWith('.claude/')) return true;
+  return HIDDEN_ROOT_FILES.has(p) || HIDDEN_SHORTCUT.test(p);
+}
+
+/** Canon files only. A rename from a hidden path into canon is an addition. */
 export function canonFiles(files: ChangedFile[]): ChangedFile[] {
   const out: ChangedFile[] = [];
   for (const file of files) {
-    if (isLocalPath(file.path)) continue;
-    const from = file.from !== undefined && !isLocalPath(file.from) ? file.from : undefined;
+    if (isHiddenPath(file.path)) continue;
+    const from = file.from !== undefined && !isHiddenPath(file.from) ? file.from : undefined;
     const status = file.status === 'renamed' && from === undefined ? 'added' : file.status;
     out.push(from === undefined ? { path: file.path, status } : { path: file.path, status, from });
   }

@@ -1,0 +1,47 @@
+@if (state.snapshot() === null) {
+  @if (state.error(); as failure) {
+    <p class="notice error" role="alert">{{ failure }}</p>
+  } @else {
+    <p class="status" role="status">{{ s.copy('live.loading') }}</p>
+  }
+} @else if (state.session() === null) {
+  <section class="empty" aria-labelledby="live-empty-heading">
+    <h1 id="live-empty-heading">{{ s.copy('live.empty.heading') }}</h1>
+    <p class="lead">{{ s.copy('live.empty.text') }}</p>
+    <form class="start" (submit)="$event.preventDefault(); start()">
+      <label class="field">
+        <span>{{ s.copy('live.empty.titleLabel') }}</span>
+        <input type="text" maxlength="120" autocomplete="off" [value]="title()"
+          [placeholder]="s.copy('live.empty.titlePlaceholder')" (input)="onTitle($event)" />
+      </label>
+      @if (state.error(); as failure) {
+        <p class="notice error" role="alert">{{ failure }}</p>
+      }
+      <button type="submit" class="primary" [disabled]="state.busy()">{{ s.copy('live.empty.start') }}</button>
+    </form>
+  </section>
+} @else {
+  @if (state.session(); as session) {
+    <header class="bar">
+      <h1 class="title" [title]="session.title">{{ session.title }}</h1>
+      <span class="spacer"></span>
+      @if (confirmingEnd()) {
+        <span class="confirm">{{ s.copy('live.session.stopConfirm') }}</span>
+        <button type="button" class="danger" [disabled]="state.busy()" (click)="endNow()">{{ s.copy('live.session.yes') }}</button>
+        <button type="button" class="ghost" (click)="confirmingEnd.set(false)">{{ s.copy('live.session.no') }}</button>
+      } @else {
+        <button type="button" class="icon" [disabled]="state.busy()"
+          [attr.aria-label]="s.copy('live.session.stop')" [title]="s.copy('live.session.stop')" (click)="confirmingEnd.set(true)">
+          <lucide-angular [img]="icons.Square" [size]="18" aria-hidden="true" />
+        </button>
+      }
+    </header>
+  }
+  @if (state.error(); as failure) {
+    <p class="notice error" role="alert">{{ failure }}</p>
+  }
+  <div class="body">
+    <ms-live-canvas class="canvas" />
+    <ms-live-dock [snapshot]="state.snapshot()" [open]="dockOpen()" [tab]="dockTab()" (tabSelect)="onTab($event)" (toggle)="dockOpen.set(!dockOpen())" />
+  </div>
+}

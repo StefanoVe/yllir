@@ -134,3 +134,34 @@ A change group is a git commit made by the engine. Undo of group G runs `git rev
 - Preferences (theme, text size, recent and favourite documents) in `localStorage`, keys prefixed `yllir:<campaign slug>:`. Wrap every access in try/catch.
 - Modern, calm, readable: CSS custom properties for tokens, light and dark theme following the system with a manual override, `prefers-reduced-motion` respected, visible focus rings, keyboard shortcut Ctrl/Cmd+K for search, layout works from 360 px width.
 - UI language: the campaign language from `/api/status` (`it` or `en` at least); strings live in one `i18n` file per language, no hard-coded copy in templates.
+
+## Live session (phase 2)
+
+State lives in `<campaign>/.campaign/state/live/`, never in canon, never in git history of canon (it is under `.campaign/`). The log and the combat state are owned by the framework skills `session-log` and `combat-tracker` (so the terminal and the Claude app can use them with no master screen); the server only calls their library modules through `loadFrameworkModule`-style dynamic import and never re-implements their rules. The board (free canvas) is owned by the server alone and is not part of undo.
+
+Files: `live/active.json` (`{ "sessionId": "<id>" | null }`), `live/<sessionId>/session.json` (LiveSession), `live/<sessionId>/log.json` (LogEntry[]), `live/<sessionId>/combat.json` (CombatState), `live/<sessionId>/board.json` (Board). All written atomically (temp + rename), mode 0600, UTF-8, pretty JSON.
+
+Framework library contract (ESM, in `yllir/skills/library/<skill>/scripts/lib/`). Every function is synchronous, takes the campaign root first, never throws for bad input and returns `{ ok: true, ... }` or `{ ok: false, error: { code: string, message: string } }` (message in English, plain):
+- `session-log/scripts/lib/log-store.mjs`: `openSession(root, { title?, sessionRef?, now? })` (fails with code `already-open` when one is active; id is the date, `-2`, `-3` for more the same day) -> `{ session }`; `getActive(root)` -> `{ session | null }`; `addEntry(root, { kind, text, scene?, subjects?, by? , now? })` -> `{ entry }`; `updateEntry(root, id, patch)` (patch: text, kind, scene, subjects, resolved) -> `{ entry }`; `removeEntry(root, id)`; `listEntries(root)` -> `{ entries }`; `endSession(root, { now? })` -> `{ session }` (keeps files; clears active.json); `readSession(root, sessionId)` -> `{ session, entries }`.
+- `combat-tracker/scripts/lib/combat-store.mjs`: `getCombat(root)` -> `{ combat | null }` (for the active session); `applyOp(root, op, { now? })` where op is the `CombatOp` union of `shared/src/types.ts` -> `{ combat }`. It loads the adapter named in campaign.yaml `system.adapter` and delegates every rule to `<framework>/modules/systems/<id>/encounter.mjs` (exports `initEncounter(adapter)`, `recordEvent(adapter, state, op)`, `advanceTurn(adapter, state)`, `validateState(adapter, state)`, each pure on plain objects). A validator runs before every save; an invalid result is not saved.
+- CLIs, one JSON document on stdout and a last line `exit: <code>` (0 ok, 1 domain error, 2 usage): `node <framework>/skills/library/session-log/scripts/session-log.mjs <open|add|update|remove|list|end|status> <root> [options]` and `node <framework>/skills/library/combat-tracker/scripts/combat.mjs <op> <root> [options]` (op names as in `CombatOp`, plus `status`).
+
+Server endpoints (all under `/api`):
+
+| Method and path | Request | Response |
+|---|---|---|
+| GET `/live` | | `LiveSnapshot` |
+| POST `/live/open` | `{ title?: string, sessionRef?: string }` | `LiveSnapshot` (409 plain message if already open) |
+| POST `/live/end` | | `LiveSnapshot` (session null) |
+| POST `/live/log` | `{ kind, text, scene?, subjects? }` | `LiveSnapshot` |
+| PATCH `/live/log/:id` | `{ text?, kind?, scene?, subjects?, resolved? }` | `LiveSnapshot` |
+| DELETE `/live/log/:id` | | `LiveSnapshot` |
+| POST `/live/combat` | `CombatOp` | `LiveSnapshot` (409 plain message when the rule engine refuses) |
+| PUT `/live/board` | `Board` (full replacement, `revision` must equal the stored one else 409 with the current board in `{ error, board }`) | `{ board }` |
+| GET `/plot` | | `PlotResponse` built from the framework `plot/plot-map.mjs` |
+
+The server publishes SSE `live` `{ revision }` after every write through the API and also when anything under `.campaign/state/live/` changes on disk (written by the agent or the terminal): a second chokidar watcher, debounced 150 ms. `revision` is a hash of the four files' mtimes and sizes. The client refetches `/api/live` on `live`.
+
+Rules: log entries are not canon and never touch sheets during the session; the log and combat tools are available to the in-app agent through the framework scripts (the Bash gate already allows `skills/**/scripts/*.mjs`); a combat starts when a `start` op succeeds and the combat panel opens by itself when `combat.active` turns true; the master-only block is never put into `LiveSnapshot` (cards reference documents by path, the reader decides what to show); board validation: at most 300 cards, coordinates within +-20000, `ref` must be a campaign-relative path without `..`.
+
+Client (phase 2): route `/live` (the table: free canvas in the centre, an icon dock on the right with log, combat, quick look-up), route `/plot` (plot map: nodes for sessions and scenes, solid arrows for declared dependencies, dashed lines for mere file order, with a legend). The combat panel opens by itself when a combat starts. The canvas supports document, image and note cards, scene frames and arrows, drag and resize, pan and zoom; layout saves without entering undo. All of it follows the "Client rules" above (icons with tooltips, no jargon, no optimistic updates: the board position shown after a drop is the one the server confirmed, but dragging itself is local and smooth).

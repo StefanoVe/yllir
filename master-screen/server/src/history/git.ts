@@ -211,7 +211,7 @@ export async function diff(root: string, sha: string): Promise<FileDiff[]> {
  * True when nothing outside .campaign/ and .git has an uncommitted change. Untracked canon
  * files count as changes.
  */
-export async function isCleanCanon(root: string): Promise<boolean> {
+export async function isCleanCanon(root: string, isHidden: (p: string) => boolean = isLocalPath): Promise<boolean> {
   const result = await runGit(root, ['status', '--porcelain=v1', '-z', '--untracked-files=all']);
   const tokens = result.stdout.split('\0');
   for (let i = 0; i < tokens.length; i++) {
@@ -221,7 +221,7 @@ export async function isCleanCanon(root: string): Promise<boolean> {
     const y = entry[1];
     // A rename or copy is followed by its origin path as its own NUL-separated token.
     if (x === 'R' || x === 'C' || y === 'R' || y === 'C') i++;
-    if (!isLocalPath(entry.slice(3))) return false;
+    if (!isHidden(entry.slice(3))) return false;
   }
   return true;
 }

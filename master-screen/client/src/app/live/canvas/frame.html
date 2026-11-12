@@ -1,0 +1,14 @@
+<section class="frame" data-live-frame
+  [attr.data-live-id]="frame().id"
+  [class.selected]="selected()"
+  [class.link-target]="linkMode()"
+  [style.transform]="'translate(' + x() + 'px, ' + y() + 'px)'"
+  [style.width.px]="w()"
+  [style.height.px]="h()"
+  (focusin)="focused.emit()">
+  <header class="head" data-drag-handle data-no-pan [attr.title]="s.copy('live.card.move')" (pointerdown)="onHeader($event)">
+    <input class="title" type="text" data-no-pan [value]="frame().title"
+      [attr.aria-label]="s.copy('live.frame.titleLabel')" (input)="onTitle($event)" />
+  </header>
+  <span class="grip" data-no-pan [attr.title]="s.copy('live.frame.resize')" (pointerdown)="onGrip($event)" aria-hidden="true"></span>
+</section>

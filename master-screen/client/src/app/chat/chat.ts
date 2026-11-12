@@ -13,11 +13,12 @@ import {
   viewChild,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import type { ChatMessage, ChatResponse, Turn } from '@shared/types';
-import { LucideAngularModule, ArrowDown, Send, Square } from 'lucide-angular';
+import { LucideAngularModule, ArrowDown, Dices, Send, Square } from 'lucide-angular';
 import { ApiService, isApiFailure } from '../core/api.service';
 import { LiveService } from '../core/live.service';
+import { LiveStateService } from '../live/live-api.service';
 import { StatusService } from '../core/status.service';
 import { I18n, type TranslationKey } from '../i18n';
 import {
@@ -40,7 +41,7 @@ const EXAMPLE_KEYS: readonly TranslationKey[] = ['chat.example.1', 'chat.example
 /** The conversation with the assistant: messages, composer and the status line of the current turn. */
 @Component({
   selector: 'ms-chat',
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, RouterLink],
   templateUrl: './chat.html',
   styleUrl: './chat.css',
 })
@@ -48,6 +49,7 @@ export class Chat implements OnInit {
   readonly i18n = inject(I18n);
   private readonly api = inject(ApiService);
   private readonly live = inject(LiveService);
+  private readonly liveState = inject(LiveStateService);
   private readonly statusService = inject(StatusService);
   private readonly router = inject(Router);
   private readonly focus = inject(FocusMessageService);
@@ -55,7 +57,9 @@ export class Chat implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  readonly icons = { ArrowDown, Send, Square };
+  readonly icons = { ArrowDown, Dices, Send, Square };
+  /** True while a live session is open: the header then links to the live table. */
+  readonly liveOpen = computed(() => this.liveState.session() !== null);
   readonly examples = EXAMPLE_KEYS;
 
   private readonly list = viewChild<ElementRef<HTMLElement>>('list');

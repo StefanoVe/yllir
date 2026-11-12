@@ -23,5 +23,13 @@ export const routes: Routes = [
     path: 'settings',
     loadComponent: () => import('./settings/settings').then((m) => m.Settings),
   },
+  {
+    path: 'live',
+    loadComponent: () => import('./live/live').then((m) => m.LiveComponent),
+  },
+  {
+    path: 'plot',
+    loadComponent: () => import('./plot/plot-map').then((m) => m.PlotMapComponent),
+  },
   { path: '**', redirectTo: '' },
 ];

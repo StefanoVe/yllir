@@ -11,6 +11,7 @@ import { createApp } from './app.js';
 import { createCtx } from './context.js';
 import { agentStatus } from './agent/index.js';
 import { startWatcher } from './docs/watcher.js';
+import { startLiveWatcher } from './live/watcher.js';
 
 const DEFAULT_PORT = 4317;
 const PORT_ATTEMPTS = 200;
@@ -232,6 +233,7 @@ async function main(): Promise<void> {
   });
   server.on('request', createApp(ctx));
   const stopWatcher = startWatcher(ctx);
+  const stopLiveWatcher = startLiveWatcher(ctx);
   await writeLock(lockPath, { pid: process.pid, port, url });
 
   let stopping: Promise<void> | null = null;
@@ -239,6 +241,7 @@ async function main(): Promise<void> {
     if (stopping === null) {
       stopping = (async () => {
         await stopWatcher().catch((err: unknown) => log(`watcher stop failed: ${String(err)}`));
+        await stopLiveWatcher().catch((err: unknown) => log(`live watcher stop failed: ${String(err)}`));
         ctx.bus.close();
         await ctx.closeAll();
         await new Promise<void>((resolve) => {

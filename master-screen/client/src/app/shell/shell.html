@@ -4,6 +4,14 @@
        [attr.aria-label]="i18n.t('nav.home')" [title]="i18n.t('nav.home')">
       <lucide-angular [img]="icons.MessageSquare" [size]="20" aria-hidden="true" />
     </a>
+    <a class="rail-item" routerLink="/live" routerLinkActive="active" ariaCurrentWhenActive="page"
+       [attr.aria-label]="i18n.t('nav.liveTable')" [title]="i18n.t('nav.liveTable')">
+      <lucide-angular [img]="icons.Dices" [size]="20" aria-hidden="true" />
+    </a>
+    <a class="rail-item" routerLink="/plot" routerLinkActive="active" ariaCurrentWhenActive="page"
+       [attr.aria-label]="i18n.t('nav.plot')" [title]="i18n.t('nav.plot')">
+      <lucide-angular [img]="icons.GitBranch" [size]="20" aria-hidden="true" />
+    </a>
     <button type="button" class="rail-item" aria-haspopup="dialog" [class.active]="palette.open()"
             [attr.aria-label]="i18n.t('nav.search')" [title]="i18n.t('nav.search')" (click)="palette.show()">
       <lucide-angular [img]="icons.Search" [size]="20" aria-hidden="true" />

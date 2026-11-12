@@ -6,7 +6,7 @@ import type { Router } from 'express';
 import type { ChangesResponse, DiffResponse, UndoResponse } from '../../../shared/src/types.js';
 import { readCampaignSummary } from '../campaign.js';
 import type { Ctx } from '../context.js';
-import { canonFiles, loadHistory, type HistoryItem } from '../history/groups.js';
+import { canonFiles, isHiddenPath, loadHistory, type HistoryItem } from '../history/groups.js';
 import { diff, isCleanCanon, resolveCommit, revert, showFiles, SHA_PATTERN } from '../history/git.js';
 import { langOf, messages, type Messages } from '../history/text.js';
 
@@ -66,7 +66,7 @@ async function performUndo(ctx: Ctx, requested: string | undefined): Promise<Ref
     if (!target) return refuse(409, texts.nothingToUndo);
   }
 
-  if (!(await isCleanCanon(root))) return refuse(409, texts.dirty);
+  if (!(await isCleanCanon(root, isHiddenPath))) return refuse(409, texts.dirty);
 
   const touched = canonFiles(await showFiles(root, target.group.id));
   const outcome = await revert(root, target.group.id, target.subject);
@@ -109,7 +109,8 @@ export function registerChangesRoutes(app: Router, ctx: Ctx): void {
         res.status(404).json({ error: (await textsFor(ctx)).notFound });
         return;
       }
-      const body: DiffResponse = { id: sha, files: await diff(ctx.campaignRoot, sha) };
+      const files = (await diff(ctx.campaignRoot, sha)).filter((file) => !isHiddenPath(file.path));
+      const body: DiffResponse = { id: sha, files };
       res.json(body);
     } catch (err) {
       ctx.log(`change diff failed: ${describe(err)}`);
