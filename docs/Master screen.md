@@ -29,6 +29,7 @@ Questo documento descrive il master screen: la parte del framework che il master
 - **Piattaforme (Deciso, 2026-11-12).** Il master screen gira su macOS e Windows. Linux non è un obiettivo della fase 1 (il launcher ha i file per Linux ma non è provato).
 - **Approvazione delle modifiche (Deciso, 2026-11-12).** Il master non approva le modifiche prima: compaiono subito nel pannello «cosa è cambiato» e si annullano dopo con «torna a com'era». Nessuna approvazione preventiva, nemmeno per i file del canone.
 - **Vista per i giocatori (Deciso, 2026-11-12).** Per ora non c'è. L'anteprima «vista giocatori» (nasconde il blocco riservato) resta solo un controllo del master.
+- **Enciclopedia pubblica (Deciso, 2026-11-12): opzione A.** È una sezione del master screen che genera e pubblica il sito statico. Il sito è il bersaglio dei QR della stampa, quindi gli indirizzi si legano a un identificativo stabile e non al nome del file. Servizio di hosting, dominio e credenziali restano da decidere.
 - **Interfaccia (Deciso, 2026-11-12).** Moderna e semplice da usare, ma abbastanza funzionale. È coerente con le icone con tooltip decise sopra.
 
 ### Strumenti della sessione live estratti (Deciso)
@@ -188,7 +189,7 @@ Nota: se più funzioni entrano nel framework, serve un modello comune per le imm
 
 ## Questioni aperte
 
-- Quali funzioni confluiscono nel master screen (enciclopedia pubblica, atlante, vedute, carte nautiche) e con quale opzione, fra A, B e C per ciascuna.
+- Quali altre funzioni confluiscono nel master screen (atlante, vedute, carte nautiche) e con quale opzione, fra A, B e C per ciascuna. L'enciclopedia pubblica è decisa (opzione A).
 - Piattaforma: alcune funzioni (musica, vedute, carte nautiche) potrebbero dipendere dal sistema operativo; la fase 1 è per macOS e Windows (deciso), il resto si valuta modulo per modulo.
 - Marcatura pubblico/master: il formato è definito in `Configurazione.md`, ma il master screen deve applicarlo anche ai file scritti dall'agente. Chi controlla che un blocco riservato non esca in una vista pubblica?
 - Parità fra master screen e terminale: quali operazioni devono esistere in entrambi, e quali sono solo del master screen (per esempio il pannello delle modifiche)?
