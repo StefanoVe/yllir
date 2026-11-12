@@ -1,0 +1,69 @@
+@if (viewer.image()) {
+<div
+  class="viewer-overlay"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-label]="i18n.t('liveAgent.viewer.image')"
+  (click)="viewer.closeImage()"
+>
+  <div class="viewer-controls" (click)="$event.stopPropagation()">
+    <button
+      class="icon-button"
+      (click)="viewer.imageFit.set(false); viewer.zoom.update((z) => z + 0.25)"
+      [attr.aria-label]="i18n.t('liveAgent.viewer.zoomIn')"
+      [title]="i18n.t('liveAgent.viewer.zoomIn')"
+    >
+      <ui-icon name="plus" />
+    </button>
+    <button
+      class="icon-button"
+      (click)="viewer.imageFit.set(false); viewer.zoom.update((z) => Math.max(0.25, z - 0.25))"
+      [attr.aria-label]="i18n.t('liveAgent.viewer.zoomOut')"
+      [title]="i18n.t('liveAgent.viewer.zoomOut')"
+    >
+      <ui-icon name="minus" />
+    </button>
+    <button
+      class="icon-button"
+      (click)="viewer.toggleFullscreen()"
+      [attr.aria-label]="i18n.t('liveAgent.viewer.fullscreen')"
+      [title]="i18n.t('liveAgent.viewer.fullscreen')"
+    >
+      <ui-icon name="maximize" />
+    </button>
+    <button
+      class="icon-button"
+      (click)="viewer.closeImage()"
+      [attr.aria-label]="i18n.t('liveAgent.viewer.closeImage')"
+      [title]="i18n.t('liveAgent.viewer.closeImageTitle')"
+    >
+      <ui-icon name="x" />
+    </button>
+  </div>
+  <div class="viewer-scroll" (click)="$event.stopPropagation()">
+    <img
+      [src]="viewer.image()"
+      [alt]="i18n.t('liveAgent.viewer.image')"
+      [class.fit-content]="viewer.imageFit()"
+      [style.width]="viewer.imageFit() ? null : viewer.zoom() * 75 + 'vw'"
+    />
+  </div>
+</div>
+}
+@if (viewer.pdfLink()) {
+<div
+  class="viewer-overlay viewer-pdf"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-label]="i18n.t('liveAgent.viewer.pdf')"
+  (click)="viewer.closePdf()"
+>
+  <div class="viewer-controls" (click)="$event.stopPropagation()">
+    <a class="outline-button" [href]="viewer.pdfLink()" target="_blank" rel="noopener noreferrer">{{ i18n.t('liveAgent.viewer.openPdf') }}</a>
+    <button class="icon-button" [attr.aria-label]="i18n.t('liveAgent.viewer.closePdf')" (click)="viewer.closePdf()">
+      <ui-icon name="x" />
+    </button>
+  </div>
+  <p (click)="$event.stopPropagation()">{{ i18n.t('liveAgent.viewer.pdfReady') }}</p>
+</div>
+}

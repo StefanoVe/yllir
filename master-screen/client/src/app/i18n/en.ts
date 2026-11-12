@@ -1,7 +1,13 @@
+import { liveAgentEn } from './parts/live-agent.en';
+import { liveBoardEn } from './parts/live-board.en';
+import { combatEn } from './parts/combat.en';
 import { chatRichEn } from './parts/chat-rich.en';
 import { chatStepsEn } from './parts/chat-steps.en';
 
 export const en = {
+  ...liveAgentEn,
+  ...liveBoardEn,
+  ...combatEn,
   ...chatRichEn,
   ...chatStepsEn,
   'nav.home': 'Home',

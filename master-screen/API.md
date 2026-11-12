@@ -10,7 +10,7 @@ Single source of truth for the HTTP API and the shared types. Server and client 
 - Serves the built client from `<server.mjs dir>/public` for every non-`/api` path (SPA fallback to `index.html`).
 - With `--exit-when-closed` (passed by the launcher) it exits 60 s after the last `/api/events` client disconnected, but only once at least one client has connected before; a client reconnecting inside the 60 s cancels the exit.
 - Exits cleanly (closing watcher, agent turn, SSE streams) on SIGINT/SIGTERM and when `POST /api/shutdown` is called. A lock file `.campaign/state/master-screen/server.json` (`{pid,port,url}`) is written at start and removed at exit; a stale lock (dead pid) is ignored.
-- Reads the campaign only through the framework: `node <framework>/scripts/engine.mjs <command> <campaign> ...` (JSON on stdout, last line `exit: <code>`) and the framework library modules loaded at run time by dynamic `import(<framework>/scripts/lib/<file>.mjs)` (for example `public-text.mjs`, `frontmatter.mjs`, `config.mjs`). Nothing from `<framework>/scripts` is copied into this project. All campaign writes go through `engine.mjs commit` (done by the agent, never by the HTTP API, except undo).
+- Reads the campaign only through the framework: `node <framework>/scripts/engine.mjs <command> <campaign> ...` (JSON on stdout, last line `exit: <code>`) and the framework library modules loaded at run time by dynamic `import(<framework>/scripts/lib/<file>.mjs)` (for example `public-text.mjs`, `frontmatter.mjs`, `config.mjs`). Nothing from `<framework>/scripts` is copied into this project. All campaign writes go through `engine.mjs commit` (done by the agent, or by a sheet tool of the live table; never by an HTTP route, except undo).
 - Operational state lives in `<campaign>/.campaign/state/master-screen/` (chat.json). Never inside canon folders.
 
 ## Types (`shared/src/types.ts`)
@@ -94,6 +94,8 @@ export type LiveEvent =
   | { event: 'status'; data: StatusResponse };
 ```
 
+Live table types: `shared/src/cockpit-types.ts` (session view, board, events, actions) and `shared/src/types.ts` (`CombatState`, `BattleView`, `CombatantStats`, `LivePlayer`, `LogEntry`).
+
 ## Endpoints
 
 All under `/api`, JSON, UTF-8. Errors: `{ "error": "<plain-language message>" }` with a 4xx/5xx status. Never expose stack traces, file-system paths outside the campaign, or words like commit/sha/index/frontmatter in `error`, `summary`, `message` or `activity` strings.
@@ -126,11 +128,12 @@ A change group is a git commit made by the engine. Undo of group G runs `git rev
 - Provider interface (`server/src/agent/provider.ts`): `run(input: { prompt, cwd, frameworkRoot, resumeId?, model?: ChatModel, effort?: ChatEffort, signal }): AsyncIterable<AgentEvent>` (`ChatModel`/`ChatEffort` in `shared/src/types.ts`; the real provider passes them to the SDK options `model` and `effort` when set) where `AgentEvent` is `{type:'activity',text}|{type:'step',id,kind,text,parentId?}|{type:'step-end',id,ok}|{type:'delta',text}|{type:'open',path}|{type:'resume',id}|{type:'done'}|{type:'error',message}`. A fake provider for tests lives next to it.
 - The real provider uses `@anthropic-ai/claude-agent-sdk`, bundled into `server.mjs`, with `pathToClaudeCodeExecutable` set to the Claude Code the master already has installed (looked up on PATH with `which`/`where`, then the usual install locations); when none is found `agent.available` is false with a plain reason. It runs with the Yllir plugin loaded from `frameworkRoot`, `cwd` = campaign root. No free shell: a `canUseTool` gate allows only (a) Read, Glob, Grep, Skill; (a2) Task and Agent (the framework's own sub-agents; their tool calls pass through this same gate); Read, Glob and Grep only inside the campaign and the framework folders; (b) Write and Edit only on paths under `<campaign>/.campaign/drafts/`; (c) Bash only for the single command shape `node <frameworkRoot>/scripts/<script>.mjs <args>` or `node <frameworkRoot>/skills/**/scripts/<script>.mjs <args>` with no shell metacharacters (`;|&><$` backtick, newline, `..`) in the line, and `git` is never allowed; (d) the in-process MCP tools `search_docs`, `open_document` and `suggest_music`; (e) the tools of the Yllir plugins named `mcp__plugin_yllir_<plugin>__<tool>` (the Photoshop plugin, used for images), except any tool whose name contains `execute_script` or `install_font`. Everything else is denied with a plain reason. It also receives the master's message verbatim as the prompt, prefixed by nothing, so the entry skill handles it exactly as in the terminal.
 - The master-only block is visible to the agent (it works on canon) and is never sent anywhere else by this server.
-- Live-table turns (the live thread) also get: (a) the live digest (scene, board, log, combat) as a per-turn system prompt append; the prompt stays the master's verbatim text; (b) the in-process MCP server `yllir_live`, registered only for live-thread turns and allowed by the gate only there, with the tools `get_table`, `board_stage`, `board_place`, `board_frame`, `board_link`, `board_move`, `board_remove`, `board_highlight`, `board_pin`, `board_arrange`, `scene_set`, `log_add`, `log_update`, `log_remove`, `combat_op`, `battle_map_set`, `battle_move`, `find_battle_map`; (c) one thread per live session with its own resume id. The FIFO queue is shared with the home chat.
+
+The live table (cockpit) has its own turn manager, `server/src/cockpit/turns.ts`, and does not share the queue of the home chat. Its turns run one at a time per cockpit session, in order; a turn stops after 90 s without activity (`DEFAULT_IDLE_TIMEOUT_MS`) or after 5 min in total (`DEFAULT_TURN_TIMEOUT_MS`), and can be cancelled. Its tools, token and undo rules are in "Live table (cockpit)".
 
 ## Client rules
 
-- Angular standalone components, signals, lazy routes. Routes: `/` (chat + changes), `/doc/:path*` (reader), `/search`, `/settings`.
+- Angular standalone components, signals, lazy routes. Routes: `/` (chat + changes), `/doc/:path*` (reader), `/search`, `/settings`, `/live` (the live table, see "Live table (cockpit)"), `/plot` (plot map).
 - One `EventSource` on `/api/events`, reconnecting with backoff. It stays open while the tab is hidden (the server uses the open stream to know the screen is still there).
 - Icons only in the navigation (Lucide), each with a tooltip and an `aria-label`; no text labels next to icons. Page content may contain text.
 - Words shown to the master: document, scene, sheet, session, character. Never: commit, index, canon, frontmatter, token, provider, sha.
@@ -139,79 +142,143 @@ A change group is a git commit made by the engine. Undo of group G runs `git rev
 - Modern, calm, readable: CSS custom properties for tokens, light and dark theme following the system with a manual override, `prefers-reduced-motion` respected, visible focus rings, keyboard shortcut Ctrl/Cmd+K for search, layout works from 360 px width.
 - UI language: the campaign language from `/api/status` (`it` or `en` at least); strings live in one `i18n` file per language, no hard-coded copy in templates.
 
-## Live session (phase 2)
+## Live table (cockpit)
 
-State lives in `<campaign>/.campaign/state/live/`, never in canon, never in git history of canon (it is under `.campaign/`). The log and the combat state are owned by the framework skills `session-log` and `combat-tracker` (so the terminal and the Claude app can use them with no master screen); the server only calls their library modules through `loadFrameworkModule`-style dynamic import and never re-implements their rules. The board (free canvas), the scene bar and the battle view are owned by the server alone; undo covers the board and the scene only (see "Undo of the live table").
+Route `/live`. The live table is the cockpit: a board (a free canvas with document, image and note cards, scene frames and arrows), the current scene, the session log, the combat overlay, and one chat thread with the assistant per cockpit session. While the master plays, the assistant arranges the board, keeps the log and runs the combat on the master's words. The cockpit was imported from the author's prototype and adapted to the master screen (theme, campaign language, framework libraries). Claude is the only provider. The code is in `server/src/cockpit/` (agent side, tools, turns, store, REST, MCP), `server/src/cockpit-host/` (the adapters that connect it to this server: archive, maps, music, categories, engine, battle), `server/src/routes/battle.ts` (battle endpoints) and `client/src/app/cockpit/` (screen, board, chat, combat overlay). `server/src/cockpit/ports.ts` is the only interface between the cockpit and the rest of the server.
 
-Files: `live/active.json` (`{ "sessionId": "<id>" | null }`), `live/<sessionId>/session.json` (LiveSession), `live/<sessionId>/log.json` (LogEntry[]), `live/<sessionId>/combat.json` (CombatState), `live/<sessionId>/board.json` (Board), `scene.json` (TableScene), `battle.json` (BattleView), `history.json` (BoardGroup[] plus the board and scene snapshots for undo, max 50), `chat.json` (the live chat thread: messages and resume id). All written atomically (temp + rename), mode 0600, UTF-8, pretty JSON.
+### State
 
-Framework library contract (ESM, in `yllir/skills/library/<skill>/scripts/lib/`). Every function is synchronous except `applyOp` (combat-store, async because its rules file is loaded with a dynamic import; callers must await it). Every function takes the campaign root first, never throws for bad input and returns `{ ok: true, ... }` or `{ ok: false, error: { code: string, message: string } }` (message in English, plain):
-- `session-log/scripts/lib/log-store.mjs`: `openSession(root, { title?, sessionRef?, now? })` (fails with code `already-open` when one is active; id is the date, `-2`, `-3` for more the same day) -> `{ session }`; `getActive(root)` -> `{ session | null }`; `addEntry(root, { kind, text, scene?, subjects?, by? , now? })` -> `{ entry }`; `updateEntry(root, id, patch)` (patch: text, kind, scene, subjects, resolved) -> `{ entry }`; `removeEntry(root, id)`; `listEntries(root)` -> `{ entries }`; `endSession(root, { now? })` -> `{ session }` (keeps files; clears active.json); `readSession(root, sessionId)` -> `{ session, entries }`.
-- `combat-tracker/scripts/lib/combat-store.mjs`: `getCombat(root)` -> `{ combat | null }` (for the active session); `async applyOp(root, op, { now? })` (returns a Promise) where op is the `CombatOp` union of `shared/src/types.ts` -> `{ combat }`. It loads the adapter named in campaign.yaml `system.adapter` and delegates every rule to `<framework>/modules/systems/<id>/encounter.mjs` (exports `initEncounter(adapter)`, `recordEvent(adapter, state, op)`, `advanceTurn(adapter, state)`, `validateState(adapter, state)`, each pure on plain objects). A validator runs before every save; an invalid result is not saved.
-- CLIs, one JSON document on stdout and a last line `exit: <code>` (0 ok, 1 domain error, 2 usage): `node <framework>/skills/library/session-log/scripts/session-log.mjs <open|add|update|remove|list|end|status> <root> [options]` and `node <framework>/skills/library/combat-tracker/scripts/combat.mjs <op> <root> [options]` (op names as in `CombatOp`, plus `status`).
+Operational state, never canon, always under `.campaign/`.
 
-Server endpoints (all under `/api`):
+- Cockpit, one folder per cockpit session: `.campaign/state/live/cockpit/<uuid>/`. Files: `session.json` (chat messages, turns, revision, action groups), `undo.json` (board and scene snapshots of the last 50 undo groups), `live.json` (the framework session the cockpit is bound to, the ledger and combat links, and the sheets created at this session), `tools.jsonl` (tool calls of the turns), `files/` (images the master added).
+- Framework, shared with the terminal and the Claude app: `.campaign/state/live/active.json` (`{ "sessionId": "<id>" | null }`, the open session), and per session `.campaign/state/live/<sessionId>/`: `session.json` and `log.json` (the session log, written by the `session-log` library), `combat.json` (the combat, written by the `combat-tracker` library), `battle.json` (the battle screen: map and chip positions, with a `revision`, written by this server atomically).
+
+The cockpit does not write the log or the combat files by hand: each change goes through the framework library (`session-log` for the log, `combat-tracker` for the combat). Every read of a cockpit session fills them from the libraries before the state is sent, so the terminal and the screen show the same thing. A change made in the terminal (a log entry, a combat step) is watched on disk and pushed to the open screen. The board, the scene and the chat stay in the cockpit folder.
+
+### REST endpoints (`/api/cockpit`)
+
+Errors: `{ "error": "<plain-language message>" }`, status 400 by default, 404 for an unknown cockpit route, 409 for a refused change, 413 for a body or image too large (JSON body max 64 KB; image upload max 15 MB, `png`, `jpg`, `webp` or `gif`).
 
 | Method and path | Request | Response |
 |---|---|---|
-| GET `/live` | | `LiveSnapshot` |
-| POST `/live/open` | `{ title?: string, sessionRef?: string }` | `LiveSnapshot` (409 plain message if already open) |
-| POST `/live/end` | | `LiveSnapshot` (session null) |
-| POST `/live/log` | `{ kind, text, scene?, subjects? }` | `LiveSnapshot` |
-| PATCH `/live/log/:id` | `{ text?, kind?, scene?, subjects?, resolved? }` | `LiveSnapshot` |
-| DELETE `/live/log/:id` | | `LiveSnapshot` |
-| POST `/live/combat` | `CombatOp` | `LiveSnapshot` (409 plain message when the rule engine refuses) |
-| PUT `/live/board` | `Board` (full replacement, `revision` must equal the stored one else 409 with the current board in `{ error, board }`) | `{ board }` |
-| GET `/plot` | | `PlotResponse` built from the framework `plot/plot-map.mjs` |
-| POST `/live/board/ops` | `{ ops: BoardOp[] }` (1..20, master structural edits) | `LiveSnapshot` |
-| PUT `/live/board/layout` | `{ items: [{id,x,y,w,h}] }` (1..300, geometry only, no undo group) | `{ board }` |
-| POST `/live/undo` | `{ groupId }`, must be the latest not-undone group | `LiveSnapshot` (409 otherwise) |
-| PUT `/live/battle` | `{ positions?, map? }` | `LiveSnapshot` |
-| GET `/live/combat/stats/:id` | | `CombatantStats` (404 when unknown) |
-| GET `/live/players` | | `{ players: LivePlayer[] }` from the player-character category |
-| GET `/live/chat` | | `{ messages: ChatMessage[], turn }` of the live thread |
-| POST `/live/chat` | `{ text, scope?: 'table' \| 'combat' }` | `{ turnId }` |
-| POST `/live/chat/cancel` | | `{}` |
+| GET `/api/cockpit/sessions` | | list of sessions |
+| POST `/api/cockpit/sessions` | `{ title: 1..200 chars, provider?: "claude" }` (any other provider is refused) | 201 session view; opens the framework live session, or joins the one already open |
+| GET `/api/cockpit/sessions/:id` | | session view (ledger and combat filled from the framework) |
+| DELETE `/api/cockpit/sessions/:id` | | `{ ok: true }`; 409 while a turn of the session is running |
+| GET `/api/cockpit/sessions/:id/events` | `Last-Event-ID` header or `lastEventId` query | SSE (see below) |
+| POST `/api/cockpit/sessions/:id/messages` | `{ text: 1..8000 chars, clientId?: string }` | 202 `{ turnId, messageId }`; a repeated `clientId` returns the same turn |
+| POST `/api/cockpit/sessions/:id/turns/:turnId/cancel` | | `{ ok: true }` |
+| POST `/api/cockpit/sessions/:id/actions` | `{ actions: 1..20 CockpitAction }` | `{ revision, group }`; the master's own board edits, one undo group for the whole request |
+| POST `/api/cockpit/sessions/:id/layout` | `{ items: 1..300 }` (geometry only) | `{ revision }`; no undo group |
+| POST `/api/cockpit/sessions/:id/undo` | `{ groupId }`, must be the newest group not yet undone | `{ revision }`; 409 otherwise |
+| POST `/api/cockpit/sessions/:id/files` | raw image body, `Content-Type` `image/png`, `image/jpeg`, `image/webp` or `image/gif` | 201 `{ name }` |
+| GET `/api/cockpit/sessions/:id/files/:name` | | the image (cached, immutable) |
+| GET `/api/cockpit/runtime?sessionId=` | | status of the Claude provider and, when `sessionId` is given, of that session's turn |
 
-The server publishes SSE `live` `{ revision }` after every write through the API and also when anything under `.campaign/state/live/` changes on disk (written by the agent or the terminal): a second chokidar watcher, debounced 150 ms. `revision` is a hash of the mtimes and sizes of every file under the live folder, the new files included. The client refetches `/api/live` on `live`. Live-table chat uses the existing chat events with `thread: 'live'`. The existing `PUT /live/board` stays for compatibility.
+Error messages are plain language, in the campaign language, with no stack trace or file path.
 
-Rules: log entries are not canon and never touch sheets during the session; the log and combat tools are available to the in-app agent through the framework scripts (the Bash gate already allows `skills/**/scripts/*.mjs`); a combat starts when a `start` op succeeds and the combat panel opens by itself when `combat.active` turns true; the master-only block is never put into `LiveSnapshot` (cards reference documents by path, the reader decides what to show); board validation: at most 300 cards, coordinates within +-20000, `ref` must be a campaign-relative path without `..`.
+### SSE
 
-### Board ops (agent and master structural edits)
+`GET /api/cockpit/sessions/:id/events` is one stream per open session. The first frame is `snapshot` (the whole session view). Then `state` (new revision, board and scene view, and the undo group when the change was one), `message`, `delta` (streamed text of the assistant), `turn` and `deleted`. Each frame has an `id`; the server keeps the last 500 events per session and replays the missing ones from `Last-Event-ID`. A heartbeat goes out every 15 s. `state` frames are published in order, after the framework state of the session is read.
 
-`POST /live/board/ops` applies a list of `BoardOp` (1..20) in order, read-modify-write inside the serialize queue. Master drags and resizes use `PUT /live/board/layout` and never create an undo group.
+### MCP endpoint and turn tokens
 
-- `place`: every `ref` must exist as a campaign document or image. `near` is a card id, or `@N` = the N-th card of the same op.
-- `remove`: pinned cards are refused when the op comes from the agent; only the master removes them.
-- `clear`: keeps the pinned cards (`keepPinned: true`, the only value).
-- `arrange`: runs automatically at the end of an agent turn, after the structural ops.
+- `POST /mcp/cockpit` is the MCP endpoint (streamable HTTP, JSON responses, one server per request). It is outside `/api`.
+- Each turn gets its own random token (32 bytes, base64url). The token is valid only while that turn runs and is revoked when the turn ends. A request needs `Authorization: Bearer <token>`; without a valid token it gets 401. The `Host` header must be `127.0.0.1` or `localhost`, otherwise 403.
+- The Claude provider receives this URL and the token of its own turn only. The endpoint lists only the cockpit tools below.
 
-### Undo of the live table
+### Agent tools
 
-- Undo covers the board and the scene only. `POST /live/undo` `{ groupId }` undoes the latest group that is not undone; any other group gets 409.
-- One agent turn that changes the board or the scene is one `BoardGroup`; every board and scene tool call of that turn joins that group.
-- `history.json` keeps the board and scene snapshots of each group, max 50 groups.
-- Log and combat are not undone by the button: the master corrects them by talking to the agent.
+These are the tools of `COCKPIT_TOOL_NAMES` (`server/src/cockpit/tools.ts`), in the campaign language in their descriptions.
 
-### Free text in the snapshot
+Reading the campaign:
+- `search_docs`: finds names or themes in the sources the master can see (up to 12 hits).
+- `read_doc`: reads a document or a section and lists its headings; the text may be truncated, and the result says so.
+- `plot_neighbors`: the plot node of the current scene, with its predecessors, successors and optional branches.
+- `session_outline`: a whole session or activity: scenes in order, sections, branches, linked sheets and maps.
+- `list_maps`: the map assets of the campaign, filtered by a name or an area.
+- `find_images`: images by subject, split into the player version and the master version, plus object cards.
+- `search_music`: up to eight tracks; searching never plays anything.
+- `get_board`: the board with ids and sources, for a check after many changes in one turn.
 
-Free text the agent writes into the snapshot (log text, card `reason`, scene `summary`, combat notes) must never copy text from the master-only block of any sheet. The agent writes its own short words; it may quote only public text.
+Board and scene:
+- `board_stage`: lays out the whole session on the board, one frame per scene; `replace` clears the board first (pinned cards stay).
+- `board_place`: puts on the board NPCs, enemies, maps, battle maps, objects, music, plot sections and notes; an existing source is updated and moved if its frame changes.
+- `board_move`: moves cards already on the board into a frame, or out of every frame.
+- `board_remove`: removes cards, frames or arrows that are clearly out of date.
+- `board_highlight`: highlights the card or frame that matters now (the canvas centres on it).
+- `board_pin`: protects a card or frame from automatic clean-up, or makes it removable.
+- `board_frame`: creates a frame that groups cards, and can link frames in sequence (`after` and `before`).
+- `board_link`: draws arrows between cards or frames, one or many in one call.
+- `board_arrange`: reorders frames and cards, only when the master asks. The board is also reordered at the end of every turn that changed its structure.
+- `scene_set`: updates the place, the time, the plot section and the group of characters.
+- `open_source`: opens a source in the reader, only on an explicit request.
 
-### Combat overlay
+Sheets:
+- `sheet_create`: creates a new sheet (NPC, creature, object or place) and puts it on the board. Use it only after `search_docs` has shown that no sheet exists. The sheet is saved through the review flow below.
+- `sheet_update`: rewrites the body of a sheet this cockpit session created. Hand-written sheets are read only.
 
-- Full state (hp, conditions, resources) only for NPCs and creatures. Player characters have name, initiative and position only; the server never reads a player sheet beyond its title.
-- Every document card of a character or creature on the board has a swords button, which opens the full-screen combat overlay.
-  - Step 1, initiative popup: player characters come from `GET /live/players`; creatures are the card's own, plus any other character or creature card the master ticks.
-  - Step 2, battle view: the battle map when one is set and the preference "show battle maps" is on (localStorage `showBattleMaps`, default on); otherwise a list. A chip for each combatant, draggable inside the map (`PUT /live/battle`). Hovering a chip shows the stats from `GET /live/combat/stats/:id`.
-  - A floating chat on the right, scope `combat`; the agent applies the words with the combat tools.
-- The stats tooltip is built from the sheet with its master-only block removed, before the adapter sees it.
-- Place sheets link their battle map; the agent finds it with `find_battle_map`.
+Session log (framework library `session-log`):
+- `ledger_note`: adds an entry of kind fact, decision, intention or open thread, stated by the master.
+- `ledger_update`: merges fragments, corrects an entry, resolves it or drops it.
+- `ledger_remove`: removes a wrong or outdated entry.
 
-### Player-character category
+Combat (framework library `combat-tracker`):
+- `combat_start`, `combat_add`, `combat_update`, `combat_remove`, `combat_turn`, `combat_notes`, `combat_end`: the combat state, as the master declares it. Nothing is rolled and no tactics are chosen. Player characters carry only name and initiative. The turn advances only on an explicit order.
 
-The player characters are the documents of the category in `campaign.yaml` `structure.categories` whose id is `players`, `giocatori`, `pg` or `pc`; otherwise the first `master-only` category whose documents use the player-character format (format 4.13 in `templates/content-format.md`). `GET /live/players` lists their titles and refs.
+Battle screen and music:
+- `find_battle_map`: battle maps of the campaign, filtered by the place (title or path of the sheet that holds them), with grid size when known.
+- `battle_map_set`: shows a battle map on the battle screen of the open session.
+- `battle_move`: moves a combatant's chip to a grid cell, only when the master says where it is.
+- `music_play`, `music_stop`: only when the master explicitly asks.
 
-Client (phase 2): route `/live` (the table: free canvas in the centre, an icon dock on the right with log, combat, quick look-up), route `/plot` (plot map: nodes for sessions and scenes, solid arrows for declared dependencies, dashed lines for mere file order, with a legend). The combat panel opens by itself when a combat starts. The canvas supports document, image and note cards, scene frames and arrows, drag and resize, pan and zoom; layout saves without entering undo. All of it follows the "Client rules" above (icons with tooltips, no jargon, no optimistic updates: the board position shown after a drop is the one the server confirmed, but dragging itself is local and smooth).
+### Undo
+
+- A turn or a request from the screen makes one undo group. `POST .../undo` reverts the newest group not yet undone; the other groups cannot be reached.
+- The undo covers the board and the position only: the scene (place, time, section, group of characters) and the board. It does not touch the log, the combat or the sheets.
+- The log and the combat are corrected by talking to the assistant, not with the undo button.
+- A sheet created or changed at the table is an ordinary change of the campaign: it appears in "what changed" and can be undone there.
+- The battle screen (chips, battle map) has no undo group.
+
+### Sheets created at the table
+
+A sheet made at the table follows the same write cycle as every other sheet:
+
+1. The draft is written under `.campaign/drafts/`.
+2. `engine.mjs check` validates it. The engine also links every mention of an existing sheet.
+3. When the batch adds facts to the canon, the `batch-reviewer` sub-agent checks it against the canon and the seed. The sheet is saved only on its approval; otherwise the objections come back in plain words and nothing is saved. Without Claude Code on the computer the review is not available, and such sheets cannot be saved from the table.
+4. `engine.mjs commit` saves it as one change group, which appears in "what changed".
+
+The sheet is remembered in the cockpit session's `live.json`, which is what lets `sheet_update` rewrite it later.
+
+### Free text
+
+The assistant writes its own short words in the log, in a card's reason, in a scene summary and in a combat note, and may quote only public text. It never copies text from the master-only block of a sheet.
+
+### Battle screen endpoints (`/api/battle`)
+
+Owned by `routes/battle.ts` and `cockpit-host/battle.ts`. Battle state lives in the open session's `battle.json`.
+
+| Method and path | Request | Response |
+|---|---|---|
+| GET `/api/battle` | | `BattleView` of the open session (`map`, `positions`, `revision`), or `null` when no session is open |
+| PUT `/api/battle` | `{ positions?: { <combatant id>: { x, y } \| null }, map?: { ref, cols?, rows? } \| null }` | the new `BattleView`; positions are merged into the stored ones (`null` removes a chip), `map: null` clears the map; `revision` goes up by one. 409 when no session is open; 400 for invalid input, a map that is not an image of the campaign (`.png`, `.jpg`, `.jpeg`, `.webp`) or more than 300 chips |
+| GET `/api/battle/players` | | `{ players: LivePlayer[] }` (name and ref only) |
+| GET `/api/battle/maps?place=` | `place` optional | battle maps of the campaign (category `Battlemap`), filtered by the title or the path of the sheet that holds them, accents and case ignored |
+| GET `/api/battle/stats/:combatantId` | | `CombatantStats` (`lines`, `actions`); 404 when the id is not in the active combat |
+
+The stats tooltip is built by the game system's adapter (`statSummary` of the encounter module) from the public part of the combatant's sheet: the master-only block is removed before the adapter sees the text. The labels of hit points and armour class come from the adapter. A player character gets its initiative only, with no actions.
+
+Player-character category: the sheets of the category in `campaign.yaml` `structure.categories` whose id is `players`, `giocatori`, `pg` or `pc`; otherwise the first `master-only` category whose documents use the player-character format (format 4.13 in `templates/content-format.md`). `GET /api/battle/players` lists their titles and refs.
+
+### Combat overlay (client)
+
+- Each document card of an NPC or an enemy on the board has a swords button. It opens the full-screen combat overlay. Player characters have no button.
+- Step 1, initiative popup: the player characters come from `GET /api/battle/players`, each with an initiative field; the creature cards come from the board. Any other character or creature card can be ticked, and each ticked creature is an ally or an enemy (a click switches it). Starting the combat sends `combat.start` through the cockpit.
+- Step 2, battle view: when the open session has a battle map and the preference "show battle maps" is on (default on, saved per campaign), the map is shown with a chip for each combatant; otherwise the combatants are listed in initiative order. Chips are dragged inside the map and saved with `PUT /api/battle`. A button asks the assistant to find the battle map of the scene. The round and the current turn are shown; the stop button ends the combat.
+- Hovering or focusing a chip shows a tooltip with the initiative and, for creatures, the stats and actions from `GET /api/battle/stats/:id`.
+- A floating chat on the right is the same chat thread of the session. The assistant applies what the master says with the combat tools.
+- The overlay opens by itself only when a combat starts while the live table is on screen, and stays closed once the master closes it.
 
 ## Music (phase 3)
 

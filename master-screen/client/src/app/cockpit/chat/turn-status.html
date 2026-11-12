@@ -1,0 +1,12 @@
+@if(turn();as t){
+<div class="turn-status">
+  <ui-icon
+    [class.spinning]="t.status==='running'"
+    [name]="icon(t)"
+    [size]="16"
+  /><span>{{label(t)}}</span
+  ><span class="numeric">{{seconds()}}s</span>@if(queued()){<small>{{ i18n.t("liveAgent.turn.queued", { n: queued() }) }}</small>}<button [title]="i18n.t('liveAgent.turn.stop')" [attr.aria-label]="i18n.t('liveAgent.turn.stop')" (click)="stop()">
+    <ui-icon name="stop" [size]="16" />
+  </button>
+</div>
+}

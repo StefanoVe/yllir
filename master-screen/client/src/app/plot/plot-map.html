@@ -1,13 +1,13 @@
 <header class="bar">
-  <h2 class="title">{{ s.text('plot.title') }}</h2>
+  <h2 class="title">{{ s.t('plot.title') }}</h2>
   <span class="spacer"></span>
-  <button type="button" class="icon" [attr.aria-label]="s.text('plot.zoomOut')" [title]="s.text('plot.zoomOut')" (click)="zoomBy(0.8)">
+  <button type="button" class="icon" [attr.aria-label]="s.t('plot.zoomOut')" [title]="s.t('plot.zoomOut')" (click)="zoomBy(0.8)">
     <lucide-angular [img]="icons.ZoomOut" [size]="18" aria-hidden="true" />
   </button>
-  <button type="button" class="icon" [attr.aria-label]="s.text('plot.fit')" [title]="s.text('plot.fit')" (click)="fit()">
+  <button type="button" class="icon" [attr.aria-label]="s.t('plot.fit')" [title]="s.t('plot.fit')" (click)="fit()">
     <lucide-angular [img]="icons.Maximize" [size]="18" aria-hidden="true" />
   </button>
-  <button type="button" class="icon" [attr.aria-label]="s.text('plot.zoomIn')" [title]="s.text('plot.zoomIn')" (click)="zoomBy(1.25)">
+  <button type="button" class="icon" [attr.aria-label]="s.t('plot.zoomIn')" [title]="s.t('plot.zoomIn')" (click)="zoomBy(1.25)">
     <lucide-angular [img]="icons.ZoomIn" [size]="18" aria-hidden="true" />
   </button>
 </header>
@@ -15,16 +15,16 @@
 @if (error(); as message) {
   <p class="state" role="alert">{{ message }}</p>
 } @else if (loading()) {
-  <p class="state" role="status">{{ s.text('panels.common.loading') }}</p>
+  <p class="state" role="status">{{ s.t('panels.common.loading') }}</p>
 } @else if (!hasSessions()) {
-  <p class="state">{{ s.text('plot.empty') }}</p>
+  <p class="state">{{ s.t('plot.empty') }}</p>
 }
 
 <div class="viewport" #viewport
      (pointerdown)="onPointerDown($event)" (pointermove)="onPointerMove($event)"
      (pointerup)="onPointerUp()" (pointercancel)="onPointerUp()" (pointerleave)="onPointerUp()">
   @if (layout(); as map) {
-    <svg class="map" role="group" [attr.aria-label]="s.text('plot.canvasLabel')" width="100%" height="100%">
+    <svg class="map" role="group" [attr.aria-label]="s.t('plot.canvasLabel')" width="100%" height="100%">
       <defs>
         <marker id="plot-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
           <path class="arrow-head" d="M0 0 L10 5 L0 10 z" />
@@ -66,25 +66,25 @@
 
 @if (layout(); as map) {
   @if (hasSessions()) {
-    <ul class="legend" [attr.aria-label]="s.text('plot.legendTitle')">
-      <li class="legend-title">{{ s.text('plot.legendTitle') }}</li>
+    <ul class="legend" [attr.aria-label]="s.t('plot.legendTitle')">
+      <li class="legend-title">{{ s.t('plot.legendTitle') }}</li>
       <li>
         <svg class="sample" width="48" height="12" aria-hidden="true">
           <line class="edge depends" x1="2" y1="6" x2="44" y2="6" marker-end="url(#plot-arrow)" />
         </svg>
-        <span>{{ s.text('plot.legendNeeds') }}</span>
+        <span>{{ s.t('plot.legendNeeds') }}</span>
       </li>
       <li>
         <svg class="sample" width="48" height="12" aria-hidden="true">
           <line class="edge order" x1="2" y1="6" x2="46" y2="6" />
         </svg>
-        <span>{{ s.text('plot.legendFollows') }}</span>
+        <span>{{ s.t('plot.legendFollows') }}</span>
       </li>
     </ul>
   }
 
   <section class="sr-only">
-    <h3>{{ s.text('plot.textList') }}</h3>
+    <h3>{{ s.t('plot.textList') }}</h3>
     <ul>
       @for (node of map.nodes; track node.id) {
         <li>{{ node.title }} ({{ kindText(node.kind) }}). {{ needsText(node) }}</li>

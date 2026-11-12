@@ -9,7 +9,10 @@ const REAL_FRAMEWORK = fileURLToPath(new URL('../../../../yllir', import.meta.ur
 
 const harnesses: Harness[] = [];
 after(async () => {
-  await Promise.all(harnesses.map((h) => h.server.close()));
+  for (const h of harnesses) {
+    await h.server.close();
+    await h.ctx.closeAll();
+  }
 });
 
 // Same layout the framework's plot-map tests use: plot, chronicle and places categories.

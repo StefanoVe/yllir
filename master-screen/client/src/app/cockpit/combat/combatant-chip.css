@@ -1,0 +1,130 @@
+:host {
+  position: relative;
+  display: inline-flex;
+}
+
+.token {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-2);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  line-height: 1;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.token[data-side="pc"] {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.token[data-side="enemy"] {
+  background: var(--color-danger);
+  color: var(--color-danger-contrast);
+}
+
+.token[data-side="ally"] {
+  background: color-mix(in srgb, var(--color-accent) 55%, var(--color-surface));
+  color: var(--color-text);
+}
+
+.token:hover {
+  filter: brightness(1.06);
+}
+
+.token.active,
+.token:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.hp {
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  bottom: 4px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, currentColor 30%, transparent);
+  overflow: hidden;
+}
+
+.hp-fill {
+  display: block;
+  height: 100%;
+  background: currentColor;
+}
+
+.tooltip {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  width: min(260px, 70vw);
+  max-height: 50vh;
+  overflow: auto;
+  padding: var(--space-1);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  line-height: 1.4;
+  text-align: left;
+  white-space: normal;
+}
+
+.tooltip p,
+.tooltip h4,
+.tooltip dl {
+  margin: 0 0 var(--space-0-5);
+}
+
+.tip-name {
+  font-weight: 700;
+}
+
+.tooltip h4 {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+}
+
+.tooltip dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-1);
+}
+
+.tooltip dt {
+  color: var(--color-text-muted);
+}
+
+.tooltip dd {
+  margin: 0;
+}
+
+.actions {
+  margin: 0;
+  padding-left: var(--space-2);
+}
+
+.actions li + li {
+  margin-top: var(--space-0-5);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}

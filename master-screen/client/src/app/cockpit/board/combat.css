@@ -1,0 +1,112 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+.combat {
+  margin-top: 16px;
+  background: var(--color-surface);
+  border-radius: 8px;
+  padding: 12px 16px;
+}
+.combat header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.combat h2 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+.combat header span {
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.spacer {
+  flex: 1;
+}
+.icon-button {
+  width: 34px;
+  height: 34px;
+  color: var(--color-text-muted);
+}
+.combat table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.combat th {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  text-align: left;
+}
+.combat th,
+.combat td {
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+.combat th.numeric,
+.combat td.numeric {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  width: 64px;
+  white-space: nowrap;
+}
+.combat tbody tr:last-child td {
+  border-bottom: 0;
+}
+.combat tr.current td:first-child {
+  border-left: 2px solid var(--color-accent);
+}
+.combat tr.current td.name {
+  font-weight: 600;
+  color: var(--color-text);
+}
+.combat td small {
+  color: var(--color-text-muted);
+}
+.condition-chip {
+  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface));
+  color: var(--color-danger);
+  padding: 3px 6px;
+  border-radius: 4px;
+  margin-right: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+/* Second line of a row: shown on the phone only. */
+.combat .row-meta {
+  display: none;
+}
+@media (max-width: 759px) {
+  .combat {
+    padding: 10px;
+  }
+  /* Phone: conditions and phase move under the name instead of off-screen columns. */
+  .combat th.wide,
+  .combat td.wide {
+    display: none;
+  }
+  .combat .row-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    margin-top: 4px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--color-text-muted);
+  }
+  .combat .icon-button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+.combat .unknown {
+  color: var(--color-text-muted);
+}

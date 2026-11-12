@@ -2,6 +2,10 @@
 
 Local web app for the game master: chat with the assistant, read the campaign, see and undo recent changes. One Node.js process per campaign, bound to 127.0.0.1.
 
+## Live table
+
+The live table (`/live`) is the cockpit imported from the author's prototype: a board where the assistant arranges the cards of the scene, the session log, and the combat overlay (initiative, battle map with draggable tokens, stats on hover, and a chat). The cockpit code is in `server/src/cockpit/` (agent tools, turns, store, MCP endpoint, prompt), its adapters to this server and the framework are in `server/src/cockpit-host/`, the battle endpoints are in `server/src/routes/battle.ts`, and the client is in `client/src/app/cockpit/` (the combat overlay is in its `combat/` folder). The log and the combat are kept by the framework libraries; sheets created at the table go through the engine. `API.md` section "Live table (cockpit)" has the details.
+
 ## Folders
 
 - `server/`: Node.js and Express server (TypeScript). Reads the campaign only through the framework engine.

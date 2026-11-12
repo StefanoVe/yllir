@@ -1,0 +1,73 @@
+<form class="step" (submit)="$event.preventDefault(); start()">
+  <p class="hint muted">{{ i18n.t("combat.initiative.hint") }}</p>
+
+  <section aria-labelledby="combat-pcs">
+    <h3 id="combat-pcs">{{ i18n.t("combat.initiative.players") }}</h3>
+    @if (pcRows().length === 0) {
+    <p class="muted">{{ i18n.t("combat.initiative.noPlayers") }}</p>
+    }
+    <ul class="rows">
+      @for (row of pcRows(); track row.key) {
+      <li>
+        <span class="name">{{ row.name }}</span>
+        <input
+          type="number"
+          step="1"
+          inputmode="numeric"
+          class="initiative"
+          [value]="row.initiative"
+          [attr.aria-label]="i18n.t('combat.initiative.of', { name: row.name })"
+          (input)="setInitiative(row.key, initiativeValue($event))"
+        />
+      </li>
+      }
+    </ul>
+  </section>
+
+  <section aria-labelledby="combat-creatures">
+    <h3 id="combat-creatures">{{ i18n.t("combat.initiative.creatures") }}</h3>
+    <ul class="rows">
+      @for (row of creatureRows(); track row.key) {
+      <li [class.unticked]="!row.checked">
+        <label class="name">
+          <input
+            type="checkbox"
+            [checked]="row.checked"
+            (change)="toggle(row.cardId, checkedValue($event))"
+          />
+          <span>{{ row.name }}</span>
+        </label>
+        <button
+          type="button"
+          class="side"
+          [class.ally]="row.side === 'ally'"
+          [disabled]="!row.checked"
+          [attr.aria-label]="i18n.t('combat.side.change', { name: row.name })"
+          [title]="i18n.t('combat.side.change', { name: row.name })"
+          (click)="toggleSide(row.cardId)"
+        >{{ sideLabel(row.side) }}</button>
+        <input
+          type="number"
+          step="1"
+          inputmode="numeric"
+          class="initiative"
+          [value]="row.initiative"
+          [disabled]="!row.checked"
+          [attr.aria-label]="i18n.t('combat.initiative.of', { name: row.name })"
+          (input)="setInitiative(row.key, initiativeValue($event))"
+        />
+      </li>
+      }
+    </ul>
+  </section>
+
+  @if (error()) {
+  <p class="alert" role="alert">{{ error() }}</p>
+  }
+
+  <div class="actions">
+    <button type="submit" class="primary" [disabled]="!canStart()">
+      {{ busy() ? i18n.t("combat.initiative.starting") : i18n.t("combat.initiative.start") }}
+    </button>
+  </div>
+</form>

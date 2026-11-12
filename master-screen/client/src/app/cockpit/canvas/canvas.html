@@ -1,0 +1,489 @@
+<div
+  class="surface"
+  tabindex="0"
+  role="application"
+  [attr.aria-label]="i18n.t('liveAgent.canvas.surface')"
+  [class.dragging]="pointer.dragging()"
+  [style.background-size]="gridSize()"
+  [style.background-position]="gridPosition()"
+  (pointerdown)="onPointerDown($event)"
+  (pointermove)="onPointerMove($event)"
+  (pointerup)="onPointerUp($event)"
+  (pointercancel)="onPointerCancel()"
+  (dblclick)="onBackgroundDblClick($event)"
+  (keydown)="onKey($event)"
+  (dragenter)="onDragEnter($event)"
+  (dragover)="onDragOver($event)"
+  (dragleave)="onDragLeave()"
+  (drop)="onDrop($event)"
+>
+  <div
+    class="world"
+    [class.animating]="animating()"
+    [style.transform]="worldTransform()"
+    [style.--k]="textScale()"
+  >
+    <div class="frames-layer">
+      @for (frame of displayFrames(); track frame.id) {
+      <section
+        class="frame"
+        [attr.data-id]="frame.id"
+        [attr.data-color]="frame.color ?? null"
+        [class.highlighted]="board().highlightId === frame.id"
+        [class.selected]="selection().has(frame.id)"
+        [class.drop-target]="pointer.dropTarget() === frame.id"
+        [class.pulse]="latestIds().has(frame.id)"
+        [style.left.px]="frame.x"
+        [style.top.px]="frame.y"
+        [style.width.px]="frame.w"
+        [style.height.px]="frame.h"
+      >
+        <header
+          class="frame-title"
+          [class.selected]="selection().has(frame.id)"
+          [style.font-size.px]="frameTitleSize(frame)"
+          (dblclick)="startFrameEdit(frame)"
+        >
+          @if (isEditingFrame(frame)) {
+          <input
+            #editor
+            class="frame-title-input"
+            type="text"
+            [attr.aria-label]="i18n.t('liveAgent.canvas.frameTitle')"
+            [value]="frame.title"
+            (blur)="onEditBlur($event)"
+            (keydown)="onEditKey($event)"
+          />
+          } @else {
+          <span [title]="frame.title">{{ frame.title }}</span>
+          }
+        </header>
+        <span class="resize-handle" aria-hidden="true"></span>
+      </section>
+      }
+    </div>
+
+    <svg
+      class="links"
+      aria-hidden="true"
+      [style.left.px]="linksBox().x"
+      [style.top.px]="linksBox().y"
+      [attr.width]="linksBox().w"
+      [attr.height]="linksBox().h"
+    >
+      <defs>
+        <marker
+          [attr.id]="markerId"
+          viewBox="0 0 10 10"
+          refX="10"
+          refY="5"
+          markerUnits="userSpaceOnUse"
+          [attr.markerWidth]="arrowSize()"
+          [attr.markerHeight]="arrowSize()"
+          orient="auto"
+        >
+          <path d="M0,0 L10,5 L0,10 z" />
+        </marker>
+      </defs>
+      <g
+        [attr.transform]="'translate(' + -linksBox().x + ' ' + -linksBox().y + ')'"
+      >
+        @for (line of lines(); track line.id) {
+        <line
+          [class.selected]="selectedLink() === line.id"
+          [attr.x1]="line.x1"
+          [attr.y1]="line.y1"
+          [attr.x2]="line.x2"
+          [attr.y2]="line.y2"
+          [attr.stroke-width]="linkWidth(line.id)"
+          [attr.marker-end]="'url(#' + markerId + ')'"
+        />
+        } @for (line of lines(); track line.id) {
+        <line
+          class="hit"
+          [attr.data-link-id]="line.id"
+          [attr.x1]="line.x1"
+          [attr.y1]="line.y1"
+          [attr.x2]="line.x2"
+          [attr.y2]="line.y2"
+          [attr.stroke-width]="hitWidth()"
+        />
+        } @if (pendingLine(); as p) {
+        <line
+          class="pending"
+          [attr.x1]="p.x1"
+          [attr.y1]="p.y1"
+          [attr.x2]="p.x2"
+          [attr.y2]="p.y2"
+          [attr.stroke-width]="strokeWidth()"
+          [attr.stroke-dasharray]="dashPattern()"
+        />
+        }
+      </g>
+    </svg>
+    @for (line of lines(); track line.id) { @if (line.label) {
+    <span class="link-label" [style.left.px]="line.mx" [style.top.px]="line.my"
+      >{{ line.label }}</span
+    >
+    } }
+
+    <div class="cards-layer">
+      @for (card of displayCards(); track card.id) {
+      <article
+        class="card"
+        [attr.data-id]="card.id"
+        [attr.data-kind]="card.kind"
+        [attr.data-color]="card.color ?? null"
+        [attr.data-detail]="detail()"
+        [class.image-card]="isImageCard(card)"
+        [class.art-card]="isArtCard(card)"
+        [attr.title]="isArtCard(card) ? card.content.title : null"
+        [class.note]="card.kind === 'note'"
+        [class.missing]="card.content.missing"
+        [class.selected]="selection().has(card.id)"
+        [class.highlighted]="board().highlightId === card.id"
+        [class.linking]="pointer.connectFrom() === card.id"
+        [class.pulse]="latestIds().has(card.id)"
+        [style.left.px]="card.x"
+        [style.top.px]="card.y"
+        [style.width.px]="card.w"
+        [style.height.px]="card.h"
+        (dblclick)="activate(card)"
+      >
+        @if (isImageCard(card)) {
+        <img
+          class="card-image"
+          [src]="card.content.image"
+          alt=""
+          loading="lazy"
+          draggable="false"
+        />
+        } @if (card.kind !== "note") {
+        <header class="card-head">
+          <ui-icon
+            class="kind"
+            [name]="kindIcon(card)"
+            [size]="16"
+            [attr.title]="kindLabel(card)"
+          />
+          <span class="card-title" [title]="card.content.title"
+            >{{ card.content.title }}</span
+          >
+          @if (canFight(card)) {
+          <button
+            type="button"
+            class="fight"
+            [attr.title]="i18n.t('combat.fight')"
+            [attr.aria-label]="i18n.t('combat.fight')"
+            (click)="fight(card, $event)"
+            (dblclick)="$event.stopPropagation()"
+          >
+            <ui-icon name="swords" [size]="14" />
+          </button>
+          }
+          @if (card.pinned) {
+          <ui-icon class="pin" name="pin" [size]="14" />
+          } @if (card.content.missing) {
+          <ui-icon
+            class="warn"
+            name="warning"
+            [size]="14"
+            [attr.title]="i18n.t('liveAgent.canvas.sourceMissing')"
+          />
+          } @if (musicOn() && card.kind === "music") {
+          <button
+            type="button"
+            class="play"
+            [attr.title]="i18n.t('liveAgent.canvas.play')"
+            [attr.aria-label]="i18n.t('liveAgent.canvas.play')"
+            (click)="playCard(card, $event)"
+          >
+            <ui-icon name="play" [size]="12" />
+          </button>
+          }
+        </header>
+        } @if (card.kind === "note") { @if (isEditingNote(card)) {
+        <textarea
+          #editor
+          class="note-text note-editor"
+          [attr.aria-label]="i18n.t('liveAgent.canvas.noteText')"
+          [value]="noteText(card)"
+          (blur)="onEditBlur($event)"
+          (keydown)="onEditKey($event)"
+        ></textarea>
+        } @else {
+        <div class="note-text">
+          {{ card.content.summary || card.content.title }}
+        </div>
+        } } @else if (!isImageCard(card) && detail() !== "icon") {
+        <div class="card-body">
+          @if (card.content.image) {
+          <img
+            class="thumb"
+            [src]="card.content.image"
+            alt=""
+            loading="lazy"
+            draggable="false"
+          />
+          } @if (card.content.subtitle) {
+          <p class="subtitle">{{ card.content.subtitle }}</p>
+          } @if (card.content.summary) {
+          <p class="summary">{{ card.content.summary }}</p>
+          } @if (detail() === "full" && card.content.stats?.length) {
+          <ul class="stats">
+            @for (stat of card.content.stats; track $index) {
+            <li>{{ stat.label }}<b>{{ stat.value }}</b></li>
+            }
+          </ul>
+          }
+        </div>
+        }
+        <span class="resize-handle" aria-hidden="true"></span>
+      </article>
+      }
+    </div>
+  </div>
+
+  @if (marqueeBox(); as m) {
+  <div
+    class="marquee"
+    aria-hidden="true"
+    [style.left.px]="m.left"
+    [style.top.px]="m.top"
+    [style.width.px]="m.width"
+    [style.height.px]="m.height"
+  ></div>
+  } @if (isEmpty()) {
+  <div class="empty" role="status">
+    <ui-icon name="board" [size]="34" />
+    <p class="empty-title">{{ i18n.t('liveAgent.canvas.emptyTitle') }}</p>
+    <p class="empty-hint">
+      {{ i18n.t('liveAgent.canvas.emptyHint') }}
+    </p>
+  </div>
+  }
+</div>
+
+@if (fileOver()) {
+<div class="drop-overlay" aria-hidden="true">
+  <ui-icon name="image" [size]="28" />
+  <p>{{ i18n.t('liveAgent.canvas.dropHint') }}</p>
+</div>
+} @if (pointer.connectFrom()) {
+<p class="connect-hint" role="status">
+  {{ i18n.t('liveAgent.canvas.linkHint') }}
+</p>
+} @if (bar(); as bar) {
+<div
+  class="context-bar"
+  role="toolbar"
+  [attr.aria-label]="i18n.t('liveAgent.canvas.selectionActions')"
+  (mousedown)="$event.preventDefault()"
+  [style.left.px]="bar.left"
+  [style.top.px]="bar.top"
+>
+  @if (bar.card; as card) { @if (card.kind !== "note") {
+  <button type="button" [attr.title]="i18n.t('liveAgent.open')" [attr.aria-label]="i18n.t('liveAgent.open')" (click)="openCard(card)">
+    <ui-icon name="external" [size]="16" />
+  </button>
+  } @if (card.content.image) {
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.fullscreenKey')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.fullscreen')"
+    (click)="fullscreenCard(card)"
+  >
+    <ui-icon name="maximize" [size]="16" />
+  </button>
+  } }
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.highlight')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.highlight')"
+    [class.active]="bar.highlighted"
+    [disabled]="bar.multi"
+    (click)="toggleHighlight()"
+  >
+    <ui-icon name="locate" [size]="16" />
+  </button>
+  @if (bar.card; as card) {
+  <button
+    type="button"
+    [title]="card.pinned ? 'Sblocca' : 'Fissa'"
+    [attr.aria-label]="card.pinned ? 'Sblocca' : 'Fissa'"
+    (click)="pinSelection()"
+  >
+    <ui-icon [name]="card.pinned ? 'unpin' : 'pin'" [size]="16" />
+  </button>
+  }
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.color')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.color')"
+    [class.active]="colorOpen()"
+    [attr.aria-expanded]="colorOpen()"
+    (click)="toggleColorPicker()"
+  >
+    <ui-icon name="sparkles" [size]="16" />
+  </button>
+  @if (colorOpen()) {
+  <span class="swatches">
+    @for (color of colors; track color) {
+    <button
+      type="button"
+      class="swatch"
+      [attr.data-color]="color"
+      [title]="colorLabel(color)"
+      [attr.aria-label]="colorLabel(color)"
+      (click)="setColor(color)"
+    ></button>
+    }
+    <button
+      type="button"
+      class="swatch-none"
+      [attr.title]="i18n.t('liveAgent.canvas.noColor')"
+      [attr.aria-label]="i18n.t('liveAgent.canvas.noColor')"
+      (click)="setColor(null)"
+    >
+      {{ i18n.t('liveAgent.canvas.noneText') }}
+    </button>
+  </span>
+  } @if (!bar.multi) {
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.link')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.link')"
+    (click)="connectSelection()"
+  >
+    <ui-icon name="branch" [size]="16" />
+  </button>
+  }
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.delete')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.delete')"
+    (click)="removeSelected()"
+  >
+    <ui-icon name="trash" [size]="16" />
+  </button>
+</div>
+}
+
+<nav class="toolbar" [attr.aria-label]="i18n.t('liveAgent.canvas.tools')">
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.zoomOut')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.zoomOut')"
+    (click)="zoomOut()"
+  >
+    <ui-icon name="minus" [size]="16" />
+  </button>
+  <button
+    type="button"
+    class="zoom-value"
+    [attr.title]="i18n.t('liveAgent.canvas.zoomReset')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.zoomReset')"
+    (click)="resetZoom()"
+  >
+    {{ zoomPercent() }}%
+  </button>
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.zoomIn')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.zoomIn')"
+    (click)="zoomIn()"
+  >
+    <ui-icon name="plus" [size]="16" />
+  </button>
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.fitAll')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.fitAll')"
+    (click)="fitAll()"
+  >
+    <ui-icon name="maximize" [size]="16" />
+  </button>
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.goHighlight')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.goHighlight')"
+    [disabled]="!board().highlightId"
+    (click)="goToHighlight()"
+  >
+    <ui-icon name="locate" [size]="16" />
+  </button>
+  <span class="sep" aria-hidden="true"></span>
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.addSheet')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.addSheet')"
+    (click)="addDocument()"
+  >
+    <ui-icon name="file" [size]="16" />
+  </button>
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.addNote')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.addNote')"
+    (click)="addNote()"
+  >
+    <ui-icon name="message" [size]="16" />
+  </button>
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.arrange')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.arrange')"
+    (click)="arrange()"
+  >
+    <ui-icon name="move" [size]="16" />
+  </button>
+  <button
+    type="button"
+    [attr.title]="i18n.t('liveAgent.canvas.minimap')"
+    [attr.aria-label]="i18n.t('liveAgent.canvas.minimap')"
+    [class.active]="minimapOpen()"
+    [attr.aria-pressed]="minimapOpen()"
+    (click)="minimapOpen.set(!minimapOpen())"
+  >
+    <ui-icon name="layers" [size]="16" />
+  </button>
+</nav>
+
+@if (minimapOpen()) {
+<div
+  class="minimap"
+  role="img"
+  [attr.aria-label]="i18n.t('liveAgent.canvas.minimapAria')"
+  (pointerdown)="minimapDown($event)"
+  (pointermove)="minimapMove($event)"
+  (pointerup)="minimapUp()"
+  (pointercancel)="minimapUp()"
+>
+  @for (frame of miniFrames(); track frame.id) {
+  <span
+    class="mini-item frame"
+    [attr.data-color]="frame.color"
+    [style.left.%]="frame.box.left"
+    [style.top.%]="frame.box.top"
+    [style.width.%]="frame.box.width"
+    [style.height.%]="frame.box.height"
+  ></span>
+  } @for (card of miniCards(); track card.id) {
+  <span
+    class="mini-item"
+    [attr.data-color]="card.color"
+    [style.left.%]="card.box.left"
+    [style.top.%]="card.box.top"
+    [style.width.%]="card.box.width"
+    [style.height.%]="card.box.height"
+  ></span>
+  }
+  <span
+    class="mini-view"
+    [style.left.%]="miniView().left"
+    [style.top.%]="miniView().top"
+    [style.width.%]="miniView().width"
+    [style.height.%]="miniView().height"
+  ></span>
+</div>
+}

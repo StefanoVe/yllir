@@ -3,6 +3,7 @@ import { LoaderCircle, LucideAngularModule, Monitor, Moon, RefreshCw, Sun } from
 import type { ChecksResponse, ModuleId } from '@shared/types';
 import { ApiService, isApiFailure } from '../core/api.service';
 import { PrefsService } from '../core/prefs.service';
+import { BattleMapPrefs } from '../cockpit/combat/battle-maps-pref';
 import { StatusService } from '../core/status.service';
 import { ThemePref, ThemeService } from '../core/theme.service';
 import { I18n, type TranslationKey } from '../i18n';
@@ -63,6 +64,8 @@ export class Settings {
   private readonly prefs = inject(PrefsService);
   private readonly theme = inject(ThemeService);
   private readonly status = inject(StatusService);
+  private readonly battleMaps = inject(BattleMapPrefs);
+  readonly showBattleMaps = this.battleMaps.showMaps;
   readonly i18n = inject(I18n);
 
   readonly icons = { LoaderCircle, Monitor, Moon, RefreshCw, Sun };
@@ -158,6 +161,10 @@ export class Settings {
   /** Plain sentence for one broken link. */
   linkLine(from: string, to: string): string {
     return this.t('settings.linkLine', { from, to });
+  }
+
+  setShowBattleMaps(on: boolean): void {
+    this.battleMaps.set(on);
   }
 
   readonly scaleLabel = computed(() => this.t('settings.textSizeValue', { percent: this.textScale() }));

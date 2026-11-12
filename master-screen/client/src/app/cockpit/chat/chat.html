@@ -1,0 +1,71 @@
+<div class="messages" #messageList (scroll)="scrollChanged(messageList)">
+  @if(api.session();as s){@for(m of s.messages;track m.id){
+  <article
+    class="message"
+    [class.dm]="m.role==='dm'"
+    [class.cancelled]="m.status==='cancelled'"
+  >
+    @if(m.status==='error'){
+    <div class="error-pill">
+      <ui-icon
+        name="warning"
+        [size]="14"
+      />{{s.turns.find(t=>t.id===m.turnId)?.error||m.text}}<button
+        [title]="i18n.t('liveAgent.chat.retry')"
+        [attr.aria-label]="i18n.t('liveAgent.chat.retry')"
+        (click)="retry(m.role==='dm'?m.text:s.messages.find(dm=>dm.role==='dm'&&dm.turnId===m.turnId)?.text||'')"
+      >
+        <ui-icon name="retry" [size]="14" />
+      </button>
+    </div>
+    }@else{
+    <div
+      class="message-body"
+      [innerHTML]="markdown(m.text)"
+      (click)="messageClick($event)"
+    ></div>
+    } @if(m.status==='cancelled'){<small class="muted">{{ i18n.t("liveAgent.chat.cancelled") }}</small>}
+    @if(m.role==='agent'&&m.actions?.length){
+    <button
+      class="actions-summary"
+      [attr.aria-expanded]="expandedActions()===m.id"
+      (click)="expandedActions.set(expandedActions()===m.id?'':m.id)"
+    >
+      <ui-icon name="board" [size]="13" />{{ m.actions!.length === 1 ? i18n.t("liveAgent.chat.changeOne") : i18n.t("liveAgent.chat.changeMany", { n: m.actions!.length }) }}<ui-icon
+        [name]="expandedActions()===m.id?'up':'down'"
+        [size]="13"
+      />
+    </button>
+    @if(expandedActions()===m.id){
+    <div class="action-chips">
+      @for(a of m.actions||[];track $index){<span
+        ><ui-icon
+          [name]="icon(a.type.split('.')[0])"
+          [size]="13"
+        />{{a.label}}</span
+      >}
+    </div>
+    } }
+  </article>
+  }}@if(newCount()){<button
+    class="jump-bottom"
+    [title]="i18n.t('liveAgent.chat.jumpBottom')"
+    [attr.aria-label]="i18n.t('liveAgent.chat.jumpBottomAria', { n: newCount() })"
+    (click)="scrollEnd(messageList)"
+  >
+    <ui-icon name="down" [size]="16" />{{newCount()}}</button
+  >}
+</div>
+@if(api.chatError()){
+<div class="error-pill network-error">
+  <ui-icon name="warning" [size]="14" />{{api.chatError()}}<button
+    [title]="i18n.t('liveAgent.close')"
+    [attr.aria-label]="i18n.t('liveAgent.close')"
+    (click)="api.chatError.set('')"
+  >
+    <ui-icon name="x" [size]="14" />
+  </button>
+</div>
+} @if(api.session()){<cockpit-turn-status
+  class="desktop-turn"
+/><cockpit-composer (send)="send($event)" />}

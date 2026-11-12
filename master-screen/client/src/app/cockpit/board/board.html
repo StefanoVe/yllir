@@ -1,0 +1,172 @@
+@if(session(); as s){
+<header class="board-head">
+  <div class="session-switch">
+    <button
+      class="session-button"
+      [title]="i18n.t('liveAgent.sessionsTitle')"
+      aria-haspopup="dialog"
+      (click)="openSessions.emit()"
+    >
+      <h1>{{s.title}}</h1>
+      <ui-icon name="down" [size]="16" />
+    </button>
+  </div>
+  <div class="head-actions">
+    @if(!api.connected()){<span class="reconnect">{{ i18n.t("liveAgent.reconnecting") }}</span>}
+    <button
+      class="icon-button"
+      [title]="i18n.t('liveAgent.undoTitle', { label: api.lastGroup()?.actions?.map(a=>a.label)?.join(', ') || i18n.t('liveAgent.noAction') })"
+      [attr.aria-label]="i18n.t('liveAgent.undoLast')"
+      [disabled]="!api.lastGroup()"
+      (click)="undo()"
+    >
+      <ui-icon name="undo" [size]="16" />
+    </button>
+  </div>
+</header>
+@if(hasScene(s)){
+<div class="scene">
+  @if(s.state.position.location){<span class="scene-place"
+    ><ui-icon name="place" [size]="15" /><strong
+      >{{s.state.position.location}}</strong
+    ></span
+  >} @if(s.state.position.moment){<span class="scene-moment"
+    >{{s.state.position.moment}}</span
+  >} @if(s.state.position.summary){<span
+    class="scene-summary"
+    [title]="s.state.position.summary"
+    >{{s.state.position.summary}}</span
+  >} @if(s.state.party.length){<span class="party" [title]="i18n.t('liveAgent.party')"
+    ><ui-icon name="users" [size]="14" />{{s.state.party.join(' · ')}}</span
+  >} @if(s.state.position.source;as source){<button
+    class="plot-link"
+    [title]="i18n.t('liveAgent.openPlot')"
+    [attr.aria-label]="i18n.t('liveAgent.openPlot')"
+    (click)="openSource()(source)"
+  >
+    <ui-icon name="route" [size]="14" />{{sourceLabel(source)}}
+  </button>
+  }
+</div>
+}
+<div class="canvas-area">
+  <cockpit-canvas
+    class="canvas"
+    [board]="s.state.board"
+    [latestIds]="latestIds()"
+    [sessionId]="s.id"
+    [musicOn]="musicOn()"
+    (action)="applyMany($event)"
+    (layout)="layout($event)"
+    (open)="openModule($event)"
+    (fullscreen)="openFullscreen($event)"
+    (play)="play($event)"
+    (addDoc)="startAddDoc($event)"
+    (upload)="uploadImage($event)"
+  />
+  <div class="canvas-tools" [class.shifted]="!!panel()">
+    <button
+      class="tool"
+      [class.on]="panel() === 'ledger'"
+      [title]="i18n.t('liveAgent.ledger.title')"
+      [attr.aria-label]="i18n.t('liveAgent.ledger.title')"
+      [attr.aria-pressed]="panel() === 'ledger'"
+      (click)="togglePanel('ledger')"
+    >
+      <ui-icon name="ledger" [size]="18" />
+      @if(activeLedger()){<span class="badge">{{activeLedger()}}</span>}
+    </button>
+    @if(s.state.combat){<button
+      class="tool"
+      [class.on]="panel() === 'combat'"
+      [title]="i18n.t('liveAgent.combat.title')"
+      [attr.aria-label]="i18n.t('liveAgent.combat.title')"
+      [attr.aria-pressed]="panel() === 'combat'"
+      (click)="togglePanel('combat')"
+    >
+      <ui-icon name="swords" [size]="18" /></button
+    >}
+  </div>
+  @if(panel(); as open){
+  <aside
+    class="panel"
+    [attr.aria-label]="open === 'ledger' ? i18n.t('liveAgent.ledger.title') : i18n.t('liveAgent.combat.title')"
+  >
+    <header class="panel-head">
+      <h2>{{open === 'ledger' ? i18n.t('liveAgent.ledger.title') : i18n.t('liveAgent.combat.title')}}</h2>
+      <button
+        class="close"
+        [title]="i18n.t('liveAgent.close')"
+        [attr.aria-label]="i18n.t('liveAgent.close')"
+        (click)="panel.set(null)"
+      >
+        <ui-icon name="x" [size]="16" />
+      </button>
+    </header>
+    <div class="panel-body">
+      @if(open === 'ledger'){
+      <cockpit-ledger [entries]="s.state.ledger" [latestIds]="latestIds()" />
+      } @if(open === 'combat' && s.state.combat; as combat){
+      <cockpit-combat [combat]="combat" (action)="apply($event)" />
+      }
+    </div>
+  </aside>
+  } @if(addAt()){
+  <div class="add-doc" role="dialog" [attr.aria-label]="i18n.t('liveAgent.addSheet')">
+    <div class="add-search">
+      <ui-icon name="search" [size]="16" />
+      <input
+        #addInput
+        type="text"
+        [placeholder]="i18n.t('liveAgent.searchSheet')"
+        [attr.aria-label]="i18n.t('liveAgent.searchSheet')"
+        autocomplete="off"
+        [value]="addQuery()"
+        (input)="setAddQuery($event)"
+        (keydown)="onAddKey($event)"
+      />
+      <button
+        class="close"
+        [title]="i18n.t('liveAgent.close')"
+        [attr.aria-label]="i18n.t('liveAgent.close')"
+        (click)="closeAddDoc()"
+      >
+        <ui-icon name="x" [size]="14" />
+      </button>
+    </div>
+    <ul class="add-results" role="listbox">
+      @for(doc of addResults(); track doc.path; let i = $index){
+      <li role="option" [attr.aria-selected]="i === addIndex()">
+        <button
+          [class.active]="i === addIndex()"
+          [title]="kindLabel(docKind(doc.path))"
+          (mouseenter)="addIndex.set(i)"
+          (click)="chooseDoc(doc)"
+        >
+          <ui-icon [name]="kindIcon(docKind(doc.path))" [size]="15" />
+          <span class="add-title">{{doc.title}}</span>
+          <small>{{doc.path}}</small>
+        </button>
+      </li>
+      } @empty {
+      <li class="add-empty">{{ i18n.t("liveAgent.noSheet") }}</li>
+      }
+    </ul>
+  </div>
+  }
+</div>
+@if(error()){
+<div class="error-pill" role="alert">
+  {{error()}}<button [title]="i18n.t('liveAgent.close')" [attr.aria-label]="i18n.t('liveAgent.close')" (click)="error.set('')">
+    <ui-icon name="x" [size]="14" />
+  </button>
+</div>
+} }@else{
+<div class="board-empty">
+  <h1>{{ i18n.t("liveAgent.emptyTitle") }}</h1>
+  <p>{{ i18n.t("liveAgent.emptyText") }}</p>
+  <button class="primary-button" (click)="openSessions.emit()">
+    <ui-icon name="plus" [size]="16" />{{ i18n.t("liveAgent.openOrCreate") }}
+  </button>
+</div>
+}

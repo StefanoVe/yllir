@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Ctx } from './context.js';
+import { registerBattleRoutes } from './routes/battle.js';
 import { registerChangesRoutes } from './routes/changes.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerDocsRoutes } from './routes/docs.js';
@@ -18,6 +19,8 @@ import { registerPrintRoutes } from './routes/print.js';
 import { encyclopediaEnabledAtStartup } from './encyclopedia/config.js';
 import { musicEnabledAtStartup } from './music/config.js';
 import { securityMiddleware } from './security.js';
+import { createCampaignCockpit } from './cockpit/wiring.js';
+import { webHandlerMiddleware } from './cockpit/http-bridge.js';
 
 // Next to server.mjs in the distribution. In development there is no public folder.
 const PUBLIC_DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), 'public');
@@ -54,6 +57,12 @@ export function createApp(ctx: Ctx): express.Express {
       encyclopedia: encyclopediaEnabledAtStartup(ctx.campaignRoot),
     }),
   );
+  // The cockpit (live table) answers /api/cockpit and /mcp/cockpit. It is mounted before
+  // express.json so its Web handlers read the raw request body, and after the security
+  // middleware, so the Host, Origin and security headers apply to it too.
+  const { cockpit, battle } = createCampaignCockpit(ctx);
+  ctx.onClose(() => cockpit.close());
+  app.use(['/api/cockpit', '/mcp/cockpit'], webHandlerMiddleware((req) => cockpit.handle(req)));
   app.use(express.json({ limit: '64kb' }));
 
   const api = express.Router();
@@ -63,6 +72,7 @@ export function createApp(ctx: Ctx): express.Express {
   registerChangesRoutes(api, ctx);
   registerChatRoutes(api, ctx);
   registerLiveRoutes(api, ctx);
+  registerBattleRoutes(api, battle);
   registerPlotRoutes(api, ctx);
   registerMusicRoutes(api, ctx);
   registerEncyclopediaRoutes(api, ctx);

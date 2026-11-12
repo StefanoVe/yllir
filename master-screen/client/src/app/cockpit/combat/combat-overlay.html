@@ -1,0 +1,72 @@
+@if (svc.open()) {
+<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="combat-overlay-title">
+  <header class="bar">
+    <ui-icon name="swords" [size]="20" />
+    <h2 id="combat-overlay-title">{{ title() }}</h2>
+    @if (combat(); as c) {
+    <span class="round">{{ i18n.t("combat.round", { n: c.round }) }}</span>
+    }
+    <span class="spacer"></span>
+    @if (combat()) {
+    <button
+      type="button"
+      class="icon-button"
+      [attr.title]="i18n.t('combat.end')"
+      [attr.aria-label]="i18n.t('combat.end')"
+      (click)="endCombat()"
+    >
+      <ui-icon name="stop" [size]="18" />
+    </button>
+    }
+    <button
+      type="button"
+      class="icon-button"
+      [attr.title]="i18n.t('combat.close')"
+      [attr.aria-label]="i18n.t('combat.close')"
+      (click)="close()"
+    >
+      <ui-icon name="x" [size]="18" />
+    </button>
+  </header>
+
+  <div class="stage">
+    <main class="body" [class.with-chat]="chatOpen()">
+      @if (error()) {
+      <p class="alert" role="alert">{{ error() }}</p>
+      }
+      @if (combat(); as c) {
+      <cockpit-battle-board
+        [combatants]="c.participants"
+        [battle]="battle()"
+        [showMaps]="prefs.showMaps()"
+        [activeId]="c.activeId"
+        (findMap)="findMap()"
+      />
+      } @else {
+      <cockpit-initiative-step
+        [players]="players()"
+        [cards]="cards()"
+        [clicked]="svc.clicked()"
+      />
+      }
+    </main>
+
+    <aside class="chat-panel" [class.collapsed]="!chatOpen()" [attr.aria-label]="i18n.t('combat.chat.title')">
+      <button
+        type="button"
+        class="chat-toggle"
+        [attr.aria-expanded]="chatOpen()"
+        [attr.title]="chatOpen() ? i18n.t('combat.chat.collapse') : i18n.t('combat.chat.expand')"
+        (click)="chatOpen.set(!chatOpen())"
+      >
+        <ui-icon name="chat" [size]="16" />
+        <span>{{ i18n.t("combat.chat.title") }}</span>
+        <ui-icon [name]="chatOpen() ? 'right' : 'left'" [size]="14" />
+      </button>
+      @if (chatOpen()) {
+      <cockpit-chat class="chat" [openSource]="openSource" />
+      }
+    </aside>
+  </div>
+</div>
+}

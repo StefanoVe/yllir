@@ -13,9 +13,9 @@ import { Router } from '@angular/router';
 import { LucideAngularModule, Maximize, ZoomIn, ZoomOut } from 'lucide-angular';
 import type { PlotNode, PlotResponse } from '@shared/types';
 import { docUrl } from '../core/doc-nav.service';
-import { isPanelFailure } from '../live-panels/panel-http';
-import { PanelStrings } from '../live-panels/strings';
+import { I18n } from '../i18n';
 import { PlotApi } from './plot-api';
+import { isPlotFailure } from './plot-http';
 import {
   type Transform,
   dependencyChain,
@@ -44,7 +44,7 @@ export class PlotMapComponent {
   private readonly router = inject(Router);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
-  readonly s = inject(PanelStrings);
+  readonly s = inject(I18n);
 
   private readonly viewport = viewChild.required<ElementRef<HTMLElement>>('viewport');
 
@@ -118,7 +118,7 @@ export class PlotMapComponent {
       this.data.set(await this.api.load());
       afterNextRender(() => this.fit(), { injector: this.injector });
     } catch (failure) {
-      this.error.set(isPanelFailure(failure) ? failure.error : this.s.text('panels.errors.generic'));
+      this.error.set(isPlotFailure(failure) ? failure.error : this.s.t('panels.errors.generic'));
     } finally {
       this.loading.set(false);
     }
@@ -177,16 +177,16 @@ export class PlotMapComponent {
     const needs = data.edges
       .filter((edge) => edge.kind === 'depends' && edge.to === node.id)
       .map((edge) => titles.get(edge.from) ?? edge.from);
-    return needs.length === 0 ? this.s.text('plot.needsNothing') : this.s.text('plot.needs', { list: needs.join(', ') });
+    return needs.length === 0 ? this.s.t('plot.needsNothing') : this.s.t('plot.needs', { list: needs.join(', ') });
   }
 
   kindText(kind: PlotNode['kind']): string {
-    return this.s.text(kind === 'session' ? 'plot.kind.session' : 'plot.kind.scene');
+    return this.s.t(kind === 'session' ? 'plot.kind.session' : 'plot.kind.scene');
   }
 
   private labelOf(node: PlotNode): string {
     const parts = [node.title, this.kindText(node.kind)];
-    if (node.status) parts.push(this.s.text('plot.status', { status: node.status }));
+    if (node.status) parts.push(this.s.t('plot.status', { status: node.status }));
     return parts.join(' · ');
   }
 

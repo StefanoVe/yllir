@@ -1,0 +1,66 @@
+<section class="combat">
+  <header>
+    <h2>{{combat().title}}</h2>
+    <span>{{ i18n.t("liveAgent.combat.round", { n: combat().round }) }}</span>
+    <div class="spacer"></div>
+    <button
+      class="icon-button"
+      [title]="i18n.t('liveAgent.combat.next')"
+[attr.aria-label]="i18n.t('liveAgent.combat.next')"
+      (click)="next()"
+    >
+      <ui-icon name="right" [size]="16" /></button
+    ><button
+      class="icon-button"
+      [title]="i18n.t('liveAgent.combat.end')"
+[attr.aria-label]="i18n.t('liveAgent.combat.end')"
+      (click)="end()"
+    >
+      <ui-icon name="stop" [size]="16" />
+    </button>
+  </header>
+  <table>
+    <thead>
+      <tr>
+        <th>{{ i18n.t("liveAgent.combat.creature") }}</th>
+        <th class="numeric">{{ i18n.t("liveAgent.combat.initiativeShort") }}</th>
+        <th class="numeric">{{ i18n.t("liveAgent.combat.hpShort") }}</th>
+        @if(hasConditions()){
+        <th class="wide">{{ i18n.t("liveAgent.combat.conditions") }}</th>
+        } @if(hasPhases()){
+        <th class="wide">{{ i18n.t("liveAgent.combat.phase") }}</th>
+        }
+      </tr>
+    </thead>
+    <tbody>
+      @for(p of combat().participants;track p.id){
+      <tr [class.current]="combat().activeId===p.id">
+        <td class="name">
+          {{p.name}}@if(p.conditions.length||p.phase){<span class="row-meta"
+            >@for(c of p.conditions;track c){<span class="condition-chip"
+              >{{c}}</span
+            >}@if(p.phase){<span>{{p.phase}}</span>}</span
+          >}
+        </td>
+        <td class="numeric">{{p.initiative??'—'}}</td>
+        <td class="numeric">
+          @if(p.hp===undefined&&p.maxHp===undefined){<span class="unknown"
+            >—</span
+          >}@else{{{p.hp??'—'}}/{{p.maxHp??'—'}}}@if(p.tempHp){<small>
+            +{{p.tempHp}}</small
+          >}
+        </td>
+        @if(hasConditions()){
+        <td class="wide">
+          @for(c of p.conditions;track c){<span class="condition-chip"
+            >{{c}}</span
+          >}
+        </td>
+        } @if(hasPhases()){
+        <td class="wide">{{p.phase||''}}</td>
+        }
+      </tr>
+      }
+    </tbody>
+  </table>
+</section>

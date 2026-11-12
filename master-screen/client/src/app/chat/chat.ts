@@ -41,7 +41,7 @@ import {
 } from 'lucide-angular';
 import { ApiService, isApiFailure } from '../core/api.service';
 import { LiveService } from '../core/live.service';
-import { LiveStateService } from '../live/live-api.service';
+import { ChatLiveSession } from './chat-live-session';
 import { StatusService } from '../core/status.service';
 import { I18n, type TranslationKey } from '../i18n';
 import {
@@ -114,7 +114,7 @@ export class Chat implements OnInit {
   readonly i18n = inject(I18n);
   private readonly api = inject(ApiService);
   private readonly live = inject(LiveService);
-  private readonly liveState = inject(LiveStateService);
+  private readonly liveSession = inject(ChatLiveSession);
   private readonly statusService = inject(StatusService);
   private readonly router = inject(Router);
   private readonly focus = inject(FocusMessageService);
@@ -148,7 +148,7 @@ export class Chat implements OnInit {
   readonly modelText = MODEL_TEXT;
   readonly effortText = EFFORT_TEXT;
   /** True while a live session is open: the header then links to the live table. */
-  readonly liveOpen = computed(() => this.liveState.session() !== null);
+  readonly liveOpen = computed(() => this.liveSession.open());
   readonly examples = EXAMPLE_KEYS;
 
   private readonly list = viewChild<ElementRef<HTMLElement>>('list');

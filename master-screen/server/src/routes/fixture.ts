@@ -69,6 +69,7 @@ export async function openFixture(yaml: string): Promise<Fixture> {
     },
     async close() {
       await server.close();
+      await ctx.closeAll();
       await fake.cleanup();
       await fs.rm(root, { recursive: true, force: true });
     },

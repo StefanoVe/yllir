@@ -1,0 +1,91 @@
+/* Shared by the cockpit modals. Z-index from the --z-* scale in styles.css: the scrim sits at --z-modal, the dialog one step above it, so the map lightbox, the Spotlight and the image viewer stay on top. */
+.cockpit-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  background: color-mix(in srgb, var(--color-text) 60%, transparent);
+}
+.cockpit-modal {
+  position: fixed;
+  z-index: calc(55 + 1);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  width: min(960px, calc(100vw - 32px));
+  max-height: min(86vh, 980px);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 10px;
+  box-shadow: 0 24px 64px color-mix(in srgb, var(--color-text) 50%, transparent);
+  overflow: hidden;
+}
+.cockpit-modal .modal-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 60px;
+  padding: 10px 12px 10px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+.cockpit-modal .modal-title {
+  flex: 1;
+  min-width: 0;
+}
+.cockpit-modal .modal-title h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cockpit-modal .modal-title p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.cockpit-modal .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+}
+.cockpit-modal .icon-button:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.cockpit-modal .modal-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px 32px 32px;
+}
+.cockpit-modal .modal-error {
+  color: var(--color-danger);
+}
+@media (max-width: 759px) {
+  .cockpit-modal {
+    top: 0;
+    left: 0;
+    transform: none;
+    width: 100vw;
+    max-height: none;
+    height: 100dvh;
+    border-radius: 0;
+  }
+  .cockpit-modal .modal-body {
+    padding: 4px 16px 24px;
+  }
+  .cockpit-modal .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+}

@@ -1,8 +1,14 @@
 import type { TranslationKey } from '../i18n';
+import { liveAgentIt } from './parts/live-agent.it';
+import { liveBoardIt } from './parts/live-board.it';
+import { combatIt } from './parts/combat.it';
 import { chatRichIt } from './parts/chat-rich.it';
 import { chatStepsIt } from './parts/chat-steps.it';
 
 export const it: Record<TranslationKey, string> = {
+  ...liveAgentIt,
+  ...liveBoardIt,
+  ...combatIt,
   ...chatRichIt,
   ...chatStepsIt,
   'nav.home': 'Home',

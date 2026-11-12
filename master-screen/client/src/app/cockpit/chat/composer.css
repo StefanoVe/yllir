@@ -1,0 +1,47 @@
+.composer {
+  padding: 10px 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
+}
+.composer textarea {
+  resize: none;
+  min-height: 38px;
+  max-height: 144px;
+  flex: 1;
+  min-width: 0;
+  background: var(--color-surface);
+  border: 0;
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--color-text);
+  font: inherit;
+  line-height: 1.35;
+  outline: none;
+  overflow: auto;
+}
+.composer textarea:focus-visible {
+  outline: 2px solid var(--color-border);
+}
+.send {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 18px;
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+.send:hover {
+  background: var(--color-text);
+}
+.send:disabled {
+  opacity: 0.35;
+}
+@media (max-width: 759px) {
+  .send {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+}

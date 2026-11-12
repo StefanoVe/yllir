@@ -1,0 +1,55 @@
+<div class="cockpit-scrim" (click)="dismiss()"></div>
+<section
+  class="cockpit-modal document-modal"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-label]="doc()?.title || i18n.t('liveAgent.document')"
+>
+  <header class="modal-head">
+    @if (history().length > 1) {
+    <button
+      class="icon-button"
+      [title]="i18n.t('liveAgent.back')"
+      [attr.aria-label]="i18n.t('liveAgent.backToPrevious')"
+      (click)="back()"
+    >
+      <ui-icon name="left" [size]="17" />
+    </button>
+    }
+    <div class="modal-title">
+      <h2>{{ doc()?.title || i18n.t("liveAgent.loading") }}</h2>
+      @if (doc(); as d) {
+      <p>{{ d.path }}</p>
+      }
+    </div>
+    <button
+      class="icon-button"
+      [title]="i18n.t('liveAgent.openInReader')"
+      [attr.aria-label]="i18n.t('liveAgent.openInReaderAria')"
+      (click)="openInReader()"
+    >
+      <ui-icon name="external" [size]="17" />
+    </button>
+    <button
+      #closeButton
+      class="icon-button"
+      [title]="i18n.t('liveAgent.closeEsc')"
+      [attr.aria-label]="i18n.t('liveAgent.close')"
+      (click)="dismiss()"
+    >
+      <ui-icon name="x" [size]="18" />
+    </button>
+  </header>
+  <div #body class="modal-body document-content" (click)="click($event)">
+    @if (error()) {
+    <p class="modal-error">{{ error() }}</p>
+    } @else if (doc(); as d) {
+    @if (d.masterOnly) {
+    <p class="notice">{{ i18n.t("liveAgent.masterOnlyDoc") }}</p>
+    }
+    <article [class.item-document]="d.path.startsWith('Items/')">
+      <ms-doc-body [blocks]="d.blocks" />
+    </article>
+    }
+  </div>
+</section>

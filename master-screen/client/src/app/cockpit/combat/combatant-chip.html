@@ -1,0 +1,46 @@
+<button
+  type="button"
+  class="token"
+  [attr.data-side]="isPc() ? 'pc' : combatant().kind"
+  [class.active]="active()"
+  [attr.aria-label]="label()"
+  [attr.aria-describedby]="open() ? tooltipId : null"
+  (mouseenter)="show()"
+  (mouseleave)="hide()"
+  (focus)="show()"
+  (blur)="hide()"
+>
+  <span class="initials" aria-hidden="true">{{ initials() }}</span>
+  @if (!isPc() && hp() !== null) {
+  <span class="hp" aria-hidden="true"><span class="hp-fill" [style.width.%]="hp()"></span></span>
+  }
+</button>
+@if (open()) {
+<div class="tooltip" role="tooltip" [id]="tooltipId">
+  <p class="tip-name">{{ combatant().name }}</p>
+  <p class="muted">{{ i18n.t("combat.stats.initiative") }}: {{ combatant().initiative ?? "—" }}</p>
+  @if (!isPc()) { @if (combatant().maxHp !== undefined || combatant().hp !== undefined) {
+  <p class="muted">{{ i18n.t("combat.chip.hp", { hp: combatant().hp ?? "—", max: combatant().maxHp ?? "—" }) }}</p>
+  } @switch (statsState()) { @case ("loading") {
+  <p class="muted">{{ i18n.t("combat.stats.loading") }}</p>
+  } @case ("error") {
+  <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
+  } @case ("ready") { @if (stats(); as s) { @if (s.lines.length) {
+  <dl>
+    @for (line of s.lines; track $index) {
+    <dt>{{ line.label }}</dt>
+    <dd>{{ line.value }}</dd>
+    }
+  </dl>
+  } @if (s.actions.length) {
+  <h4>{{ i18n.t("combat.stats.actions") }}</h4>
+  <ul class="actions">
+    @for (action of s.actions; track $index) {
+    <li><strong>{{ action.name }}</strong> {{ action.text }}</li>
+    }
+  </ul>
+  } @if (!s.lines.length && !s.actions.length) {
+  <p class="muted">{{ i18n.t("combat.stats.none") }}</p>
+  } } } } }
+</div>
+}

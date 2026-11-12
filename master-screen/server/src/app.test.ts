@@ -25,27 +25,28 @@ describe('app and status route', () => {
   let tmp: string;
   let server: RunningServer;
   let shutdownRequested = false;
+  let ctx: ReturnType<typeof createCtx> | undefined;
 
   before(async () => {
     tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'ms-app-'));
     await fs.writeFile(path.join(tmp, 'campaign.yaml'), CAMPAIGN_YAML, 'utf8');
-    server = await startServer((port) =>
-      createApp(
-        createCtx({
-          campaignRoot: tmp,
-          frameworkRoot: REAL_FRAMEWORK,
-          port,
-          log: () => {},
-          requestShutdown: () => {
-            shutdownRequested = true;
-          },
-        }),
-      ),
-    );
+    server = await startServer((port) => {
+      ctx = createCtx({
+        campaignRoot: tmp,
+        frameworkRoot: REAL_FRAMEWORK,
+        port,
+        log: () => {},
+        requestShutdown: () => {
+          shutdownRequested = true;
+        },
+      });
+      return createApp(ctx);
+    });
   });
 
   after(async () => {
     await server.close();
+    await ctx?.closeAll();
     await fs.rm(tmp, { recursive: true, force: true });
   });
 

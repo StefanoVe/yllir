@@ -1,0 +1,174 @@
+:host {
+  display: block;
+}
+
+.board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.find-map {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 40px;
+  padding: var(--space-0-5) var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-1);
+}
+
+.find-map:hover {
+  background: var(--color-surface-2);
+}
+
+.alert {
+  margin: 0;
+  color: var(--color-danger);
+}
+
+.muted {
+  color: var(--color-text-muted);
+}
+
+.hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.map-scroll {
+  overflow: auto;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+}
+
+.map {
+  position: relative;
+  width: 100%;
+  user-select: none;
+  touch-action: none;
+}
+
+.map-image {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+}
+
+.grid {
+  --grid-line: color-mix(in srgb, var(--color-text) 30%, transparent);
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  background-size: calc(100% / var(--cols)) calc(100% / var(--rows));
+}
+
+.placed {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+}
+
+.dragging {
+  visibility: hidden;
+}
+
+.tray {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.tray h3 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.tray-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.ghost {
+  position: fixed;
+  z-index: 70;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 2px solid var(--color-surface);
+  box-shadow: var(--shadow-2);
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.ghost.over {
+  outline: 3px solid var(--color-focus);
+  opacity: 1;
+}
+
+.ghost[data-side="pc"] {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.ghost[data-side="enemy"] {
+  background: var(--color-danger);
+  color: var(--color-danger-contrast);
+}
+
+.ghost[data-side="ally"] {
+  background: color-mix(in srgb, var(--color-accent) 55%, var(--color-surface));
+  color: var(--color-text);
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.list li.active {
+  border-color: var(--color-focus);
+  box-shadow: var(--shadow-1);
+}
+
+.row-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 600;
+}
+
+.row-meta {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}

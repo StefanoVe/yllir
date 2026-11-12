@@ -1,0 +1,147 @@
+import {
+  Component,
+  ElementRef,
+  HostListener,
+  OnInit,
+  ViewEncapsulation,
+  effect,
+  inject,
+  untracked,
+  input,
+  output,
+  signal,
+  viewChild,
+} from "@angular/core";
+import { Router } from "@angular/router";
+import { Icon } from "../support/icon";
+import { DocumentsService } from "../support/documents.service";
+import { ViewerService } from "../support/viewer.service";
+import { OverlayService } from "../support/overlay.service";
+import { DocBody } from "../../reader/doc-body";
+import type { DocResponse } from "@shared/types";
+import type { SourceRef } from "@shared/cockpit-types";
+import { docUrl, parseDocHref } from "../../core/doc-nav.service";
+import { I18n } from "../../i18n";
+
+/**
+ * A campaign document over the cockpit. Links to other documents open inside the
+ * modal (with a back button), so the master never leaves the live table by accident.
+ */
+@Component({
+  selector: "cockpit-document-modal",
+  imports: [Icon, DocBody],
+  templateUrl: "./document-modal.html",
+  styleUrl: "./modal.css",
+  // The document body is rendered by the reader's DocBody, whose styles are global.
+  encapsulation: ViewEncapsulation.None,
+})
+export class DocumentModal implements OnInit {
+  source = input.required<SourceRef>();
+  close = output<void>();
+  readonly i18n = inject(I18n);
+  private documents = inject(DocumentsService);
+  private viewer = inject(ViewerService);
+  private overlay = inject(OverlayService);
+  private router = inject(Router);
+  private body = viewChild<ElementRef<HTMLElement>>("body");
+  private closeButton = viewChild<ElementRef<HTMLButtonElement>>("closeButton");
+  private returnFocus = document.activeElement as HTMLElement | null;
+  doc = signal<DocResponse | null>(null);
+  error = signal("");
+  /** Visited documents inside the modal; the last one is shown. */
+  history = signal<SourceRef[]>([]);
+
+  constructor() {
+    // Follow the source, not the component's lifetime: the modal is reused when the
+    // cockpit opens another document while it is already showing one.
+    effect(() => {
+      const source = this.source();
+      untracked(() => this.load(source, false));
+    });
+  }
+
+  ngOnInit() {
+    setTimeout(() => this.closeButton()?.nativeElement.focus(), 0);
+  }
+
+  private load(source: SourceRef, push: boolean) {
+    this.show(source, push).catch((e: unknown) =>
+      this.error.set(
+        this.i18n.t("liveAgent.docOpenFailed") +
+          " " +
+          (e instanceof Error ? e.message : String(e)),
+      ),
+    );
+  }
+
+  async show(source: SourceRef, push = true) {
+    this.error.set("");
+    this.doc.set(null);
+    try {
+      const doc = await this.documents.detail(source.path);
+      this.doc.set(doc);
+      this.history.update((h) => (push ? [...h, source] : [source]));
+      setTimeout(() => this.scrollToAnchor(source.anchor), 0);
+    } catch {
+      this.error.set(this.i18n.t("liveAgent.docUnavailable") + " " + source.path);
+    }
+  }
+
+  back() {
+    const history = this.history();
+    if (history.length < 2) return;
+    const previous = history[history.length - 2]!;
+    this.history.set(history.slice(0, -2));
+    this.load(previous, true);
+  }
+
+  /** Scrolls the body to the heading of the anchor, or to the top. */
+  private scrollToAnchor(anchor?: string) {
+    const root = this.body()?.nativeElement;
+    if (!root) return;
+    const target = anchor
+      ? root.querySelector<HTMLElement>("[id=" + JSON.stringify(anchor) + "]")
+      : null;
+    root.scrollTop = target
+      ? target.getBoundingClientRect().top -
+        root.getBoundingClientRect().top +
+        root.scrollTop -
+        12
+      : 0;
+  }
+
+  /** Images open in the viewer; links to other documents stay inside this modal. */
+  click(event: MouseEvent) {
+    const el = event.target as HTMLElement;
+    const img = el.closest("img");
+    if (img) {
+      this.viewer.openImage(img.src, img);
+      return;
+    }
+    const link = el.closest("a");
+    if (!link) return;
+    const target = parseDocHref(link.getAttribute("href") || "");
+    if (!target) return;
+    event.preventDefault();
+    this.load({ path: target.path, anchor: target.fragment || undefined }, true);
+  }
+
+  openInReader() {
+    const current = this.history().at(-1) || this.source();
+    this.dismiss();
+    void this.router.navigateByUrl(
+      docUrl(current.path) + (current.anchor ? "#" + encodeURIComponent(current.anchor) : ""),
+    );
+  }
+
+  dismiss() {
+    this.close.emit();
+    this.returnFocus?.focus();
+  }
+
+  /** Esc closes this modal only when no image or PDF is open above it. */
+  @HostListener("document:keydown.escape") escape() {
+    if (this.overlay.top() !== null) return;
+    this.dismiss();
+  }
+}

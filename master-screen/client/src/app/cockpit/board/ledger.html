@@ -1,0 +1,37 @@
+<section class="ledger">
+  <div class="ledger-scroll">
+    @for(group of groups();track group.kind){
+    <div class="ledger-group">
+      <h3>
+        <ui-icon [name]="group.icon" [size]="15" />{{group.label}}
+        <span>{{group.entries.length}}</span>
+      </h3>
+      @for(entry of group.entries;track entry.id){<button
+        class="ledger-entry"
+        [class.expanded]="expanded()===entry.id"
+        [class.marked]="latestIds().has(entry.id)"
+        [class.inactive]="inactive(entry)"
+        (click)="toggle(entry)"
+      >
+        <strong
+          >{{entry.title}}@if(latestIds().has(entry.id)){<i
+            [attr.aria-label]="i18n.t('liveAgent.updated')"
+          ></i
+          >}</strong
+        ><span class="entry-text">{{entry.text}}</span
+        >@if(entry.status==='resolved'){<ui-icon
+          class="entry-state"
+          name="resolved"
+          [size]="14"
+        />}@else if(entry.status==='dropped'){<ui-icon
+          class="entry-state"
+          name="dropped"
+          [size]="14"
+        />}</button
+      >}
+    </div>
+    } @if(!groups().length){
+    <p class="muted">{{ i18n.t("liveAgent.ledger.empty") }}</p>
+    }
+  </div>
+</section>

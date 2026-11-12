@@ -25,7 +25,10 @@ const HEX40 = /^[0-9a-f]{40}$/;
 
 const harnesses: Harness[] = [];
 after(async () => {
-  await Promise.all(harnesses.map((h) => h.server.close()));
+  for (const h of harnesses) {
+    await h.server.close();
+    await h.ctx.closeAll();
+  }
 });
 
 async function setup(opts: { libs?: boolean; lang?: 'en' | 'it'; files?: Record<string, string> } = {}): Promise<Harness> {

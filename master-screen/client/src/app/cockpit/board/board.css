@@ -1,0 +1,425 @@
+:host {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  color: var(--color-text);
+}
+.board-head {
+  height: 72px;
+  min-height: 72px;
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+}
+.session-switch {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+/* The session title is the session picker: one control, readable at a glance. */
+.session-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 4px 8px;
+  margin-left: -8px;
+  border-radius: 6px;
+  color: var(--color-text);
+}
+.session-button:hover {
+  background: var(--color-surface-2);
+}
+.session-button h1 {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.2;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-button ui-icon {
+  color: var(--color-text-muted);
+  flex: none;
+}
+.head-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+  flex-shrink: 0;
+}
+.icon-button {
+  width: 34px;
+  height: 34px;
+  color: var(--color-text-muted);
+  padding: 8px;
+  border-radius: 6px;
+}
+.icon-button:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.icon-button:disabled {
+  opacity: 0.35;
+}
+.reconnect {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-right: 6px;
+}
+.popover {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  z-index: 5;
+  min-width: 190px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text) 35%, transparent);
+  border-radius: 8px;
+  padding: 6px;
+}
+.popover button {
+  width: 100%;
+  justify-content: flex-start;
+  min-height: 36px;
+  text-align: left;
+  font-size: 13px;
+}
+.popover small {
+  margin-left: auto;
+  color: var(--color-text-muted);
+}
+/* Scene bar: one compact line above the canvas. */
+.scene {
+  display: flex;
+  align-items: center;
+  gap: 6px 14px;
+  min-width: 0;
+  margin: 0 20px 10px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+.scene-place {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  color: var(--color-text);
+}
+.scene-place strong {
+  font-weight: 600;
+}
+.scene-moment {
+  flex: none;
+  color: var(--color-text);
+}
+.scene-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.party,
+.plot-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.plot-link {
+  padding: 2px 0;
+  color: var(--color-accent);
+  text-align: left;
+}
+.plot-link:hover {
+  text-decoration: underline;
+}
+
+/* The canvas takes the rest of the pane. */
+.canvas-area {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+cockpit-canvas {
+  flex: 1;
+  min-height: 0;
+  display: block;
+}
+
+/* Floating panel toggles, top-right over the canvas. */
+.canvas-tools {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
+  display: flex;
+  gap: 6px;
+  transition: right 0.18s ease-out;
+}
+.canvas-tools.shifted {
+  right: calc(min(380px, 90%) + 12px);
+}
+.tool {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-text) 35%, transparent);
+}
+.tool:hover {
+  color: var(--color-text);
+  background: var(--color-surface-2);
+}
+.tool.on {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+.badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: var(--color-bg);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 17px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Side panel sliding over the canvas from the right. */
+.panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  width: min(380px, 90%);
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -8px 0 24px color-mix(in srgb, var(--color-text) 35%, transparent);
+  animation: panel-in 0.18s ease-out;
+}
+@keyframes panel-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 56px;
+  padding: 0 12px 0 16px;
+  flex: none;
+}
+.panel-head h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.panel-head .close {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+}
+.panel-head .close:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 16px 24px;
+}
+
+/* Document search, centred over the canvas. */
+.add-doc {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  width: min(440px, calc(100% - 32px));
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text) 35%, transparent);
+  overflow: hidden;
+}
+.add-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  color: var(--color-text-muted);
+}
+.add-search input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+}
+.add-search .close {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+}
+.add-search .close:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.add-results {
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: min(360px, 50vh);
+  overflow: auto;
+}
+.add-results button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  text-align: left;
+  color: var(--color-text);
+  font-size: 13px;
+}
+.add-results button.active {
+  background: var(--color-surface-2);
+}
+.add-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.add-results small {
+  margin-left: auto;
+  padding-left: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.add-empty {
+  padding: 10px 8px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.error-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface));
+  color: var(--color-danger);
+  border-radius: 6px;
+  font-size: 12px;
+  margin: 8px 20px;
+}
+.error-pill button {
+  margin-left: auto;
+  color: var(--color-danger);
+}
+@media (max-width: 1099px) {
+  .board-head {
+    padding-inline: 14px;
+  }
+  .scene {
+    margin-inline: 14px;
+  }
+}
+@media (max-width: 759px) {
+  .board-head {
+    height: auto;
+    min-height: 66px;
+    padding: 12px;
+  }
+  .session-button h1 {
+    font-size: 18px;
+  }
+  .scene {
+    margin-inline: 12px;
+  }
+  .board-head .icon-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .tool {
+    width: 44px;
+    height: 44px;
+  }
+}
+/* No session open: one clear way in. */
+.board-empty {
+  margin: auto;
+  max-width: 420px;
+  padding: 32px 20px;
+  text-align: center;
+}
+.board-empty h1 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+}
+.board-empty p {
+  margin: 0 0 20px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+.board-empty .primary-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-weight: 600;
+}

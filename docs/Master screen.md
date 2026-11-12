@@ -1,6 +1,6 @@
 # Master screen
 
-**Stato:** Bozza di progetto. Fasi 1, 2 e musica (fase 3) implementate (2026-11-12): sorgente in `master-screen/`, pacchetto pubblicato come release di GitHub dalla CI e scaricato dal launcher; chat, modifiche con annullamento, lettura e ricerca, tavolo live (tela, registro, scontri), mappa della trama, player musicale, enciclopedia locale (generazione e anteprima, senza pubblicazione) e stampa (fogli PDF con QR, stato di stampa, carte con Photoshop o renderer Node).
+**Stato:** Bozza di progetto. Fasi 1, 2 e musica (fase 3) implementate (2026-11-12): sorgente in `master-screen/`, pacchetto pubblicato come release di GitHub dalla CI e scaricato dal launcher; chat, modifiche con annullamento, lettura e ricerca, tavolo live (il cockpit importato dal prototipo: tavola, registro, scontri con mappa di battaglia), mappa della trama, player musicale, enciclopedia locale (generazione e anteprima, senza pubblicazione) e stampa (fogli PDF con QR, stato di stampa, carte con Photoshop o renderer Node).
 
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
 Allineato alla [Riprogettazione](Riprogettazione.md) (2026-11-11) e alle decisioni dell'autore del 2026-11-12.
@@ -25,6 +25,12 @@ Questo documento descrive il master screen: la parte del framework che il master
 - **Node.js (Deciso, 2026-11-12).** Il launcher controlla che Node.js, versione minima 20, sia nel PATH o in `~/.yllir/node`. Se manca, lo scarica da nodejs.org in `~/.yllir/node`: versione LTS fissata, checksum SHA256 verificato, nessun permesso di amministratore, nessun installer. Il master non installa nulla a mano.
 - **Agente (Deciso, 2026-11-12).** Il server parla con Claude tramite Claude Agent SDK. Un server MCP locale espone solo gli strumenti del framework, con un token valido per il solo turno; nessuna shell libera. Vedi [Architettura proposta](#architettura-proposta), componente 2.
 - **Prototipo (Deciso, 2026-11-12).** Esiste un prototipo dell'autore, fuori dal repository. Ne va portata solo la parte di sessione live; il resto si riprogetta secondo questo documento.
+- **Cockpit del tavolo live (Deciso, 2026-11-12).** L'autore ha deciso di importare il cockpit del prototipo e di adattarne il tema. È il punto di partenza del tavolo live, con tre adattamenti:
+  - registro e scontri passano dalle librerie del framework (`session-log` e `combat-tracker`), così restano leggibili dal terminale e dall'app di Claude anche senza il master screen;
+  - le schede create al tavolo si salvano tramite l'engine, con controllo e revisione prima del salvataggio, come ogni altra scheda;
+  - il tema segue quello del master screen.
+- **Annullamento e chat del tavolo (Deciso, 2026-11-12).** L'annullamento dei gruppi di azioni dell'agente riguarda solo la tavola e la posizione: registro e scontri si correggono parlando con l'agente. Per ogni sessione live c'è una sola conversazione con l'agente.
+- **Personaggi giocanti nello scontro (Deciso, 2026-11-12).** Nello scontro i personaggi giocanti hanno solo nome, iniziativa e posizione. Le loro statistiche non entrano nel master screen.
 - **Fasi e sessione live (Deciso, 2026-11-12).** Le fasi di rilascio restano. Si parte dalla fase 1: chat, pannello «cosa è cambiato», «torna a com'era», ricerca e lettura con marcatura pubblico/master, impostazioni essenziali. La sessione live (tela, registro, combattimento, musica) viene dopo. Combattimento e musica sono skill di libreria non ancora realizzate ([L12 Scontri](Skill%20di%20libreria.md#l12-scontri), [L13 Ricerca musicale](Skill%20di%20libreria.md#l13-ricerca-musicale)): il master screen ne è solo una vista.
 - **Piattaforme (Deciso, 2026-11-12).** Il master screen gira su macOS e Windows. Linux non è un obiettivo della fase 1 (il launcher ha i file per Linux ma non è provato).
 - **Approvazione delle modifiche (Deciso, 2026-11-12).** Il master non approva le modifiche prima: compaiono subito nel pannello «cosa è cambiato» e si annullano dopo con «torna a com'era». Nessuna approvazione preventiva, nemmeno per i file del canone.
@@ -39,7 +45,7 @@ Gli strumenti della sessione live non vivono dentro il master screen: sono funzi
 | Strumento | Funzione di libreria | Cosa resta allo schermo |
 |---|---|---|
 | Registro della partita | [Registro di sessione](Skill%20di%20libreria.md#l18-registro-di-sessione) | Mostrare il registro e i fili aperti |
-| Combattimento | [Scontri](Skill%20di%20libreria.md#l12-scontri) | Pannello di iniziativa e risorse |
+| Combattimento | [Scontri](Skill%20di%20libreria.md#l12-scontri) | Schermata dello scontro: iniziativa, campo di battaglia, pedine e chat |
 | Musica | Modulo musica e [ricerca musicale](Skill%20di%20libreria.md#l13-ricerca-musicale) | Player e controlli |
 | Consultazione rapida | [Ricerca nel canone](Skill%20di%20libreria.md#l4-ricerca-nel-canone) e viste compatte della [gestione dei PNG](Skill%20di%20libreria.md#l14-gestione-dei-png) | Pannello laterale |
 | Tela libera | Nessuna: è solo interfaccia | Tutta |
@@ -87,9 +93,11 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 
 ### Sessione live e scontri
 
-- Il registro di sessione mostra ciò che è accaduto, le decisioni, le intenzioni e i fili aperti. Le sue regole sono in [Registro di sessione](Skill%20di%20libreria.md#l18-registro-di-sessione).
-- La **tela libera** è una superficie con schede (documenti, mappe, immagini, note), cornici per scena e frecce per le diramazioni. Il master sposta e ridimensiona gli elementi liberamente; la disposizione si salva senza entrare nell'annullamento.
-- Il pannello di **combattimento** mostra iniziativa, risorse e note. Le regole sono in [Scontri](Skill%20di%20libreria.md#l12-scontri) e nell'adattatore del sistema di gioco (vedi `Sistemi di gioco e stili.md`). Il pannello si apre da solo quando inizia uno scontro.
+- Il registro di sessione mostra ciò che è accaduto, le decisioni, le intenzioni e i fili aperti. Le sue regole sono in [Registro di sessione](Skill%20di%20libreria.md#l18-registro-di-sessione). Lo tiene la libreria del framework: il master lo corregge parlando con l'agente.
+- La **tela libera** è una superficie con schede (documenti, mappe, immagini, note), cornici per scena e frecce per le diramazioni. L'agente dispone ciò che entra in scena; il master sposta e ridimensiona gli elementi liberamente, e la disposizione si salva senza entrare nell'annullamento.
+- Le schede create al tavolo (un PNG o un luogo improvvisato) passano dallo stesso ciclo di scrittura delle altre modifiche: controllo, revisione e salvataggio. Compaiono in «cosa è cambiato» e si possono annullare da lì.
+- Lo **scontro** si apre dal pulsante con le spade sulla scheda di un PNG o di un nemico. A tutto schermo ha due passi. Il primo è l'iniziativa: i personaggi giocanti, i PNG e i nemici presenti sulla tela, ciascuno alleato o nemico. Il secondo è il campo di battaglia: se c'è una mappa di battaglia e la preferenza «mostra mappe di battaglia» è attiva, le pedine si trascinano sulla mappa; altrimenti i combattenti appaiono in elenco, in ordine di iniziativa. Passando sopra una pedina si vede un riepilogo delle statistiche, ricavato dalla parte pubblica della scheda secondo le regole del sistema di gioco. Accanto ai combattenti una chat raccoglie ciò che il master dice sullo scontro.
+- Le regole dello scontro sono in [Scontri](Skill%20di%20libreria.md#l12-scontri) e nell'adattatore del sistema di gioco (vedi `Sistemi di gioco e stili.md`). Lo scontro si apre da solo quando inizia mentre il tavolo è a schermo, e resta chiuso quando il master lo chiude.
 
 ### Musica
 

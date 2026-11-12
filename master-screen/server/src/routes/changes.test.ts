@@ -21,6 +21,7 @@ interface Harness {
   port: number;
   events: Published[];
   server: RunningServer;
+  close(): Promise<void>;
 }
 
 /** Starts the real app on a free port over a repo. Bus events are recorded instead of streamed. */
@@ -36,7 +37,7 @@ async function harness(repo: TestRepo): Promise<Harness> {
     };
     return createApp(ctx);
   });
-  return { repo, port: server.port, events, server };
+  return { repo, port: server.port, events, server, close: async () => { await server.close(); await ctx?.closeAll(); } };
 }
 
 function get(h: Harness, route: string) {
@@ -75,7 +76,7 @@ describe('changes routes', () => {
   let open: Harness | undefined;
 
   afterEach(async () => {
-    await open?.server.close();
+    await open?.close();
     open?.repo.cleanup();
     open = undefined;
   });

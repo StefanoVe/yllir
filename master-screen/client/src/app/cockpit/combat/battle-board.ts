@@ -1,0 +1,171 @@
+import {
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+  viewChild,
+} from "@angular/core";
+import type { BattleView } from "@shared/types";
+import type { Combatant } from "@shared/cockpit-types";
+import { Icon } from "../support/icon";
+import { DocumentsService } from "../support/documents.service";
+import { I18n } from "../../i18n";
+import { CombatantChip } from "./combatant-chip";
+import {
+  type Cell,
+  byInitiative,
+  cellAt,
+  gridOf,
+  initials,
+  percentAt,
+  stepCell,
+} from "./combat-model";
+import { BattleApi } from "./battle-api";
+
+interface Drag {
+  id: string;
+  cx: number;
+  cy: number;
+  cell: Cell | null;
+}
+
+/**
+ * The battle view: the battle map with a grid and draggable chips, or the combatants in
+ * initiative order when there is no map or the preference is off. Chips move by drag and
+ * drop or with the arrow keys (grid only); every move is saved with PUT /api/battle.
+ */
+@Component({
+  selector: "cockpit-battle-board",
+  imports: [Icon, CombatantChip],
+  templateUrl: "./battle-board.html",
+  styleUrl: "./battle-board.css",
+})
+export class BattleBoard {
+  readonly i18n = inject(I18n);
+  private readonly api = inject(BattleApi);
+  private readonly documents = inject(DocumentsService);
+  combatants = input.required<Combatant[]>();
+  battle = input<BattleView | null>(null);
+  showMaps = input(true);
+  activeId = input<string | null>(null);
+  findMap = output<void>();
+  readonly positions = signal<Record<string, Cell>>({});
+  readonly moveError = signal("");
+  readonly drag = signal<Drag | null>(null);
+  private readonly mapFrame = viewChild<ElementRef<HTMLElement>>("mapFrame");
+
+  readonly hasMap = computed(() => !!this.battle()?.map?.ref && this.showMaps());
+  readonly grid = computed(() => gridOf(this.battle()?.map));
+  readonly mapUrl = computed(() => {
+    const ref = this.battle()?.map?.ref;
+    return ref ? this.documents.asset(ref) : "";
+  });
+  readonly placed = computed(() =>
+    this.combatants().filter((c) => this.positions()[c.id]),
+  );
+  readonly tray = computed(() =>
+    this.combatants().filter((c) => !this.positions()[c.id]),
+  );
+  readonly ordered = computed(() => byInitiative(this.combatants()));
+  readonly dragged = computed(() => {
+    const d = this.drag();
+    return d ? this.combatants().find((c) => c.id === d.id) ?? null : null;
+  });
+
+  constructor() {
+    // The server's positions replace the local copy whenever a new battle view arrives.
+    effect(() => {
+      const battle = this.battle();
+      untracked(() => this.positions.set({ ...(battle?.positions ?? {}) }));
+    });
+  }
+
+  percent(cell: Cell) {
+    return percentAt(cell, this.grid());
+  }
+
+  sideOf(c: Combatant): string {
+    return c.kind;
+  }
+
+  ghostInitials(c: Combatant): string {
+    return initials(c.name);
+  }
+
+  pointerDown(event: PointerEvent, c: Combatant): void {
+    if (!this.hasMap() || event.button !== 0) return;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    event.preventDefault();
+    this.drag.set({
+      id: c.id,
+      cx: event.clientX,
+      cy: event.clientY,
+      cell: this.cellFor(event.clientX, event.clientY),
+    });
+  }
+
+  pointerMove(event: PointerEvent): void {
+    const d = this.drag();
+    if (!d) return;
+    this.drag.set({
+      ...d,
+      cx: event.clientX,
+      cy: event.clientY,
+      cell: this.cellFor(event.clientX, event.clientY),
+    });
+  }
+
+  pointerUp(): void {
+    const d = this.drag();
+    this.drag.set(null);
+    if (d?.cell) void this.place(d.id, d.cell);
+  }
+
+  pointerCancel(): void {
+    this.drag.set(null);
+  }
+
+  key(event: KeyboardEvent, c: Combatant): void {
+    const current = this.positions()[c.id];
+    if (!current) return;
+    const next = stepCell(current, event.key, this.grid());
+    if (!next) return;
+    event.preventDefault();
+    void this.place(c.id, next);
+  }
+
+  /** Saves one move. The chip moves at once and goes back when the server refuses. */
+  async place(id: string, cell: Cell): Promise<void> {
+    const previous = this.positions()[id];
+    if (previous && previous.x === cell.x && previous.y === cell.y) return;
+    this.positions.update((all) => ({ ...all, [id]: cell }));
+    this.moveError.set("");
+    try {
+      await this.api.place(id, cell);
+    } catch {
+      this.positions.update((all) => {
+        const next = { ...all };
+        if (previous) next[id] = previous;
+        else delete next[id];
+        return next;
+      });
+      this.moveError.set(this.i18n.t("combat.error.move"));
+    }
+  }
+
+  private cellFor(clientX: number, clientY: number): Cell | null {
+    const el = this.mapFrame()?.nativeElement;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+    const fx = (clientX - rect.left) / rect.width;
+    const fy = (clientY - rect.top) / rect.height;
+    if (fx < 0 || fx > 1 || fy < 0 || fy > 1) return null;
+    return cellAt(fx, fy, this.grid());
+  }
+}

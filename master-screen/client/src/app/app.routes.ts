@@ -25,7 +25,7 @@ export const routes: Routes = [
   },
   {
     path: 'live',
-    loadComponent: () => import('./live/live').then((m) => m.LiveComponent),
+    loadComponent: () => import('./cockpit/cockpit').then((m) => m.Cockpit),
   },
   {
     path: 'plot',

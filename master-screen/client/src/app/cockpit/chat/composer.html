@@ -1,0 +1,19 @@
+<form class="composer" (submit)="$event.preventDefault();submit()">
+  <textarea
+    [ngModel]="draft()"
+    (ngModelChange)="draft.set($event)"
+    name="draft"
+    rows="1"
+    [placeholder]="i18n.t('liveAgent.composer.placeholder')"
+    (keydown)="key($event)"
+    (input)="resize($any($event.target))"
+  ></textarea
+  ><button
+    class="send"
+    [title]="i18n.t('liveAgent.composer.send')"
+    [attr.aria-label]="i18n.t('liveAgent.composer.send')"
+    [disabled]="!draft().trim()"
+  >
+    <ui-icon name="send" [size]="16" />
+  </button>
+</form>

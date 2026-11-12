@@ -259,3 +259,17 @@ summary {
   .spin { animation: none; }
   .card, .icon-btn { transition: none; }
 }
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 40px;
+  font-weight: 600;
+}
+
+.toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}

@@ -6,7 +6,10 @@ import { MUSIC_OFF_YAML, MUSIC_ON_YAML, musicCampaign, oldFramework, REAL_FRAMEW
 
 const harnesses: Harness[] = [];
 after(async () => {
-  await Promise.all(harnesses.map((h) => h.server.close()));
+  for (const h of harnesses) {
+    await h.server.close();
+    await h.ctx.closeAll();
+  }
 });
 
 async function start(yaml: string, framework: string = REAL_FRAMEWORK): Promise<Harness> {

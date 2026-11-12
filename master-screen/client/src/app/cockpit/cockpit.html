@@ -1,0 +1,59 @@
+<div
+  class="cockpit"
+  [class.chat-only]="mobile() === 'chat'"
+  [style.--chat-width]="chatWidth() + 'px'"
+>
+  <nav class="pane-tabs" [attr.aria-label]="i18n.t('liveAgent.views')">
+    <button
+      [class.selected]="mobile() === 'board'"
+      [attr.aria-pressed]="mobile() === 'board'"
+      (click)="mobile.set('board')"
+    >
+      <ui-icon name="board" [size]="17" />{{ i18n.t("liveAgent.board") }}
+    </button>
+    <button
+      [class.selected]="mobile() === 'chat'"
+      [attr.aria-pressed]="mobile() === 'chat'"
+      (click)="showChat()"
+    >
+      <ui-icon name="chat" [size]="17" />{{ i18n.t("liveAgent.chat") }}
+      @if (active() || unread()) {
+      <i [attr.aria-label]="i18n.t('liveAgent.newInChat')"></i>
+      }
+    </button>
+  </nav>
+  <cockpit-turn-status class="pane-turn" />
+  @if (loadError()) {
+  <p class="load-error" role="alert">{{ loadError() }}</p>
+  }
+  <cockpit-board
+    class="board-pane"
+    [openSource]="openSource"
+    (openSessions)="openSessions()"
+  />
+  <div
+    class="splitter"
+    role="separator"
+    [attr.aria-label]="i18n.t('liveAgent.resizeChat')"
+    tabindex="0"
+    aria-orientation="vertical"
+    (pointerdown)="beginDrag($event)"
+    (pointermove)="moveDrag($event)"
+    (keydown)="dragKey($event)"
+  ></div>
+  <cockpit-chat
+    class="chat-pane"
+    [openSource]="openSource"
+    (messagesArrived)="arrived($event)"
+  />
+</div>
+@switch (api.modal()?.kind) { @case ("document") {
+<cockpit-document-modal
+  [source]="$any(api.modal()).source"
+  (close)="api.modal.set(null)"
+/>
+} @case ("sessions") {
+<cockpit-session-modal (close)="api.modal.set(null)" />
+} }
+<cockpit-viewer />
+<cockpit-combat-overlay />

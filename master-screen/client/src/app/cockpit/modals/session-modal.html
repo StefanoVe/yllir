@@ -1,0 +1,73 @@
+<div class="cockpit-scrim" (click)="dismiss()"></div>
+<section
+  class="cockpit-modal session-modal"
+  role="dialog"
+  aria-modal="true"
+  [attr.aria-label]="i18n.t('liveAgent.sessionTitle')"
+>
+  <header class="modal-head">
+    <div class="modal-title"><h2>{{ i18n.t("liveAgent.sessionTitle") }}</h2></div>
+    <button
+      class="icon-button"
+      [title]="i18n.t('liveAgent.closeEsc')"
+      [attr.aria-label]="i18n.t('liveAgent.close')"
+      (click)="dismiss()"
+    >
+      <ui-icon name="x" [size]="18" />
+    </button>
+  </header>
+  <form class="session-create" (submit)="$event.preventDefault(); create()">
+    <input
+      #titleInput
+      name="title"
+      [(ngModel)]="title"
+      [placeholder]="i18n.t('liveAgent.newSessionTitle')"
+      [attr.aria-label]="i18n.t('liveAgent.newSessionTitle')"
+      autocomplete="off"
+      (keydown.enter)="$event.preventDefault(); create()"
+    />
+    <button
+      class="primary-button"
+      type="submit"
+      [disabled]="!title.trim() || busy()"
+    >
+      <ui-icon name="plus" [size]="16" />{{ i18n.t("liveAgent.create") }}
+    </button>
+  </form>
+  @if (error()) {
+  <p class="modal-error session-error">{{ error() }}</p>
+  }
+  <ul class="session-list">
+    @for (item of api.sessions(); track item.id) {
+    <li [class.current]="item.id === api.session()?.id">
+      <button class="session-open" (click)="open(item.id)">
+        <strong>{{ item.title }}</strong>
+        <span>{{ item.location || i18n.t("liveAgent.noLocation") }}</span>
+      </button>
+      <small>{{ updated(item.updatedAt) }}</small>
+      <button
+        class="icon-button"
+        [class.danger]="confirmDelete() === item.id"
+        [title]="
+            confirmDelete() === item.id
+              ? i18n.t('liveAgent.deleteAgain')
+              : i18n.t('liveAgent.deleteSession')
+          "
+        [attr.aria-label]="
+            confirmDelete() === item.id
+              ? i18n.t('liveAgent.confirmDelete', { title: item.title })
+              : i18n.t('liveAgent.deleteNamed', { title: item.title })
+          "
+        (click)="remove(item.id)"
+      >
+        <ui-icon
+          [name]="confirmDelete() === item.id ? 'check' : 'trash'"
+          [size]="16"
+        />
+      </button>
+    </li>
+    } @empty {
+    <li class="session-empty">{{ i18n.t("liveAgent.noSessions") }}</li>
+    }
+  </ul>
+</section>
