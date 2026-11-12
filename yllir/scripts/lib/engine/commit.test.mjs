@@ -625,6 +625,88 @@ test('a batch with an image-only draft and an image source needs no review', asy
   assert.equal(check.reviewRequired, false);
 });
 
+/** A generated battle-map section, as the map script writes it between two marker lines. */
+const MAP_SECTION = [
+  '<!-- yllir:map -->',
+  '## Mappa',
+  '',
+  '![alt](img/x-map-grid.png)',
+  '',
+  '[Senza griglia](img/x-map.png) · [Anteprima navigabile](img/x-map-preview.html)',
+  '<!-- /yllir:map -->',
+];
+
+/** Inserts lines under the title line of the fixture document, as the map script places a section. */
+function withLinesUnderTitle(text, lines) {
+  const all = text.split('\n');
+  const at = all.findIndex((line) => line.startsWith('# '));
+  assert.ok(at >= 0, 'the fixture document has a title line');
+  all.splice(at + 1, 0, '', ...lines);
+  return all.join('\n');
+}
+
+/** Writes the files that the map section links to, so the links in a draft have targets. */
+function writeMapFiles(dir, folder) {
+  writeImage(dir, `${folder}/img/x-map-grid.png`);
+  writeImage(dir, `${folder}/img/x-map.png`);
+  fs.writeFileSync(path.join(dir, folder, 'img/x-map-preview.html'), '<!doctype html><title>map</title>\n');
+}
+
+test('a batch that only adds a marked map section needs no review', async (t) => {
+  const dir = makeCampaign(t);
+  const rel = 'Cronaca/2026-10-03.md';
+  writeMapFiles(dir, 'Cronaca');
+  writeDraft(dir, rel, withLinesUnderTitle(readAt(dir, rel), MAP_SECTION));
+  const check = await checkBatch(dir, { files: [rel] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, false);
+});
+
+test('a batch that replaces a marked map section with another one needs no review', async (t) => {
+  const dir = makeCampaign(t);
+  const rel = 'Cronaca/2026-10-03.md';
+  writeMapFiles(dir, 'Cronaca');
+  writeDraft(dir, rel, withLinesUnderTitle(readAt(dir, rel), MAP_SECTION));
+  const first = await checkBatch(dir, { files: [rel] });
+  assert.equal(first.ok, true, JSON.stringify(first.errors));
+  const committed = await commitBatch(dir, { files: [rel], message: 'Add the map' });
+  assert.equal(committed.ok, true, JSON.stringify(committed.errors));
+  const finalPath = committed.finalFiles[0];
+
+  const replaced = MAP_SECTION.map((line) => line.replace('## Mappa', '## Mappa del molo'));
+  const onDisk = readAt(dir, finalPath);
+  const open = onDisk.split('\n').findIndex((line) => line.trim() === '<!-- yllir:map -->');
+  const close = onDisk.split('\n').findIndex((line) => line.trim() === '<!-- /yllir:map -->');
+  assert.ok(open >= 0 && close > open, 'the saved document keeps the map section');
+  const lines = onDisk.split('\n');
+  lines.splice(open, close - open + 1, ...replaced);
+  writeDraft(dir, finalPath, lines.join('\n'));
+  const check = await checkBatch(dir, { files: [finalPath] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, false);
+});
+
+test('a batch that adds a marked map section and changes one word of prose needs review', async (t) => {
+  const dir = makeCampaign(t);
+  const rel = 'Cronaca/2026-10-03.md';
+  writeMapFiles(dir, 'Cronaca');
+  const withMap = withLinesUnderTitle(readAt(dir, rel), MAP_SECTION);
+  writeDraft(dir, rel, withMap.replace('La mattina del terzo giorno', 'La mattina presto del terzo giorno'));
+  assert.notEqual(withMap.replace('La mattina del terzo giorno', 'La mattina presto del terzo giorno'), withMap);
+  const check = await checkBatch(dir, { files: [rel] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, true);
+});
+
+test('an unclosed map marker plus added text needs review', async (t) => {
+  const dir = makeCampaign(t);
+  const rel = 'Cronaca/2026-10-03.md';
+  writeDraft(dir, rel, withLinesUnderTitle(readAt(dir, rel), ['<!-- yllir:map -->', 'Una frase nuova.']));
+  const check = await checkBatch(dir, { files: [rel] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, true);
+});
+
 test('a relative symlink to a folder outside the campaign passes check and survives commit', async (t) => {
   const parent = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-ext-'));
   t.after(() => fs.rmSync(parent, { recursive: true, force: true }));

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Probes the image services and stores the result in the campaign's probe table.
-// Usage: node image-probe.mjs <campaignRoot> --photoshop yes|no [--comfyui-url <url>] [--mcp-tools "<a,b>"]
+// Usage: node image-probe.mjs <campaignRoot> --photoshop yes|no [--comfyui-url <url>] [--mcp-tools "<a,b>"] [--data-dir <path>]
 // Exit codes: 0 probe written, 2 usage error.
 
 import path from 'node:path';
@@ -10,17 +10,18 @@ import { loadAllProviders, ORDER } from './lib/providers.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE =
-  'usage: node image-probe.mjs <campaignRoot> --photoshop yes|no [--comfyui-url <url>] [--mcp-tools "<a,b>"]';
+  'usage: node image-probe.mjs <campaignRoot> --photoshop yes|no [--comfyui-url <url>] [--mcp-tools "<a,b>"] [--data-dir <path>]';
 
 function parseArgs(argv) {
-  const opts = { root: null, photoshop: null, comfyuiUrl: null, mcpTools: [] };
+  const opts = { root: null, photoshop: null, comfyuiUrl: null, mcpTools: [], dataDir: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === '--photoshop' || arg === '--comfyui-url' || arg === '--mcp-tools') {
+    if (arg === '--photoshop' || arg === '--comfyui-url' || arg === '--mcp-tools' || arg === '--data-dir') {
       const value = argv[i + 1];
       if (value === undefined || value.startsWith('--')) return null;
       if (arg === '--photoshop') opts.photoshop = value;
       else if (arg === '--comfyui-url') opts.comfyuiUrl = value;
+      else if (arg === '--data-dir') opts.dataDir = value;
       else opts.mcpTools = value.split(',').map((s) => s.trim()).filter(Boolean);
       i++;
     } else if (arg.startsWith('--') || arg === '') {
@@ -46,6 +47,7 @@ async function main() {
     photoshop: args.photoshop,
     comfyuiUrl: args.comfyuiUrl ?? undefined,
     mcpTools: args.mcpTools,
+    dataDir: args.dataDir ?? undefined,
   });
   const { providers } = table;
 

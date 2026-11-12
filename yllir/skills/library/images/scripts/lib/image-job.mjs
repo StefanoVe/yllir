@@ -33,6 +33,49 @@ export function slugify(text) {
     .replace(/^-+|-+$/g, '');
 }
 
+/** Style id that every map job uses, whatever the folder of the document. */
+export const MAP_STYLE = 'map';
+
+/** Fixed English request of every map job; C and R are the grid size. */
+export function mapRequirement(cols, rows) {
+  return (
+    'Top-down orthographic battle map seen from directly above, no perspective, even lighting, no text, no labels, ' +
+    'no grid lines, no compass, no frame, no characters or creatures. ' +
+    `The area is ${cols} squares wide and ${rows} squares tall; ` +
+    'walls, doors and exits follow the attached plan when one is attached.'
+  );
+}
+
+/**
+ * Joins the style text and the extra sentences with `. `. The style text ends
+ * with a newline in prompt.md, so it is trimmed and its final `.` is removed
+ * before the sentences are appended, so the prompt never has `\n.` or `..`.
+ * With no sentences, the style text is returned trimmed and unchanged.
+ * The sentences are appended as given: the caller removes a trailing `.` from
+ * free text (the request).
+ */
+export function joinPrompt(base, pieces) {
+  const parts = pieces.map((piece) => String(piece).trim()).filter((piece) => piece !== '');
+  const head = String(base).trimEnd();
+  if (parts.length === 0) return head;
+  return [head.replace(/\.$/, ''), ...parts].join('. ');
+}
+
+function validCells(cells) {
+  if (!isPlainObject(cells)) return false;
+  const ok = (n) => Number.isInteger(n) && n >= 8 && n <= 60;
+  return ok(cells.cols) && ok(cells.rows);
+}
+
+/** Map image size: the long side is 1536, the other side follows the grid, multiple of 16, at least 512. */
+export function mapSize(cols, rows) {
+  const round16 = (n) => Math.round(n / 16) * 16;
+  if (cols >= rows) {
+    return { width: 1536, height: Math.max(512, round16((1536 * rows) / cols)) };
+  }
+  return { width: Math.max(512, round16((1536 * cols) / rows)), height: 1536 };
+}
+
 function truncateAtWord(text, maxChars) {
   if (text.length <= maxChars) return text;
   let cut = text.slice(0, maxChars);
@@ -61,11 +104,11 @@ export function subjectDescription(publicMarkdown, maxChars = 1500) {
   return truncateAtWord(lines.join(' ').replace(/\s+/g, ' ').trim(), maxChars);
 }
 
-function fail(error, message) {
+export function fail(error, message) {
   return { ok: false, error, message };
 }
 
-function isFile(p) {
+export function isFile(p) {
   try {
     return fs.statSync(p).isFile();
   } catch {
@@ -73,7 +116,7 @@ function isFile(p) {
   }
 }
 
-function isDir(p) {
+export function isDir(p) {
   try {
     return fs.statSync(p).isDirectory();
   } catch {
@@ -86,7 +129,7 @@ function isPlainObject(value) {
 }
 
 /** Normalized campaign-relative path with `/` separators, or null when unsafe. */
-function safeRelative(value) {
+export function safeRelative(value) {
   if (typeof value !== 'string' || value.trim() === '') return null;
   const normalized = path.posix.normalize(value.replace(/\\/g, '/'));
   if (normalized === '.' || normalized === '..' || normalized.startsWith('../') || path.posix.isAbsolute(normalized)) {
@@ -95,7 +138,7 @@ function safeRelative(value) {
   return normalized;
 }
 
-function readCampaign(rootAbs) {
+export function readCampaign(rootAbs) {
   const file = path.join(rootAbs, 'campaign.yaml');
   if (!isFile(file)) return fail('no-campaign', 'campaign.yaml not found in the campaign root');
   const { data, errors } = parseYamlLite(fs.readFileSync(file, 'utf8'));
@@ -122,8 +165,12 @@ function styleFor(rel, config) {
   return 'base';
 }
 
-function loadStyle(rootAbs, rel, config) {
-  const styleId = styleFor(rel, config);
+/**
+ * Loads the style of a job: the forced style id when given (map jobs always use `map`),
+ * else the style of the document's folder.
+ */
+function loadStyle(rootAbs, rel, config, forcedStyle = null) {
+  const styleId = forcedStyle ?? styleFor(rel, config);
   if (!STYLE_ID.test(styleId)) return fail('bad-style', `style id is not valid: ${styleId}`);
   const dir = path.join(rootAbs, '.campaign', 'styles', styleId);
   const profilePath = path.join(dir, 'profile.yaml');
@@ -159,12 +206,30 @@ function loadStyle(rootAbs, rel, config) {
  * Creates the folder and job.json of one image job. The job reads only the
  * public part of the document; a document that is not public is refused before
  * anything else of it is read.
+ * A map job (`purpose: 'map'`) is always a generate job with the style `map`, a
+ * fixed top-down map request, a size from the grid (`cells`), and an optional
+ * plan (`reference`) that must be a file under `.campaign/state/maps/`.
  * @param {{ root: string, document: string, operation: 'generate'|'remove_background',
- *   request?: string, image?: string|null, seed?: number }} args
+ *   request?: string, image?: string|null, seed?: number, purpose?: 'image'|'map',
+ *   cells?: {cols: number, rows: number}|null, reference?: string|null }} args
  * @returns {{ ok: true, jobId: string, jobDir: string, job: object } | { ok: false, error: string, message: string }}
  */
-export function buildJob({ root, document, operation, request = '', image = null, seed } = {}) {
+export function buildJob({
+  root,
+  document,
+  operation,
+  request = '',
+  image = null,
+  seed,
+  purpose = 'image',
+  cells = null,
+  reference = null,
+} = {}) {
   if (!OPERATIONS.has(operation)) return fail('bad-operation', 'operation must be generate or remove_background');
+  if (purpose !== 'image' && purpose !== 'map') return fail('bad-purpose', 'purpose must be image or map');
+  const isMap = purpose === 'map';
+  if (isMap && operation !== 'generate') return fail('bad-operation', 'a map job only supports generate');
+  if (isMap && !validCells(cells)) return fail('bad-cells', 'cells must be integers from 8 to 60 for cols and rows');
   const rootAbs = path.resolve(String(root ?? ''));
   const rel = safeRelative(document);
   if (rel === null) return fail('not-found', `document not found: ${document}`);
@@ -181,6 +246,16 @@ export function buildJob({ root, document, operation, request = '', image = null
   const pub = publicText(fs.readFileSync(docAbs, 'utf8'), rel, config);
   if (pub === null) return fail('not-public', `${rel} is not public: its text cannot be sent to an image service`);
 
+  let referencePath = null;
+  if (isMap && reference !== null) {
+    const mapsRoot = path.join(rootAbs, '.campaign', 'state', 'maps');
+    const refAbs = typeof reference === 'string' && path.isAbsolute(reference) ? path.resolve(reference) : null;
+    if (refAbs === null || !refAbs.startsWith(`${mapsRoot}${path.sep}`) || !isFile(refAbs)) {
+      return fail('bad-reference', 'reference must be an existing file under .campaign/state/maps/');
+    }
+    referencePath = refAbs;
+  }
+
   if (String(request ?? '').length > MAX_REQUEST) {
     return fail('request-too-long', `request must be at most ${MAX_REQUEST} characters`);
   }
@@ -193,14 +268,17 @@ export function buildJob({ root, document, operation, request = '', image = null
   let height = 0;
   let input = null;
   if (operation === 'generate') {
-    const loaded = loadStyle(rootAbs, rel, config);
+    const loaded = loadStyle(rootAbs, rel, config, isMap ? MAP_STYLE : null);
     if (!loaded.ok) return loaded;
     style = loaded.style;
-    prompt = loaded.template.split(PLACEHOLDER).join(subjectDescription(pub));
-    if (note !== '') prompt += `. ${note}`;
+    const pieces = [];
+    if (note !== '') pieces.push(note.replace(/\.$/, ''));
+    if (isMap) pieces.push(mapRequirement(cells.cols, cells.rows));
+    prompt = joinPrompt(loaded.template.split(PLACEHOLDER).join(subjectDescription(pub)), pieces);
     negative = loaded.negative;
     width = loaded.width;
     height = loaded.height;
+    if (isMap) ({ width, height } = mapSize(cells.cols, cells.rows));
   } else {
     const imageRel = safeRelative(image);
     if (imageRel === null || !isFile(path.join(rootAbs, imageRel))) {
@@ -209,7 +287,7 @@ export function buildJob({ root, document, operation, request = '', image = null
     input = path.join(rootAbs, imageRel);
   }
 
-  const kind = operation === 'generate' ? 'generate' : 'remove-background';
+  const kind = isMap ? 'map' : operation === 'generate' ? 'generate' : 'remove-background';
   const base = `${slugify(path.posix.basename(rel, '.md')) || 'image'}-${kind}`;
   const jobsRoot = path.join(rootAbs, '.campaign', 'state', 'images');
   let n = 1;
@@ -228,7 +306,10 @@ export function buildJob({ root, document, operation, request = '', image = null
     height,
     seed: Number.isInteger(seed) ? seed : [...jobId].reduce((sum, ch) => sum + ch.charCodeAt(0), 0),
     input,
+    purpose,
+    reference: referencePath,
   };
+  if (isMap) job.cells = { cols: cells.cols, rows: cells.rows };
   fs.mkdirSync(jobDir, { recursive: true });
   fs.writeFileSync(path.join(jobDir, 'job.json'), `${JSON.stringify(job, null, 2)}\n`, { flag: 'wx' });
   return { ok: true, jobId, jobDir, job };
@@ -262,7 +343,7 @@ function renderParameters(obj) {
   return lines.length === 0 ? ['parameters: {}'] : ['parameters:', ...lines];
 }
 
-function renderSidecar({ provider, operation, document, effectivePrompt, parameters, review }) {
+export function renderSidecar({ provider, operation, document, effectivePrompt, parameters, review }) {
   return [
     `provider: ${JSON.stringify(provider)}`,
     `operation: ${JSON.stringify(operation)}`,

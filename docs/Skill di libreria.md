@@ -64,7 +64,7 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | [Gestione dei PNG](#l14-gestione-dei-png) (`npc-manager`) | Processi del core e motore; skill rimossa | Creare e mantenere personaggi non giocanti, nemici e venditori con schede sempre standardizzate. | Deciso (indice). Skill rimossa; controlli implementati in 0.30.0 |
 | [Artwork](#l8-artwork) (`artwork`) | Libreria, chiamata dal core | Dipingere una creatura o un personaggio partendo da una descrizione verificata, e collegare il dipinto alla scheda. | Deciso (indice). Non implementata in 0.30.0 |
 | [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Deciso (indice). Non implementata in 0.30.0 |
-| [Mappe di luogo e di battaglia](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Creare mappe con livelli separati, per luoghi e scontri. | Deciso (indice). Non implementata in 0.30.0 |
+| [Mappe di luogo e di battaglia](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Creare mappe con livelli separati, per luoghi e scontri. | Deciso (indice; modalità `map` dello strumento `images`, Deciso 2026-11-11). Implementata in 0.41.0 per mappe di luogo e di battaglia |
 | [Mappe del mondo](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Modificare una carta del mondo senza alterarne la geometria. | Deciso (indice). Non implementata in 0.30.0 |
 | [Scontri](#l12-scontri) (`combat-tracker`) | Libreria, con adattatore | Tenere lo stato di uno scontro per il master: iniziativa, PF, fasi, condizioni, risorse dei nemici. | Deciso (indice). Non implementata in 0.30.0: la skill non esiste |
 | [Bilanciamento degli incontri](#l15-bilanciamento-degli-incontri) (`encounter-balancer`) | Libreria, su richiesta | Ribilanciare scontri e prove quando il master lo chiede, per esempio se cambia il gruppo. | Deciso (indice). Non implementata in 0.30.0 |
@@ -287,6 +287,7 @@ Non ancora implementata in 0.30.0. La Riprogettazione non la tocca: la decisione
 - **Giudizio:** quali modifiche fare e con quale fonte; scrittura dei prompt; verifica visiva dei risultati.
 - **Modello:** superato dalla decisione 16.
 - **Dipendenze:** profilo di stile (carta antica o moderna); configurazione dello spazio di coordinate; adattatore del sistema di gioco per le mappe di battaglia (griglia, dimensione del quadretto).
+- **Stato (2026-11-11):** modalità `map` dello strumento `images`, implementata in 0.41.0, per le mappe di luogo e di battaglia. La decisione dell'autore per le sole mappe di battaglia supera «l'esportazione verso motori di gioco è scartata»: l'esportazione per Tiled e il file per i tavoli virtuali sono previsti. La carta del mondo resta Proposta.
 - **Requisiti:**
   - proposta: una sola skill con due modalità (mondo, luogo);
   - l'esportazione verso motori di gioco è scartata nel core; l'atlante passa al modulo di output;
@@ -486,7 +487,7 @@ Le tre skill seguenti sono **Deciso (2026-11-11)** come skill di libreria. Sono 
 - **Gestione dei PNG e schede:** le creature non ostili (animali, cavalcature) stanno nella gestione dei PNG o nelle schede? Proposta: nella gestione dei PNG, con il ruolo «creatura» (`template: creature`).
 - **Economia:** serve una sola valuta di riferimento per i confronti?
 - **Ricerca musicale:** fonti ammesse (solo YouTube o anche altre piattaforme) e lingua delle ricerche.
-- **Mappe:** una skill con due modalità o due skill? La scelta incide sulla dimensione della skill, non sul risultato.
+- **Mappe:** una skill con due modalità o due skill? La scelta incide sulla dimensione della skill, non sul risultato. **Risposta (2026-11-11):** modalità di `images` (Deciso, 2026-11-11).
 - **Stampa:** libreria attivata da un modulo, o modulo puro? Nel documento è trattata come modulo opzionale con una skill di esecuzione; confermare.
 - **Modelli:** Superata dalla Riprogettazione (2026-11-11): non c'è più un modello assegnato per skill. Quando delegare e a quale modello lo decide il framework, tarato con il testbench (decisione 16).
 - **Autorun:** Superata dalla Riprogettazione (2026-11-11) per la ricerca nel canone, rimossa come skill. Restano l'autorun dell'ingest e della ricerca musicale, decisi nell'indice; la domanda sull'ingest è aggiunta sotto.

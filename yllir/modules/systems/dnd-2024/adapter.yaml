@@ -15,6 +15,9 @@ headings:
     it: Effetti
     en: Effects
 encounters: turn-based
+battle_grid:
+  square: 5
+  unit: ft
 progression:
   method: milestone
   experience_points: false

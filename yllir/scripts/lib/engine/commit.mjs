@@ -696,9 +696,34 @@ function onlyLinksOrImagesChanged(dir, files) {
   });
 }
 
-/** The text used to compare a draft with its campaign file: no links, no images, normalized blank lines. */
+/** The text used to compare a draft with its campaign file: no map sections, no links, no images, normalized blank lines. */
 function comparable(text) {
-  return normalizeText(stripLinks(stripImages(text)));
+  return normalizeText(stripLinks(stripImages(stripMapSections(text))));
+}
+
+const MAP_OPEN = '<!-- yllir:map -->';
+const MAP_CLOSE = '<!-- /yllir:map -->';
+
+/**
+ * Removes each generated map section: from a line that is exactly the opening marker to the next line
+ * that is exactly the closing marker, both included. An opening marker without a closing one removes nothing.
+ */
+function stripMapSections(text) {
+  const lines = text.split('\n');
+  const kept = [];
+  let i = 0;
+  while (i < lines.length) {
+    if (lines[i].trim() === MAP_OPEN) {
+      const close = lines.findIndex((line, at) => at > i && line.trim() === MAP_CLOSE);
+      if (close >= 0) {
+        i = close + 1;
+        continue;
+      }
+    }
+    kept.push(lines[i]);
+    i += 1;
+  }
+  return kept.join('\n');
 }
 
 /** Removes each whole line that is only an image embed, and every inline image embed. */

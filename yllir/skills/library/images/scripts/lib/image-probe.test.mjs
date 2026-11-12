@@ -72,6 +72,8 @@ const offline = (root, extra = {}) => ({
   campaignRoot: root,
   photoshop: 'no',
   codexCommand: MISSING_CODEX,
+    g2dProbe: notInstalled,
+    dataDir: tempRoot(),
   fetchImpl: unreachableFetch,
   env: {},
   ...extra,
@@ -80,6 +82,7 @@ const offline = (root, extra = {}) => ({
 const here = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(here, '../image-probe.mjs');
 const MISSING_CODEX = '/nonexistent/codex';
+const notInstalled = async () => ({ available: false, reason: 'not-installed' });
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -98,6 +101,8 @@ test('comfyui unreachable and codex missing: both unavailable, upload available,
     campaignRoot: root,
     photoshop: 'yes',
     codexCommand: MISSING_CODEX,
+    g2dProbe: notInstalled,
+    dataDir: tempRoot(),
     fetchImpl: unreachableFetch,
     now: () => '2026-11-11T10:00:00.000Z',
   });
@@ -116,6 +121,8 @@ test('comfyui unreachable and codex missing: both unavailable, upload available,
     campaignRoot: root,
     photoshop: 'no',
     codexCommand: MISSING_CODEX,
+    g2dProbe: notInstalled,
+    dataDir: tempRoot(),
     fetchImpl: unreachableFetch,
   });
   assert.equal(noPhotoshop.providers.photoshop.available, false);
@@ -130,7 +137,9 @@ test('comfyui serving one checkpoint: available with that checkpoint', async () 
     }
     return new Response('not found', { status: 404 });
   };
-  const table = await probeAll({ campaignRoot: root, photoshop: 'no', codexCommand: MISSING_CODEX, fetchImpl });
+  const table = await probeAll({ campaignRoot: root, photoshop: 'no', codexCommand: MISSING_CODEX,
+    g2dProbe: notInstalled,
+    dataDir: tempRoot(), fetchImpl });
   assert.equal(table.providers.comfyui.available, true);
   assert.equal(table.providers.comfyui.checkpoint, 'model-a.safetensors');
   assert.equal(table.providers.comfyui.removeBackground, false);
@@ -140,7 +149,9 @@ test('comfyui serving one checkpoint: available with that checkpoint', async () 
 test('consent recorded earlier is kept by a new probe', async () => {
   const root = tempRoot();
   writeTable(root, { checked: 'old', providers: { codex: { available: false, consent: true } } });
-  const table = await probeAll({ campaignRoot: root, photoshop: 'no', codexCommand: MISSING_CODEX, fetchImpl: unreachableFetch });
+  const table = await probeAll({ campaignRoot: root, photoshop: 'no', codexCommand: MISSING_CODEX,
+    g2dProbe: notInstalled,
+    dataDir: tempRoot(), fetchImpl: unreachableFetch });
   assert.equal(table.providers.codex.consent, true);
   assert.equal(table.providers.codex.available, false);
   assert.equal(readTable(root).providers.codex.consent, true);
@@ -158,15 +169,61 @@ test('custom comfyui url is stored and reused without the option', async () => {
     photoshop: 'no',
     comfyuiUrl: 'http://10.0.0.5:9999',
     codexCommand: MISSING_CODEX,
+    g2dProbe: notInstalled,
+    dataDir: tempRoot(),
     fetchImpl: recordingFetch,
   });
   assert.equal(first.providers.comfyui.url, 'http://10.0.0.5:9999');
 
   seen.length = 0;
-  const second = await probeAll({ campaignRoot: root, photoshop: 'no', codexCommand: MISSING_CODEX, fetchImpl: recordingFetch });
+  const second = await probeAll({ campaignRoot: root, photoshop: 'no', codexCommand: MISSING_CODEX,
+    g2dProbe: notInstalled,
+    dataDir: tempRoot(), fetchImpl: recordingFetch });
   assert.equal(second.providers.comfyui.url, 'http://10.0.0.5:9999');
   assert.ok(seen.length > 0);
   assert.ok(seen.every((url) => url.startsWith('http://10.0.0.5:9999/')));
+});
+
+test('generate2dmedia comes from the injected probe, with no install record read from a real folder', async () => {
+  const root = tempRoot();
+  const seen = [];
+  const table = await probeAll({
+    campaignRoot: root,
+    photoshop: 'no',
+    codexCommand: MISSING_CODEX,
+    fetchImpl: unreachableFetch,
+    dataDir: tempRoot(),
+    g2dProbe: async (options) => {
+      seen.push(options);
+      return { available: false, reason: 'no-route' };
+    },
+  });
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].campaignRoot, root);
+  assert.equal(seen[0].ready, null);
+  assert.deepEqual(table.providers.generate2dmedia, { available: false, reason: 'no-route' });
+});
+
+test('generate2dmedia consent recorded earlier is kept by a new probe', async () => {
+  const root = tempRoot();
+  writeTable(root, { checked: 'old', providers: { generate2dmedia: { available: false, consent: true } } });
+  const table = await probeAll({
+    campaignRoot: root,
+    photoshop: 'no',
+    codexCommand: MISSING_CODEX,
+    fetchImpl: unreachableFetch,
+    dataDir: tempRoot(),
+    g2dProbe: notInstalled,
+  });
+  assert.equal(table.providers.generate2dmedia.available, false);
+  assert.equal(table.providers.generate2dmedia.reason, 'not-installed');
+  assert.equal(table.providers.generate2dmedia.consent, true);
+});
+
+test('CLI with --data-dir and no value prints usage and exit 2', () => {
+  const result = spawnSync(process.execPath, [CLI, tempRoot(), '--photoshop', 'no', '--data-dir'], { encoding: 'utf8' });
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /usage: node image-probe\.mjs/);
 });
 
 test('CLI without arguments prints usage and exit 2', () => {

@@ -37,14 +37,16 @@ function tempDir(prefix) {
   return fs.mkdtempSync(path.join(os.tmpdir(), prefix));
 }
 
-test('loadProviders reads the four real manifests in ORDER', () => {
+test('loadProviders reads the five real manifests in ORDER', () => {
   assert.deepEqual(
     providers.map((p) => p.id),
-    ['comfyui', 'codex', 'photoshop', 'upload'],
+    ['comfyui', 'codex', 'generate2dmedia', 'photoshop', 'upload'],
   );
   assert.deepEqual(providers.map((p) => p.id), ORDER);
   const codex = providers.find((p) => p.id === 'codex');
   assert.deepEqual(codex, { id: 'codex', kind: 'script', operations: ['generate'], external: true });
+  const g2d = providers.find((p) => p.id === 'generate2dmedia');
+  assert.deepEqual(g2d, { id: 'generate2dmedia', kind: 'script', operations: ['generate'], external: true });
 });
 
 test('loadProviders throws naming the file on an invalid manifest', () => {

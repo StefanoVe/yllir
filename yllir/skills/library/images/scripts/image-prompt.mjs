@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Creates one image job from the public part of a campaign document.
 // Usage: node image-prompt.mjs <root> --document <relPath> --operation generate|remove_background [--request "<text>"] [--image <relPath>]
+//        node image-prompt.mjs <root> --document <relPath> --operation generate --purpose map --cells <C>x<R> [--reference <absPath>] [--request "<text>"]
 // Exit codes: 0 job created, 1 refused (error: and message: lines), 2 usage error.
 // The prompt is never printed: it stays in job.json.
 
@@ -9,12 +10,22 @@ import { buildJob } from './lib/image-job.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
 const USAGE =
-  'usage: node image-prompt.mjs <root> --document <relPath> --operation generate|remove_background [--request "<text>"] [--image <relPath>]';
+  'usage: node image-prompt.mjs <root> --document <relPath> --operation generate|remove_background [--request "<text>"] [--image <relPath>] ' +
+  '[--purpose image|map --cells <C>x<R> --reference <absPath> (map only)]';
 
-const VALUE_OPTIONS = new Set(['--document', '--operation', '--request', '--image']);
+const VALUE_OPTIONS = new Set(['--document', '--operation', '--request', '--image', '--purpose', '--cells', '--reference']);
 
 function parseArgs(argv) {
-  const opts = { root: null, document: null, operation: null, request: null, image: null };
+  const opts = {
+    root: null,
+    document: null,
+    operation: null,
+    request: null,
+    image: null,
+    purpose: 'image',
+    cells: null,
+    reference: null,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (VALUE_OPTIONS.has(arg)) {
@@ -32,6 +43,16 @@ function parseArgs(argv) {
   }
   if (opts.root === null || opts.document === null || opts.operation === null) return null;
   if (opts.operation !== 'generate' && opts.operation !== 'remove_background') return null;
+  if (opts.purpose !== 'image' && opts.purpose !== 'map') return null;
+
+  if (opts.purpose === 'map') {
+    if (opts.operation !== 'generate' || opts.image !== null || opts.cells === null) return null;
+    const match = /^(\d+)x(\d+)$/.exec(opts.cells);
+    if (match === null) return null;
+    opts.cells = { cols: Number(match[1]), rows: Number(match[2]) };
+  } else {
+    if (opts.cells !== null || opts.reference !== null) return null;
+  }
   return opts;
 }
 
@@ -45,6 +66,9 @@ function main() {
     operation: args.operation === 'generate' ? 'generate' : 'remove_background',
     request: args.request ?? '',
     image: args.image,
+    purpose: args.purpose,
+    cells: args.cells,
+    reference: args.reference,
   });
 
   if (!result.ok) {

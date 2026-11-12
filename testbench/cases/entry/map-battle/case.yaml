@@ -1,0 +1,6 @@
+case: entry-map-battle
+prompt: |
+  Fammi una mappa di battaglia della Torre dell’Ascia.
+limits:
+  max_minutes: 12
+  max_tool_calls: 140

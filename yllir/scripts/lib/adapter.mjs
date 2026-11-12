@@ -62,6 +62,15 @@ function manifests(pluginRoot) {
   })).filter(({ filename }) => fs.existsSync(filename));
 }
 
+// Size of one battle-grid square: { square, unit }. Defaults to 1 with no unit when the adapter declares none.
+export function battleGrid(adapter) {
+  const grid = adapter && isMapping(adapter.battle_grid) ? adapter.battle_grid : null;
+  if (grid === null || !Number.isInteger(grid.square) || grid.square < 1 || !['ft', 'm'].includes(grid.unit)) {
+    return { square: 1, unit: null };
+  }
+  return { square: grid.square, unit: grid.unit };
+}
+
 function result(adapter, errors) { return { ok: errors.length === 0, adapter, errors }; }
 function isMapping(value) { return value !== null && typeof value === 'object' && !Array.isArray(value); }
 // Returns null when the optional checks key is absent or valid, otherwise the problem.
@@ -80,7 +89,7 @@ function validate(adapter, folderId, folder) {
   const errors = [];
   const error = (code, field, message) => errors.push({ code, path: field, message });
   if (!isMapping(adapter)) return [{ code: 'bad-type', path: '', message: 'adapter manifest must be a mapping' }];
-  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'creature_sheet', 'checks', 'item_sheet', 'tracking', 'do_not'];
+  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'creature_sheet', 'checks', 'item_sheet', 'tracking', 'do_not'];
   for (const key of Object.keys(adapter)) if (!allowed.includes(key)) error('unknown-key', key, `"${key}" is not a setting of an adapter manifest`);
   if (typeof adapter.id !== 'string' || !SLUG_RE.test(adapter.id)) error('bad-value', 'id', 'id must be a lowercase slug');
   if (adapter.id !== folderId) error('id-mismatch', 'id', `id must match the adapter folder ${folderId}`);
@@ -109,6 +118,17 @@ function validate(adapter, folderId, folder) {
     }
   }
   if (!['turn-based', 'none'].includes(adapter.encounters)) error('bad-value', 'encounters', 'encounters must be turn-based or none');
+  if (adapter.battle_grid !== undefined) {
+    if (!isMapping(adapter.battle_grid)) {
+      error('bad-value', 'battle_grid', 'battle_grid must be a mapping with square and unit');
+    } else {
+      for (const key of Object.keys(adapter.battle_grid)) {
+        if (!['square', 'unit'].includes(key)) error('unknown-key', `battle_grid.${key}`, `"${key}" is not a setting of battle_grid`);
+      }
+      if (!Number.isInteger(adapter.battle_grid.square) || adapter.battle_grid.square < 1) error('bad-value', 'battle_grid.square', 'battle_grid.square must be a positive whole number');
+      if (!['ft', 'm'].includes(adapter.battle_grid.unit)) error('bad-value', 'battle_grid.unit', 'battle_grid.unit must be ft or m');
+    }
+  }
   if (!isMapping(adapter.progression) || typeof adapter.progression.method !== 'string' || !adapter.progression.method.trim()) error('bad-value', 'progression.method', 'progression.method must be nonempty text');
   if (!isMapping(adapter.creature_sheet) || !Array.isArray(adapter.creature_sheet.required)) {
     error('bad-type', 'creature_sheet.required', 'creature_sheet.required must be a list');

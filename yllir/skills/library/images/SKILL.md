@@ -1,8 +1,8 @@
 ---
 name: images
-description: Library skill. Creates an image for a campaign document (a portrait, an illustration of a place or an item), or removes the background of an existing image, with the image service it picks by itself or the one the master names; adds a new image service to the campaign when the master names one that is not there. Invoked by the entry skill when the master asks for an image.
+description: Library skill. Creates an image for a campaign document (a portrait, an illustration of a place or an item, or a battle map of a place (a top-down map with a grid, an interactive preview and files for virtual tabletops and Tiled)), or removes the background of an existing image, with the image service it picks by itself or the one the master names; adds a new image service to the campaign when the master names one that is not there. Invoked by the entry skill when the master asks for an image.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-probe.mjs" *), Bash(node */skills/library/images/scripts/image-probe.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-select.mjs" *), Bash(node */skills/library/images/scripts/image-select.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-prompt.mjs" *), Bash(node */skills/library/images/scripts/image-prompt.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/comfyui-run.mjs" *), Bash(node */skills/library/images/scripts/comfyui-run.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/codex-run.mjs" *), Bash(node */skills/library/images/scripts/codex-run.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/command-run.mjs" *), Bash(node */skills/library/images/scripts/command-run.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/http-run.mjs" *), Bash(node */skills/library/images/scripts/http-run.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-place.mjs" *), Bash(node */skills/library/images/scripts/image-place.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/provider-check.mjs" *), Bash(node */skills/library/images/scripts/provider-check.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-probe.mjs" *), Bash(node */skills/library/images/scripts/image-probe.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-select.mjs" *), Bash(node */skills/library/images/scripts/image-select.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-prompt.mjs" *), Bash(node */skills/library/images/scripts/image-prompt.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/comfyui-run.mjs" *), Bash(node */skills/library/images/scripts/comfyui-run.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/codex-run.mjs" *), Bash(node */skills/library/images/scripts/codex-run.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/command-run.mjs" *), Bash(node */skills/library/images/scripts/command-run.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/http-run.mjs" *), Bash(node */skills/library/images/scripts/http-run.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-place.mjs" *), Bash(node */skills/library/images/scripts/image-place.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/provider-check.mjs" *), Bash(node */skills/library/images/scripts/provider-check.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/g2dmedia-run.mjs" *), Bash(node */skills/library/images/scripts/g2dmedia-run.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/maps/maps-setup.mjs" *), Bash(node */skills/library/images/scripts/maps/maps-setup.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/maps/maps-run.mjs" *), Bash(node */skills/library/images/scripts/maps/maps-run.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/maps/map-job.mjs" *), Bash(node */skills/library/images/scripts/maps/map-job.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/maps/map-uvtt.mjs" *), Bash(node */skills/library/images/scripts/maps/map-uvtt.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Edit, Glob, Grep, WebSearch, WebFetch
 ---
 
 # Images
@@ -18,24 +18,27 @@ You are the AUTHOR. Images make a picture for a campaign document: a portrait, a
 - Never name a service to the master, except in the consent sentence and when the master named it first.
 - Images are written only by `image-place.mjs`; documents only through the write cycle.
 - The style files and the new-service files you write in `.campaign/styles/` and `.campaign/image-providers/` are saved with `--sources`: these two folders are the only exception to the rule that `--sources` holds only files placed by scripts.
+- The map tools are installed outside the campaign by `maps-setup.mjs`; never install, download or run Python yourself: every Python tool runs only through `maps-run.mjs`.
+
+**Maps.** When the master asks for a map, battle map, floor plan or «mappa di battaglia» of a place, follow `maps.md` in this folder instead of the Steps below (read it with the Read tool). A map of the whole world or of a region is not made here: say [world map not available] and stop.
 
 ## Steps
 
 **Step 1 — Settings.** Read `campaign.yaml` with the Read tool. Keep the CAMPAIGN LANGUAGE (`language.main`), `campaign.seed` and the `structure` entries.
 1. Identify the DOCUMENT: the campaign-relative path of the document the image is for. Use the master's words: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . find "<the name the master used>"` and read its result; or use Glob in the campaign folders. If two documents are plausible, ask ONE question naming both by title, and stop.
-2. OPERATION is `generate`. It is `remove_background` when the master asks to remove or clear the background of an image; then IMAGE is the campaign-relative path of that image, found under the document's title (Glob in the document's folder).
+2. OPERATION is `generate`. It is `map` when the master asks for a battle map or a map of a place (then follow `maps.md`). It is `remove_background` when the master asks to remove or clear the background of an image; then IMAGE is the campaign-relative path of that image, found under the document's title (Glob in the document's folder).
 3. REQUESTED is the service the master named in THIS message («con gemini», «usa ComfyUI»), or none.
 4. REQUEST is the extra visual wishes of the master for this image («di profilo», «al tramonto»), translated into English, at most 300 characters. None otherwise.
 
 **Step 2 — Is this an answer?** Look at your previous message in this conversation. If it was a question of this tool, take the master's answer and continue from the step that asked it:
 - a style confirmation: Step 5, with the style the master confirmed (or corrected);
 - a consent question: run `image-select.mjs . --consent <id>` (the id of the service you asked about), then Step 4;
-- a key request (Step A.4): merge the key as Step A.4 says;
+- a key request (Step A.4, or Step A0 for a service named there): merge the key as that step says;
 - a question about which document: Step 1 with that answer.
 If the previous message was not a question of this tool, go to Step 3.
 
 **Step 3 — Services.** Once per conversation (skip it if you already ran it in this conversation): run
-`node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-probe.mjs" . --photoshop <yes or no> --mcp-tools "<names>"`
+`node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-probe.mjs" . --photoshop <yes or no> --mcp-tools "<names>" --data-dir "${CLAUDE_PLUGIN_DATA}"`
 1. `--photoshop yes` when a tool whose name contains `photoshop_get_capabilities` is available to you; otherwise `no`.
 2. `--mcp-tools`: the comma-separated names of the `mcp__` tools you can see that a campaign service could use to create an image. Empty string `""` if none.
 Read the output. Go to Step 4.
@@ -45,10 +48,10 @@ Read the output. Go to Step 4.
 - add `--provider "<REQUESTED>"` when REQUESTED is not none;
 - add `--exclude <ids separated by commas>` after a technical failure (Step 6), listing every service that failed in this request.
 Read the output lines `provider`, `reason`, `needs-consent`.
-1. `reason: unknown-provider`: the master named a service that is not known. Go to Step A, then come back to Step 3.
+1. `reason: unknown-provider`: if REQUESTED is one of the names in Step A0, go to Step A0; otherwise go to Step A, then come back to Step 3.
 2. `reason: requested-unavailable` or `reason: requested-unsupported`: say the fixed sentence [requested service unavailable] and stop.
 3. `provider: none`: say the fixed sentence [no service] and stop.
-4. `needs-consent: yes`: say the consent sentence [consent] with the service's plain name and the document title, and stop. The plain name is «Codex di OpenAI» (Italian) or «OpenAI's Codex» (English) for codex; «Photoshop di Adobe» or «Adobe Photoshop» for photoshop; the `name` of the service for a campaign service. On a yes: run `image-select.mjs . --consent <id>`, then Step 4 again. On a no: run Step 4 again with `--exclude <id>`.
+4. `needs-consent: yes`: say the consent sentence [consent] with the service's plain name and the document title, and stop. The plain name is «Codex di OpenAI» (Italian) or «OpenAI's Codex» (English) for codex; «Agent Sprite Forge, che passa la descrizione al servizio di immagini per cui mi hai dato una chiave, oppure a Codex» (Italian) or «Agent Sprite Forge, which passes the description to the image service you gave me a key for, or to Codex» (English) for generate2dmedia; «Photoshop di Adobe» or «Adobe Photoshop» for photoshop; the `name` of the service for a campaign service. On a yes: run `image-select.mjs . --consent <id>`, then Step 4 again. On a no: run Step 4 again with `--exclude <id>`.
 5. `provider: upload`: say the fixed sentence [send your own image] and stop. When the master then sends a file, go to Step 8 with `--file`.
 6. Otherwise the provider is chosen: go to Step 5.
 
@@ -65,6 +68,7 @@ Read the lines `job` (JOB) and `folder` (JOB_DIR). For remove_background, skip t
 **Step 6 — Run, by provider.** Use the provider of Step 4.
 - **comfyui**: Read `.campaign/state/image-providers.json`, take `providers.comfyui.checkpoint` and `providers.comfyui.url`. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/comfyui-run.mjs" "<JOB_DIR>" --checkpoint "<checkpoint>" --url "<url>"`.
 - **codex**: run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/codex-run.mjs" "<JOB_DIR>"`. It can take minutes: wait for it.
+- **generate2dmedia**: run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/g2dmedia-run.mjs" . "<JOB_DIR>" --data-dir "${CLAUDE_PLUGIN_DATA}"`, adding `--route <ROUTE>` when ROUTE is set (Step A0). It can take minutes: wait for it.
 - **a campaign service of kind command**: run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/command-run.mjs" . "<JOB_DIR>" --provider <id>`.
 - **a campaign service of kind http**: run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/http-run.mjs" . "<JOB_DIR>" --provider <id>`.
 - **a campaign service of kind mcp**:
@@ -123,6 +127,18 @@ Write REVIEW: one English sentence on what matches and what does not.
 4. Kind http with a key: when Step 3 or Step 4 says the service is unavailable because it has no key, ask the master ONE question with the fixed sentence [key needed]. When the master gives the key, merge it into `.campaign/state/keys.json` with the Write tool (read the file first if it exists), as a JSON object with the provider id as key. Never repeat the key, in any message, file or commit.
 5. Save: first `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" check . --sources "<the files in .campaign/image-providers/<ID>/>"`, then, if its exit code is 0, `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" commit . --sources "<the same files>" --message "<campaign language: New image service: <name>>"`. If either exits 1, say the lexicon failure sentence and stop. The key file is never part of the commit.
 6. From now on this service is the first choice of the campaign. Go back to Step 3.
+
+**Step A0 — A service that Agent Sprite Forge covers.** The master named one of these services (match the name, in any case). Use the route and the key variable of its row.
+- gemini, google, nano banana → ROUTE `gemini`, KEY VARIABLE `GEMINI_API_KEY`.
+- openai, chatgpt, gpt image, dall-e → ROUTE `openai`, KEY VARIABLE `OPENAI_API_KEY`.
+- grok, xai → ROUTE `xai`, KEY VARIABLE `XAI_API_KEY`.
+- seedream, byteplus → ROUTE `byteplus`, KEY VARIABLE `ARK_API_KEY`.
+- fal → ROUTE `fal`, KEY VARIABLE `FAL_KEY`.
+
+1. REQUESTED becomes `generate2dmedia`. Keep ROUTE for Step 6.
+2. Read `.campaign/state/keys.json` if it exists. If it has no `generate2dmedia` object that holds the KEY VARIABLE: ask the master the fixed sentence [key needed], with the service name the master used, and stop.
+3. When the master gives the key: read `.campaign/state/keys.json` if it exists, then merge the key with the Write tool as `"generate2dmedia": {"<KEY VARIABLE>": "<key>"}`, keeping every other entry. Never repeat the key, in any message, file or commit. The keys file is never saved in the campaign history.
+4. Run Step 3 (probe) again, then Step 4 with `--provider generate2dmedia`.
 
 ## Failures and fixed sentences
 

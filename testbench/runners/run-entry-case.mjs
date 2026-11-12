@@ -93,8 +93,8 @@ function setupTwoVersions(caseName) {
       const v1 = saveVersion(dir, { message: V1_MESSAGE, kind: 'framework' });
       if (!v1.saved) throw new Error('setup: version 1 was not saved');
 
-      if (IMAGE_CASES.includes(caseName)) {
-        const v2 = setupImageService(tmp, dir);
+      if (IMAGE_CASES.includes(caseName) || MAP_CASES.includes(caseName)) {
+        const v2 = setupImageService(tmp, dir, { mapStyle: MAP_CASES.includes(caseName) });
         const versions = listVersions(dir);
         if (versions.length !== REQUIRED_VERSIONS) {
           throw new Error(`setup: ${versions.length} versions instead of ${REQUIRED_VERSIONS}`);
@@ -135,6 +135,11 @@ const IMAGE_PROVIDER_CHECK = path.join(REPO_ROOT, 'yllir', 'skills', 'library', 
 // Words of the master-only block of the Oria Brunel sheet: none may reach the service.
 const IMAGE_FORBIDDEN_WORDS = ['teodo', 'lana', 'rubata', 'segreto'];
 const IMAGE_FORBIDDEN_NAMES = ['pennello', 'comfyui', 'codex'];
+// The map case: the image setup plus a map style (setupImageService with mapStyle).
+const MAP_CASES = ['entry-map-battle'];
+const MAP_SHEET_NAME = 'Torre dell’Ascia.md';
+// Words of the master-only block of the Torre dell’Ascia sheet (morvalle fixture, after <!-- master -->), none of them in the public part: none may reach the service.
+const MAP_FORBIDDEN_WORDS = ['sicuro', 'controlla', 'indicazioni', 'nessuno'];
 
 /**
  * The fake image service, as the body of fake.mjs (setupImageService writes it; this function is
@@ -143,13 +148,98 @@ const IMAGE_FORBIDDEN_NAMES = ['pennello', 'comfyui', 'codex'];
  * measure around her neck. The PNG is encoded here: RGB 8-bit, filter type 0 on every row, zlib
  * from node:zlib, CRC32 computed by hand. Needs fs and zlib imported in the file.
  */
-function fakeMain(callsFile) {
+function fakeMain(callsFile, campaignDir) {
   const [, , prompt, output] = process.argv;
   fs.appendFileSync(callsFile, `${JSON.stringify({ prompt: prompt ?? '' })}\n`);
 
-  const W = 256;
-  const H = 256;
+  // A map prompt (the map service prompt starts with this text) gets the agent's own plan (the newest
+  // guide.png of the campaign's map jobs) scaled up 8x, or a fixed floor plan when there is none; any
+  // other prompt gets the figure.
+  const map = prompt.includes('Top-down orthographic battle map');
+  // Decodes the newest guide.png written by the encoder of maps/lib/png.mjs: { width, height, pixels }, or null.
+  const readGuide = (root) => {
+    const base = path.join(root, '.campaign', 'state', 'maps');
+    if (!fs.existsSync(base)) return null;
+    let newest = null;
+    for (const job of fs.readdirSync(base)) {
+      const file = path.join(base, job, 'guide.png');
+      if (!fs.existsSync(file)) continue;
+      const time = fs.statSync(file).mtimeMs;
+      if (newest === null || time > newest.time) newest = { file, time };
+    }
+    if (newest === null) return null;
+    const buf = fs.readFileSync(newest.file);
+    let width = 0;
+    let height = 0;
+    const idat = [];
+    let p = 8;
+    while (p + 8 <= buf.length) {
+      const len = buf.readUInt32BE(p);
+      const type = buf.toString('latin1', p + 4, p + 8);
+      const data = buf.subarray(p + 8, p + 8 + len);
+      if (type === 'IHDR') {
+        width = data.readUInt32BE(0);
+        height = data.readUInt32BE(4);
+      } else if (type === 'IDAT') {
+        idat.push(data);
+      }
+      p += 12 + len;
+      if (type === 'IEND') break;
+    }
+    const raw = zlib.inflateSync(Buffer.concat(idat));
+    const stride = width * 3;
+    const guidePixels = Buffer.alloc(width * height * 3);
+    for (let y = 0; y < height; y++) {
+      raw.copy(guidePixels, y * stride, y * (stride + 1) + 1, y * (stride + 1) + 1 + stride);
+    }
+    return { width, height, pixels: guidePixels };
+  };
+  const guide = map ? readGuide(campaignDir) : null;
+  const W = guide ? guide.width * 8 : map ? 768 : 256;
+  const H = guide ? guide.height * 8 : map ? 512 : 256;
   const pixels = Buffer.alloc(W * H * 3, 255);
+  if (guide) {
+    // Each guide pixel becomes an 8x8 block: black is a wall, every other colour is floor.
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const g = (Math.floor(y / 8) * guide.width + Math.floor(x / 8)) * 3;
+        const wall = guide.pixels[g] === 0 && guide.pixels[g + 1] === 0 && guide.pixels[g + 2] === 0;
+        const c = wall ? [60, 60, 60] : [200, 190, 170];
+        const o = (y * W + x) * 3;
+        pixels[o] = c[0];
+        pixels[o + 1] = c[1];
+        pixels[o + 2] = c[2];
+      }
+    }
+  }
+  if (map && guide === null) {
+    const fill = (x0, y0, x1, y1, [r, g, b]) => {
+      for (let y = Math.max(0, y0); y < Math.min(H, y1); y++) {
+        for (let x = Math.max(0, x0); x < Math.min(W, x1); x++) {
+          const o = (y * W + x) * 3;
+          pixels[o] = r;
+          pixels[o + 1] = g;
+          pixels[o + 2] = b;
+        }
+      }
+    };
+    const STONE = [200, 190, 170];
+    const DARK = [60, 60, 60];
+    fill(0, 0, W, H, STONE);
+    const T = 12;
+    fill(0, 0, W, T, DARK); // outer wall: top
+    fill(0, H - T, W, H, DARK); // outer wall: bottom
+    fill(0, 0, T, H, DARK); // outer wall: left
+    fill(W - T, 0, W, 232, DARK); // outer wall: right, above the exit
+    fill(W - T, 280, W, H, DARK); // outer wall: right, below the exit (gap 232..280)
+    fill(384, 0, 396, 232, DARK); // inner wall, above the door
+    fill(384, 280, 396, H, DARK); // inner wall, below the door (gap 232..280)
+    for (let y = 130; y <= 170; y++) {
+      for (let x = 580; x <= 620; x++) {
+        if ((x - 600) ** 2 + (y - 150) ** 2 <= 400) fill(x, y, x + 1, y + 1, DARK); // spiral stair
+      }
+    }
+  }
   // A 3-pixel-thick brush: the 3x3 square around each sampled point is black.
   const ink = (x, y) => {
     for (let dy = -1; dy <= 1; dy++) {
@@ -176,19 +266,21 @@ function fakeMain(callsFile) {
 
   // The figure: head, neck, dress (a triangle), arms and legs as lines, and the tape measure: two
   // thin bands from the neck down each side of the front.
-  ring(128, 56, 22);
-  line(128, 78, 128, 90);
-  line(128, 90, 90, 222);
-  line(128, 90, 166, 222);
-  line(90, 222, 166, 222);
-  line(122, 104, 78, 150);
-  line(134, 104, 178, 150);
-  line(118, 222, 114, 248);
-  line(138, 222, 142, 248);
-  line(119, 84, 106, 172);
-  line(125, 84, 112, 172);
-  line(137, 84, 150, 172);
-  line(131, 84, 144, 172);
+  if (!map) {
+    ring(128, 56, 22);
+    line(128, 78, 128, 90);
+    line(128, 90, 90, 222);
+    line(128, 90, 166, 222);
+    line(90, 222, 166, 222);
+    line(122, 104, 78, 150);
+    line(134, 104, 178, 150);
+    line(118, 222, 114, 248);
+    line(138, 222, 142, 248);
+    line(119, 84, 106, 172);
+    line(125, 84, 112, 172);
+    line(137, 84, 150, 172);
+    line(131, 84, 144, 172);
+  }
 
   // Raw image data: one filter byte (0) and W RGB pixels per row.
   const stride = W * 3;
@@ -241,7 +333,7 @@ function fakeMain(callsFile) {
  * The service is checked with provider-check, and the setup fails unless it prints result: ok.
  * Returns the hash of version 2.
  */
-function setupImageService(tmp, dir) {
+function setupImageService(tmp, dir, { mapStyle = false } = {}) {
   const fake = path.join(tmp, 'fake.mjs');
   const calls = path.join(tmp, IMAGE_CALLS);
   // The fake is the testbench's own script (no network, no model): its body is fakeMain.
@@ -249,11 +341,12 @@ function setupImageService(tmp, dir) {
     fake,
     [
       "import fs from 'node:fs';",
+      "import path from 'node:path';",
       "import zlib from 'node:zlib';",
       '',
       fakeMain.toString(),
       '',
-      `fakeMain(${JSON.stringify(calls)});`,
+      `fakeMain(${JSON.stringify(calls)}, ${JSON.stringify(dir)});`,
       '',
     ].join('\n'),
   );
@@ -262,6 +355,12 @@ function setupImageService(tmp, dir) {
   fs.mkdirSync(styleDir, { recursive: true });
   fs.writeFileSync(path.join(styleDir, 'profile.yaml'), 'id: base\nnegative: "text, watermark"\nwidth: 512\nheight: 512\n');
   fs.writeFileSync(path.join(styleDir, 'prompt.md'), 'Simple ink sketch. {SUBJECT_DESCRIPTION}\n');
+  if (mapStyle) {
+    const mapStyleDir = path.join(dir, '.campaign', 'styles', 'map');
+    fs.mkdirSync(mapStyleDir, { recursive: true });
+    fs.writeFileSync(path.join(mapStyleDir, 'profile.yaml'), 'id: map\nnegative: "text, labels, grid lines"\nwidth: 1536\nheight: 1024\n');
+    fs.writeFileSync(path.join(mapStyleDir, 'prompt.md'), 'Simple ink plan of a place seen from above. {SUBJECT_DESCRIPTION}\n');
+  }
 
   const providerDir = path.join(dir, '.campaign', 'image-providers', IMAGE_PROVIDER);
   fs.mkdirSync(providerDir, { recursive: true });
@@ -321,6 +420,7 @@ const CASES = [
   'entry-after-proceed',
   'entry-after-too-thin',
   ...IMAGE_CASES,
+  ...MAP_CASES,
 ];
 
 function loadCase(caseDir) {
@@ -995,6 +1095,103 @@ function imageReservedResults({ dir, setup, report }) {
   return [result('R1', r1), result('R2', r2), result('R3', r3)];
 }
 
+// ---------------------------------------------------------------- map cases grading
+
+/** Decodes a link target (%20 and other escapes), keeping it as written when it cannot be decoded. */
+function decodeTarget(raw) {
+  try {
+    return decodeURIComponent(raw.trim());
+  } catch {
+    return raw.trim();
+  }
+}
+
+/** The text between the yllir:map markers of a text, or null when there is no such block. */
+function mapBlock(text) {
+  const match = text.match(/<!-- yllir:map -->([\s\S]*?)<!-- \/yllir:map -->/);
+  return match ? match[1] : null;
+}
+
+/** M1 to M5 of entry-map-battle. */
+function mapBattleResults({ dir, setup, report }) {
+  const sheet = findCampaignFile(dir, MAP_SHEET_NAME);
+  const sheetFolder = sheet === null ? null : path.dirname(sheet);
+  const block = sheet === null ? null : mapBlock(fs.readFileSync(sheet, 'utf8'));
+  const targets = block === null ? [] : [...block.matchAll(/\]\(([^()\n]+)\)/g)].map((m) => decodeTarget(m[1]));
+  const exists = (target) => fs.existsSync(path.resolve(sheetFolder, target));
+
+  // M1: the map block of the sheet shows the grid picture, and the file exists.
+  const m1 = [];
+  if (sheet === null) {
+    m1.push(`${MAP_SHEET_NAME} does not exist`);
+  } else if (block === null) {
+    m1.push('the sheet has no yllir:map block');
+  } else {
+    const embed = block.match(/!\[[^\]\n]*\]\(([^()\n]+-grid\.png)\)/);
+    if (!embed) m1.push('no image embed ![...](<path>-grid.png) in the map block');
+    else if (!exists(decodeTarget(embed[1]))) m1.push(`grid image ${decodeTarget(embed[1])} does not exist`);
+  }
+
+  // M2: the block links to an existing .uvtt, preview and map.tmj; the .uvtt is format 0.3 with 64 pixels per grid cell.
+  const m2 = [];
+  if (block !== null) {
+    const uvttLinks = targets.filter((t) => t.endsWith('.uvtt'));
+    const previewLinks = targets.filter((t) => t.endsWith('-preview.html'));
+    const tmjLinks = targets.filter((t) => path.basename(t) === 'map.tmj');
+    if (uvttLinks.length === 0) {
+      m2.push('no link to a .uvtt file in the map block');
+    } else {
+      const uvtt = uvttLinks.find(exists);
+      if (uvtt === undefined) {
+        m2.push(`${uvttLinks[0]} does not exist`);
+      } else {
+        try {
+          const data = JSON.parse(fs.readFileSync(path.resolve(sheetFolder, uvtt), 'utf8'));
+          if (Number(data.format) !== 0.3) m2.push(`format is ${JSON.stringify(data.format)} (want 0.3)`);
+          if (data.resolution?.pixels_per_grid !== 64) {
+            m2.push(`resolution.pixels_per_grid is ${JSON.stringify(data.resolution?.pixels_per_grid)} (want 64)`);
+          }
+        } catch (err) {
+          m2.push(`${uvtt} is not JSON: ${err.message}`);
+        }
+      }
+    }
+    if (previewLinks.length === 0) m2.push('no link to a -preview.html file in the map block');
+    else if (!previewLinks.some(exists)) m2.push(`${previewLinks[0]} does not exist`);
+    if (tmjLinks.length === 0) m2.push('no link to map.tmj in the map block');
+    else if (!tmjLinks.some(exists)) m2.push(`${tmjLinks[0]} does not exist`);
+  }
+
+  // M3: the service was called, no call carries a master-only word or a service name.
+  const m3 = [];
+  const calls = imageCalls(dir);
+  if (calls === null || calls.length === 0) m3.push('the image service was not called');
+  const callText = calls === null ? '' : normalized(calls.join('\n'));
+  const leakedWords = MAP_FORBIDDEN_WORDS.filter((word) => callText.includes(word));
+  if (leakedWords.length > 0) m3.push(`a call to the image service has master-only words: ${leakedWords.join(', ')}`);
+  const leakedNames = IMAGE_FORBIDDEN_NAMES.filter((name) => callText.includes(name));
+  if (leakedNames.length > 0) m3.push(`a call to the image service names a service: ${leakedNames.join(', ')}`);
+
+  // M4: nothing is left outside .campaign/, and the newest commit touches the sheet.
+  const m4 = [];
+  const status = tryGit(dir, ['-c', 'core.quotePath=false', 'status', '--porcelain']);
+  if (status === null) {
+    m4.push('git status failed');
+  } else {
+    const outside = status.split('\n').filter((line) => line.trim() !== '' && !line.slice(3).startsWith('.campaign/'));
+    if (outside.length > 0) m4.push(`git status not empty outside .campaign: ${outside.join(' | ')}`);
+  }
+  const touched = tryGit(dir, ['-c', 'core.quotePath=false', 'show', '--name-only', '--format=', 'HEAD']);
+  const sheetRel = sheet === null ? null : path.relative(dir, sheet);
+  if (touched === null) m4.push('no newest commit');
+  else if (sheetRel === null || !touched.split('\n').includes(sheetRel)) m4.push(`the newest commit does not touch ${MAP_SHEET_NAME}`);
+
+  // M5: plain words in the final message.
+  const m5 = report === null || report === undefined ? ['no final message'] : plainWords(report).reasons;
+
+  return [result('M1', m1), result('M2', m2), result('M3', m3), result('M4', m4), result('M5', m5)];
+}
+
 // ---------------------------------------------------------------- checks per case
 
 /**
@@ -1128,6 +1325,9 @@ function gradeCase({ caseName, dir, setup, report, prompt = '', turnOne = null, 
         ? imagePortraitResults({ dir, setup, report })
         : imageReservedResults({ dir, setup, report });
     for (const [id, ok, reasons] of results) record(id, ok, reasons);
+  } else if (MAP_CASES.includes(caseName)) {
+    plain = report === null || report === undefined ? null : plainWords(report);
+    for (const [id, ok, reasons] of mapBattleResults({ dir, setup, report })) record(id, ok, reasons);
   } else if (PREPARE_CASES.includes(caseName)) {
     const results = [];
     if (turnOne) results.push(...turnOne.results);

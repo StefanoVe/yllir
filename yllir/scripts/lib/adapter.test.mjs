@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { listAdapters, loadAdapter, pluginRootFromHere } from './adapter.mjs';
+import { battleGrid, listAdapters, loadAdapter, pluginRootFromHere } from './adapter.mjs';
 
 const root = pluginRootFromHere();
 const manifest = path.join(root, 'modules/systems/dnd-2024/adapter.yaml');
@@ -39,6 +39,7 @@ test('discovers installed adapters in sorted order and loads the D&D manifest', 
   });
   assert.equal(loaded.adapter.creature_sheet.required.length, 9);
   assert.deepEqual(loaded.adapter.item_sheet.printable_fields, ['title', 'description']);
+  assert.deepEqual(battleGrid(loaded.adapter), { square: 5, unit: 'ft' });
 });
 
 test('missing systems folder returns an empty list; unknown adapter returns an issue', () => {
@@ -119,6 +120,38 @@ test('validates heading keys and nonempty Italian and English labels', () => {
     const errors = loadAdapter(temp, 'dnd-2024').errors;
     assert.ok(errors.some((e) => e.path === 'headings.effects.en' && e.code === 'bad-value'));
     assert.ok(errors.some((e) => e.path === 'headings.effects.fr' && e.code === 'unknown-key'));
+  });
+});
+
+test('optional battle_grid is validated and battleGrid gives the square size', () => {
+  withRoot((temp) => {
+    const plain = replace(source, 'battle_grid:\n  square: 5\n  unit: ft\n', '');
+    const block = 'battle_grid:\n  square: 5\n  unit: ft\n';
+    fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    write(temp, 'dnd-2024', replace(plain, 'encounters: turn-based\n', `encounters: turn-based\n${block}`));
+    let loaded = loadAdapter(temp, 'dnd-2024');
+    assert.deepEqual(loaded.errors, []);
+    assert.deepEqual(battleGrid(loaded.adapter), { square: 5, unit: 'ft' });
+
+    write(temp, 'dnd-2024', plain);
+    loaded = loadAdapter(temp, 'dnd-2024');
+    assert.deepEqual(loaded.errors, []);
+    assert.deepEqual(battleGrid(loaded.adapter), { square: 1, unit: null });
+    assert.deepEqual(battleGrid(null), { square: 1, unit: null });
+
+    const cases = [
+      ['battle_grid:\n  square: 0\n  unit: ft\n', 'battle_grid.square'],
+      ['battle_grid:\n  square: "5"\n  unit: ft\n', 'battle_grid.square'],
+      ['battle_grid:\n  square: 5\n  unit: yd\n', 'battle_grid.unit'],
+      ['battle_grid:\n  square: 5\n  unit: ft\n  extra: 1\n', 'battle_grid.extra'],
+      ['battle_grid: 5\n', 'battle_grid'],
+    ];
+    for (const [block, at] of cases) {
+      write(temp, 'dnd-2024', replace(plain, 'encounters: turn-based\n', `encounters: turn-based\n${block}`));
+      const errors = loadAdapter(temp, 'dnd-2024').errors;
+      assert.ok(errors.some((e) => e.path === at && e.code === (at.includes('.extra') ? 'unknown-key' : 'bad-value')), `${block} -> ${at}`);
+    }
   });
 });
 

@@ -92,6 +92,8 @@ Use these sentences as they are when the image tool needs them. The label in bra
 | [reserved document] | Questo documento è riservato a te, quindi non lo mando a nessun servizio per le illustrazioni. | This document is for your eyes only, so I will not send it to any illustration service. |
 | [send your own image] | Non ho un servizio per le illustrazioni disponibile: mandami un'immagine tua e la collego alla scheda. | I have no illustration service available: send me an image of your own and I will attach it to the sheet. |
 | [key needed] | Per usare <servizio> mi serve la sua chiave. Me la incolli qui? La tengo solo su questo computer, fuori dalla campagna. | To use <service> I need its key. Can you paste it here? I keep it only on this computer, outside the campaign. |
+| [map tools unavailable] | Non riesco a preparare gli strumenti per le mappe su questo computer. Posso comunque creare un'illustrazione del luogo vista dall'alto, senza griglia: vuoi? | I cannot set up the map tools on this computer. I can still create an illustration of the place seen from above, without a grid: would you like that? |
+| [world map not available] | Per ora so fare mappe di un luogo, come una stanza, un edificio o una strada, ma non la carta di tutto il mondo o di una regione. | For now I can make maps of one place, such as a room, a building or a street, but not a chart of the whole world or of a region. |
 
 ## Other languages
 

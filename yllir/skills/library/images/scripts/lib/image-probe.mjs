@@ -8,6 +8,7 @@ import { ORDER, readTable, writeTable } from './providers.mjs';
 import { loadCampaignProviders, readKey } from './campaign-providers.mjs';
 import { DEFAULT_URL, probeComfyui } from './comfyui.mjs';
 import { probeCodex } from './codex.mjs';
+import { probeG2dmedia, readReady } from './g2dmedia.mjs';
 
 const PROBE_TIMEOUT_MS = 5000;
 
@@ -85,15 +86,18 @@ export async function probeAll({
   mcpTools = [],
   env = process.env,
   now = () => new Date().toISOString(),
+  dataDir,
+  g2dProbe = probeG2dmedia,
 }) {
   const previous = readTable(campaignRoot);
   const previousEntry = (id) => previous.providers[id] ?? {};
 
   const url = comfyuiUrl ?? previousEntry('comfyui').url ?? DEFAULT_URL;
   const campaign = loadCampaignProviders(campaignRoot, env);
-  const [comfy, codex, campaignEntries] = await Promise.all([
+  const [comfy, codex, g2d, campaignEntries] = await Promise.all([
     probeComfyui({ url, fetchImpl }),
     probeCodex({ command: codexCommand }),
+    g2dProbe({ campaignRoot, ready: readReady(dataDir) }),
     Promise.all(campaign.providers.map((manifest) => probeCampaignProvider(campaignRoot, manifest, { mcpTools, env }))),
   ]);
 
@@ -109,6 +113,7 @@ export async function probeAll({
     reason: comfy.reason ?? null,
   };
   providers.codex = { available: codex.available, version: codex.version, reason: codex.reason };
+  providers.generate2dmedia = { available: g2d.available, reason: g2d.reason };
   providers.photoshop = { available: photoshop === 'yes' };
   providers.upload = { available: true };
 

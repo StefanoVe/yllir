@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildJob, placeImage, slugify, subjectDescription } from './image-job.mjs';
+import { buildJob, joinPrompt, placeImage, slugify, subjectDescription } from './image-job.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -342,4 +342,171 @@ test('both CLIs with no arguments print usage and exit 2', () => {
     assert.match(run.stdout, /exit: 2\n$/);
     assert.match(run.stderr, /usage:/);
   }
+});
+
+const MAP_PROMPT = 'Mappa di battaglia pulita, nessuna prospettiva. {SUBJECT_DESCRIPTION}\n';
+
+function addMapStyle(root) {
+  write(root, '.campaign/styles/map/profile.yaml', 'id: map\nnegative: "testo, griglia, prospettiva"\nwidth: 512\nheight: 512\n');
+  write(root, '.campaign/styles/map/prompt.md', MAP_PROMPT);
+}
+
+test('a map job uses the map style, the fixed request and the grid size, never master-only text', () => {
+  const root = makeCampaign();
+  addMapStyle(root);
+  const result = buildJob({
+    root,
+    document: 'Personaggi/Oria Brunel.md',
+    operation: 'generate',
+    purpose: 'map',
+    cells: { cols: 24, rows: 16 },
+  });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(result.jobId, 'oria-brunel-map-1');
+  assert.equal(result.job.style, 'map');
+  assert.equal(result.job.purpose, 'map');
+  assert.deepEqual(result.job.cells, { cols: 24, rows: 16 });
+  assert.equal(result.job.reference, null);
+  assert.equal(result.job.width, 1536);
+  assert.equal(result.job.height, 1024);
+  assert.equal(result.job.negative, 'testo, griglia, prospettiva');
+  assert.match(result.job.prompt, /^Mappa di battaglia pulita/);
+  assert.match(result.job.prompt, /cartografa dai capelli rossi/);
+  assert.match(result.job.prompt, /Top-down orthographic battle map seen from directly above/);
+  assert.match(result.job.prompt, /The area is 24 squares wide and 16 squares tall;/);
+  assert.ok(!result.job.prompt.includes('SEGRETO'));
+  const onDisk = JSON.parse(fs.readFileSync(path.join(result.jobDir, 'job.json'), 'utf8'));
+  assert.equal(onDisk.purpose, 'map');
+  assert.deepEqual(onDisk.cells, { cols: 24, rows: 16 });
+  assert.ok(!JSON.stringify(onDisk).includes('SEGRETO'));
+});
+
+test('a tall map gets the height of 1536 and the width from the grid', () => {
+  const root = makeCampaign();
+  addMapStyle(root);
+  const result = buildJob({ root, document: 'Personaggi/Oria Brunel.md', operation: 'generate', purpose: 'map', cells: { cols: 16, rows: 24 } });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(result.job.width, 1024);
+  assert.equal(result.job.height, 1536);
+});
+
+test('a map job without the map style is no-style', () => {
+  const root = makeCampaign();
+  const result = buildJob({ root, document: 'Personaggi/Oria Brunel.md', operation: 'generate', purpose: 'map', cells: { cols: 24, rows: 16 } });
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'no-style');
+  assert.match(result.message, /map/);
+});
+
+test('a map job with cells outside 8..60 is bad-cells', () => {
+  const root = makeCampaign();
+  addMapStyle(root);
+  for (const cells of [{ cols: 7, rows: 10 }, { cols: 10, rows: 61 }, { cols: 10.5, rows: 10 }, null]) {
+    const result = buildJob({ root, document: 'Personaggi/Oria Brunel.md', operation: 'generate', purpose: 'map', cells });
+    assert.equal(result.error, 'bad-cells');
+  }
+});
+
+test('a map job only supports generate', () => {
+  const root = makeCampaign();
+  addMapStyle(root);
+  const result = buildJob({ root, document: 'Personaggi/Oria Brunel.md', operation: 'remove_background', purpose: 'map', cells: { cols: 24, rows: 16 } });
+  assert.equal(result.error, 'bad-operation');
+});
+
+test('a map reference outside the maps folder is bad-reference, one inside is kept', () => {
+  const root = makeCampaign();
+  addMapStyle(root);
+  const inbox = makeInbox();
+  const plan = path.join(inbox, 'plan.png');
+  fs.writeFileSync(plan, 'PNG');
+  const outside = buildJob({
+    root,
+    document: 'Personaggi/Oria Brunel.md',
+    operation: 'generate',
+    purpose: 'map',
+    cells: { cols: 24, rows: 16 },
+    reference: plan,
+  });
+  assert.equal(outside.error, 'bad-reference');
+
+  const inside = path.join(root, '.campaign', 'state', 'maps', 'plan-map', 'plan.png');
+  write(root, '.campaign/state/maps/plan-map/plan.png', 'PNG');
+  const ok = buildJob({
+    root,
+    document: 'Personaggi/Oria Brunel.md',
+    operation: 'generate',
+    purpose: 'map',
+    cells: { cols: 24, rows: 16 },
+    reference: inside,
+  });
+  assert.equal(ok.ok, true, ok.message);
+  assert.equal(ok.job.reference, inside);
+});
+
+test('an image job is marked purpose image with no reference', () => {
+  const root = makeCampaign();
+  const result = buildJob({ root, document: 'Personaggi/Oria Brunel.md', operation: 'generate' });
+  assert.equal(result.job.purpose, 'image');
+  assert.equal(result.job.reference, null);
+  assert.equal(result.job.cells, undefined);
+});
+
+test('the image prompt CLI takes --purpose map with --cells and refuses invalid combinations with usage', () => {
+  const root = makeCampaign();
+  addMapStyle(root);
+  const run = spawnSync(
+    process.execPath,
+    [PROMPT_CLI, root, '--document', 'Personaggi/Oria Brunel.md', '--operation', 'generate', '--purpose', 'map', '--cells', '24x16'],
+    { encoding: 'utf8' },
+  );
+  assert.equal(run.status, 0, run.stderr);
+  assert.match(run.stdout, /^job: oria-brunel-map-1\n/m);
+  assert.ok(!run.stdout.includes('Top-down'));
+
+  const noCells = spawnSync(
+    process.execPath,
+    [PROMPT_CLI, root, '--document', 'Personaggi/Oria Brunel.md', '--operation', 'generate', '--purpose', 'map'],
+    { encoding: 'utf8' },
+  );
+  assert.equal(noCells.status, 2);
+  const cellsOnImage = spawnSync(
+    process.execPath,
+    [PROMPT_CLI, root, '--document', 'Personaggi/Oria Brunel.md', '--operation', 'generate', '--cells', '24x16'],
+    { encoding: 'utf8' },
+  );
+  assert.equal(cellsOnImage.status, 2);
+});
+
+test('the prompt has no newline before a period and no double period, for image and map jobs', () => {
+  const root = makeCampaign();
+  addMapStyle(root);
+  const image = buildJob({ root, document: 'Personaggi/Oria Brunel.md', operation: 'generate', request: 'sfondo notturno.' });
+  const map = buildJob({
+    root,
+    document: 'Personaggi/Oria Brunel.md',
+    operation: 'generate',
+    purpose: 'map',
+    cells: { cols: 24, rows: 16 },
+    request: 'rovine.',
+  });
+  const bare = buildJob({ root, document: 'Personaggi/Oria Brunel.md', operation: 'generate' });
+  for (const result of [image, map, bare]) {
+    assert.equal(result.ok, true, result.message);
+    assert.ok(!result.job.prompt.includes('\n.'), result.job.prompt);
+    assert.ok(!result.job.prompt.includes('..'), result.job.prompt);
+    assert.ok(!result.job.prompt.includes('\n'), result.job.prompt);
+  }
+  assert.match(image.job.prompt, /acquerello su carta antica\. Oria Brunel/);
+  assert.match(image.job.prompt, /\. sfondo notturno$/);
+  assert.match(map.job.prompt, /\. rovine\. Top-down orthographic/);
+  assert.match(map.job.prompt, /squares wide and 16 squares tall;/);
+  assert.match(map.job.prompt, /follow the attached plan when one is attached\.$/);
+  assert.equal(bare.job.prompt.endsWith('\n'), false);
+});
+
+test('joinPrompt trims the style text and removes its final period before appending', () => {
+  assert.equal(joinPrompt('Stile pulito. Dalla breccia.\n', ['Top-down.']), 'Stile pulito. Dalla breccia. Top-down.');
+  assert.equal(joinPrompt('Stile pulito.\n', []), 'Stile pulito.');
+  assert.equal(joinPrompt('Stile.\n', ['  ', '']), 'Stile.');
 });
