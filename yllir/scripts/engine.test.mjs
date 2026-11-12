@@ -223,3 +223,67 @@ test('deletes and sources go through check with their own options', (t) => {
   assert.equal(missing.status, 1);
   assert.equal(missing.json.errors[0].code, 'missing-source');
 });
+
+test('change-plan prints the census of a subject with exit 0, an unknown id exits 1, a missing --subject is a usage error', (t) => {
+  const dir = makeCampaign(t);
+  const before = git(dir, ['status', '--porcelain']);
+  const census = cli(['change-plan', dir, '--subject', 'fosco-il-ramaio']);
+  assert.equal(census.status, 0, census.stdout);
+  assert.equal(census.json.ok, true);
+  assert.equal(census.json.subject.id, 'fosco-il-ramaio');
+  assert.deepEqual(census.json.errors, []);
+  assert.ok(Array.isArray(census.json.links) && Array.isArray(census.json.mentions));
+
+  const unknown = cli(['change-plan', dir, '--subject', 'nessuno-del-tutto']);
+  assert.equal(unknown.status, 1);
+  assert.equal(unknown.json.ok, false);
+  assert.equal(unknown.json.errors[0].code, 'unknown-subject');
+
+  assertUsage(cli(['change-plan', dir]));
+  assert.equal(git(dir, ['status', '--porcelain']), before);
+});
+
+test('change-draft rename writes the drafts of a rename with exit 0, a taken name exits 1 with nothing written', (t) => {
+  const dir = makeCampaign(t);
+  const sheet = 'Personaggi/Teodo Marr.md';
+  const original = fs.readFileSync(path.join(dir, sheet), 'utf8');
+  const renamed = cli(['change-draft', dir, '--op', 'rename', '--subject', 'teodo-marr', '--title', 'Teodo Brevald']);
+  assert.equal(renamed.status, 0, renamed.stdout);
+  assert.equal(renamed.json.ok, true);
+  assert.equal(renamed.json.op, 'rename');
+  assert.equal(renamed.json.subject, 'teodo-marr');
+  assert.deepEqual(renamed.json.deletes, [sheet]);
+  assert.ok(renamed.json.files.includes('Personaggi/Teodo Brevald.md'), JSON.stringify(renamed.json.files));
+  assert.ok(fs.existsSync(path.join(dir, '.campaign/drafts/Personaggi/Teodo Brevald.md')));
+  assert.equal(fs.readFileSync(path.join(dir, sheet), 'utf8'), original, 'the campaign sheet is not changed by a draft');
+
+  const taken = cli(['change-draft', dir, '--op', 'rename', '--subject', 'oria-valdes', '--title', 'Lino Valdes']);
+  assert.equal(taken.status, 1, taken.stdout);
+  assert.equal(taken.json.ok, false);
+  assert.equal(taken.json.errors[0].code, 'path-taken');
+});
+
+test('change-draft delete writes the drafts of a delete with exit 0, a referenced subject exits 1 with still-referenced', (t) => {
+  const dir = makeCampaign(t);
+  const deleted = cli(['change-draft', dir, '--op', 'delete', '--subject', 'oria-valdes']);
+  assert.equal(deleted.status, 0, deleted.stdout);
+  assert.equal(deleted.json.ok, true);
+  assert.equal(deleted.json.op, 'delete');
+  assert.deepEqual(deleted.json.deletes, ['Personaggi/Oria Valdes.md']);
+  assert.ok(Array.isArray(deleted.json.files) && deleted.json.files.length > 0, JSON.stringify(deleted.json));
+
+  const referenced = cli(['change-draft', dir, '--op', 'delete', '--subject', 'borgo-cenere']);
+  assert.equal(referenced.status, 1, referenced.stdout);
+  assert.equal(referenced.json.ok, false);
+  assert.ok(referenced.json.errors.every((error) => error.code === 'still-referenced'));
+  assert.equal(fs.existsSync(path.join(dir, '.campaign/drafts/Mondo/Morvalle/Borgo Cenere/Borgo Cenere.md')), false);
+});
+
+test('change-draft usage: a missing op or subject, a title with delete or without rename are usage errors', (t) => {
+  const dir = makeCampaign(t);
+  assertUsage(cli(['change-draft', dir, '--subject', 'teodo-marr', '--title', 'X']));
+  assertUsage(cli(['change-draft', dir, '--op', 'rename', '--title', 'X']));
+  assertUsage(cli(['change-draft', dir, '--op', 'rename', '--subject', 'teodo-marr']));
+  assertUsage(cli(['change-draft', dir, '--op', 'delete', '--subject', 'oria-valdes', '--title', 'X']));
+  assertUsage(cli(['change-draft', dir, '--op', 'merge', '--subject', 'teodo-marr']));
+});

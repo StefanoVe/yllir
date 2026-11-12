@@ -70,6 +70,20 @@ Use only the words in the language column of the campaign: the Italian column fo
 
 Never write these words, in any language, in a message to the master or in a document meant for players: skill, script, git, commit, repository, YAML, frontmatter, metadata block, Markdown, sub-agent, model, Haiku, Claude, hook, MCP, template, prompt, JSON, plugin, draft, batch, provenance field, codes of saved versions (for example a1b2c3d), text in backticks, and the names of terminal commands (for example `node`, `mkdir`, `git`, `cat`).
 
+## Changes to the canon
+
+Use these words when you propose or report a change of the shape of the canon.
+
+| Internal term (never say it) | Italian word the master sees | English word the master sees |
+|---|---|---|
+| Rename | «Cambiare nome» | «Change name» |
+| Move | «Spostare» | «Move» |
+| Delete (of a subject) | «Eliminare» | «Remove» |
+| Merge | «Unire due schede» | «Merge two sheets» |
+| Split | «Dividere una scheda» | «Split a sheet» |
+| Retcon (correction of an established fact) | «Correggere un fatto già stabilito» | «Correct a fact already established» |
+| Census (plan of references) | «Che cosa cambia» | «What changes» |
+
 ## Where a document comes from
 
 Use these words when you tell the master where something comes from. They are not internal terms.

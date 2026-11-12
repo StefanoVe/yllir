@@ -245,7 +245,7 @@ function subjectOf(index, id) {
  * True when a link target reaches the subject's original document. Internal
  * geographic aliases and external ingest symlinks both resolve to that file.
  */
-function isSameSheet(target, subject, campaignRoot) {
+export function isSameSheet(target, subject, campaignRoot) {
   const sheet = subject.sheet;
   if (target === sheet || subject.paths?.includes(target)) return true;
   if (!subject.external) return false;
@@ -292,7 +292,7 @@ function containsWholeWord(haystack, needle) {
  * (with `/` separators). Anchors are dropped; an empty target means the file
  * itself; external URLs are returned as written.
  */
-function resolveLinkTarget(target, file, campaignRoot) {
+export function resolveLinkTarget(target, file, campaignRoot) {
   const withoutAnchor = target.split('#')[0];
   let decoded;
   try {

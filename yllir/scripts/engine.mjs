@@ -8,12 +8,17 @@
 //   commit  <root> [--files "a,b"] [--deletes "c"] [--sources "d"] --message "<text>" [--note "<text>"]
 //   query   <root> <name> [args...]
 //   index   <root>
+//   change-plan <root> --subject <id>   (read-only census of the references to one subject)
+//   change-draft <root> --op rename --subject <id> --title "<new title>"
+//   change-draft <root> --op delete --subject <id>   (writes the drafts of a whole-subject change)
 // Exit codes: 0 ok, 1 campaign problem (ok:false, or a query error), 2 usage or internal error.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { checkBatch, commitBatch } from './lib/engine/commit.mjs';
 import { buildContext } from './lib/engine/context.mjs';
+import { changePlan } from './lib/engine/change-plan.mjs';
+import { changeDraft } from './lib/engine/change-draft.mjs';
 import { runQuery } from './lib/engine/query.mjs';
 import { buildSubjectIndex } from './lib/subjects.mjs';
 import { buildWorldIndex, writeWorldIndex } from './lib/world-graph.mjs';
@@ -26,6 +31,8 @@ const USAGE = [
   '  commit  <root> [--files "a,b"] [--deletes "c"] [--sources "d"] --message "<text>" [--note "<text>"]',
   '  query   <root> <name> [args...]',
   '  index   <root>',
+  '  change-plan <root> --subject <id>',
+  '  change-draft <root> --op rename|delete --subject <id> [--title "<new title>"]',
 ].join('\n');
 
 const COMMANDS = {
@@ -34,6 +41,8 @@ const COMMANDS = {
   commit: ['files', 'deletes', 'sources', 'message', 'note'],
   query: null, // positional: <name> [args...], no options
   index: [],
+  'change-plan': ['subject'],
+  'change-draft': ['op', 'subject', 'title'],
 };
 
 class UsageError extends Error {}
@@ -142,6 +151,29 @@ async function run(parsed) {
       writeWorldIndex(root, world);
       const errors = subjects.errors.length + world.errors.length;
       return { code: 0, value: { ok: errors === 0, subjects: subjects.subjects.length, errors } };
+    }
+    case 'change-plan': {
+      if (options.subject === undefined || options.subject.trim() === '') {
+        usageError('--subject is required');
+      }
+      const result = changePlan(root, options.subject.trim());
+      return { code: result.ok ? 0 : 1, value: result };
+    }
+    case 'change-draft': {
+      if (options.op !== 'rename' && options.op !== 'delete') {
+        usageError('--op must be rename or delete');
+      }
+      if (options.subject === undefined || options.subject.trim() === '') {
+        usageError('--subject is required');
+      }
+      if (options.op === 'rename' && options.title === undefined) usageError('--title is required for rename');
+      if (options.op === 'delete' && options.title !== undefined) usageError('--title is not allowed for delete');
+      const result = changeDraft(root, {
+        op: options.op,
+        subject: options.subject.trim(),
+        title: options.title,
+      });
+      return { code: result.ok ? 0 : 1, value: result };
     }
     default:
       usageError(`unknown command '${command}'`);

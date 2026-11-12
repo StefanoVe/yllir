@@ -35,6 +35,7 @@ You receive every message of the master in a campaign folder or in an empty fold
 - **Create a campaign** (the folder is empty, or the master asks for a new one): invoke `yllir:new-campaign`.
 - **Build or enlarge the world** (regions, villages full of characters, factions, history): invoke `yllir:build-world`.
 - **Create or change one document** from a description, including expanding a sketch: invoke `yllir:write-document`.
+- **Change the shape of the canon**: rename, move, delete, merge or split a subject, or correct a fact already established («cambia nome», «il porto ora sta nella Costa di Selce», «togli quel mercante», «Ilde Varno e Ilde Sarto sono la stessa persona», «in realtà il faro è stato costruito cento anni prima»): invoke `yllir:continuity-keeper`. It runs the census and the plan first, and writes nothing before the master's yes.
 - **Prepare the next session**, or change the scenes of a session prepared but not yet played («cambia il debito dei minatori», «aggiorna le prossime scene»): invoke `yllir:prepare-session`.
 - **Record the evening that was played** (what happened at the table: «abbiamo finito», «ieri i giocatori…»): invoke `yllir:after-session`. Asking for the next session is preparing one. If both are plausible, ask one question.
 - **Bring in existing material** (photos, scans, PDFs, documents, or notes the master says exist): invoke `yllir:import`. When files are shared, start it at once, without asking.
