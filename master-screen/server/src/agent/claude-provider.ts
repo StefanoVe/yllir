@@ -1,6 +1,7 @@
 // Real agent provider on @anthropic-ai/claude-agent-sdk: runs the master's Claude Code
 // with the Yllir plugin, a permission gate and two in-process tools. Owner: chat engineer.
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -15,7 +16,7 @@ import {
 import { z } from 'zod';
 import type { Ctx } from '../context.js';
 import { runEngine } from '../engine.js';
-import { narrationActivity, toolActivity } from '../chat/activity.js';
+import { describeTool, narrationActivity, type ActivityRoots } from '../chat/activity.js';
 import { suggestMusic } from '../music/suggest.js';
 import { validateOpenPath } from '../chat/paths.js';
 import { TEXTS, campaignLanguage, type Lang } from '../chat/text.js';
@@ -171,13 +172,46 @@ function classifyFailure(lang: Lang, subtype: string | undefined, details: strin
 
 interface ContentBlock {
   type: string;
+  id?: string;
   text?: string;
   name?: string;
   input?: Record<string, unknown>;
+  tool_use_id?: string;
+  is_error?: boolean;
+}
+
+function rootsOf(ctx: Ctx): ActivityRoots | undefined {
+  return typeof ctx.campaignRoot === 'string' && typeof ctx.frameworkRoot === 'string'
+    ? { campaignRoot: ctx.campaignRoot, frameworkRoot: ctx.frameworkRoot }
+    : undefined;
 }
 
 /**
- * Maps one SDK message to agent events. Sub-agent messages (parent_tool_use_id) are ignored.
+ * The events of the tool uses of one message: an activity sentence (when the tool has one) and
+ * a step that starts. A sub-agent's tool uses carry `parentId`, the tool use that started it.
+ */
+function toolEvents(content: ContentBlock[], lang: Lang, ctx: Ctx, parentId?: string): AgentEvent[] {
+  const events: AgentEvent[] = [];
+  const roots = rootsOf(ctx);
+  for (const block of content) {
+    if (block.type !== 'tool_use' || typeof block.name !== 'string') continue;
+    const described = describeTool(block.name, block.input ?? {}, lang, roots);
+    if (described) events.push({ type: 'activity', text: described.text });
+    const step = described ?? { kind: 'other' as const, text: TEXTS[lang].working };
+    events.push({
+      type: 'step',
+      id: typeof block.id === 'string' ? block.id : randomUUID(),
+      kind: step.kind,
+      text: step.text,
+      ...(parentId ? { parentId } : {}),
+    });
+  }
+  return events;
+}
+
+/**
+ * Maps one SDK message to agent events. Every tool use starts a step; every tool result ends one.
+ * Sub-agent messages (parent_tool_use_id) only contribute their tool steps, never text or the end.
  * An assistant message is complete when it arrives, so it is judged whole: text of a message
  * that uses a tool is progress (activity only); text of a message that uses no tool is the
  * answer, held in `state` and sent once as a delta when the run succeeds, just before done.
@@ -190,7 +224,10 @@ export function mapMessage(message: SDKMessage, state: RunState, ctx: Ctx, lang:
       return [];
     }
     case 'assistant': {
-      if (message.parent_tool_use_id || state.finished) return [];
+      const parentId = message.parent_tool_use_id || undefined;
+      const content = (message.message?.content ?? []) as unknown as ContentBlock[];
+      if (parentId) return toolEvents(content, lang, ctx, parentId);
+      if (state.finished) return [];
       if (message.error) {
         state.finished = true;
         ctx.log(`agent message error: ${message.error}`);
@@ -201,7 +238,6 @@ export function mapMessage(message: SDKMessage, state: RunState, ctx: Ctx, lang:
           },
         ];
       }
-      const content = (message.message?.content ?? []) as unknown as ContentBlock[];
       const text = content
         .filter((block) => block.type === 'text' && typeof block.text === 'string')
         .map((block) => block.text as string)
@@ -214,11 +250,17 @@ export function mapMessage(message: SDKMessage, state: RunState, ctx: Ctx, lang:
       const events: AgentEvent[] = [];
       const narration = narrationActivity(text, lang);
       if (narration) events.push({ type: 'activity', text: narration });
-      for (const block of toolUses) {
-        const sentence = toolActivity(block.name as string, block.input ?? {}, lang);
-        if (sentence) events.push({ type: 'activity', text: sentence });
-      }
+      events.push(...toolEvents(content, lang, ctx));
       return events;
+    }
+    case 'user': {
+      // Tool results end the steps they answer; a failed tool result ends its step as failed.
+      if (state.finished) return [];
+      const content: unknown = message.message?.content;
+      if (!Array.isArray(content)) return [];
+      return (content as ContentBlock[])
+        .filter((block) => block.type === 'tool_result' && typeof block.tool_use_id === 'string')
+        .map((block): AgentEvent => ({ type: 'step-end', id: block.tool_use_id as string, ok: block.is_error !== true }));
     }
     case 'result': {
       if (state.finished) return [];
@@ -313,12 +355,13 @@ async function* runTurn(ctx: Ctx, executable: string, input: AgentRunInput): Asy
     permissionMode: 'default',
     canUseTool,
     mcpServers: { yllir: yllirTools },
-    disallowedTools: ['WebFetch', 'WebSearch'],
     systemPrompt: { type: 'preset', preset: 'claude_code', append: MASTER_SCREEN_PROMPT },
     // Text is judged per complete assistant message, so partial text messages are not needed.
     includePartialMessages: false,
     abortController: controller,
     ...(input.resumeId ? { resume: input.resumeId } : {}),
+    ...(input.model ? { model: input.model } : {}),
+    ...(input.effort ? { effort: input.effort } : {}),
   };
 
   // Ends by itself: the SDK stream stops when the controller aborts, and every failure is queued.

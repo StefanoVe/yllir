@@ -1,6 +1,10 @@
 import type { TranslationKey } from '../i18n';
+import { chatRichIt } from './parts/chat-rich.it';
+import { chatStepsIt } from './parts/chat-steps.it';
 
 export const it: Record<TranslationKey, string> = {
+  ...chatRichIt,
+  ...chatStepsIt,
   'nav.home': 'Home',
   'nav.search': 'Cerca',
   'nav.liveTable': 'Tavolo',
@@ -40,6 +44,22 @@ export const it: Record<TranslationKey, string> = {
   'chat.status': 'Stato dell’assistente',
   'chat.you': 'Tu',
   'chat.assistant': 'Assistente',
+  'chat.model.title': 'Quale assistente risponde',
+  'chat.model.sonnet': 'Sonnet',
+  'chat.model.sonnet.desc': 'Equilibrato',
+  'chat.model.opus': 'Opus',
+  'chat.model.opus.desc': 'Il più approfondito',
+  'chat.model.haiku': 'Haiku',
+  'chat.model.haiku.desc': 'Il più veloce',
+  'chat.thinking': 'Riflessione',
+  'chat.effort.low': 'Bassa',
+  'chat.effort.low.desc': 'Risposte rapide',
+  'chat.effort.medium': 'Media',
+  'chat.effort.medium.desc': 'Riflessione equilibrata',
+  'chat.effort.high': 'Alta',
+  'chat.effort.high.desc': 'Ci pensa con calma',
+  'chat.effort.max': 'Massima',
+  'chat.effort.max.desc': 'La più lunga e approfondita',
   'changes.empty': 'Nessuna modifica per ora.',
   'changes.loadError': 'Non è stato possibile caricare le modifiche.',
   'changes.undo': 'Annulla questa modifica',

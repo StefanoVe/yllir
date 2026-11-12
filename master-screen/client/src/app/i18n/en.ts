@@ -1,4 +1,9 @@
+import { chatRichEn } from './parts/chat-rich.en';
+import { chatStepsEn } from './parts/chat-steps.en';
+
 export const en = {
+  ...chatRichEn,
+  ...chatStepsEn,
   'nav.home': 'Home',
   'nav.search': 'Search',
   'nav.liveTable': 'Live table',
@@ -38,6 +43,22 @@ export const en = {
   'chat.status': 'Assistant status',
   'chat.you': 'You',
   'chat.assistant': 'Assistant',
+  'chat.model.title': 'Which assistant answers',
+  'chat.model.sonnet': 'Sonnet',
+  'chat.model.sonnet.desc': 'Balanced',
+  'chat.model.opus': 'Opus',
+  'chat.model.opus.desc': 'Deepest',
+  'chat.model.haiku': 'Haiku',
+  'chat.model.haiku.desc': 'Fastest',
+  'chat.thinking': 'Thinking',
+  'chat.effort.low': 'Low',
+  'chat.effort.low.desc': 'Quick answers',
+  'chat.effort.medium': 'Medium',
+  'chat.effort.medium.desc': 'Balanced thinking',
+  'chat.effort.high': 'High',
+  'chat.effort.high.desc': 'Thinks it through',
+  'chat.effort.max': 'Max',
+  'chat.effort.max.desc': 'Longest and deepest',
   'changes.empty': 'No changes yet.',
   'changes.loadError': 'The changes could not be loaded.',
   'changes.undo': 'Undo this change',

@@ -45,7 +45,17 @@
           @if (row.message.role === 'master') {
             <p class="text">{{ row.message.text }}</p>
           } @else {
-            <div class="text md" [innerHTML]="renderMarkdown(row.message.text)"></div>
+            <div class="text md" [msChatRich]="row.message.text" [innerHTML]="renderMarkdown(row.message.text)"></div>
+          }
+          @if (row.steps; as steps) {
+            <details class="steps-done">
+              <summary>{{ doneLabel(row.message.steps?.length ?? 0) }}</summary>
+              <ul class="steps" role="list" [attr.aria-label]="t('chat.steps.list')">
+                @for (item of steps; track item.step.id) {
+                  <ng-container [ngTemplateOutlet]="stepRow" [ngTemplateOutletContext]="{ $implicit: item, live: false }" />
+                }
+              </ul>
+            </details>
           }
         </article>
       }
@@ -60,13 +70,11 @@
   </div>
 
   <div class="status" aria-live="polite" [attr.aria-label]="t('chat.status')">
-    @if (activeTurn(); as turn) {
-      <span class="dot" aria-hidden="true"></span>
-      <span class="activity">{{ turn.activity || t('chat.working') }}</span>
-      <button type="button" class="icon-btn stop" [title]="t('chat.stop')" [attr.aria-label]="t('chat.stop')"
-              (click)="stop()">
-        <lucide-angular [img]="icons.Square" [size]="14" aria-hidden="true" />
-      </button>
+    @if (activeTurn()) {
+      <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+      <span class="activity">{{ activeLine() }}</span>
+      <button type="button" class="steps-toggle" aria-controls="chat-steps-live" [attr.aria-expanded]="stepsOpen()"
+              (click)="toggleSteps()">{{ t('chat.steps.toggle') }}</button>
     } @else if (failedTurn(); as turn) {
       <span class="failed">{{ turn.error || t('chat.turnFailed') }}</span>
     }
@@ -75,17 +83,121 @@
     }
   </div>
 
+  @if (activeTurn() && stepsOpen()) {
+    <div class="steps-live" aria-live="off">
+      <ul id="chat-steps-live" class="steps" role="list" #steps [attr.aria-label]="t('chat.steps.list')"
+          (scroll)="onStepsScroll()">
+        @for (item of stepRows(); track item.step.id) {
+          <ng-container [ngTemplateOutlet]="stepRow" [ngTemplateOutletContext]="{ $implicit: item, live: true }" />
+        }
+      </ul>
+    </div>
+  }
+
   <form class="composer" (submit)="$event.preventDefault(); send()">
     <textarea #composer rows="1" class="input" [value]="draft()" [disabled]="!agentAvailable()"
               [placeholder]="t('chat.placeholder')" [attr.aria-label]="t('chat.composer')"
               (input)="onInput($any($event.target))" (keydown)="onComposerKeydown($event)"></textarea>
-    <button type="submit" class="icon-btn send" [disabled]="!canSend()" [title]="t('chat.send')"
-            [attr.aria-label]="t('chat.send')">
-      <lucide-angular [img]="icons.Send" [size]="18" aria-hidden="true" />
-    </button>
+
+    <div class="composer-bar">
+      <div class="choices">
+        <div class="choice" data-choice="model">
+          <button type="button" class="pill" data-menu-trigger="model" aria-haspopup="menu"
+                  [attr.aria-expanded]="menu() === 'model'" [attr.aria-controls]="menu() === 'model' ? 'chat-model-menu' : null"
+                  [title]="t('chat.model.title')"
+                  [attr.aria-label]="t('chat.model.title') + ': ' + modelLabel(choice().model)"
+                  (click)="toggleMenu('model')" (keydown)="onTriggerKeydown('model', $event)">
+            <span class="pill-text">{{ modelLabel(choice().model) }}</span>
+            <lucide-angular [img]="icons.ChevronDown" [size]="14" aria-hidden="true" />
+          </button>
+          @if (menu() === 'model') {
+            <div class="menu" role="menu" id="chat-model-menu" data-menu="model" [attr.aria-label]="t('chat.model.title')"
+                 (keydown)="onMenuKeydown('model', $event)">
+              @for (id of models; track id) {
+                <button type="button" role="menuitemradio" class="menu-item" tabindex="-1"
+                        [attr.aria-checked]="choice().model === id" (click)="selectModel(id)">
+                  <span class="item-text">
+                    <span class="item-name">{{ t(modelText[id].label) }}</span>
+                    <span class="item-desc">{{ t(modelText[id].description) }}</span>
+                  </span>
+                  @if (choice().model === id) {
+                    <lucide-angular [img]="icons.Check" [size]="16" class="item-check" aria-hidden="true" />
+                  }
+                </button>
+              }
+            </div>
+          }
+        </div>
+
+        <div class="choice" data-choice="effort">
+          <button type="button" class="pill" data-menu-trigger="effort" aria-haspopup="menu"
+                  [attr.aria-expanded]="menu() === 'effort'" [attr.aria-controls]="menu() === 'effort' ? 'chat-effort-menu' : null"
+                  [title]="t('chat.thinking')"
+                  [attr.aria-label]="t('chat.thinking') + ': ' + effortLabel(choice().effort)"
+                  (click)="toggleMenu('effort')" (keydown)="onTriggerKeydown('effort', $event)">
+            <span class="pill-text">{{ t('chat.thinking') }}: {{ effortLabel(choice().effort) }}</span>
+            <lucide-angular [img]="icons.ChevronDown" [size]="14" aria-hidden="true" />
+          </button>
+          @if (menu() === 'effort') {
+            <div class="menu end" role="menu" id="chat-effort-menu" data-menu="effort" [attr.aria-label]="t('chat.thinking')"
+                 (keydown)="onMenuKeydown('effort', $event)">
+              @for (id of efforts; track id) {
+                <button type="button" role="menuitemradio" class="menu-item" tabindex="-1"
+                        [attr.aria-checked]="choice().effort === id" (click)="selectEffort(id)">
+                  <span class="item-text">
+                    <span class="item-name">{{ t(effortText[id].label) }}</span>
+                    <span class="item-desc">{{ t(effortText[id].description) }}</span>
+                  </span>
+                  @if (choice().effort === id) {
+                    <lucide-angular [img]="icons.Check" [size]="16" class="item-check" aria-hidden="true" />
+                  }
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      @if (activeTurn()) {
+        <button type="button" class="composer-btn stop" [title]="t('chat.stop')" [attr.aria-label]="t('chat.stop')"
+                (click)="stop()">
+          <lucide-angular [img]="icons.Square" [size]="14" aria-hidden="true" />
+        </button>
+      } @else {
+        <button type="submit" class="composer-btn send" [disabled]="!canSend()" [title]="t('chat.send')"
+                [attr.aria-label]="t('chat.send')">
+          <lucide-angular [img]="icons.Send" [size]="18" aria-hidden="true" />
+        </button>
+      }
+    </div>
   </form>
 
   @if (sendError(); as error) {
     <p class="error" role="alert">{{ error }}</p>
   }
+
+  <ng-template #stepRow let-item let-live="live">
+    <li class="step" [class.child]="item.depth > 0" [class.failed]="item.step.state === 'failed'">
+      <lucide-angular [img]="iconFor(item.step.kind)" [size]="14" class="step-kind" aria-hidden="true" />
+      <span class="step-body">
+        <span class="step-text">{{ item.step.text }}</span>
+        @if (isSlowStep(item.step)) {
+          <span class="step-hint">{{ t('chat.steps.imageHint') }}</span>
+        }
+      </span>
+      @if (item.step.state === 'running') {
+        @if (live) {
+          <lucide-angular [img]="icons.LoaderCircle" [size]="14" class="step-state spin" aria-hidden="true" />
+          <span class="sr-only">{{ t('chat.steps.running') }}</span>
+        }
+      } @else if (item.step.state === 'failed') {
+        <lucide-angular [img]="icons.CircleAlert" [size]="14" class="step-state step-failed" aria-hidden="true" />
+        <span class="sr-only">{{ t('chat.steps.failed') }}</span>
+      } @else {
+        <lucide-angular [img]="icons.Check" [size]="14" class="step-state step-done" aria-hidden="true" />
+        <span class="sr-only">{{ t('chat.steps.done') }}</span>
+      }
+      <time class="step-time">{{ durationOf(item.step) }}</time>
+    </li>
+  </ng-template>
 </div>

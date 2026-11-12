@@ -51,9 +51,24 @@ export interface DiffResponse { id: string; files: FileDiff[] }
 export interface UndoResponse { ok: boolean; message: string; groupId?: string } // 409 when the tree has uncommitted changes or nothing to undo; message is plain language
 
 export type TurnState = 'queued' | 'running' | 'done' | 'error' | 'cancelled';
-export interface ChatMessage { id: string; role: 'master' | 'agent'; text: string; at: string; turnId?: string }
-export interface Turn { id: string; messageId: string; state: TurnState; activity: string; startedAt: string; endedAt?: string; fromSha?: string; toSha?: string; error?: string }
+
+export type StepKind = 'read' | 'search' | 'write' | 'skill' | 'image' | 'check' | 'save' | 'agent' | 'music' | 'open' | 'other';
+export interface TurnStep { id: string; kind: StepKind; text: string; at: string; endedAt?: string; state: 'running' | 'done' | 'failed'; parentId?: string }
+
+export interface ChatMessage {
+  id: string; role: 'master' | 'agent'; text: string; at: string; turnId?: string;
+  boardChanges?: Array<{ label: string; targetId?: string }>; // live thread: what the agent changed on the board, for the chat line
+  steps?: TurnStep[];         // agent message: the steps of the turn that produced it, all with a final state
+}
+export interface Turn { id: string; messageId: string; state: TurnState; activity: string; startedAt: string; endedAt?: string; fromSha?: string; toSha?: string; error?: string;
+  steps?: TurnStep[];         // live list of the steps of the turn, newest last, at most 60
+}
 export interface ChatResponse { messages: ChatMessage[]; turn: Turn | null }
+
+// Model and thinking effort the master picks for one chat message; absent = the SDK / Claude Code default.
+export type ChatModel = 'sonnet' | 'opus' | 'haiku';
+export type ChatEffort = 'low' | 'medium' | 'high' | 'max';
+export interface ChatChoice { model?: ChatModel; effort?: ChatEffort }
 
 export interface ChecksResponse {
   // checkedLinks (optional, added later): total number of links that were checked
@@ -145,16 +160,71 @@ export type CombatOp =
   | { op: 'end' };
 
 export type BoardCardKind = 'document' | 'image' | 'note';
-export interface BoardCard { id: string; kind: BoardCardKind; ref?: string; text?: string; x: number; y: number; w: number; h: number; z: number; frame?: string }
-export interface BoardFrame { id: string; title: string; x: number; y: number; w: number; h: number }
+export interface BoardCard { id: string; kind: BoardCardKind; ref?: string; text?: string; x: number; y: number; w: number; h: number; z: number; frame?: string;
+  anchor?: string;            // heading anchor inside the document ref, when the card points to one section
+  reason?: string;            // why the agent placed it, shown as a tooltip
+  pinned?: boolean;           // the agent cannot remove it; only the master can
+  by?: 'master' | 'agent';    // who placed it
+}
+export interface BoardFrame { id: string; title: string; x: number; y: number; w: number; h: number;
+  color?: string;             // CSS colour of the frame border
+}
 export interface BoardArrow { id: string; from: string; to: string; label?: string } // card or frame ids
-export interface Board { revision: number; cards: BoardCard[]; frames: BoardFrame[]; arrows: BoardArrow[] }
+export interface Board { revision: number; cards: BoardCard[]; frames: BoardFrame[]; arrows: BoardArrow[];
+  highlight?: string | null;  // id of a card or frame that is centred and marked; null or absent = none
+}
+
+// Scene bar of the live table: where the table is now. Free text is never canon.
+export interface TableScene {
+  place?: string;             // campaign-relative path of the place sheet
+  moment?: string;            // short label of the moment, e.g. "arrival at the gate"
+  summary?: string;           // one or two plain sentences
+  party?: string[];           // player-character sheet paths present
+  plotRef?: string;           // campaign-relative path of the plot session or scene
+  plotAnchor?: string;        // heading anchor inside plotRef
+  revision: number;
+}
+
+// One change the agent or the master makes to the board or the scene. Ops are applied in order.
+export type BoardOp =
+  | { op: 'place'; cards: Array<{ kind: 'document' | 'image' | 'note'; ref?: string; anchor?: string; text?: string;
+                                   frame?: string; near?: string; pinned?: boolean; reason?: string }> } // near: card id, or "@N" = the N-th card of the same op
+  | { op: 'frame'; title: string; color?: string; cards?: string[]; after?: string[]; before?: string[] }
+  | { op: 'link'; links: Array<{ from: string; to: string; label?: string }> }
+  | { op: 'move'; ids: string[]; frame: string | null }
+  | { op: 'remove'; ids: string[] }          // pinned cards are refused unless by master
+  | { op: 'highlight'; id: string | null }
+  | { op: 'pin'; id: string; pinned: boolean }
+  | { op: 'arrange' }
+  | { op: 'clear'; keepPinned: true };
+
+// One undo unit: the board and scene changes of one agent turn (or one master structural edit).
+export interface BoardGroup { id: string; turnId?: string; by: 'agent' | 'master'; labels: string[]; targetIds: string[]; at: string; undone?: boolean }
+
+// Battle view (server-owned, not canon, not undo): where the chips are on the battle map.
+export interface BattleView {
+  map?: { ref: string; cols?: number; rows?: number } | null;   // campaign-relative image path; grid when known
+  positions: Record<string, { x: number; y: number }>;           // combatant id -> cell (or fraction 0..1 when no grid)
+  revision: number;
+}
+
+// Tooltip of a combatant chip, built by the game-system adapter from the sheet's public text.
+export interface CombatantStats {
+  lines: Array<{ label: string; value: string }>;   // e.g. AC, HP, speed
+  actions: Array<{ name: string; text: string }>;   // attacks and other actions
+}
+
+// A player character as listed for the initiative popup (name and sheet only, no stats).
+export interface LivePlayer { name: string; ref: string }
 
 export interface LiveSnapshot {
   session: LiveSession | null;           // null when no live session is open
   log: LogEntry[];
   combat: CombatState | null;
   board: Board;
+  scene?: TableScene | null;             // null when no scene is set; optional so older snapshots still type-check
+  battle?: BattleView | null;            // null when no battle is shown
+  history?: BoardGroup[];                // undo groups, newest last, max 50
   revision: string;                      // changes whenever anything above changes
 }
 

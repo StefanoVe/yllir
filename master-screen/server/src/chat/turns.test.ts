@@ -54,6 +54,21 @@ describe('turn queue', () => {
     await service.runner.close();
   });
 
+  it('hands the choice of model and effort to the provider for that turn only', async () => {
+    const campaign = makeCampaign();
+    const provider = createFakeProvider([{ type: 'done' }]);
+    const service = setup(campaign, provider);
+    const chosen = await service.runner.submit('con scelta', { model: 'haiku', effort: 'low' });
+    const plain = await service.runner.submit('senza scelta');
+    assert.ok(chosen && plain);
+    await waitFor(() => lastTurn(campaign, plain.turnId)?.state === 'done', 'second turn done');
+    assert.equal(provider.calls[0].model, 'haiku');
+    assert.equal(provider.calls[0].effort, 'low');
+    assert.equal(provider.calls[1].model, undefined);
+    assert.equal(provider.calls[1].effort, undefined);
+    await service.runner.close();
+  });
+
   it('publishes the user message before its turn, and the agent message before the done turn', async () => {
     const campaign = makeCampaign();
     const service = setup(campaign, createFakeProvider([{ type: 'delta', text: 'Ok' }, { type: 'done' }]));
@@ -245,6 +260,58 @@ describe('events from the provider', () => {
     assert.equal(campaign.of('changes').length, 0);
     const turns = JSON.parse(fs.readFileSync(path.join(campaign.dir, '.campaign', 'state', 'master-screen', 'turns.json'), 'utf8'));
     assert.deepEqual(turns[0], { messageId: sub.messageId, turnId: sub.turnId, fromSha: '', toSha: '' });
+    await service.runner.close();
+  });
+});
+
+describe('steps of a turn', () => {
+  it('publishes the steps as they start and end, and stores them closed on the agent message', async () => {
+    const campaign = makeCampaign();
+    const service = setup(
+      campaign,
+      createFakeProvider([
+        { type: 'step', id: 'r1', kind: 'read', text: 'Sto leggendo «Taverna del Porto»…' },
+        { type: 'step-end', id: 'r1', ok: true },
+        { type: 'step', id: 'w1', kind: 'write', text: 'Sto scrivendo la bozza…' },
+        { type: 'step', id: 'r2', kind: 'read', text: 'Sto leggendo un documento…', parentId: 'task-1' },
+        { type: 'step-end', id: 'r2', ok: false },
+        { type: 'delta', text: 'Fatto.' },
+        { type: 'done' },
+      ]),
+    );
+    const sub = await service.runner.submit('scrivi');
+    assert.ok(sub);
+    await waitFor(() => lastTurn(campaign, sub.turnId)?.state === 'done', 'done');
+    await service.store.flush();
+
+    const turn = lastTurn(campaign, sub.turnId);
+    assert.deepEqual(
+      turn.steps.map((s: { id: string; state: string }) => [s.id, s.state]),
+      [['r1', 'done'], ['w1', 'done'], ['r2', 'failed']],
+    );
+    assert.equal(turn.steps[2].parentId, 'task-1');
+    const earlier = campaign.of('turn').filter((e) => e.data.id === sub.turnId && e.data.steps.length === 1);
+    assert.equal(earlier[0].data.steps[0].state, 'running');
+    const agent = service.store.messages().find((m) => m.role === 'agent');
+    assert.deepEqual(agent?.steps?.map((s) => s.state), ['done', 'done', 'failed']);
+    await service.runner.close();
+  });
+
+  it('keeps the plain-language rule for step text and at most 60 steps', async () => {
+    const campaign = makeCampaign();
+    const script: AgentEvent[] = [{ type: 'step', id: 'bad', kind: 'read', text: 'Sto usando Read…' }];
+    for (let i = 0; i < 65; i++) script.push({ type: 'step', id: `s${i}`, kind: 'search', text: 'Sto cercando nei documenti…' });
+    script.push({ type: 'done' });
+    const service = setup(campaign, createFakeProvider(script));
+    const sub = await service.runner.submit('ciao');
+    assert.ok(sub);
+    await waitFor(() => lastTurn(campaign, sub.turnId)?.state === 'done', 'done');
+    const seen = campaign.of('turn').flatMap((e) => e.data.steps ?? []);
+    assert.equal(seen.find((s: { id: string }) => s.id === 'bad')?.text, 'Sto lavorando…');
+    const turn = lastTurn(campaign, sub.turnId);
+    assert.equal(turn.steps.length, 60);
+    assert.equal(turn.steps[0].id, 's5');
+    assert.equal(turn.steps[0].text, 'Sto cercando nei documenti…');
     await service.runner.close();
   });
 });

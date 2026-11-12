@@ -51,9 +51,12 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   padding: var(--space-2) var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
+  /* The top edge fades out instead of cutting the first bubble off. Only alpha matters in a mask. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, var(--color-text) var(--space-2));
+  mask-image: linear-gradient(to bottom, transparent 0, var(--color-text) var(--space-2));
 }
 
 .empty {
@@ -66,7 +69,7 @@
 
 .empty-title {
   color: var(--color-text-muted);
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--space-3);
 }
 
 .chips {
@@ -74,24 +77,29 @@
   flex-wrap: wrap;
   max-width: 100%;
   justify-content: center;
-  gap: var(--space-2);
+  gap: var(--space-1);
 }
 
+/* Suggestions read as quiet cards: a hairline, a faint shadow, no fill colour fight. */
 .chip {
+  width: 14rem;
   max-width: 100%;
-  padding: 6px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-text);
+  box-shadow: var(--shadow-1);
   font: inherit;
   font-size: var(--font-size-sm);
+  line-height: 1.45;
   text-align: left;
   cursor: pointer;
 }
 
 .chip:hover:not(:disabled) {
   background: var(--color-surface-2);
+  border-color: var(--color-accent-soft);
 }
 
 .chip:disabled {
@@ -104,7 +112,7 @@
   display: flex;
   align-items: baseline;
   gap: var(--space-1);
-  margin: var(--space-2) var(--space-1) 2px;
+  margin: var(--space-3) var(--space-1) var(--space-0-5);
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
@@ -122,20 +130,21 @@
 }
 
 .msg {
-  max-width: min(70%, 42rem);
+  max-width: min(72%, 42rem);
   min-width: 6rem;
   box-sizing: border-box;
-  padding: 10px 14px;
-  border-radius: 16px 16px 16px 4px;
+  padding: 12px 16px;
+  border-radius: 18px 18px 18px 6px;
   background: var(--color-surface-2);
   color: var(--color-text);
-  line-height: 1.5;
+  line-height: 1.55;
   align-self: flex-start;
+  animation: msg-in 160ms ease-out both;
 }
 
 .msg.master {
   align-self: flex-end;
-  border-radius: 16px 16px 4px 16px;
+  border-radius: 18px 18px 6px 18px;
   background: var(--color-accent);
   color: var(--color-accent-contrast);
 }
@@ -143,6 +152,17 @@
 .msg.flash {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .text {
@@ -270,58 +290,247 @@
   color: var(--color-danger);
 }
 
-.dot {
+/* Streaming indicator: three dots that rise and fall in turn. */
+.dots {
   flex: none;
-  width: 8px;
-  height: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dots span {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--color-accent);
-  animation: pulse 1.2s ease-in-out infinite;
+  opacity: 0.3;
+  animation: dot-wave 1.2s ease-in-out infinite;
 }
 
-@keyframes pulse {
+.dots span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.dots span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+@keyframes dot-wave {
   0%,
+  60%,
   100% {
     opacity: 0.3;
+    transform: translateY(0);
   }
-  50% {
+  30% {
     opacity: 1;
+    transform: translateY(-3px);
   }
 }
 
+/* The composer is one floating card: the textarea on top, a toolbar under it. */
 .composer {
   width: 100%;
   min-width: 0;
   display: flex;
-  align-items: flex-end;
-  gap: var(--space-1);
+  flex-direction: column;
+  gap: var(--space-0-5);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-2);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+}
+
+.composer:focus-within {
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 4px var(--color-accent-soft), var(--shadow-2);
 }
 
 .input {
-  flex: 1 1 0;
-  width: 0;
+  display: block;
+  width: 100%;
   min-width: 0;
-  min-height: 44px;
+  min-height: 40px;
   max-height: 40vh;
-  padding: 11px 16px;
-  border: 1px solid var(--color-border);
-  border-radius: 22px;
-  background: var(--color-surface);
+  padding: 8px 4px 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text);
   font: inherit;
-  line-height: 1.4;
+  line-height: 1.45;
   resize: none;
   overflow-y: auto;
-}
-
-.input:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
+  outline: none;
 }
 
 .input:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.choice {
+  position: relative;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pill:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.pill[aria-expanded="true"] {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.pill-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+  min-width: 15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--space-0-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-2);
+}
+
+/* The thinking menu opens to the left, so it stays inside the phone-width card. */
+.menu.end {
+  left: auto;
+  right: 0;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:hover {
+  background: var(--color-surface-2);
+}
+
+.menu-item:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
+}
+
+.menu-item[aria-checked="true"] .item-name {
+  color: var(--color-accent);
+}
+
+.item-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.item-name {
+  font-weight: 600;
+}
+
+.item-desc {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.item-check {
+  flex: none;
+  color: var(--color-accent);
+}
+
+.composer-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--color-accent);
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  cursor: pointer;
+}
+
+.composer-btn:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.composer-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.composer-btn.stop {
+  background: var(--color-surface-2);
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.composer-btn.stop:hover {
+  background: var(--color-border);
+  border-color: var(--color-border);
+}
+
+.chat-tools {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .icon-btn {
@@ -338,41 +547,17 @@
   cursor: pointer;
 }
 
-.chat-tools {
-  display: flex;
-  justify-content: flex-end;
-}
-
 .live-link {
   text-decoration: none;
 }
 
+.pill:focus-visible,
+.composer-btn:focus-visible,
+.jump:focus-visible,
+.chip:focus-visible,
 .live-link:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
-}
-
-.icon-btn.send {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-accent-contrast);
-}
-
-.icon-btn.send:focus-visible,
-.icon-btn.stop:focus-visible,
-.jump:focus-visible,
-.chip:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.icon-btn.stop {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
 }
 
 .jump:hover {
@@ -384,10 +569,301 @@
   cursor: default;
 }
 
-
 @media (prefers-reduced-motion: reduce) {
-  .dot {
+  .msg {
     animation: none;
-    opacity: 1;
+  }
+
+  .dots span {
+    animation: none;
+    opacity: 0.7;
   }
 }
+
+/* rich messages */
+/* The rendered Markdown is plain HTML from innerHTML, so these rules reach it through ::ng-deep. */
+:host ::ng-deep .md h2,
+:host ::ng-deep .md h3,
+:host ::ng-deep .md h4,
+:host ::ng-deep .md h5,
+:host ::ng-deep .md h6 {
+  margin: 0.8em 0 0.3em;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+:host ::ng-deep .md h2 {
+  font-size: 1.1em;
+}
+
+:host ::ng-deep .md h3 {
+  font-size: 1.05em;
+}
+
+:host ::ng-deep .md h4,
+:host ::ng-deep .md h5,
+:host ::ng-deep .md h6 {
+  font-size: 1em;
+  color: var(--color-text-muted);
+}
+
+:host ::ng-deep .md a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+:host ::ng-deep .msg.master .md a {
+  color: var(--color-accent-contrast);
+}
+
+:host ::ng-deep .md blockquote {
+  margin: 0 0 0.5em;
+  padding: 2px 0 2px var(--space-1);
+  border-left: 3px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+:host ::ng-deep .md hr {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 0.8em 0;
+}
+
+:host ::ng-deep .md .chat-table-wrap {
+  max-width: 100%;
+  overflow-x: auto;
+  margin: 0 0 0.5em;
+}
+
+:host ::ng-deep .md table {
+  display: table;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+:host ::ng-deep .md th,
+:host ::ng-deep .md td {
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+:host ::ng-deep .md th {
+  font-weight: 600;
+}
+
+:host ::ng-deep .md tbody tr:nth-child(even) {
+  background: color-mix(in srgb, currentColor 6%, transparent);
+}
+
+:host ::ng-deep .md pre {
+  margin: 0 0 0.5em;
+  padding: var(--space-1);
+  overflow-x: auto;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+:host ::ng-deep .md pre code {
+  padding: 0;
+  background: none;
+  font-family: var(--font-family-mono);
+  font-size: 0.85em;
+  white-space: pre;
+}
+
+:host ::ng-deep .md :not(pre) > code {
+  font-family: var(--font-family-mono);
+}
+
+:host ::ng-deep .md li.task-list-item {
+  list-style: none;
+}
+
+:host ::ng-deep .md .task-checkbox {
+  margin: 0 0.45em 0 0;
+  vertical-align: -0.1em;
+  accent-color: var(--color-accent);
+}
+
+:host ::ng-deep .md .chat-image {
+  margin: 0.5em 0;
+  text-align: center;
+}
+
+:host ::ng-deep .md .chat-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+  border-radius: var(--radius-sm);
+  cursor: zoom-in;
+}
+
+:host ::ng-deep .md .chat-image figcaption {
+  margin-top: 4px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+:host ::ng-deep .md .chat-image:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+:host ::ng-deep .md .chat-image-missing {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-style: italic;
+}
+
+:host ::ng-deep .md .chat-diagram {
+  margin: 0.5em 0;
+  overflow-x: auto;
+  text-align: center;
+}
+
+:host ::ng-deep .md .chat-diagram .ms-diagram {
+  overflow-x: auto;
+  text-align: center;
+}
+
+:host ::ng-deep .md .chat-diagram .ms-diagram svg {
+  display: block;
+  height: auto;
+  margin: 0 auto;
+}
+
+:host ::ng-deep .md .chat-diagram .ms-diagram-error {
+  margin: 0.25em 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* Step details: the live list under the status line and the read-only list under an agent message. */
+.steps-toggle {
+  flex: none;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.steps-toggle:focus-visible,
+.steps-done summary:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.steps-live {
+  max-height: 9rem;
+  overflow-y: auto;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  font-size: var(--font-size-sm);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.step {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
+  color: var(--color-text-muted);
+}
+
+.step.child {
+  margin-left: var(--space-3);
+}
+
+.step.failed {
+  color: var(--color-danger);
+}
+
+.step-kind,
+.step-state {
+  flex: none;
+  margin-top: 2px;
+}
+
+.step-done {
+  color: var(--color-accent);
+}
+
+.step-failed {
+  color: var(--color-danger);
+}
+
+.step-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.step-text {
+  overflow-wrap: anywhere;
+}
+
+.step-hint {
+  font-size: var(--font-size-xs);
+  font-style: italic;
+}
+
+.step-time {
+  flex: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.spin {
+  animation: step-spin 1s linear infinite;
+}
+
+@keyframes step-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.steps-done {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.steps-done summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.steps-done .steps {
+  margin-top: var(--space-1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+

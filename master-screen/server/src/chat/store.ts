@@ -87,6 +87,14 @@ async function writeAtomic(file: string, data: string): Promise<void> {
   }
 }
 
+/** Files written before steps existed have no `steps`; a malformed one is dropped, the message is kept. */
+function withValidSteps(message: ChatMessage): ChatMessage {
+  if (message.steps === undefined || Array.isArray(message.steps)) return message;
+  const kept: ChatMessage = { ...message };
+  delete kept.steps;
+  return kept;
+}
+
 export class ChatStore {
   private readonly chatFile: string;
   private readonly turnsFile: string;
@@ -117,7 +125,7 @@ export class ChatStore {
       },
       log,
     );
-    this.messagesList = chat.messages.slice(-MAX_MESSAGES);
+    this.messagesList = chat.messages.slice(-MAX_MESSAGES).map(withValidSteps);
     this.resume = chat.resumeId;
     this.turnList = readStateFile<TurnRecord[]>(
       this.turnsFile,

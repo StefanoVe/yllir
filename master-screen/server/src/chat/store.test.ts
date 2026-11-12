@@ -102,6 +102,32 @@ describe('ChatStore persistence', () => {
   });
 });
 
+describe('steps of an agent message', () => {
+  const steps = [
+    { id: 'tu-1', kind: 'read' as const, text: 'Sto leggendo «Taverna»…', at: '2026-01-01T00:00:01.000Z', endedAt: '2026-01-01T00:00:02.000Z', state: 'done' as const },
+    { id: 'tu-2', kind: 'image' as const, text: 'Sto generando l’immagine…', at: '2026-01-01T00:00:03.000Z', state: 'failed' as const, parentId: 'task-1' },
+  ];
+
+  it('persists and reloads the steps of an agent message', async () => {
+    const dir = stateDir();
+    const store = new ChatStore(dir);
+    await store.addMessage({ ...message(1, 'agent'), steps });
+    await store.flush();
+    const reopened = new ChatStore(dir);
+    assert.deepEqual(reopened.messages()[0].steps, steps);
+  });
+
+  it('loads a chat.json written before steps existed, and drops a malformed steps field only', async () => {
+    const dir = stateDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const old = { version: 1, messages: [message(1), { ...message(2, 'agent'), steps: 'rotto' }] };
+    fs.writeFileSync(path.join(dir, 'chat.json'), JSON.stringify(old));
+    const store = new ChatStore(dir);
+    assert.deepEqual(store.messages(), [message(1), message(2, 'agent')]);
+    assert.equal(fs.existsSync(path.join(dir, 'chat.json.bak')), false);
+  });
+});
+
 describe('turns.json', () => {
   it('appends {messageId, turnId, fromSha, toSha} records as a JSON array', async () => {
     const dir = stateDir();

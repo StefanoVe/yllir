@@ -28,12 +28,53 @@ export interface ChatTexts {
   notRunning: string;
   closing: string;
   invalidText: string;
+  invalidChoice: string;
   unavailable: string;
   noSuchTurn: string;
+  // Precise steps (see activity.ts). Each sentence is plain language and carries no path or tool name.
+  readingInstructions: string;
+  readingDoc: (title: string) => string;
+  draftingDoc: (title: string) => string;
+  musicSearch: string;
+  photoshopRetouch: string;
+  imageSelect: string;
+  imagePrompt: string;
+  imageRender: string;
+  imagePlace: string;
+  mapDrawing: string;
+  /** Campaign skills by name (the part after the colon of the skill id). */
+  skills: Record<string, string>;
 }
 
 export const TEXTS: Record<Lang, ChatTexts> = {
   it: {
+    readingInstructions: 'Sto rileggendo le mie istruzioni…',
+    readingDoc: (title) => `Sto leggendo «${title}»…`,
+    draftingDoc: (title) => `Sto scrivendo la bozza di «${title}»…`,
+    musicSearch: 'Sto cercando della musica…',
+    photoshopRetouch: 'Sto ritoccando l’immagine…',
+    imageSelect: 'Scelgo come creare l’immagine…',
+    imagePrompt: 'Preparo la descrizione dell’immagine…',
+    imageRender: 'Sto generando l’immagine, può volerci qualche minuto…',
+    imagePlace: 'Sto mettendo l’immagine nella scheda…',
+    mapDrawing: 'Sto disegnando la mappa…',
+    skills: {
+      images: 'Sto preparando l’immagine…',
+      'build-world': 'Sto costruendo il mondo…',
+      'write-document': 'Sto scrivendo un documento…',
+      'prepare-session': 'Sto preparando la sessione…',
+      'after-session': 'Sto registrando la serata…',
+      'continuity-audit': 'Sto controllando la coerenza della campagna…',
+      import: 'Sto leggendo il materiale che mi hai dato…',
+      'music-search': 'Sto cercando della musica…',
+      'artwork-search': 'Sto cercando un’illustrazione già esistente…',
+      cards: 'Sto creando la carta…',
+      print: 'Sto preparando la stampa…',
+      encyclopedia: 'Sto costruendo l’enciclopedia…',
+      'combat-tracker': 'Sto aggiornando lo scontro…',
+      'session-log': 'Sto aggiornando il diario della partita…',
+      'continuity-keeper': 'Sto aggiornando le schede collegate…',
+    },
     queued: 'In attesa che finisca il messaggio precedente…',
     preparing: 'Sto preparando la risposta…',
     reading: 'Sto leggendo un documento…',
@@ -55,10 +96,38 @@ export const TEXTS: Record<Lang, ChatTexts> = {
     notRunning: 'Nessuna risposta è in corso con questo numero.',
     closing: 'Lo schermo si sta chiudendo. Riapri la campagna per scrivere di nuovo.',
     invalidText: 'Scrivi un messaggio di almeno un carattere, fino a 8000.',
+    invalidChoice: 'Scegli un modello e un livello di ragionamento tra quelli proposti.',
     unavailable: 'L’assistente non è disponibile in questo momento.',
     noSuchTurn: 'Questa risposta non esiste.',
   },
   en: {
+    readingInstructions: 'Re-reading my instructions…',
+    readingDoc: (title) => `Reading “${title}”…`,
+    draftingDoc: (title) => `Writing the draft of “${title}”…`,
+    musicSearch: 'Looking for music…',
+    photoshopRetouch: 'Retouching the image…',
+    imageSelect: 'Choosing how to create the image…',
+    imagePrompt: 'Preparing the image description…',
+    imageRender: 'Generating the image, this can take a few minutes…',
+    imagePlace: 'Placing the image on the sheet…',
+    mapDrawing: 'Drawing the map…',
+    skills: {
+      images: 'Preparing the image…',
+      'build-world': 'Building the world…',
+      'write-document': 'Writing a document…',
+      'prepare-session': 'Preparing the session…',
+      'after-session': 'Recording the evening…',
+      'continuity-audit': 'Checking the consistency of the campaign…',
+      import: 'Reading the material you gave me…',
+      'music-search': 'Looking for music…',
+      'artwork-search': 'Looking for an existing illustration…',
+      cards: 'Creating the card…',
+      print: 'Preparing the print…',
+      encyclopedia: 'Building the encyclopedia…',
+      'combat-tracker': 'Updating the fight…',
+      'session-log': 'Updating the session log…',
+      'continuity-keeper': 'Updating the linked sheets…',
+    },
     queued: 'Waiting for the previous message to finish…',
     preparing: 'Preparing the answer…',
     reading: 'Reading a document…',
@@ -80,6 +149,7 @@ export const TEXTS: Record<Lang, ChatTexts> = {
     notRunning: 'No answer is running with this number.',
     closing: 'The screen is closing. Open the campaign again to write.',
     invalidText: 'Write a message of at least one character, up to 8000.',
+    invalidChoice: 'Choose a model and a thinking level from the options offered.',
     unavailable: 'The assistant is not available right now.',
     noSuchTurn: 'This answer does not exist.',
   },

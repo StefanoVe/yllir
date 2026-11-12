@@ -11,6 +11,7 @@ import type {
   UndoResponse,
 } from '@shared/types';
 import { I18n } from '../i18n';
+import type { ChatChoice, ChatEffort, ChatModel } from '../chat/chat-choice';
 import type { ViewMode } from './view-mode.service';
 
 /** A failed call. `error` is plain language: the server's `error` (or its `message` when that is what it sent). */
@@ -68,8 +69,12 @@ export class ApiService {
     return this.request('GET', '/chat');
   }
 
-  sendMessage(text: string): Promise<{ messageId: string; turnId: string }> {
-    return this.request('POST', '/chat/messages', { body: { text } });
+  /** Sends a message. The model and thinking effort go along only when they are set. */
+  sendMessage(text: string, choice: Partial<ChatChoice> = {}): Promise<{ messageId: string; turnId: string }> {
+    const body: { text: string; model?: ChatModel; effort?: ChatEffort } = { text };
+    if (choice.model !== undefined) body.model = choice.model;
+    if (choice.effort !== undefined) body.effort = choice.effort;
+    return this.request('POST', '/chat/messages', { body });
   }
 
   cancelTurn(turnId: string): Promise<{ ok: true }> {

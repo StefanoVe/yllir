@@ -138,6 +138,92 @@ describe('layoutPlot', () => {
   });
 });
 
+describe('lanes: sessions in chronological order', () => {
+  const placed = (layout: ReturnType<typeof layoutPlot>, id: string) => {
+    const node = layout.nodes.find((item) => item.id === id);
+    if (!node) throw new Error(`no node ${id}`);
+    return node;
+  };
+  const centre = (node: { y: number; h: number }) => node.y + node.h / 2;
+
+  it('places an unlinked session in a lane after the last column of the previous one, on another row', () => {
+    const layout = layoutPlot({
+      nodes: [
+        session('s1', { path: 'sessions/s1.md' }),
+        scene('a1', { session: 's1' }),
+        scene('a2', { session: 's1' }),
+        session('s2', { path: 'sessions/s2.md' }),
+        scene('b1', { session: 's2' }),
+        scene('b2', { session: 's2' }),
+      ],
+      edges: [follows('a1', 'a2'), follows('b1', 'b2')],
+    });
+    const lastOfFirst = Math.max(...['s1', 'a1', 'a2'].map((id) => placed(layout, id).rank));
+    expect(placed(layout, 's2').rank).toBe(lastOfFirst + 1);
+    expect(placed(layout, 'b1').rank).toBeGreaterThan(placed(layout, 's2').rank);
+    expect(placed(layout, 'b2').rank).toBeGreaterThan(placed(layout, 'b1').rank);
+
+    // The lane is one row: a session and its scenes share the same centre line.
+    expect(centre(placed(layout, 'a1'))).toBe(centre(placed(layout, 's1')));
+    expect(centre(placed(layout, 'b2'))).toBe(centre(placed(layout, 's2')));
+    // The second lane is on a different row, below the first.
+    expect(placed(layout, 's2').y).toBeGreaterThan(placed(layout, 'a2').y + placed(layout, 'a2').h);
+  });
+
+  it('keeps unrelated lanes free of overlaps', () => {
+    const layout = layoutPlot({
+      nodes: [
+        session('s1', { path: 'sessions/a.md' }),
+        scene('a1', { session: 's1' }),
+        scene('a2', { session: 's1' }),
+        scene('a3', { session: 's1' }),
+        session('s2', { path: 'sessions/b.md' }),
+        scene('b1', { session: 's2' }),
+        session('s3', { path: 'sessions/c.md' }),
+        scene('c1', { session: 's3' }),
+        scene('c2', { session: 's3' }),
+        scene('loose', {}),
+      ],
+      edges: [follows('a1', 'a2'), follows('a2', 'a3'), needs('a3', 'a1'), follows('c1', 'c2'), needs('loose', 'a1')],
+    });
+    for (let i = 0; i < layout.nodes.length; i++) {
+      for (let j = i + 1; j < layout.nodes.length; j++) {
+        expect(overlaps(layout.nodes[i], layout.nodes[j])).toBe(false);
+      }
+    }
+    expect(placed(layout, 's3').rank).toBeGreaterThan(placed(layout, 'b1').rank);
+  });
+
+  it('decides the order of unlinked sessions by path', () => {
+    const layout = layoutPlot({
+      nodes: [session('x', { path: 'sessions/b.md' }), session('y', { path: 'sessions/a.md' })],
+      edges: [],
+    });
+    expect(placed(layout, 'y').rank).toBe(0);
+    expect(placed(layout, 'x').rank).toBe(1);
+  });
+
+  it('lets a dependency override the path order', () => {
+    const layout = layoutPlot({
+      nodes: [session('late', { path: 'sessions/a.md' }), session('early', { path: 'sessions/z.md' })],
+      edges: [needs('late', 'early')],
+    });
+    expect(placed(layout, 'early').rank).toBe(0);
+    expect(placed(layout, 'late').rank).toBe(1);
+  });
+
+  it('orders by depth before path: a session that needs another comes after every session of the same depth', () => {
+    // Path order would give W (b), Z (a) right after W, then Y (c). Depth gives W (0), Y (0), Z (1).
+    const layout = layoutPlot({
+      nodes: [session('Y', { path: 'sessions/c.md' }), session('Z', { path: 'sessions/a.md' }), session('W', { path: 'sessions/b.md' })],
+      edges: [needs('Z', 'W')],
+    });
+    expect(placed(layout, 'W').rank).toBe(0);
+    expect(placed(layout, 'Y').rank).toBe(1);
+    expect(placed(layout, 'Z').rank).toBe(2);
+  });
+});
+
 describe('routeEdge', () => {
   it('leaves the right side of a source to the left of a target further right', () => {
     const d = routeEdge({ x: 0, y: 0, w: 100, h: 50 }, { x: 300, y: 100, w: 100, h: 50 });

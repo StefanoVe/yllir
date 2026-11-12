@@ -16,14 +16,31 @@ export type GateDecision = { allow: true } | { allow: false; reason: string };
 const READ_TOOLS = new Set(['Read', 'Glob', 'Grep']);
 /** The skill loader and the framework's own sub-agents (reviewers, sheet writers). Sub-agent tool calls pass through this same gate. */
 const FRAMEWORK_TOOLS = new Set(['Skill', 'Task', 'Agent']);
-/** Writes are checked against the drafts folder. */
+/** Writes are checked against the writable folders and files of the campaign. */
 const WRITE_TOOLS = new Set(['Write', 'Edit']);
+/** Folders under `.campaign/` the assistant may write into (drafts and working files of the framework skills). */
+const WRITABLE_FOLDERS = [
+  path.join('.campaign', 'drafts'),
+  path.join('.campaign', 'styles'),
+  path.join('.campaign', 'image-providers'),
+  path.join('.campaign', 'state', 'maps'),
+];
+/** Single files the assistant may write: the API keys of the image services. */
+const WRITABLE_FILES = [path.join('.campaign', 'state', 'keys.json')];
+const WRITE_DENIED_MESSAGE =
+  'The assistant writes drafts and working files only; campaign documents are saved through the Yllir save step. Allowed folders: drafts, styles, image services, battle map layouts, and the keys file.';
 /** In-process tools built by claude-provider; their handlers validate their own input. */
 export const MCP_TOOLS = new Set([
   'mcp__yllir__search_docs',
   'mcp__yllir__open_document',
   'mcp__yllir__suggest_music',
 ]);
+/**
+ * Tools of the Yllir plugins (for example the Photoshop plugin, used for images). Allowed by
+ * name, except the two that run arbitrary code or install fonts on the computer.
+ */
+const PLUGIN_MCP_TOOL = /^mcp__plugin_yllir_[a-z0-9-]+__[a-z0-9_]+$/;
+const PLUGIN_MCP_DENIED = /execute_script|install_font/;
 
 /**
  * Characters that are never allowed in a Bash command line, quoted or not: shell
@@ -68,6 +85,28 @@ export function isDraftPath(filePath: unknown, ctx: GateContext): boolean {
   const target = path.resolve(path.resolve(ctx.campaignRoot), filePath);
   if (!isInside(target, drafts)) return false;
   return isInside(realpathLenient(target), realpathLenient(drafts));
+}
+
+/**
+ * Write targets: a file inside one of the writable folders of `<campaign>/.campaign/`, or exactly the
+ * keys file, after symlinks are resolved. Paths with `..`, NUL bytes or empty values are refused.
+ */
+export function isWritablePath(filePath: unknown, ctx: GateContext): boolean {
+  if (typeof filePath !== 'string' || filePath.trim() === '' || filePath.includes('\0')) return false;
+  if (filePath.split(/[\\/]/).includes('..')) return false;
+  const campaign = path.resolve(ctx.campaignRoot);
+  const target = path.resolve(campaign, filePath);
+  const realTarget = realpathLenient(target);
+
+  const inFolder = (rel: string): boolean => {
+    const base = path.join(campaign, rel);
+    return isInside(target, base) && isInside(realTarget, realpathLenient(base));
+  };
+  const isFile = (rel: string): boolean => {
+    const base = path.join(campaign, rel);
+    return target === base && realTarget === realpathLenient(base);
+  };
+  return WRITABLE_FILES.some(isFile) || WRITABLE_FOLDERS.some(inFolder);
 }
 
 /** A script path that is `<root>/scripts/<name>.mjs` or `<root>/skills/**\/scripts/<name>.mjs`. */
@@ -132,6 +171,7 @@ const DENY_DEFAULT = 'This action is not allowed while the assistant works on th
 
 export function isAllowed(toolName: string, input: Record<string, unknown>, ctx: GateContext): GateDecision {
   if (FRAMEWORK_TOOLS.has(toolName) || MCP_TOOLS.has(toolName)) return { allow: true };
+  if (PLUGIN_MCP_TOOL.test(toolName) && !PLUGIN_MCP_DENIED.test(toolName)) return { allow: true };
   if (READ_TOOLS.has(toolName)) {
     const pattern = typeof input.pattern === 'string' ? input.pattern : '';
     const patternOk = toolName !== 'Glob' || !(path.isAbsolute(pattern) || pattern.split(/[\\/]/).includes('..'));
@@ -139,8 +179,8 @@ export function isAllowed(toolName: string, input: Record<string, unknown>, ctx:
     return { allow: false, reason: 'The assistant can only read the files of the campaign and of Yllir.' };
   }
   if (WRITE_TOOLS.has(toolName)) {
-    if (isDraftPath(input.file_path, ctx)) return { allow: true };
-    return { allow: false, reason: 'Changes can only be written to the drafts folder of the campaign.' };
+    if (isWritablePath(input.file_path, ctx)) return { allow: true };
+    return { allow: false, reason: WRITE_DENIED_MESSAGE };
   }
   if (toolName === 'Bash') {
     if (isAllowedCommand(input.command, ctx.frameworkRoot)) return { allow: true };
@@ -149,8 +189,6 @@ export function isAllowed(toolName: string, input: Record<string, unknown>, ctx:
       reason: 'Only the Yllir framework scripts can run, written as node "<script>" with plain arguments.',
     };
   }
-  if (toolName === 'WebFetch' || toolName === 'WebSearch') {
-    return { allow: false, reason: 'Web access is not allowed while the assistant works on the campaign.' };
-  }
+  if (toolName === 'WebFetch' || toolName === 'WebSearch') return { allow: true };
   return { allow: false, reason: DENY_DEFAULT };
 }

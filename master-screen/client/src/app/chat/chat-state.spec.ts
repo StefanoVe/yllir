@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ChatMessage, Turn } from '@shared/types';
+import type { ChatMessage, Turn, TurnStep } from '@shared/types';
 import {
   EMPTY_CHAT_STATE,
   addMessage,
@@ -10,6 +10,15 @@ import {
   setTurn,
   type ChatState,
 } from './chat-state';
+
+const step = (id: string, extra: Partial<TurnStep> = {}): TurnStep => ({
+  id,
+  kind: 'read',
+  text: id,
+  at: AT,
+  state: 'running',
+  ...extra,
+});
 
 const AT = '2026-11-12T10:00:00.000Z';
 const master = (id: string, text: string): ChatMessage => ({ id, role: 'master', text, at: AT });
@@ -102,5 +111,48 @@ describe('mergeFetched', () => {
     expect(mergeFetched(state, { messages: [], turn: null }).turn?.state).toBe('running');
     const done = setTurn(EMPTY_CHAT_STATE, turn('done'));
     expect(mergeFetched(done, { messages: [], turn: null }).turn).toBeNull();
+  });
+});
+
+describe('steps', () => {
+  it('keeps the steps of a turn event', () => {
+    const state = setTurn(EMPTY_CHAT_STATE, turn('running', { steps: [step('s1')] }));
+    expect(state.turn?.steps?.map((s) => s.id)).toEqual(['s1']);
+  });
+
+  it('does not lose shown steps when a later event for the same turn has fewer', () => {
+    let state = setTurn(EMPTY_CHAT_STATE, turn('running', { steps: [step('s1'), step('s2')] }));
+    state = setTurn(state, turn('running', { activity: 'x', steps: [step('s2')] }));
+    expect(state.turn?.steps?.map((s) => s.id)).toEqual(['s1', 's2']);
+    expect(state.turn?.activity).toBe('x');
+  });
+
+  it('takes the newer state of a step from a later event', () => {
+    let state = setTurn(EMPTY_CHAT_STATE, turn('running', { steps: [step('s1')] }));
+    state = setTurn(state, turn('running', { steps: [step('s1', { state: 'done', endedAt: AT })] }));
+    expect(state.turn?.steps?.[0].state).toBe('done');
+  });
+
+  it('starts from the new list when the turn id changes', () => {
+    let state = setTurn(EMPTY_CHAT_STATE, turn('done', { steps: [step('old', { state: 'done' })] }));
+    state = setTurn(state, { ...turn('running'), id: 't2', steps: [step('new')] });
+    expect(state.turn?.steps?.map((s) => s.id)).toEqual(['new']);
+  });
+
+  it('drops the steps key when the turn has none', () => {
+    const state = setTurn(EMPTY_CHAT_STATE, turn('running'));
+    expect(state.turn && 'steps' in state.turn).toBe(false);
+  });
+
+  it('keeps steps on a finished agent message, also when it replaces a bubble', () => {
+    let state = applyDelta(EMPTY_CHAT_STATE, { messageId: 'a1', text: 'Par' }, AT);
+    state = addMessage(state, { ...agent('a1', 'Partito.'), steps: [step('s1', { state: 'done', endedAt: AT })] });
+    expect(state.messages[0].steps?.map((s) => s.id)).toEqual(['s1']);
+  });
+
+  it('keeps the steps of the active turn through a refetch', () => {
+    const shown = setTurn(EMPTY_CHAT_STATE, turn('running', { steps: [step('s1'), step('s2')] }));
+    const state = mergeFetched(shown, { messages: [], turn: turn('running', { steps: [step('s2')] }) });
+    expect(state.turn?.steps?.map((s) => s.id)).toEqual(['s1', 's2']);
   });
 });

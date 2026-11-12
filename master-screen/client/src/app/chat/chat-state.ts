@@ -1,4 +1,5 @@
-import type { ChatMessage, ChatResponse, Turn } from '@shared/types';
+import type { ChatMessage, ChatResponse, Turn, TurnStep } from '@shared/types';
+import { mergeSteps } from './chat-steps';
 
 /** A message as shown. An agent reply created from a delta stays `pending` until its final message arrives. */
 export interface ViewMessage extends ChatMessage {
@@ -46,8 +47,25 @@ export function applyDelta(state: ChatState, delta: DeltaEvent, at: string): Cha
   return { ...state, messages };
 }
 
+/**
+ * Stores the turn from an event. Steps already shown for the same turn id are kept:
+ * the merge is by step id, and the newer state of a step wins.
+ */
 export function setTurn(state: ChatState, turn: Turn): ChatState {
-  return { ...state, turn };
+  return { ...state, turn: withSteps(turn, previousSteps(state.turn, turn)) };
+}
+
+/** The steps of `turn`, merged with those shown for the same turn. */
+function previousSteps(shown: Turn | null, turn: Turn): TurnStep[] {
+  const sameTurn = shown !== null && shown.id === turn.id;
+  return mergeSteps(sameTurn ? shown.steps : undefined, turn.steps);
+}
+
+function withSteps(turn: Turn, steps: TurnStep[]): Turn {
+  const copy: Turn = { ...turn };
+  if (steps.length > 0) copy.steps = steps;
+  else delete copy.steps;
+  return copy;
 }
 
 export function isActiveTurn(turn: Turn | null): turn is Turn {
@@ -65,7 +83,9 @@ export function isFailedTurn(turn: Turn | null): turn is Turn {
 export function mergeFetched(state: ChatState, fetched: ChatResponse): ChatState {
   const serverIds = new Set(fetched.messages.map((m) => m.id));
   const extra = state.messages.filter((m) => !serverIds.has(m.id));
-  const turn = fetched.turn ?? (isActiveTurn(state.turn) ? state.turn : null);
+  const turn = fetched.turn
+    ? withSteps(fetched.turn, previousSteps(state.turn, fetched.turn))
+    : isActiveTurn(state.turn) ? state.turn : null;
   return {
     messages: [...fetched.messages.map((m) => ({ ...m })), ...extra],
     turn,

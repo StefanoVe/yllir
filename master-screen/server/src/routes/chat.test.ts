@@ -96,6 +96,42 @@ describe('chat routes with an agent', () => {
     assert.equal((await post(server.port, '/api/chat/messages', { text: 'x'.repeat(8000) })).status, 202);
   });
 
+  it('passes a chosen model and effort to the provider', async () => {
+    const campaign = makeCampaign();
+    const provider = createFakeProvider([{ type: 'done' }]);
+    const server = await serve(campaign, provider);
+    const res = await post(server.port, '/api/chat/messages', { text: 'ciao', model: 'opus', effort: 'max' });
+    assert.equal(res.status, 202);
+    await waitFor(() => provider.calls.length === 1, 'run');
+    assert.equal(provider.calls[0].model, 'opus');
+    assert.equal(provider.calls[0].effort, 'max');
+  });
+
+  it('leaves model and effort undefined when the master chose none', async () => {
+    const campaign = makeCampaign();
+    const provider = createFakeProvider([{ type: 'done' }]);
+    const server = await serve(campaign, provider);
+    assert.equal((await post(server.port, '/api/chat/messages', { text: 'ciao' })).status, 202);
+    await waitFor(() => provider.calls.length === 1, 'run');
+    assert.equal(provider.calls[0].model, undefined);
+    assert.equal(provider.calls[0].effort, undefined);
+  });
+
+  it('rejects an unknown model or effort with 400 before anything is queued', async () => {
+    const campaign = makeCampaign();
+    const provider = createFakeProvider([{ type: 'done' }]);
+    const server = await serve(campaign, provider);
+    const badModel = await post(server.port, '/api/chat/messages', { text: 'ciao', model: 'gpt' });
+    const badEffort = await post(server.port, '/api/chat/messages', { text: 'ciao', effort: 'xhigh' });
+    const nullModel = await post(server.port, '/api/chat/messages', { text: 'ciao', model: null });
+    for (const res of [badModel, badEffort, nullModel]) {
+      assert.equal(res.status, 400);
+      assert.equal(typeof (res.json as { error: unknown }).error, 'string');
+    }
+    assert.equal(campaign.of('message').length, 0);
+    assert.equal(provider.calls.length, 0);
+  });
+
   it('cancels a running turn with ok, and answers 404 for an unknown turn', async () => {
     const campaign = makeCampaign();
     const provider = createFakeProvider([], { hang: true });

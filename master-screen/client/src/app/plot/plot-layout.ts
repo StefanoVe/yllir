@@ -6,6 +6,8 @@ export const SCENE_SIZE = { w: 180, h: 48 };
 const COLUMN_WIDTH = 220;
 const COLUMN_GAP = 96;
 const ROW_GAP = 28;
+/** Vertical space between two rows (lanes, and the band of unassigned scenes). */
+const LANE_GAP = 56;
 const MARGIN = 32;
 const SWEEPS = 4;
 
@@ -98,12 +100,77 @@ export function computeRanks(ids: readonly string[], arrows: readonly Arrow[]): 
   return rank;
 }
 
-/** Arrows of the layout: every `depends` edge, and the file order between sessions. */
-function layoutArrows(nodes: readonly PlotNode[], edges: readonly PlotEdge[]): Arrow[] {
-  const sessions = new Set(nodes.filter((node) => node.kind === 'session').map((node) => node.id));
-  return edges
-    .filter((edge) => edge.kind === 'depends' || (sessions.has(edge.from) && sessions.has(edge.to)))
+function byCode(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * Chronological order of the sessions: first by depth in the declared `depends` edges between
+ * sessions (a session that needs more sessions before it comes later), then by path in plain
+ * code-unit order, then by id. Edges that close a dependency cycle are cut by computeRanks.
+ */
+function sessionChronology(nodes: readonly PlotNode[], edges: readonly PlotEdge[]): string[] {
+  const sessions = nodes.filter((node) => node.kind === 'session');
+  const ids = sessions.map((node) => node.id);
+  const known = new Set(ids);
+  const needs = edges
+    .filter((edge) => edge.kind === 'depends' && known.has(edge.from) && known.has(edge.to))
     .map(edgeArrow);
+  const depth = computeRanks(ids, needs);
+  return [...sessions]
+    .sort((a, b) => (depth.get(a.id) ?? 0) - (depth.get(b.id) ?? 0) || byCode(a.path, b.path) || byCode(a.id, b.id))
+    .map((node) => node.id);
+}
+
+/**
+ * Lanes, one per session in chronological order. A lane is the session node followed by the scenes
+ * of that session in their order. `laneOf` gives the lane index of every lane member; a scene whose
+ * session is missing or unknown has no lane.
+ */
+function buildLanes(nodes: readonly PlotNode[], edges: readonly PlotEdge[]): { lanes: string[][]; laneOf: Map<string, number> } {
+  const order = sessionChronology(nodes, edges);
+  const lanes: string[][] = order.map((id) => [id]);
+  const slot = new Map(order.map((id, index) => [id, index] as const));
+  const laneOf = new Map<string, number>(order.map((id, index) => [id, index] as const));
+  for (const node of nodes) {
+    if (node.kind !== 'scene' || node.session === undefined) continue;
+    const lane = slot.get(node.session);
+    if (lane === undefined) continue;
+    lanes[lane]?.push(node.id);
+    laneOf.set(node.id, lane);
+  }
+  return { lanes, laneOf };
+}
+
+/**
+ * Arrows that decide the layers: each lane starts at its session node and runs through its scenes,
+ * every node of a lane comes before the session node of the next lane, and the declared dependencies
+ * and scene order apply. A dependency on a node of a later lane is not used for the layers (it is
+ * still drawn). File order between sessions is not used: the chronology decides it.
+ */
+function layoutArrows(
+  nodes: readonly PlotNode[],
+  edges: readonly PlotEdge[],
+  lanes: readonly string[][],
+  laneOf: ReadonlyMap<string, number>,
+): Arrow[] {
+  const kinds = new Map(nodes.map((node) => [node.id, node.kind] as const));
+  const arrows: Arrow[] = [];
+  lanes.forEach((lane, k) => {
+    const head = lane[0];
+    if (head === undefined) return;
+    for (const scene of lane.slice(1)) arrows.push({ source: head, target: scene });
+    const next = lanes[k + 1]?.[0];
+    if (next !== undefined) for (const id of lane) arrows.push({ source: id, target: next });
+  });
+  for (const edge of edges) {
+    if (edge.kind === 'order' && kinds.get(edge.from) === 'session' && kinds.get(edge.to) === 'session') continue;
+    const from = laneOf.get(edge.from);
+    const to = laneOf.get(edge.to);
+    if (from !== undefined && to !== undefined && from > to) continue;
+    arrows.push(edgeArrow(edge));
+  }
+  return arrows;
 }
 
 /** Node ids of a column reordered by the average position of their neighbours in the next or previous column. */
@@ -126,16 +193,22 @@ function sweep(columns: string[][], neighbours: Map<string, string[]>, forward: 
 }
 
 /**
- * Places the map in columns (one per layer). Columns are ordered so that linked nodes sit close to
- * each other, which reduces crossings. Nothing overlaps: each column stacks its nodes vertically.
+ * Places the map in columns (one per layer) and rows. Each session is a lane: its session node, then
+ * its scenes, on one row, and a later session's lane starts in the column after the last column of
+ * the lane before it (a staircase). Unassigned scenes get a row of their own at the bottom. Within a
+ * row, nodes of one column stack vertically. Nothing overlaps.
  */
 export function layoutPlot(data: PlotResponse): PlotLayout {
   const ids = data.nodes.map((node) => node.id);
-  const ranks = computeRanks(ids, layoutArrows(data.nodes, data.edges));
+  const { lanes, laneOf } = buildLanes(data.nodes, data.edges);
+  const ranks = computeRanks(ids, layoutArrows(data.nodes, data.edges, lanes, laneOf));
   const maxRank = Math.max(0, ...ids.map((id) => ranks.get(id) ?? 0));
 
+  // Seed order: lane by lane, then the unassigned scenes. The sweeps only permute nodes inside a
+  // column, so a column keeps the nodes of one lane (or of the unassigned scenes).
+  const unassigned = ids.filter((id) => !laneOf.has(id));
   const columns: string[][] = Array.from({ length: maxRank + 1 }, () => []);
-  for (const id of ids) columns[ranks.get(id) ?? 0]?.push(id);
+  for (const id of [...lanes.flat(), ...unassigned]) columns[ranks.get(id) ?? 0]?.push(id);
 
   // prerequisitesOf: for each item, the items it needs (they sit in the column before it).
   // dependentsOf: for each item, the items that need it (they sit in the column after it).
@@ -151,22 +224,43 @@ export function layoutPlot(data: PlotResponse): PlotLayout {
     sweep(columns, dependentsOf, false);
   }
 
+  // Rows (bands): one per lane, then one for the unassigned scenes when there are any.
   const byId = new Map(data.nodes.map((node) => [node.id, node] as const));
   const sizeOf = (node: PlotNode) => (node.kind === 'session' ? SESSION_SIZE : SCENE_SIZE);
-  const columnHeights = columns.map((column) =>
-    column.reduce((sum, id) => sum + sizeOf(byId.get(id) as PlotNode).h, 0) + ROW_GAP * Math.max(0, column.length - 1),
-  );
-  const tallest = Math.max(0, ...columnHeights);
+  const bandOf = (id: string): number => laneOf.get(id) ?? lanes.length;
+  const bandCount = lanes.length + (unassigned.length > 0 ? 1 : 0);
+  const stacks: string[][][] = Array.from({ length: bandCount }, () => columns.map((): string[] => []));
+  columns.forEach((column, c) => {
+    for (const id of column) stacks[bandOf(id)]?.[c]?.push(id);
+  });
+  const stackHeight = (stack: string[]): number =>
+    stack.reduce((sum, id) => sum + sizeOf(byId.get(id) as PlotNode).h, 0) + ROW_GAP * Math.max(0, stack.length - 1);
+  const bandHeights = stacks.map((band) => Math.max(0, ...band.map(stackHeight)));
+  const bandTops: number[] = [];
+  let top = MARGIN;
+  bandHeights.forEach((height, b) => {
+    bandTops[b] = top;
+    top += height + LANE_GAP;
+  });
+
+  const yOf = new Map<string, number>();
+  stacks.forEach((band, b) => {
+    band.forEach((stack) => {
+      let y = (bandTops[b] ?? MARGIN) + ((bandHeights[b] ?? 0) - stackHeight(stack)) / 2;
+      for (const id of stack) {
+        yOf.set(id, y);
+        y += sizeOf(byId.get(id) as PlotNode).h + ROW_GAP;
+      }
+    });
+  });
 
   const nodes: PlacedNode[] = [];
   columns.forEach((column, c) => {
-    let y = MARGIN + (tallest - (columnHeights[c] ?? 0)) / 2;
     for (const id of column) {
       const node = byId.get(id);
       if (!node) continue;
       const size = sizeOf(node);
-      nodes.push({ ...node, rank: c, x: MARGIN + c * (COLUMN_WIDTH + COLUMN_GAP) + (COLUMN_WIDTH - size.w) / 2, y, w: size.w, h: size.h });
-      y += size.h + ROW_GAP;
+      nodes.push({ ...node, rank: c, x: MARGIN + c * (COLUMN_WIDTH + COLUMN_GAP) + (COLUMN_WIDTH - size.w) / 2, y: yOf.get(id) ?? MARGIN, w: size.w, h: size.h });
     }
   });
 
@@ -181,9 +275,10 @@ export function layoutPlot(data: PlotResponse): PlotLayout {
   }
 
   const columnCount = columns.length;
+  const bandsHeight = bandHeights.reduce((sum, height) => sum + height, 0);
   return {
     width: MARGIN * 2 + Math.max(1, columnCount) * COLUMN_WIDTH + Math.max(0, columnCount - 1) * COLUMN_GAP,
-    height: MARGIN * 2 + tallest,
+    height: MARGIN * 2 + bandsHeight + LANE_GAP * Math.max(0, bandCount - 1),
     nodes,
     edges,
   };

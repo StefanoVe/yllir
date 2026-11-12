@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, before, after } from 'node:test';
-import { isAllowed, isAllowedCommand, type GateContext } from './gate.js';
+import { isAllowed, isAllowedCommand, isDraftPath, isWritablePath, type GateContext } from './gate.js';
 
 let tmp: string;
 let campaign: string;
@@ -24,6 +24,10 @@ before(() => {
   framework = path.join(tmp, 'yllir');
   fs.mkdirSync(path.join(campaign, '.campaign', 'drafts'), { recursive: true });
   fs.mkdirSync(path.join(campaign, '.campaign', 'state'), { recursive: true });
+  fs.mkdirSync(path.join(campaign, '.campaign', 'styles'), { recursive: true });
+  fs.mkdirSync(path.join(campaign, '.campaign', 'image-providers'), { recursive: true });
+  fs.mkdirSync(path.join(campaign, '.campaign', 'state', 'maps'), { recursive: true });
+  fs.mkdirSync(path.join(campaign, '.git'), { recursive: true });
   fs.mkdirSync(path.join(campaign, 'characters'), { recursive: true });
   fs.writeFileSync(path.join(campaign, 'characters', 'mara.md'), '# Mara\n');
   fs.mkdirSync(path.join(framework, 'scripts'), { recursive: true });
@@ -51,8 +55,13 @@ describe('read tools and the MCP tools', () => {
     assert.equal(allowed(isAllowed('mcp__yllir__suggest_music', {}, ctx)), true);
   });
 
+  it('allows the web tools WebFetch and WebSearch', () => {
+    assert.equal(allowed(isAllowed('WebFetch', { url: 'https://example.invalid' }, ctx)), true);
+    assert.equal(allowed(isAllowed('WebSearch', { query: 'fantasy harbour map' }, ctx)), true);
+  });
+
   it('denies other tools with a plain reason', () => {
-    for (const name of ['WebFetch', 'WebSearch', 'NotebookEdit', 'TodoWrite', 'mcp__other__x']) {
+    for (const name of ['NotebookEdit', 'TodoWrite', 'mcp__other__x']) {
       const decision = isAllowed(name, {}, ctx);
       assert.equal(decision.allow, false, name);
       if (!decision.allow) assert.match(decision.reason, /not allowed/i);
@@ -60,7 +69,61 @@ describe('read tools and the MCP tools', () => {
   });
 });
 
-describe('Write and Edit: drafts only', () => {
+describe('Write and Edit: writable working folders only', () => {
+  it('allows the working folders and the keys file', () => {
+    for (const file of [
+      '.campaign/styles/map/profile.yaml',
+      '.campaign/image-providers/x/instructions.md',
+      '.campaign/state/maps/layout-draft.json',
+      '.campaign/state/keys.json',
+      '.campaign/drafts/mara.md',
+    ]) {
+      assert.equal(allowed(isAllowed('Write', { file_path: file }, ctx)), true, file);
+    }
+  });
+
+  it('denies the canon, git, the server state and the rest of the state folder', () => {
+    for (const file of [
+      'characters/x.md',
+      'campaign.yaml',
+      '.git/config',
+      '.campaign/state/live/log.json',
+      '.campaign/state/keys.json.bak',
+      '.campaign/state/master-screen/chat.json',
+      '.campaign/state/maps',
+      '.campaign/styles',
+      '.campaign/cache/x.json',
+    ]) {
+      assert.equal(allowed(isAllowed('Write', { file_path: file }, ctx)), false, file);
+    }
+  });
+
+  it('denies a path with .. and a symlink inside styles that points outside the campaign', () => {
+    assert.equal(allowed(isAllowed('Write', { file_path: '../x' }, ctx)), false);
+    assert.equal(allowed(isAllowed('Write', { file_path: '.campaign/styles/../../characters/x.md' }, ctx)), false);
+    assert.equal(allowed(isAllowed('Write', { file_path: '.campaign/styles/a\0b.md' }, ctx)), false);
+    const link = path.join(campaign, '.campaign', 'styles', 'outside-link');
+    fs.symlinkSync(path.join(campaign, 'characters'), link, 'dir');
+    try {
+      assert.equal(allowed(isAllowed('Write', { file_path: '.campaign/styles/outside-link/new.md' }, ctx)), false);
+    } finally {
+      fs.rmSync(link, { force: true });
+    }
+  });
+
+  it('keeps isDraftPath and isWritablePath consistent for drafts', () => {
+    assert.equal(isDraftPath('.campaign/drafts/a.md', ctx), true);
+    assert.equal(isWritablePath('.campaign/drafts/a.md', ctx), true);
+    assert.equal(isWritablePath('.campaign/styles/a.md', ctx), true);
+    assert.equal(isDraftPath('.campaign/styles/a.md', ctx), false);
+  });
+
+  it('gives the plain-English denial message for a canon write', () => {
+    const decision = isAllowed('Write', { file_path: 'characters/x.md' }, ctx);
+    assert.equal(decision.allow, false);
+    if (!decision.allow) assert.match(decision.reason, /^The assistant writes drafts and working files only;/);
+  });
+
   it('allows a file inside the drafts folder, relative or absolute', () => {
     assert.equal(allowed(isAllowed('Write', { file_path: '.campaign/drafts/mara.md' }, ctx)), true);
     assert.equal(
@@ -208,6 +271,25 @@ describe('Bash: framework scripts only', () => {
   });
 });
 
+describe('plugin tools and the image providers', () => {
+  it('allows the Photoshop plugin tools by name, but not the script runner or the font installer', () => {
+    assert.equal(isAllowed('mcp__plugin_yllir_photoshop__photoshop_generate_image', {}, ctx).allow, true);
+    assert.equal(isAllowed('mcp__plugin_yllir_photoshop__photoshop_execute_script', {}, ctx).allow, false);
+    assert.equal(isAllowed('mcp__plugin_yllir_photoshop__photoshop_install_font', {}, ctx).allow, false);
+    assert.equal(isAllowed('mcp__other__x', {}, ctx).allow, false);
+    assert.equal(isAllowed('mcp__plugin_yllir_photoshop__Photoshop_Generate', {}, ctx).allow, false);
+  });
+
+  it('allows an image provider script with plain arguments, under the framework skills', () => {
+    const script = path.join(framework, 'skills', 'library', 'images', 'providers', 'codex', 'scripts', 'codex-run.mjs');
+    assert.equal(allowed(bash(`node "${script}" "${path.join(campaign, '.campaign', 'state', 'x')}"`)), true);
+    if (!script.includes(' ')) {
+      assert.equal(allowed(bash(`node ${script} ${path.join(campaign, '.campaign', 'state', 'x')}`)), true);
+    }
+    assert.equal(allowed(bash(`node "${script}" "$HOME/x"`)), false, 'a shell expansion is refused');
+  });
+});
+
 describe('isAllowed decisions carry a reason', () => {
   it('gives a reason for every denied Bash command', () => {
     const decision = bash('git status');
@@ -234,5 +316,5 @@ testIt('reads are confined to the campaign and the framework; sub-agents are all
   assert.equal(isAllowed('Glob', { pattern: '/etc/*' }, ctx).allow, false);
   assert.equal(isAllowed('Glob', { pattern: '**/*.md' }, ctx).allow, true);
   assert.equal(isAllowed('Task', {}, ctx).allow, true);
-  assert.equal(isAllowed('WebFetch', {}, ctx).allow, false);
+  assert.equal(isAllowed('WebFetch', {}, ctx).allow, true);
 });

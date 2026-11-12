@@ -7,6 +7,7 @@ import { createProvider } from '../agent/index.js';
 import { createChatService } from '../chat/index.js';
 import { campaignLanguage, TEXTS } from '../chat/text.js';
 import type { Ctx } from '../context.js';
+import type { ChatChoice } from '../../../shared/src/types.js';
 
 export interface ChatRouteOptions {
   /** Provider to use. Omitted: the one createProvider finds. Null: no agent. */
@@ -15,6 +16,8 @@ export interface ChatRouteOptions {
 
 const messageBody = z.object({
   text: z.string().trim().min(1).max(8000),
+  model: z.enum(['sonnet', 'opus', 'haiku']).optional(),
+  effort: z.enum(['low', 'medium', 'high', 'max']).optional(),
 });
 
 /** Stands in for a missing provider: the routes answer 503 before it is ever asked to run. */
@@ -44,11 +47,13 @@ export function registerChatRoutes(app: Router, ctx: Ctx, options: ChatRouteOpti
     }
     const parsed = messageBody.safeParse(req.body);
     if (!parsed.success) {
-      res.status(400).json({ error: t.invalidText });
+      const onText = parsed.error.issues.some((issue) => issue.path[0] === 'text');
+      res.status(400).json({ error: onText ? t.invalidText : t.invalidChoice });
       return;
     }
+    const choice: ChatChoice = { model: parsed.data.model, effort: parsed.data.effort };
     try {
-      const submitted = await service.runner.submit(parsed.data.text);
+      const submitted = await service.runner.submit(parsed.data.text, choice);
       if (submitted === null) {
         res.status(503).json({ error: t.closing });
         return;
