@@ -19,7 +19,11 @@ const FRAMEWORK_TOOLS = new Set(['Skill', 'Task', 'Agent']);
 /** Writes are checked against the drafts folder. */
 const WRITE_TOOLS = new Set(['Write', 'Edit']);
 /** In-process tools built by claude-provider; their handlers validate their own input. */
-export const MCP_TOOLS = new Set(['mcp__yllir__search_docs', 'mcp__yllir__open_document']);
+export const MCP_TOOLS = new Set([
+  'mcp__yllir__search_docs',
+  'mcp__yllir__open_document',
+  'mcp__yllir__suggest_music',
+]);
 
 /**
  * Characters that are never allowed in a Bash command line, quoted or not: shell

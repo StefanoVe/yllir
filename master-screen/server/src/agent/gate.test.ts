@@ -46,6 +46,11 @@ describe('read tools and the MCP tools', () => {
     assert.equal(allowed(isAllowed('mcp__yllir__open_document', { path: 'characters/mara.md' }, ctx)), true);
   });
 
+  it('allows the in-process music tool suggest_music', () => {
+    assert.equal(allowed(isAllowed('mcp__yllir__suggest_music', { query: 'porto' }, ctx)), true);
+    assert.equal(allowed(isAllowed('mcp__yllir__suggest_music', {}, ctx)), true);
+  });
+
   it('denies other tools with a plain reason', () => {
     for (const name of ['WebFetch', 'WebSearch', 'NotebookEdit', 'TodoWrite', 'mcp__other__x']) {
       const decision = isAllowed(name, {}, ctx);

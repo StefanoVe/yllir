@@ -144,6 +144,16 @@ describe('LiveCombatComponent', () => {
     expect(actions.combat).toHaveBeenCalledWith({ op: 'damage', id: 'c-2', amount: 4 });
   });
 
+  it('gives the amount box room for its placeholder, so the damage and heal row never clips', async () => {
+    fixture.componentRef.setInput('snapshot', snapshot({ combat: combatState() }));
+    render(fixture);
+    await flush();
+    const box = el.querySelector('[data-combatant-id="c-2"] input.amount') as HTMLInputElement;
+    expect(box.placeholder.length).toBeGreaterThan(0);
+    expect(parseFloat(getComputedStyle(box).minWidth)).toBeGreaterThanOrEqual(120);
+    expect(box.nextElementSibling?.getAttribute('aria-label')).toBeTruthy();
+  });
+
   it('moves to the next turn with N while the panel has focus', async () => {
     fixture.componentRef.setInput('snapshot', snapshot({ combat: combatState() }));
     render(fixture);

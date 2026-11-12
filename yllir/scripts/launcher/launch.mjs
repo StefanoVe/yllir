@@ -18,6 +18,7 @@ import {
   readCampaignLanguage,
   resolveUserClaudePath,
 } from './launch-lib.mjs';
+import { ensureMasterScreen } from './master-screen-package.mjs';
 
 const FRAMEWORK_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const READY_TIMEOUT_MS = 30000;
@@ -111,11 +112,6 @@ async function main(argv) {
   const campaign = path.resolve(args.campaign);
   const lang = args.lang ?? readCampaignLanguage(campaign);
 
-  const serverFile = path.join(FRAMEWORK_ROOT, 'master-screen', 'server.mjs');
-  if (!fs.existsSync(serverFile)) {
-    say(message('M3', lang));
-    return 1;
-  }
   if (!fs.statSync(campaign, { throwIfNoEntry: false })?.isDirectory()) {
     say(message('M4', lang));
     return 1;
@@ -126,6 +122,12 @@ async function main(argv) {
     openBrowser(live);
     return 0;
   }
+  const ensured = await ensureMasterScreen({ frameworkRoot: FRAMEWORK_ROOT, lang, say });
+  if (ensured.error) {
+    say(message(ensured.error === 'no-package' ? 'M3' : 'M7', lang));
+    return 1;
+  }
+  const serverFile = ensured.serverFile;
   // A double-clicked shortcut has a minimal PATH: resolve Claude Code as the user's shell does.
   const claudePath = await resolveUserClaudePath();
   const env = buildChildEnv({ env: process.env, claudePath, nodeDir: path.dirname(process.execPath) });

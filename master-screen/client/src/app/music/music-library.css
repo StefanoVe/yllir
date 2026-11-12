@@ -1,0 +1,185 @@
+:host {
+  display: block;
+  max-width: 72ch;
+}
+
+h1 {
+  margin-bottom: var(--space-2);
+}
+
+.notice {
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+}
+
+.field-wrap {
+  margin-bottom: var(--space-1);
+}
+
+.field {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-md);
+}
+
+.field:focus-visible,
+.fade-toggle input:focus-visible,
+.group-title a:focus-visible,
+.icon-btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.fade-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 36px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.fade-toggle input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: var(--color-accent);
+}
+
+.state {
+  margin: var(--space-2) 0;
+  color: var(--color-text-muted);
+}
+
+.group {
+  margin-top: var(--space-3);
+}
+
+.group-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-md);
+  overflow-wrap: anywhere;
+}
+
+.tracks {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.track {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: 8px var(--space-1) 8px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+/* The current track also has a bar and a visible "Now playing" badge, not only a tint. */
+.track.current {
+  background: var(--color-accent-soft);
+  box-shadow: inset 4px 0 0 var(--color-accent);
+}
+
+.track-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.track-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.track.current .track-title {
+  font-weight: 700;
+}
+
+.track-mood {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.badge.preferred {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.badge.playing {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-weight: 600;
+}
+
+.icon-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: var(--color-surface-2);
+}
+
+@media (max-width: 719px) {
+  .track {
+    padding-left: 4px;
+  }
+
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+@media (max-width: 359px) {
+  .track {
+    flex-wrap: wrap;
+  }
+}

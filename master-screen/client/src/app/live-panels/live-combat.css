@@ -35,7 +35,7 @@ label { display: flex; flex-direction: column; gap: 2px; font-size: var(--font-s
 input:not([type='checkbox']), select { font: inherit; font-size: var(--font-size-sm); padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-text); }
 .notes-input { width: 100%; }
 .small { width: 6ch; }
-.amount { width: 11ch; }
+.amount { flex: 1; min-width: 140px; }
 .add { display: flex; flex-direction: column; gap: 8px; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
 .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
 .wide { grid-column: 1 / -1; }

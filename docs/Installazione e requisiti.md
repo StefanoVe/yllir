@@ -63,6 +63,8 @@ Regole:
 
 **Deciso (2026-11-12): installazione automatica di Node.js.** Il launcher controlla la presenza di Node.js, versione minima 20, nel PATH e in `~/.yllir/node`. Se manca, lo scarica da nodejs.org in `~/.yllir/node`: la versione LTS è fissata dal framework e il file è verificato con checksum SHA256. Non servono permessi di amministratore né un installer, e il master non deve installare nulla a mano.
 
+**Deciso (2026-11-12): pacchetto del master screen.** Il launcher scarica da GitHub, dalla release del framework, il pacchetto del master screen, la cui versione e il cui SHA-256 sono fissati in `yllir/master-screen.json`. Lo verifica prima di usarlo e lo salva in `~/.yllir/master-screen/<versione>/`. Lo scarica una sola volta: al primo avvio e dopo un aggiornamento del framework che cambia la versione. Senza rete usa l'ultima versione già scaricata.
+
 **Git: motivazione.** Le versioni salvate, il «torna a com'era» e la storia dei file passano tutti da Git ([Architettura](Architettura.md), sezione 5; [Esperienza utente](Esperienza%20utente.md)). Senza Git non esiste una versione salvata a cui tornare, e per questo la scrittura è bloccata (vedi sezione 4). Per questo Git è obbligatorio, e la creazione di una campagna ne inizializza il repository.
 
 ### 1.5 Spazio su disco e connessione
@@ -71,8 +73,8 @@ Regole:
 
 **Connessione.**
 
-- Serve per installare, per accedere a Claude, per usare l'assistente, per cercare aggiornamenti e per i servizi online.
-- Senza connessione restano disponibili: la lettura e la modifica a mano delle schede, i controlli deterministici dei collegamenti, la stampa dei fogli già generati e le versioni salvate.
+- Serve per installare, per accedere a Claude, per usare l'assistente, per cercare aggiornamenti, per i servizi online e per scaricare il master screen al primo avvio o dopo un aggiornamento del framework che cambia la sua versione.
+- Senza connessione restano disponibili: la lettura e la modifica a mano delle schede, i controlli deterministici dei collegamenti, la stampa dei fogli già generati, le versioni salvate e il master screen già scaricato.
 - Non sono disponibili: l'assistente, la generazione di immagini con servizi online e i flussi musicali online.
 - La generazione locale di immagini, se mai sarà un'opzione, dovrebbe funzionare senza rete dopo l'installazione (**da verificare**).
 
@@ -212,6 +214,7 @@ Sono due aggiornamenti diversi, con chi li fa e quando.
 | Framework | Il framework stesso, con la procedura di [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md) | Su richiesta del master, dopo l'avviso di aggiornamento disponibile | Nella sezione dedicata di quel documento |
 | Claude Code | Anthropic, con il proprio meccanismo | Quando il fornitore lo chiede o quando il framework rileva una versione sotto il minimo | Sito del fornitore; il framework dà solo il link |
 | Node.js scaricato dal launcher in `~/.yllir/node` | Il launcher, con il controllo SHA256 della versione fissata dal framework | Quando manca o è sotto il minimo (sezione 1.4) | `~/.yllir/node`, senza permessi di amministratore. Il Node già presente nel computer lo aggiorna il suo fornitore |
+| Pacchetto del master screen in `~/.yllir/master-screen/<versione>/` | Il launcher, con il controllo SHA-256 fissato in `yllir/master-screen.json` | Al primo avvio e dopo un aggiornamento del framework che cambia la versione (sezione 1.4) | `~/.yllir/master-screen/`, senza permessi di amministratore |
 | Fornitore di immagini, Photoshop, Git | Ciascun fornitore | Come sopra | Sito o meccanismo del fornitore |
 | Pacchetto installato, con gli strumenti di base | L'installatore, rilanciato (ripara e aggiorna) | Quando il master lo sceglie o quando il controllo lo chiede | Stesso file dell'installazione |
 
@@ -234,7 +237,7 @@ Regole (**Proposta**):
 | Stato di lavoro (partite, scontri, registro) in `.campaign/state/` | **Resta** per impostazione predefinita, perché contiene registri di partite in corso. Si cancella su richiesta. |
 | Uscite (enciclopedia, fogli di stampa, mappe derivate) | **Restano** come file statici, che si possono consultare o cancellare. Non sono canone. |
 | Istruzioni generate per gli agenti (`.campaign/instructions/`) | **Restano** ma sono inutili senza il framework. Si possono cancellare. |
-| Pacchetto del framework, collegamento di avvio, comandi aggiunti, `~/.yllir/framework-path`, `~/.yllir/node` (il Node scaricato dal launcher) | **Vengono rimossi** dal disinstallatore. |
+| Pacchetto del framework, collegamento di avvio, comandi aggiunti, `~/.yllir/framework-path`, `~/.yllir/node` (il Node scaricato dal launcher), `~/.yllir/master-screen` (il pacchetto del master screen) | **Vengono rimossi** dal disinstallatore. |
 | Collegamenti `Apri master screen.*` / `Open master screen.*` dentro le cartelle delle campagne | **Restano**, a meno che il master non chieda di rimuoverli. |
 | Git, Node già presente nel computer, Claude Code, il fornitore di immagini, Photoshop | **Non vengono rimossi** per impostazione predefinita: sono programmi usati anche da altro. Il disinstallatore li elenca e chiede se rimuoverli. |
 | Chiavi API dei fornitori di immagini | Vengono rimosse dal computer solo su richiesta. **Vanno revocate sul sito del fornitore**: il framework non può farlo, e una chiave resta valida finché non la si revoca. |

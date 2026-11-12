@@ -12,6 +12,13 @@ import { fileURLToPath } from 'node:url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
+// Every launch run uses an empty YLLIR home and no dev override, so a developer's
+// installed master screen or shell environment cannot change what these tests see.
+const YLLIR_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-launch-home-'));
+process.on('exit', () => fs.rmSync(YLLIR_HOME, { recursive: true, force: true }));
+process.env.YLLIR_HOME = YLLIR_HOME;
+delete process.env.YLLIR_MASTER_SCREEN_DIR;
+
 /** Builds <tmp>/framework with the launcher copied in and a fake server with the given body. */
 function fakeFramework(t, serverBody) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-launch-e2e-'));
@@ -20,6 +27,7 @@ function fakeFramework(t, serverBody) {
   fs.mkdirSync(launcher, { recursive: true });
   fs.copyFileSync(path.join(HERE, 'launch.mjs'), path.join(launcher, 'launch.mjs'));
   fs.copyFileSync(path.join(HERE, 'launch-lib.mjs'), path.join(launcher, 'launch-lib.mjs'));
+  fs.copyFileSync(path.join(HERE, 'master-screen-package.mjs'), path.join(launcher, 'master-screen-package.mjs'));
   if (serverBody !== null) {
     fs.mkdirSync(path.join(root, 'master-screen'), { recursive: true });
     fs.writeFileSync(path.join(root, 'master-screen', 'server.mjs'), serverBody);

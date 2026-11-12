@@ -2,21 +2,37 @@
 // Owner: server skeleton. Applied to every request before anything else.
 import type { RequestHandler } from 'express';
 
-export const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join('; ');
+export interface CspOptions {
+  /** The music module is on: YouTube (IFrame API loader, player frame, thumbnails) only. */
+  music: boolean;
+}
+
+/**
+ * The Content-Security-Policy. With music on it adds exactly the YouTube allowances of the
+ * API contract and nothing else: no wildcards, no extra `unsafe-*` values.
+ */
+export function buildCsp({ music }: CspOptions): string {
+  const scriptSrc = music ? "script-src 'self' https://www.youtube.com" : "script-src 'self'";
+  const imgSrc = music ? "img-src 'self' data: https://i.ytimg.com" : "img-src 'self' data:";
+  const frameSrc = music ? ['frame-src https://www.youtube-nocookie.com'] : [];
+  return [
+    "default-src 'self'",
+    scriptSrc,
+    "style-src 'self' 'unsafe-inline'",
+    imgSrc,
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+    ...frameSrc,
+  ].join('; ');
+}
+
+export const CONTENT_SECURITY_POLICY = buildCsp({ music: false });
 
 export const SECURITY_HEADERS: Record<string, string> = {
-  'Content-Security-Policy': CONTENT_SECURITY_POLICY,
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'no-referrer',
@@ -49,11 +65,18 @@ export function isStateChanging(method: string): boolean {
   return !SAFE_METHODS.has(method.toUpperCase());
 }
 
-export function securityMiddleware(port: number): RequestHandler {
+export interface SecurityOptions {
+  /** Campaign music module flag, read once at startup. */
+  music?: boolean;
+}
+
+export function securityMiddleware(port: number, opts: SecurityOptions = {}): RequestHandler {
+  const csp = buildCsp({ music: opts.music === true });
   return (req, res, next) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
       res.setHeader(name, value);
     }
+    res.setHeader('Content-Security-Policy', csp);
     if (req.path === '/api' || req.path.startsWith('/api/')) {
       res.setHeader('Cache-Control', 'no-store');
     }

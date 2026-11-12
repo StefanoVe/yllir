@@ -1,0 +1,70 @@
+<h1>{{ label('music.title') }}</h1>
+
+@if (off()) {
+  <p class="notice" role="status">{{ label('music.off') }}</p>
+} @else {
+  <div class="field-wrap">
+    <input class="field" type="search" autocomplete="off" spellcheck="false"
+           [attr.aria-label]="label('music.searchLabel')" [attr.placeholder]="label('music.searchPlaceholder')"
+           [value]="search.text()" (input)="onInput($any($event.target).value)" />
+  </div>
+
+  <label class="fade-toggle">
+    <input type="checkbox" [checked]="player.fade()" (change)="player.toggleFade()" />
+    <span>{{ label('music.fades') }}</span>
+  </label>
+
+  @if (search.status() === 'error') {
+    <p class="state" role="alert">{{ search.error() }}</p>
+  } @else if (groups().length === 0) {
+    @if (search.status() === 'loading') {
+      <p class="state" role="status">{{ label('music.loading') }}</p>
+    } @else if (search.status() === 'done') {
+      <p class="state">{{ label(emptyKey()) }}</p>
+    }
+  }
+
+  @for (group of groups(); track group.docPath; let g = $index) {
+    <section class="group" [attr.aria-labelledby]="'music-group-' + g">
+      <h2 class="group-title" [id]="'music-group-' + g">
+        <a [routerLink]="docLink(group.docPath)" [attr.title]="label('music.openSheet')">{{ group.docTitle }}</a>
+      </h2>
+      <ul class="tracks">
+        @for (track of group.tracks; track track.id) {
+          <li class="track" [class.current]="isCurrent(track)" [attr.aria-current]="isCurrent(track) ? 'true' : null">
+            @if (track.provider === 'youtube') {
+              <button type="button" class="icon-btn" [attr.aria-label]="playLabel(track)" [attr.title]="playLabel(track)"
+                      (click)="toggleTrack(track)">
+                <lucide-angular [img]="isBusy(track) ? icons.Pause : icons.Play" [size]="18" aria-hidden="true" />
+              </button>
+            } @else {
+              <button type="button" class="icon-btn" [attr.aria-label]="label('music.open')" [attr.title]="label('music.open')"
+                      (click)="open(track)">
+                <lucide-angular [img]="icons.ExternalLink" [size]="18" aria-hidden="true" />
+              </button>
+            }
+            <span class="track-body">
+              <span class="track-title">{{ track.title }}</span>
+              @if (track.mood) {
+                <span class="track-mood">{{ track.mood }}</span>
+              }
+              @if (track.preferred || isCurrent(track)) {
+                <span class="badges">
+                  @if (track.preferred) {
+                    <span class="badge preferred">
+                      <lucide-angular [img]="icons.Star" [size]="12" aria-hidden="true" />
+                      {{ label('music.preferred') }}
+                    </span>
+                  }
+                  @if (isCurrent(track)) {
+                    <span class="badge playing">{{ label('music.nowPlaying') }}</span>
+                  }
+                </span>
+              }
+            </span>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+}

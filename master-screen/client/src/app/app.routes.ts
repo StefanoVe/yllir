@@ -31,5 +31,9 @@ export const routes: Routes = [
     path: 'plot',
     loadComponent: () => import('./plot/plot-map').then((m) => m.PlotMapComponent),
   },
+  {
+    path: 'music',
+    loadComponent: () => import('./music/music-library').then((m) => m.MusicLibrary),
+  },
   { path: '**', redirectTo: '' },
 ];

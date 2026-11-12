@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto';
 import type { ChatMessage, Turn } from '../../../shared/src/types.js';
 import type { Ctx } from '../context.js';
 import type { AgentEvent, AgentProvider } from '../agent/provider.js';
+import { stripLeadingNarration } from '../agent/answer.js';
 import { safeActivity } from './activity.js';
 import { validateOpenPath } from './paths.js';
 import type { ChatStore } from './store.js';
@@ -302,7 +303,8 @@ export class TurnRunner {
     turn.toSha = toSha;
     if (outcome.state === 'error') turn.error = outcome.message;
 
-    const text = job.text.trim();
+    // job.text holds only the answer (progress never reaches delta); the strip is a safety net.
+    const text = stripLeadingNarration(job.text.trim()).trim();
     const agentMessage: ChatMessage | null =
       text === '' ? null : { id: job.agentMessageId, role: 'agent', text, at: endedAt, turnId: turn.id };
     try {

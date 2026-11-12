@@ -67,6 +67,11 @@
   outline: none;
 }
 
+/* Room for the bottom dock, so the end of a page is never hidden behind it. */
+.main.has-dock {
+  padding-bottom: 150px;
+}
+
 .offline {
   margin: 0 0 var(--space-2);
   padding: var(--space-1) var(--space-2);
@@ -116,5 +121,9 @@
     grid-row: 1;
     padding: var(--space-2);
     padding-top: calc(var(--space-2) + env(safe-area-inset-top, 0px));
+  }
+
+  .main.has-dock {
+    padding-bottom: 230px;
   }
 }

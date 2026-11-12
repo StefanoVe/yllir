@@ -4,6 +4,11 @@
 import type { Lang } from './text.js';
 import { TEXTS } from './text.js';
 
+const MUSIC_SENTENCE: Record<Lang, string> = {
+  it: 'Sto cercando della musica…',
+  en: 'Looking for music…',
+};
+
 const ENGINE_CALL = /engine\.mjs"?\s+([a-z-]+)/;
 const CHECK_COMMANDS = new Set(['index', 'query', 'check']);
 const SAVE_COMMANDS = new Set(['commit', 'undo', 'revert']);
@@ -36,6 +41,8 @@ export function toolActivity(name: string, input: Record<string, unknown>, lang:
     case 'Task':
     case 'Agent':
       return t.reviewing;
+    case 'mcp__yllir__suggest_music':
+      return MUSIC_SENTENCE[lang];
     case 'Bash': {
       const match = ENGINE_CALL.exec(stringField(input, 'command'));
       if (!match) return t.working;
@@ -47,6 +54,25 @@ export function toolActivity(name: string, input: Record<string, unknown>, lang:
     default:
       return null;
   }
+}
+
+/** Text that must never be shown as narration: a path, a file name, backticks, or internal words. */
+const NARRATION_UNSAFE = /[/\\`]|\.(?:md|mjs|cjs|js|ts|json|ya?ml)\b|\b(?:migrat\w*|migrazion\w*|hooks?|scripts?|json)\b/i;
+const NARRATION_MAX = 80;
+
+/**
+ * The activity line for the intermediate text of an agent message (text before a tool use):
+ * one line, at most 80 characters, or the generic sentence when the text is unsafe.
+ * Returns '' for empty text.
+ */
+export function narrationActivity(text: string, lang: Lang): string {
+  const body = text.trim();
+  if (body === '') return '';
+  if (NARRATION_UNSAFE.test(body)) return TEXTS[lang].working;
+  const firstLine = body.split(/\r?\n/).map((line) => line.trim()).find((line) => line !== '') ?? '';
+  const oneLine = firstLine.replace(/\s+/g, ' ');
+  if (oneLine.length <= NARRATION_MAX) return oneLine;
+  return `${oneLine.slice(0, NARRATION_MAX - 1).trimEnd()}…`;
 }
 
 /** Words that must never reach the master in an activity sentence. */

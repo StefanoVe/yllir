@@ -15,11 +15,14 @@ import {
 import { z } from 'zod';
 import type { Ctx } from '../context.js';
 import { runEngine } from '../engine.js';
-import { toolActivity } from '../chat/activity.js';
+import { narrationActivity, toolActivity } from '../chat/activity.js';
+import { suggestMusic } from '../music/suggest.js';
 import { validateOpenPath } from '../chat/paths.js';
 import { TEXTS, campaignLanguage, type Lang } from '../chat/text.js';
+import { stripLeadingNarration } from './answer.js';
 import { isAllowed, type GateContext } from './gate.js';
 import type { AgentEvent, AgentProvider, AgentRunInput } from './provider.js';
+import { MASTER_SCREEN_PROMPT } from './system-prompt.js';
 
 export interface LookupDeps {
   /** Runs `which claude` / `where claude`; returns the first line or null. */
@@ -151,9 +154,10 @@ class EventQueue<T> implements AsyncIterable<T> {
   }
 }
 
-interface RunState {
+/** Per-run state of the mapping: whether the run ended, and the answer held until it succeeds. */
+export interface RunState {
   finished: boolean;
-  emittedText: boolean;
+  answer: string;
 }
 
 const AUTH_PATTERN = /auth|login|credential|api.?key|unauthori/i;
@@ -165,78 +169,71 @@ function classifyFailure(lang: Lang, subtype: string | undefined, details: strin
   return t.genericError;
 }
 
-interface RawStreamEvent {
+interface ContentBlock {
   type: string;
-  content_block?: { type?: string };
-  delta?: { type?: string; text?: string };
-}
-
-interface ToolUseBlock {
-  type: string;
+  text?: string;
   name?: string;
   input?: Record<string, unknown>;
 }
 
-/** Maps one SDK message to agent events. Sub-agent messages (parent_tool_use_id) are ignored. */
-function mapMessage(
-  message: SDKMessage,
-  out: EventQueue<AgentEvent>,
-  state: RunState,
-  ctx: Ctx,
-  lang: Lang,
-): void {
+/**
+ * Maps one SDK message to agent events. Sub-agent messages (parent_tool_use_id) are ignored.
+ * An assistant message is complete when it arrives, so it is judged whole: text of a message
+ * that uses a tool is progress (activity only); text of a message that uses no tool is the
+ * answer, held in `state` and sent once as a delta when the run succeeds, just before done.
+ */
+export function mapMessage(message: SDKMessage, state: RunState, ctx: Ctx, lang: Lang): AgentEvent[] {
   const t = TEXTS[lang];
   switch (message.type) {
     case 'system': {
-      if (message.subtype === 'init' && message.session_id) out.push({ type: 'resume', id: message.session_id });
-      return;
-    }
-    case 'stream_event': {
-      if (message.parent_tool_use_id) return;
-      const event = message.event as RawStreamEvent;
-      if (event.type === 'content_block_start' && event.content_block?.type === 'text') {
-        if (state.emittedText) out.push({ type: 'delta', text: '\n\n' });
-        return;
-      }
-      if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta' && event.delta.text) {
-        state.emittedText = true;
-        out.push({ type: 'delta', text: event.delta.text });
-      }
-      return;
+      if (message.subtype === 'init' && message.session_id) return [{ type: 'resume', id: message.session_id }];
+      return [];
     }
     case 'assistant': {
-      if (message.parent_tool_use_id || state.finished) return;
+      if (message.parent_tool_use_id || state.finished) return [];
       if (message.error) {
         state.finished = true;
         ctx.log(`agent message error: ${message.error}`);
-        out.push({
-          type: 'error',
-          message: message.error === 'authentication_failed' ? t.authFailed : t.genericError,
-        });
-        return;
+        return [
+          {
+            type: 'error',
+            message: message.error === 'authentication_failed' ? t.authFailed : t.genericError,
+          },
+        ];
       }
-      const content = (message.message?.content ?? []) as unknown as ToolUseBlock[];
-      for (const block of content) {
-        if (block.type !== 'tool_use' || typeof block.name !== 'string') continue;
-        const text = toolActivity(block.name, block.input ?? {}, lang);
-        if (text) out.push({ type: 'activity', text });
+      const content = (message.message?.content ?? []) as unknown as ContentBlock[];
+      const text = content
+        .filter((block) => block.type === 'text' && typeof block.text === 'string')
+        .map((block) => block.text as string)
+        .join('\n\n');
+      const toolUses = content.filter((block) => block.type === 'tool_use' && typeof block.name === 'string');
+      if (toolUses.length === 0) {
+        state.answer = stripLeadingNarration(text.trim());
+        return [];
       }
-      return;
+      const events: AgentEvent[] = [];
+      const narration = narrationActivity(text, lang);
+      if (narration) events.push({ type: 'activity', text: narration });
+      for (const block of toolUses) {
+        const sentence = toolActivity(block.name as string, block.input ?? {}, lang);
+        if (sentence) events.push({ type: 'activity', text: sentence });
+      }
+      return events;
     }
     case 'result': {
-      if (state.finished) return;
+      if (state.finished) return [];
       state.finished = true;
       const details = 'errors' in message && Array.isArray(message.errors) ? message.errors.map(String) : [];
       if (message.subtype !== 'success' || message.is_error) {
         ctx.log(`agent run ended with ${message.subtype}${details.length ? `: ${details.join('; ')}` : ''}`);
-        out.push({ type: 'error', message: classifyFailure(lang, message.subtype, details) });
-        return;
+        return [{ type: 'error', message: classifyFailure(lang, message.subtype, details) }];
       }
-      out.push({ type: 'done' });
-      return;
+      return state.answer === ''
+        ? [{ type: 'done' }]
+        : [{ type: 'delta', text: state.answer }, { type: 'done' }];
     }
     default:
-      return;
+      return [];
   }
 }
 
@@ -255,7 +252,7 @@ async function* runTurn(ctx: Ctx, executable: string, input: AgentRunInput): Asy
   else input.signal.addEventListener('abort', abortFromCaller, { once: true });
 
   const gate: GateContext = { campaignRoot: input.cwd, frameworkRoot: input.frameworkRoot };
-  const state: RunState = { finished: false, emittedText: false };
+  const state: RunState = { finished: false, answer: '' };
 
   const searchDocs = tool(
     'search_docs',
@@ -279,7 +276,27 @@ async function* runTurn(ctx: Ctx, executable: string, input: AgentRunInput): Asy
       return { content: [{ type: 'text', text: 'The document is open on the screen.' }] };
     },
   );
-  const yllirTools = createSdkMcpServer({ name: 'yllir', version: '1.0.0', tools: [searchDocs, openDocument] });
+  const suggestMusicTool = tool(
+    'suggest_music',
+    'Show up to five pieces of music of the campaign on the screen, for a query (words of the title, mood or sheet) and/or one sheet path. Nothing plays by itself; the master chooses. Give a short reason when useful.',
+    {
+      query: z.string().min(1).max(200).optional(),
+      doc: z.string().min(1).max(512).optional(),
+      reason: z.string().max(200).optional(),
+    },
+    async (input) => {
+      const result = await suggestMusic(ctx, input);
+      return {
+        content: [{ type: 'text', text: result.text }],
+        ...(result.isError ? { isError: true } : {}),
+      };
+    },
+  );
+  const yllirTools = createSdkMcpServer({
+    name: 'yllir',
+    version: '1.0.0',
+    tools: [searchDocs, openDocument, suggestMusicTool],
+  });
 
   const canUseTool: CanUseTool = async (toolName, toolInput) => {
     const decision = isAllowed(toolName, toolInput, gate);
@@ -297,7 +314,9 @@ async function* runTurn(ctx: Ctx, executable: string, input: AgentRunInput): Asy
     canUseTool,
     mcpServers: { yllir: yllirTools },
     disallowedTools: ['WebFetch', 'WebSearch'],
-    includePartialMessages: true,
+    systemPrompt: { type: 'preset', preset: 'claude_code', append: MASTER_SCREEN_PROMPT },
+    // Text is judged per complete assistant message, so partial text messages are not needed.
+    includePartialMessages: false,
     abortController: controller,
     ...(input.resumeId ? { resume: input.resumeId } : {}),
   };
@@ -308,7 +327,7 @@ async function* runTurn(ctx: Ctx, executable: string, input: AgentRunInput): Asy
       const stream = sdkQuery({ prompt: input.prompt, options });
       for await (const message of stream) {
         if (controller.signal.aborted) break;
-        mapMessage(message, out, state, ctx, lang);
+        for (const event of mapMessage(message, state, ctx, lang)) out.push(event);
       }
       if (!state.finished && !controller.signal.aborted) {
         state.finished = true;

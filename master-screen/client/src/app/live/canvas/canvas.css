@@ -7,6 +7,8 @@
 
 .stage {
   position: relative;
+  display: flex;
+  flex-direction: column;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
@@ -17,8 +19,10 @@
 }
 
 .viewport {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
   overflow: hidden;
   touch-action: none;
   outline: none;
@@ -92,18 +96,19 @@
   transform: translate(-50%, 0);
 }
 
-.overlay {
-  position: absolute;
-  top: 8px;
-  left: 50%;
+.bar {
+  position: relative;
   z-index: 20;
-  transform: translateX(-50%);
-  max-width: calc(100% - 16px);
+  flex: none;
+  display: flex;
+  min-width: 0;
+  padding: 8px;
+  background: var(--color-bg);
 }
 
 .popover {
   position: absolute;
-  top: 64px;
+  top: 76px;
   left: 50%;
   z-index: 30;
   transform: translateX(-50%);

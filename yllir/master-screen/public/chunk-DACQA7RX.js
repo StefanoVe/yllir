@@ -1,1 +1,0 @@
-import{J as o,ea as a}from"./chunk-KYRKAZXR.js";var i=class e{viewMode=a("master");toggle(){this.viewMode.update(t=>t==="master"?"public":"master")}static \u0275fac=function(r){return new(r||e)};static \u0275prov=o({token:e,factory:e.\u0275fac,providedIn:"root"})};export{i as a};

@@ -2,9 +2,12 @@ import { Component, HostListener, computed, effect, inject, untracked } from '@a
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { LucideAngularModule, Dices, Eye, EyeOff, GitBranch, MessageSquare, Search, Settings, SunMoon } from 'lucide-angular';
+import { LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Music, MessageSquare, Search, Settings, SunMoon } from 'lucide-angular';
 import { filter, map } from 'rxjs';
 import { LiveService } from '../core/live.service';
+import { MusicApiService } from '../music/music-api.service';
+import { MusicDock } from '../music/music-dock';
+import { MusicPlayerService } from '../music/music-player.service';
 import { PrefsService } from '../core/prefs.service';
 import { StatusService } from '../core/status.service';
 import { ThemeService } from '../core/theme.service';
@@ -15,7 +18,7 @@ import { applyTextScale, readTextScale } from './text-scale';
 
 @Component({
   selector: 'ms-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })
@@ -29,8 +32,14 @@ export class Shell {
   private readonly prefs = inject(PrefsService);
   private readonly status = inject(StatusService);
   private readonly titleService = inject(Title);
+  private readonly music = inject(MusicPlayerService);
+  private readonly musicApi = inject(MusicApiService);
 
-  readonly icons = { MessageSquare, Dices, GitBranch, Search, Settings, Eye, EyeOff, SunMoon };
+  readonly icons = { MessageSquare, Dices, GitBranch, Music, Search, Settings, Eye, EyeOff, SunMoon };
+  /** The music entry shows only when the module is on for this campaign. */
+  readonly musicEnabled = computed(() => this.status.modules()?.music === true);
+  /** The bottom dock (mini player and suggestions) is shown only while it has something to show. */
+  readonly dockVisible = computed(() => this.music.current() !== null || this.musicApi.suggestions().length > 0);
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -71,7 +80,8 @@ export class Shell {
   titleFor(url: string, campaign: string): string {
     const path = url.split(/[?#]/)[0];
     const page = path === '/' ? this.i18n.t('nav.home') : path.startsWith('/search') ? this.i18n.t('nav.search') : path.startsWith('/settings') ? this.i18n.t('nav.settings')
-      : path.startsWith('/live') ? this.i18n.t('nav.liveTable') : path.startsWith('/plot') ? this.i18n.t('nav.plot') : '';
+      : path.startsWith('/live') ? this.i18n.t('nav.liveTable') : path.startsWith('/plot') ? this.i18n.t('nav.plot')
+      : path.startsWith('/music') ? this.i18n.t('nav.music') : '';
     if (path.startsWith('/doc/')) return campaign;
     if (page === '') return campaign;
     return campaign === '' ? page : `${page} · ${campaign}`;

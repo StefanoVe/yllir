@@ -56,6 +56,8 @@ export interface Turn { id: string; messageId: string; state: TurnState; activit
 export interface ChatResponse { messages: ChatMessage[]; turn: Turn | null }
 
 export interface ChecksResponse {
+  // checkedLinks (optional, added later): total number of links that were checked
+
   brokenLinks: { from: string; to: string; text?: string }[];
   sketches: string[];                 // documents that are still sketches
   exclusions: string[];               // recorded audit exclusions, plain text
@@ -72,7 +74,8 @@ export type LiveEvent =
   | { event: 'turn'; data: Turn }
   | { event: 'open'; data: { path: string } }                           // the agent asks the screen to open a document
   | { event: 'status'; data: StatusResponse }
-  | { event: 'live'; data: { revision: string } };
+  | { event: 'live'; data: { revision: string } }
+  | { event: 'music'; data: { tracks: MusicTrack[]; reason?: string } };
 
 // ---------------------------------------------------------------------------
 // Live session (phase 2). State files live in <campaign>/.campaign/state/live/.
@@ -160,3 +163,23 @@ export interface PlotEdge { from: string; to: string; kind: 'depends' | 'order' 
 export interface PlotResponse { nodes: PlotNode[]; edges: PlotEdge[] }
 
 // SSE additions: { event: 'live'; data: { revision: string } } means "refetch GET /api/live".
+
+// ---------------------------------------------------------------------------
+// Music (phase 3). Tracks come from the `### Musica` / `### Music` sub-section
+// of place and scene sheets (master-only block). Playback is in the browser.
+// ---------------------------------------------------------------------------
+
+export type MusicProvider = 'youtube' | 'external'; // 'external' = opens in a new tab, no in-app control
+
+export interface MusicTrack {
+  id: string;                  // stable: sha1 of `${docPath}|${url}` (first 12 hex)
+  title: string;
+  url: string;                 // https only
+  mood: string;                // the text after the dash in the sheet, may be empty
+  provider: MusicProvider;
+  videoId?: string;            // for youtube
+  docPath: string;             // campaign-relative path of the sheet that lists it
+  docTitle: string;            // title of that sheet
+  preferred?: boolean;         // the sheet marks it as the preferred one
+}
+export interface MusicResponse { enabled: boolean; tracks: MusicTrack[]; note?: string } // note: plain-language reason when the framework is too old

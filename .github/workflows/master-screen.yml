@@ -8,15 +8,25 @@ on:
     paths: ['master-screen/**', '.github/workflows/master-screen.yml']
   workflow_dispatch:
 
+# Two releases never race for the same tag or the same pin commit.
+concurrency:
+  group: master-screen-release
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    # contents: write is only used by the commit-back step, which runs on push to main.
+    # contents: write is used only on push to main: the GitHub Release and the pin commit.
     permissions:
       contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
+        with:
+          # Full history: the version counts the commits that touched master-screen/.
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -39,30 +49,104 @@ jobs:
           npm run build
           npm run test:unit
 
-      - name: Assemble yllir/master-screen
+      - name: Version, package and reproducibility check
         run: |
           set -euo pipefail
-          # Client output folder, from master-screen/client/angular.json when present (default below).
-          CLIENT_OUT=master-screen/client/dist/client/browser
-          OUT=yllir/master-screen
           test -f master-screen/dist/server.mjs
-          test -d "$CLIENT_OUT"
-          rm -rf "$OUT"
-          mkdir -p "$OUT/public"
-          cp master-screen/dist/server.mjs "$OUT/server.mjs"
-          cp -R "$CLIENT_OUT/." "$OUT/public/"
-          git rev-parse --short=7 HEAD > "$OUT/VERSION"
+          test -d master-screen/client/dist/client/browser
+          V=$(sh master-screen/scripts/version.sh)
+          NAME="yllir-master-screen-$V.tar.gz"
+          # Packing twice must give the same bytes; the release uses the first pack.
+          sh master-screen/scripts/pack.sh "$V" "$RUNNER_TEMP/pack-1" > "$RUNNER_TEMP/pack-1.txt"
+          sh master-screen/scripts/pack.sh "$V" "$RUNNER_TEMP/pack-2" > "$RUNNER_TEMP/pack-2.txt"
+          cat "$RUNNER_TEMP/pack-1.txt"
+          if ! cmp -s "$RUNNER_TEMP/pack-1.txt" "$RUNNER_TEMP/pack-2.txt"; then
+            echo "The package is not reproducible: sha256 or size differ between two packs." >&2
+            exit 1
+          fi
+          SHA=$(sed -n 's/^sha256=//p' "$RUNNER_TEMP/pack-1.txt")
+          SIZE=$(sed -n 's/^size=//p' "$RUNNER_TEMP/pack-1.txt")
+          {
+            echo "VERSION=$V"
+            echo "TAG=master-screen-v$V"
+            echo "ASSET=$NAME"
+            echo "PKG=$RUNNER_TEMP/pack-1/$NAME"
+            echo "SHA=$SHA"
+            echo "SIZE=$SIZE"
+          } >> "$GITHUB_ENV"
+          echo "Packed $NAME ($SIZE bytes, sha256 $SHA)"
 
-      - name: Commit the rebuilt screen
+      - name: Publish the GitHub Release
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            # Re-run: keep the published asset and pin its checksum, not this build's.
+            echo "Release $TAG already exists: not creating it again."
+            mkdir -p "$RUNNER_TEMP/existing"
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET" --dir "$RUNNER_TEMP/existing" --clobber
+            FILE="$RUNNER_TEMP/existing/$ASSET"
+          else
+            gh release create "$TAG" "$PKG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Master screen $VERSION" \
+              --notes "Master screen package $VERSION, built from commit $GITHUB_SHA. Downloaded by the Yllir launcher; see yllir/master-screen.json."
+            FILE="$PKG"
+          fi
+          SHA=$(sha256sum "$FILE" | awk '{print $1}')
+          SIZE=$(wc -c < "$FILE" | tr -d ' ')
+          echo "SHA=$SHA" >> "$GITHUB_ENV"
+          echo "SIZE=$SIZE" >> "$GITHUB_ENV"
+          echo "Pinned asset $ASSET: $SIZE bytes, sha256 $SHA"
+
+      - name: Write the pin file
+        id: pin
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          set -euo pipefail
+          URL="https://github.com/StefanoVe/yllir-development/releases/download/$TAG/$ASSET"
+          export URL
+          node -e '
+            const fs = require("node:fs");
+            const pin = {
+              version: process.env.VERSION,
+              sha256: process.env.SHA,
+              url: process.env.URL,
+              size: Number(process.env.SIZE),
+            };
+            fs.writeFileSync("yllir/master-screen.json", JSON.stringify(pin, null, 2) + "\n");
+          '
+          if [ -n "$(git status --porcelain -- yllir/master-screen.json)" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "The pin is unchanged: nothing to commit."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Bump the framework patch and commit the pin
+        if: steps.pin.outputs.changed == 'true'
+        run: |
+          set -euo pipefail
+          # Edits only the number, so the rest of plugin.json keeps its formatting.
+          node -e '
+            const fs = require("node:fs");
+            const f = "yllir/.claude-plugin/plugin.json";
+            const re = /("version"\s*:\s*")(\d+)\.(\d+)\.(\d+)(")/;
+            const src = fs.readFileSync(f, "utf8");
+            if (!re.test(src)) throw new Error("no version field in plugin.json");
+            fs.writeFileSync(f, src.replace(re, (_, a, major, minor, patch, z) => `${a}${major}.${minor}.${Number(patch) + 1}${z}`));
+          '
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add yllir/master-screen
-          if git diff --cached --quiet; then
-            echo "The rebuilt screen is unchanged."
-          else
-            git commit -m "master-screen: rebuild [skip ci]"
-            git push
-          fi
+          git add yllir/master-screen.json yllir/.claude-plugin/plugin.json
+          git commit -m "master-screen: release v$VERSION [skip ci]"
+          for attempt in 1 2 3; do
+            if git pull --rebase origin main && git push origin HEAD:main; then
+              echo "Pushed the pin commit."
+              exit 0
+            fi
+            git rebase --abort 2>/dev/null || true
+            echo "Push failed (attempt $attempt of 3), retrying."
+            sleep $((attempt * 5))
+          done
+          echo "Could not push the pin commit after 3 attempts." >&2
+          exit 1

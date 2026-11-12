@@ -1,0 +1,81 @@
+@if (visible()) {
+  <div class="dock">
+    @if (api.suggestions().length > 0) {
+      <section class="tray" aria-labelledby="music-tray-title">
+        <h2 id="music-tray-title" class="tray-title">{{ label('music.suggested') }}</h2>
+        <ul class="chips">
+          @for (item of api.suggestions(); track item.id) {
+            <li class="chip">
+              <button type="button" class="chip-play" [attr.title]="playLabel(item.track)"
+                      (click)="playSuggestion(item.track)">
+                <lucide-angular [img]="item.track.provider === 'external' ? icons.ExternalLink : icons.Play" [size]="14" aria-hidden="true" />
+                <span class="chip-title">{{ item.track.title }}</span>
+                @if (item.reason) {
+                  <span class="chip-reason">{{ item.reason }}</span>
+                }
+              </button>
+              <button type="button" class="icon-btn chip-dismiss" [attr.aria-label]="label('music.dismiss')"
+                      [attr.title]="label('music.dismiss')" (click)="api.dismiss(item.id)">
+                <lucide-angular [img]="icons.X" [size]="14" aria-hidden="true" />
+              </button>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+
+    @if (player.current(); as track) {
+      <section class="player" [attr.aria-label]="label('music.playerLabel')">
+        <div class="now">
+          <span class="now-title" aria-live="polite">{{ track.title }}</span>
+          <span class="now-meta">
+            <span class="state" [class.is-error]="player.state() === 'error'">{{ stateText() }}</span>
+            <span class="sep" aria-hidden="true">·</span>
+            <a class="sheet-link" [routerLink]="docLink(track.docPath)" [attr.title]="label('music.openSheet')">{{ track.docTitle }}</a>
+          </span>
+          @if (player.error(); as errorKey) {
+            <span class="error" role="alert">{{ label(errorKey) }}</span>
+          }
+        </div>
+
+        <div class="controls">
+          <button type="button" class="icon-btn" [disabled]="!player.hasPrevious()"
+                  [attr.aria-label]="label('music.previous')" [attr.title]="label('music.previous')" (click)="player.previous()">
+            <lucide-angular [img]="icons.SkipBack" [size]="18" aria-hidden="true" />
+          </button>
+          <button type="button" class="icon-btn primary" [attr.aria-label]="playPauseLabel()" [attr.title]="playPauseLabel()"
+                  (click)="player.toggle()">
+            <lucide-angular [img]="isBusy() ? icons.Pause : icons.Play" [size]="20" aria-hidden="true" />
+          </button>
+          <button type="button" class="icon-btn" [disabled]="!player.hasNext()"
+                  [attr.aria-label]="label('music.next')" [attr.title]="label('music.next')" (click)="player.next()">
+            <lucide-angular [img]="icons.SkipForward" [size]="18" aria-hidden="true" />
+          </button>
+        </div>
+
+        <div class="volume">
+          <lucide-angular [img]="volumeIcon()" [size]="16" aria-hidden="true" />
+          <input type="range" class="volume-input" min="0" max="100" step="1"
+                 [value]="player.volume()" [attr.aria-label]="label('music.volume')"
+                 [attr.aria-valuetext]="volumeLabel()" [attr.title]="volumeLabel()"
+                 (input)="onVolume($event)" />
+        </div>
+
+        <div class="tools">
+          <button type="button" class="icon-btn" [class.on]="player.loop()" [attr.aria-pressed]="player.loop()"
+                  [attr.aria-label]="label('music.loop')" [attr.title]="label('music.loop')" (click)="player.toggleLoop()">
+            <lucide-angular [img]="icons.Repeat" [size]="18" aria-hidden="true" />
+          </button>
+          <button type="button" class="icon-btn" [disabled]="player.state() !== 'playing'"
+                  [attr.aria-label]="label('music.fadeOut')" [attr.title]="label('music.fadeOut')" (click)="player.fadeOut()">
+            <lucide-angular [img]="icons.Sunset" [size]="18" aria-hidden="true" />
+          </button>
+          <button type="button" class="icon-btn" [attr.aria-label]="label('music.stop')" [attr.title]="label('music.stop')"
+                  (click)="player.stop()">
+            <lucide-angular [img]="icons.X" [size]="18" aria-hidden="true" />
+          </button>
+        </div>
+      </section>
+    }
+  </div>
+}

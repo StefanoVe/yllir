@@ -12,6 +12,12 @@
        [attr.aria-label]="i18n.t('nav.plot')" [title]="i18n.t('nav.plot')">
       <lucide-angular [img]="icons.GitBranch" [size]="20" aria-hidden="true" />
     </a>
+    @if (musicEnabled()) {
+      <a class="rail-item" routerLink="/music" routerLinkActive="active" ariaCurrentWhenActive="page"
+         [attr.aria-label]="i18n.t('nav.music')" [title]="i18n.t('nav.music')">
+        <lucide-angular [img]="icons.Music" [size]="20" aria-hidden="true" />
+      </a>
+    }
     <button type="button" class="rail-item" aria-haspopup="dialog" [class.active]="palette.open()"
             [attr.aria-label]="i18n.t('nav.search')" [title]="i18n.t('nav.search')" (click)="palette.show()">
       <lucide-angular [img]="icons.Search" [size]="20" aria-hidden="true" />
@@ -33,7 +39,7 @@
     </button>
   </nav>
 
-  <main class="main" id="main" tabindex="-1">
+  <main class="main" id="main" tabindex="-1" [class.has-dock]="dockVisible()">
     @if (viewMode.viewMode() === 'public') {
       <p class="preview-banner" role="status">
         <lucide-angular [img]="icons.EyeOff" [size]="16" aria-hidden="true" />
@@ -45,6 +51,7 @@
     }
     <router-outlet />
   </main>
+  <ms-music-dock />
 </div>
 
 @if (palette.open()) {

@@ -19,6 +19,18 @@ export const MESSAGES = {
     it: "Non riesco ad avviare il master screen. Riprova; se continua, chiedi aiuto all'assistente.",
     en: 'I could not start the master screen. Try again; if it keeps happening, ask the assistant for help.',
   },
+  M6: {
+    it: 'Scarico il master screen (una sola volta), ci vorrà un momento…',
+    en: 'Downloading the master screen (one time only), this takes a moment…',
+  },
+  M7: {
+    it: 'Non riesco a scaricare il master screen. Controlla la connessione e riprova.',
+    en: 'I could not download the master screen. Check your connection and try again.',
+  },
+  M8: {
+    it: 'Uso la versione del master screen già presente sul computer.',
+    en: 'Using the master screen version already on this computer.',
+  },
 };
 
 const LANGUAGES = ['it', 'en'];

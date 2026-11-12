@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import express from 'express';
-import { isAllowedHost, isAllowedOrigin, isStateChanging, securityMiddleware } from './security.js';
+import { buildCsp, isAllowedHost, isAllowedOrigin, isStateChanging, securityMiddleware } from './security.js';
 import { request, startServer, type RunningServer } from './testing.js';
 
 describe('security helpers', () => {
@@ -109,6 +109,57 @@ describe('security middleware over HTTP', () => {
         headers: { host: `127.0.0.1:${server.port}`, origin: 'https://evil.example' },
       });
       assert.equal(res.status, 200);
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+describe('Content-Security-Policy matrix', () => {
+  const off = buildCsp({ music: false });
+  const on = buildCsp({ music: true });
+  const directives = (csp: string): string[] => csp.split('; ');
+
+  it('music off: no third-party host at all', () => {
+    assert.doesNotMatch(off, /youtube|ytimg|https?:/);
+    assert.equal(off, "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  });
+
+  it('music on: exactly the three allowances and nothing else changes', () => {
+    const offDirectives = directives(off);
+    const onDirectives = directives(on);
+    assert.equal(onDirectives.length, offDirectives.length + 1);
+    const changed = onDirectives.filter((d) => !offDirectives.includes(d));
+    assert.deepEqual(changed, [
+      "script-src 'self' https://www.youtube.com",
+      "img-src 'self' data: https://i.ytimg.com",
+      'frame-src https://www.youtube-nocookie.com',
+    ]);
+    assert.deepEqual(
+      offDirectives.filter((d) => !onDirectives.includes(d)),
+      ["script-src 'self'", "img-src 'self' data:"],
+    );
+  });
+
+  it('music on: no wildcard and no new unsafe value', () => {
+    assert.doesNotMatch(on, /\*/);
+    assert.equal(on.match(/unsafe-/g)?.length, off.match(/unsafe-/g)?.length);
+    assert.equal(on.match(/unsafe-eval|unsafe-hashes/g), null);
+    assert.doesNotMatch(on, /https?:\/\/(?!www\.youtube\.com|i\.ytimg\.com|www\.youtube-nocookie\.com)/);
+  });
+
+  it('the middleware sends the CSP of its music flag', async () => {
+    const server = await startServer((port) => {
+      const app = express();
+      app.use(securityMiddleware(port, { music: true }));
+      app.get('/x', (_req, res) => {
+        res.json({ ok: true });
+      });
+      return app;
+    });
+    try {
+      const res = await request(server.port, { path: '/x', headers: { host: `127.0.0.1:${server.port}` } });
+      assert.equal(res.headers['content-security-policy'], on);
     } finally {
       await server.close();
     }

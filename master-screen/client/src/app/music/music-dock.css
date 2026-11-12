@@ -1,0 +1,250 @@
+/* Fixed to the bottom of the main area on desktop; above the mobile rail on narrow screens. */
+.dock {
+  position: fixed;
+  left: var(--rail-width);
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0 var(--space-2) var(--space-1);
+  pointer-events: none;
+}
+
+.dock > * {
+  pointer-events: auto;
+}
+
+/* Suggestion tray */
+.tray {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-2);
+}
+
+.tray-title {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-surface-2);
+}
+
+.chip-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 36px;
+  padding: 4px 6px 4px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.chip-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 22ch;
+}
+
+.chip-reason {
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 34ch;
+}
+
+.chip-dismiss {
+  width: 32px;
+  height: 32px;
+  margin-right: 4px;
+}
+
+/* Mini player */
+.player {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-2);
+}
+
+.now {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.now-title {
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.now-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  min-width: 0;
+}
+
+.state.is-error {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.sheet-link {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 28ch;
+}
+
+.error {
+  margin-top: 2px;
+  font-size: var(--font-size-sm);
+  color: var(--color-danger);
+}
+
+.controls,
+.tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.volume {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-muted);
+}
+
+.volume-input {
+  width: 110px;
+  accent-color: var(--color-accent);
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.icon-btn.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.icon-btn.primary:hover:not(:disabled) {
+  background: var(--color-accent);
+  filter: brightness(1.08);
+}
+
+/* Pressed toggles get a border as well as a tint, so the state is not colour alone. */
+.icon-btn.on {
+  background: var(--color-accent-soft);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.icon-btn:focus-visible,
+.chip-play:focus-visible,
+.sheet-link:focus-visible,
+.volume-input:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.icon-btn:active:not(:disabled) {
+  transform: scale(0.96);
+}
+
+@media (max-width: 719px) {
+  .dock {
+    left: 0;
+    right: 0;
+    bottom: calc(var(--rail-mobile-height) + env(safe-area-inset-bottom, 0px));
+    padding: 0 var(--space-1) var(--space-1);
+  }
+
+  .chip-title,
+  .chip-reason {
+    max-width: 16ch;
+  }
+
+  .player {
+    gap: 6px;
+    padding: 6px var(--space-1);
+  }
+
+  .now {
+    flex: 1 1 100%;
+  }
+
+  .volume-input {
+    width: 80px;
+  }
+
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+}
