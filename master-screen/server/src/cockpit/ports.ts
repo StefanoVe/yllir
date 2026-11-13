@@ -196,6 +196,8 @@ export interface CockpitBattle {
   move(id: string, x: number, y: number): Promise<BattleView>;
   /** Condition and duration labels of the game system, in the campaign language. */
   rules?(): Promise<CombatRules>;
+  /** HP and AC from the public stats of a campaign sheet; null without a sheet or an adapter. */
+  vitals?(sheet: string): Promise<{ hp?: number; ac?: number } | null>;
 }
 
 export interface CockpitPorts {

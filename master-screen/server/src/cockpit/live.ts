@@ -23,6 +23,7 @@ import type {
 } from "./framework.js";
 import type { CombatMeta, CockpitStore, LedgerMeta } from "./store.js";
 import { StoreError } from "./store.js";
+import type { CockpitBattle } from "./ports.js";
 
 const TITLE_MAX = 120;
 type Meta = { origin: "agent" | "dm"; turnId?: string; groupId?: string };
@@ -127,6 +128,8 @@ export class CockpitLive {
   constructor(
     private store: CockpitStore,
     private framework: CockpitFramework,
+    /** Reads the HP and AC of a creature's sheet when it joins a fight without them. */
+    private battle?: Pick<CockpitBattle, "vitals">,
   ) {}
 
   /**
@@ -429,12 +432,27 @@ export class CockpitLive {
     });
   }
 
+  /** HP and AC of a sheet, or null when there is no battle port or the sheet cannot be read. */
+  private async sheetVitals(sheet: string): Promise<{ hp?: number; ac?: number } | null> {
+    const vitals = this.battle?.vitals;
+    if (!vitals) return null;
+    try {
+      return (await vitals.call(this.battle, sheet)) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Adds one participant. Player characters keep only name, initiative and position. */
   private async addParticipant(
     sessionId: string,
     p: Omit<Combatant, "id">,
   ): Promise<string> {
     if (p.kind === "pc") refusePcStats(p);
+    // A creature from a card has no HP or AC of its own: the sheet's public stats fill them in.
+    const sheet = p.kind !== "pc" && p.source && p.hp === undefined ? await this.sheetVitals(p.source.path) : null;
+    const hp = p.hp ?? sheet?.hp;
+    const hpMax = p.maxHp ?? (p.hp === undefined ? sheet?.hp : undefined);
     const before = new Set((await this.activeCombat()).combatants.map((c) => c.id));
     const added = await this.run({
       op: "add",
@@ -444,8 +462,9 @@ export class CockpitLive {
       ...(p.kind === "pc"
         ? {}
         : {
-            ...(p.hp !== undefined ? { hp: p.hp } : {}),
-            ...(p.maxHp !== undefined ? { hpMax: p.maxHp } : {}),
+            ...(hp !== undefined ? { hp } : {}),
+            ...(hpMax !== undefined ? { hpMax } : {}),
+            ...(sheet?.ac !== undefined ? { ac: sheet.ac } : {}),
             ...(p.resources ? { resources: p.resources } : {}),
           }),
       ...(p.source ? { sheet: p.source.path } : {}),

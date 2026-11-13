@@ -4,7 +4,8 @@ import path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import type { CombatRules, CombatantStats, LivePlayer } from '../../../shared/src/types.js';
-import { actionOf, imageOf } from '../cockpit-host/battle.js';
+import { actionOf, createBattleHost, imageOf } from '../cockpit-host/battle.js';
+import { CampaignCategories } from '../cockpit-host/categories.js';
 import { COMBAT_LIB, LOG_LIB } from '../live/framework.js';
 import { get, makeCampaign, send, startApp, type Harness } from '../live/test-support.js';
 
@@ -204,6 +205,71 @@ describe('GET /api/battle/stats/:combatantId', () => {
 
     assert.equal((await get(h, '/battle/stats/c-999')).status, 404);
     assert.equal((await get(h, '/battle/stats/' + encodeURIComponent('bad id'))).status, 404);
+  });
+});
+
+const TABLE_SHEET = [
+  '---',
+  'id: scheletro',
+  'kind: creature',
+  '---',
+  '# Scheletro',
+  '',
+  '## Statistiche',
+  '',
+  '### Caratteristiche',
+  '',
+  '| Caratteristica | Valore |',
+  '| --- | --- |',
+  '| CA | 13 |',
+  '| PF | 9 (2d8) |',
+  '| Velocità | 9 m |',
+  '',
+].join('\n');
+
+describe('stats of a creature whose combat entry has no HP or AC', () => {
+  it('shows the HP and AC lines of its sheet when the combat gives none', async () => {
+    if (!REAL_LIBS) return;
+    const h = await setup({ 'Creature/Scheletro.md': TABLE_SHEET });
+    await openSession(h);
+    await send(h, 'POST', '/live/combat', { op: 'start' });
+    const res = await send(h, 'POST', '/live/combat', { op: 'add', name: 'Scheletro', side: 'enemy', initiative: 9, sheet: 'Creature/Scheletro.md' });
+    assert.equal(res.status, 200, res.text);
+    const id = (res.json as { combat: { combatants: Array<{ id: string }> } }).combat.combatants[0]!.id;
+    const stats = (await get(h, `/battle/stats/${id}`)).json as CombatantStats;
+    assert.ok(stats.lines.some((line) => line.label === 'PF' && line.value === '9 (2d8)'), 'the sheet HP line shows');
+    assert.ok(stats.lines.some((line) => line.label === 'CA' && line.value === '13'), 'the sheet AC line shows');
+  });
+
+  it('does not repeat the sheet HP line when the combat already gives HP', async () => {
+    if (!REAL_LIBS) return;
+    const h = await setup({ 'Creature/Scheletro.md': TABLE_SHEET });
+    await openSession(h);
+    await send(h, 'POST', '/live/combat', { op: 'start' });
+    const res = await send(h, 'POST', '/live/combat', {
+      op: 'add', name: 'Scheletro', side: 'enemy', initiative: 9, hp: 7, hpMax: 9, sheet: 'Creature/Scheletro.md',
+    });
+    assert.equal(res.status, 200, res.text);
+    const id = (res.json as { combat: { combatants: Array<{ id: string }> } }).combat.combatants[0]!.id;
+    const stats = (await get(h, `/battle/stats/${id}`)).json as CombatantStats;
+    assert.ok(stats.lines.some((line) => line.label === 'HP' && line.value === '7/9'), 'the combat HP line shows');
+    assert.equal(stats.lines.filter((line) => line.value === '9 (2d8)').length, 0, 'the sheet HP line is not repeated');
+    assert.equal(stats.lines.filter((line) => line.value === '13').length, 1, 'the AC line of the sheet still shows once');
+  });
+});
+
+describe('vitals of a sheet', () => {
+  it('reads the first number of the HP and AC lines', async () => {
+    if (!REAL_LIBS) return;
+    const h = await setup({
+      'Creature/Scheletro.md': TABLE_SHEET,
+      'Creature/Lupo.md': '# Lupo\n\n## Statistiche\n\n| Caratteristica | Valore |\n| --- | --- |\n| CA | 13 (armatura di pelli: 12 + DES) |\n| PF | 9 (2d8) |\n',
+    });
+    const host = createBattleHost(h.ctx, { archive: { docs: new Map(), idle: async () => undefined }, categories: new CampaignCategories() });
+    assert.deepEqual(await host.vitals('Creature/Scheletro.md'), { hp: 9, ac: 13 });
+    assert.deepEqual(await host.vitals('Creature/Lupo.md'), { hp: 9, ac: 13 });
+    assert.equal(await host.vitals('Creature/Assente.md'), null, 'no sheet, no vitals');
+    assert.equal(await host.vitals('../fuori.md'), null, 'a path outside the campaign is refused');
   });
 });
 

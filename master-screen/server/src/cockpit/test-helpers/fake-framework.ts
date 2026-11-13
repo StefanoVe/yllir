@@ -122,6 +122,7 @@ export function createFakeFramework(options: { reviewApproves?: boolean; withRev
           resources: { ...(op.resources ?? {}) },
           ...(op.hp !== undefined ? { hp: op.hp } : {}),
           ...(op.hpMax !== undefined ? { hpMax: op.hpMax } : {}),
+          ...(op.ac !== undefined ? { ac: op.ac } : {}),
           ...(op.sheet ? { sheet: op.sheet } : {}),
         };
         combat.combatants.push(c);

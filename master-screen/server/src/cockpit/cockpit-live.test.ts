@@ -257,3 +257,51 @@ test("combat.condition is a strict action: unknown fields and empty conditions a
     rounds: 3,
   });
 });
+
+test("combat.start: an enemy from a card without HP takes HP and AC from its sheet", async () => {
+  root = await mkdtemp(path.join(tmpdir(), "cockpit-live-"));
+  const store = new CockpitStore(root);
+  const session = await store.create({ title: "Serata", provider: "claude", model: "fake" });
+  const fake = createFakeFramework();
+  const asked: string[] = [];
+  const battle = {
+    vitals: async (sheet: string) => {
+      asked.push(sheet);
+      return { hp: 9, ac: 13 };
+    },
+  };
+  const live = new CockpitLive(store, fake.framework, battle);
+  await live.apply(
+    session.id,
+    {
+      type: "combat.start",
+      title: "Porto",
+      participants: [{ name: "Guardia", kind: "enemy", initiative: 12, source: { path: "Creature/Guardia.md" }, conditions: [] }],
+    },
+    { origin: "agent" },
+  );
+  expect(asked).toEqual(["Creature/Guardia.md"]);
+  expect(fake.combat!.combatants[0]).toMatchObject({ name: "Guardia", hp: 9, hpMax: 9, ac: 13 });
+});
+
+test("combat.add: a sheet that cannot be read adds the creature without HP and AC", async () => {
+  root = await mkdtemp(path.join(tmpdir(), "cockpit-live-"));
+  const store = new CockpitStore(root);
+  const session = await store.create({ title: "Serata", provider: "claude", model: "fake" });
+  const fake = createFakeFramework();
+  const battle = {
+    vitals: async () => {
+      throw new Error("unreadable");
+    },
+  };
+  const live = new CockpitLive(store, fake.framework, battle);
+  await live.apply(session.id, { type: "combat.start", title: "Porto", participants: [] }, { origin: "agent" });
+  await live.apply(
+    session.id,
+    { type: "combat.add", participant: { name: "Ombra", kind: "enemy", initiative: 8, source: { path: "Creature/Ombra.md" }, conditions: [] } },
+    { origin: "agent" },
+  );
+  const ombra = fake.combat!.combatants.find((c) => c.name === "Ombra")!;
+  expect(ombra.hp).toBe(undefined);
+  expect(ombra.ac).toBe(undefined);
+});

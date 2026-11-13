@@ -84,6 +84,8 @@ export interface BattleHost extends CockpitBattle {
   stats(combatantId: string): Promise<CombatantStats | null>;
   /** Conditions and durations of the game system with labels in the campaign language; empty without an adapter. */
   rules(): Promise<CombatRules>;
+  /** HP and AC from the public stats of a sheet (first number of each line); null without a sheet or an adapter. */
+  vitals(sheet: string): Promise<{ hp?: number; ac?: number } | null>;
 }
 
 export interface BattleDeps {
@@ -200,7 +202,34 @@ interface Rules {
   statSummary?: (
     adapter: unknown,
     markdown: string,
-  ) => { lines: CombatantStats['lines']; actions: Array<{ name: string; text: string; group?: string; timing?: string }> };
+  ) => {
+    lines: Array<{ label: string; value: string; id?: unknown }>;
+    actions: Array<{ name: string; text: string; group?: string; timing?: string }>;
+  };
+}
+
+/** The two vitals the battle screen reads from a sheet and from a combatant. */
+type VitalId = 'hp' | 'ac';
+const VITAL_LABELS: Record<VitalId, string[]> = { hp: ['PF', 'HP'], ac: ['CA', 'AC'] };
+
+/** Lower-case label of each vital (both languages of the adapter, and the usual abbreviations) to its id. */
+function vitalIndex(rules: Rules): Map<string, VitalId> {
+  const required = rules.adapter?.creature_sheet?.required ?? [];
+  const index = new Map<string, VitalId>();
+  for (const id of ['hp', 'ac'] as const) {
+    const row = required.find((item) => item.id === id);
+    for (const label of [row?.label_it, row?.label_en, ...VITAL_LABELS[id]]) {
+      if (typeof label === 'string' && label !== '') index.set(label.toLocaleLowerCase('it'), id);
+    }
+  }
+  return index;
+}
+
+/** The vital a summary line stands for: by its adapter id when the summary gives one, else by its label. */
+function vitalIdOf(line: { label: string; id?: unknown }, index: Map<string, VitalId>): VitalId | undefined {
+  if (line.id === 'hp' || line.id === 'ac') return line.id;
+  if (typeof line.id === 'string') return undefined;
+  return index.get(line.label.toLocaleLowerCase('it'));
 }
 
 /** The label in the campaign language, then English, then the fallback (the id). */
@@ -415,14 +444,19 @@ export function createBattleHost(ctx: Ctx, deps: BattleDeps): BattleHost {
       if (who.side === 'pc') return { lines, actions: [] };
       const rules = await loadRules(ctx, root);
       const labels = labelsOf(lang, rules);
+      // The vitals the combatant itself carries; the sheet's own lines for them are dropped only then.
+      const pushed = new Set<VitalId>();
       if (who.hp !== undefined) {
+        pushed.add('hp');
         lines.push({ label: labels.hp, value: who.hpMax !== undefined ? `${who.hp}/${who.hpMax}` : String(who.hp) });
       }
-      if (who.ac !== undefined) lines.push({ label: labels.ac, value: String(who.ac) });
+      if (who.ac !== undefined) {
+        pushed.add('ac');
+        lines.push({ label: labels.ac, value: String(who.ac) });
+      }
       if (who.conditions.length > 0) {
         lines.push({ label: labels.conditions, value: who.conditions.map((condition) => condition.id).join(', ') });
       }
-      const taken = new Set([labels.hp, labels.ac].map((label) => label.toLocaleLowerCase('it')));
       let sheetLines: CombatantStats['lines'] = [];
       let actions: CombatantStats['actions'] = [];
       let image: string | undefined;
@@ -433,12 +467,35 @@ export function createBattleHost(ctx: Ctx, deps: BattleDeps): BattleHost {
           image = imageOf(who.sheet, visible);
           if (rules.statSummary) {
             const summary = rules.statSummary(rules.adapter, visible);
-            sheetLines = summary.lines.filter((line) => !taken.has(line.label.toLocaleLowerCase('it')));
+            const index = vitalIndex(rules);
+            sheetLines = summary.lines
+              .filter((line) => {
+                const vital = vitalIdOf(line, index);
+                return vital === undefined || !pushed.has(vital);
+              })
+              .map(({ label, value }) => ({ label, value }));
             actions = summary.actions.map((action) => actionOf(lang, rules, action));
           }
         }
       }
       return { lines: [...lines, ...sheetLines], actions, ...(image ? { image } : {}) };
+    },
+
+    async vitals(sheet) {
+      if (!isCampaignRef(sheet)) return null;
+      const text = await fs.readFile(path.join(root, sheet), 'utf8').catch(() => null);
+      if (text === null) return null;
+      const rules = await loadRules(ctx, root);
+      if (!rules.adapter || !rules.statSummary) return null;
+      const lines = rules.statSummary(rules.adapter, publicPartOf(text)).lines;
+      const index = vitalIndex(rules);
+      const vitals: { hp?: number; ac?: number } = {};
+      for (const id of ['hp', 'ac'] as const) {
+        const line = lines.find((item) => vitalIdOf(item, index) === id);
+        const first = line ? /\d+/.exec(line.value) : null;
+        if (first) vitals[id] = Number(first[0]);
+      }
+      return vitals;
     },
 
     async rules() {

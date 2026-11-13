@@ -69,7 +69,7 @@ export function createCockpit(options: CreateCockpitOptions) {
       else bus.publish(session.id, { type: "deleted" });
     },
   });
-  live = new CockpitLive(store, framework);
+  live = new CockpitLive(store, framework, ports.battle);
   const tracks: TrackCache = new Map();
   // Fill the track cache from the whole library whenever it (re)loads, so music
   // cards keep their titles across server restarts.
