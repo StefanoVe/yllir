@@ -86,6 +86,8 @@ import {
   PanelRight,
   Cpu,
   ImageIcon,
+  ListOrdered,
+  Crosshair,
 } from "lucide-angular";
 const icons = {
   music: Music2,
@@ -175,6 +177,8 @@ const icons = {
   chat: PanelRight,
   cpu: Cpu,
   image: ImageIcon,
+  listOrdered: ListOrdered,
+  crosshair: Crosshair,
 };
 @Component({
   selector: "ui-icon",

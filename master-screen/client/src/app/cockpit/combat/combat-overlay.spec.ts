@@ -144,7 +144,7 @@ describe('Combat overlay', () => {
   beforeEach(() => {
     localStorage.clear();
     // The combat chat follows the combat thread through its own event stream.
-    vi.stubGlobal('EventSource', class { close() {} });
+    vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} });
     Element.prototype.setPointerCapture = () => undefined;
     Element.prototype.releasePointerCapture = () => undefined;
   });
@@ -357,7 +357,7 @@ describe('Combat overlay', () => {
     expect(map.getAttribute('title')).toBe(description.textContent?.trim());
   });
 
-  it('starts with the chat folded under 900 px, and the toggle still opens it', async () => {
+  it('starts with the chat folded under 900 px, and the rail still opens it', async () => {
     const original = window.matchMedia;
     window.matchMedia = ((query: string) => ({
       matches: query === '(max-width: 899px)',
@@ -373,11 +373,15 @@ describe('Combat overlay', () => {
       await settle(fixture);
       const root = fixture.nativeElement as HTMLElement;
 
-      expect(root.querySelector('.chat-panel')?.classList.contains('collapsed')).toBe(true);
+      expect(root.querySelector('.chat-drawer')).toBeNull();
       expect(root.querySelector('cockpit-chat')).toBeNull();
-      root.querySelector<HTMLButtonElement>('.chat-toggle')!.click();
+      expect(root.querySelector('.turn-card')).toBeNull();
+      root.querySelector<HTMLButtonElement>('.rail-button[aria-label="Chat"]')!.click();
       fixture.detectChanges();
       expect(root.querySelector('cockpit-chat')).not.toBeNull();
+      expect(root.querySelector('.rail-button[aria-label="Chat"]')?.getAttribute('aria-pressed')).toBe('true');
+      // Exclusive with the turn card on phones: the turn card folds when the chat opens.
+      expect(root.querySelector('.turn-card')).toBeNull();
     } finally {
       window.matchMedia = original;
     }
@@ -410,12 +414,12 @@ describe('Combat overlay', () => {
     const root = fixture.nativeElement as HTMLElement;
 
     expect(root.querySelector('cockpit-initiative-step')).not.toBeNull();
-    expect(root.querySelector('.chat-panel')).toBeNull();
-    expect(root.querySelector('.chat-toggle')).toBeNull();
+    expect(root.querySelector('.chat-drawer')).toBeNull();
+    expect(root.querySelector('.rail')).toBeNull();
     expect(root.querySelector('cockpit-chat')).toBeNull();
   });
 
-  it('shows the chat panel once a combat is active', async () => {
+  it('shows the rail once a combat is active, and the chat drawer only when the rail opens it', async () => {
     installServer({ battle: null });
     TestBed.inject(CockpitService).session.set(session([], COMBAT));
     const fixture = create();
@@ -423,8 +427,61 @@ describe('Combat overlay', () => {
     await settle(fixture);
     const root = fixture.nativeElement as HTMLElement;
 
-    expect(root.querySelector('.chat-panel')).not.toBeNull();
-    expect(root.querySelector('.chat-toggle')).not.toBeNull();
+    expect(root.querySelector('.rail')).not.toBeNull();
+    expect(root.querySelector('.chat-drawer')).toBeNull();
+    const chatButton = root.querySelector<HTMLButtonElement>('.rail-button[aria-label="Chat"]')!;
+    expect(chatButton.getAttribute('aria-pressed')).toBe('false');
+    chatButton.click();
+    await settle(fixture);
+    expect(root.querySelector('.chat-drawer')).not.toBeNull();
+    expect(chatButton.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('shows the initiative band, the turn card and the music slot by default, and folds them from the rail', async () => {
+    installServer({ battle: null });
+    TestBed.inject(CockpitService).session.set(session([], COMBAT));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('.strip')).not.toBeNull();
+    expect(root.querySelector('.turn-card')).not.toBeNull();
+    expect(root.querySelector('.music-slot')).not.toBeNull();
+    root.querySelector<HTMLButtonElement>('.rail-button[aria-label="Initiative"]')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.strip')).toBeNull();
+    root.querySelector<HTMLButtonElement>('.rail-button[aria-label="Turn"]')!.click();
+    fixture.detectChanges();
+    expect(root.querySelector('.turn-card')).toBeNull();
+  });
+
+  it('hides every floating panel with the H key, but not while typing in a field', async () => {
+    installServer({ battle: null });
+    TestBed.inject(CockpitService).session.set(session([], COMBAT));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+    const overlay = root.querySelector<HTMLElement>('.overlay')!;
+    const hud = root.querySelector<HTMLElement>('.hud')!;
+    expect(hud.classList.contains('hud-hidden')).toBe(false);
+
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }));
+    fixture.detectChanges();
+    expect(hud.classList.contains('hud-hidden')).toBe(true);
+    expect(root.querySelector('.bar .icon-button[aria-pressed="true"]')).not.toBeNull();
+
+    overlay.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }));
+    fixture.detectChanges();
+    expect(hud.classList.contains('hud-hidden')).toBe(false);
+
+    // A text field keeps its letters: H typed there does not toggle the panels.
+    const field = document.createElement('input');
+    overlay.appendChild(field);
+    field.dispatchEvent(new KeyboardEvent('keydown', { key: 'h', bubbles: true }));
+    fixture.detectChanges();
+    expect(hud.classList.contains('hud-hidden')).toBe(false);
   });
 
   it('renders the turn panel while a combat is active', async () => {

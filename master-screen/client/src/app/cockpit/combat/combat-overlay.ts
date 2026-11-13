@@ -8,6 +8,7 @@ import {
   signal,
   untracked,
 } from "@angular/core";
+import { MusicMini } from "../../music/music-mini";
 import type { BattleView, CombatRules, LivePlayer } from "@shared/types";
 import type { CombatNotice, Combatant, SourceRef } from "@shared/cockpit-types";
 import { Icon } from "../support/icon";
@@ -32,26 +33,35 @@ import {
 } from "./combat-model";
 import { InitiativeStep } from "./initiative-step";
 import { BattleBoard } from "./battle-board";
+import { TurnPanel } from "./turn-panel";
+import { CombatHud } from "./combat-hud.service";
 
-/** True under 900 px, where the chat starts folded. Without matchMedia (old browsers, tests) it does not. */
-function narrowScreen(): boolean {
+/** True when the focus is in a field that takes typed text, where the H key must not hide the panels. */
+function isTyping(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
   return (
-    typeof window !== "undefined" &&
-    typeof window.matchMedia === "function" &&
-    window.matchMedia("(max-width: 899px)").matches
+    target.isContentEditable ||
+    target.tagName === "INPUT" ||
+    target.tagName === "TEXTAREA" ||
+    target.tagName === "SELECT"
   );
 }
 
 /**
- * Full-screen combat overlay with the table chat floating on the right. Without a combat
- * it shows the initiative step; with one, the battle view. Hosted once by the cockpit.
+ * Full-screen combat overlay: the battle map fills it, and the initiative, turn, chat and music
+ * panels float over the map with their own toggles. Without a combat it shows the initiative
+ * step; with one, the battle view. Hosted once by the cockpit.
  */
 @Component({
   selector: "cockpit-combat-overlay",
-  imports: [Icon, ConfirmButton, Chat, InitiativeStep, BattleBoard],
+  imports: [Icon, ConfirmButton, Chat, InitiativeStep, BattleBoard, TurnPanel, MusicMini],
   templateUrl: "./combat-overlay.html",
   styleUrl: "./combat-overlay.css",
-  providers: [CombatChatService, { provide: ChatSource, useExisting: CombatChatService }],
+  providers: [
+    CombatChatService,
+    { provide: ChatSource, useExisting: CombatChatService },
+    CombatHud,
+  ],
 })
 export class CombatOverlay implements OnDestroy {
   readonly svc = inject(CombatOverlayService);
@@ -67,8 +77,10 @@ export class CombatOverlay implements OnDestroy {
   readonly battle = signal<BattleView | null>(null);
   readonly rules = signal<CombatRules | null>(null);
   readonly error = signal("");
-  /** Open on wide screens; folded when the overlay opens under 900 px (see the open effect). */
-  readonly chatOpen = signal(true);
+  readonly hud = inject(CombatHud);
+  /** Floating panels that hold the pointer (by panel name) or the keyboard focus. */
+  private readonly pointerIn = new Set<string>();
+  private readonly focusIn = new Set<string>();
   readonly noticesOpen = signal(false);
   /** The `at` of the newest notice when the overlay opened: only later notices are announced. */
   private readonly noticeMark = signal("");
@@ -136,13 +148,22 @@ export class CombatOverlay implements OnDestroy {
             .catch((error: unknown) => this.error.set(String(error)));
       });
     });
-    // Each time the overlay opens: mark the notices already seen, and fold the chat on phones.
+    // Each time the overlay opens: mark the notices already seen and show the panels. When it
+    // closes, forget the panels the pointer or focus was in, since their leave events never come.
     effect(() => {
       const open = this.svc.open();
       untracked(() => {
-        if (!open) return;
-        this.noticeMark.set(this.newest()?.at ?? "");
-        this.chatOpen.set(!narrowScreen());
+        if (open) {
+          this.noticeMark.set(this.newest()?.at ?? "");
+          this.hud.activity();
+        } else this.clearPanelHolds();
+      });
+    });
+    // Without a combat there is no floating layer, so no panel can hold the pointer or focus.
+    effect(() => {
+      const active = !!this.combat();
+      untracked(() => {
+        if (!active) this.clearPanelHolds();
       });
     });
     // Opening the overlay or any cockpit state change (also one that keeps the revision, such
@@ -177,6 +198,54 @@ export class CombatOverlay implements OnDestroy {
   @HostListener("document:keydown.escape")
   escape(): void {
     if (this.svc.open() && this.overlay.isTop("combat")) this.close();
+  }
+
+  @HostListener("pointermove")
+  @HostListener("pointerdown")
+  pointerActivity(): void {
+    if (this.svc.open()) this.hud.activity();
+  }
+
+  /** Any key shows the panels; H hides or shows them all, unless the key goes to a text field. */
+  @HostListener("keydown", ["$event"])
+  keyActivity(event: KeyboardEvent): void {
+    if (!this.svc.open()) return;
+    this.hud.activity();
+    if (
+      (event.key === "h" || event.key === "H") &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      this.combat() &&
+      !isTyping(event.target)
+    ) {
+      event.preventDefault();
+      this.hud.toggleHidden();
+    }
+  }
+
+  /** The pointer enters or leaves a floating panel: while it is inside, the panels stay shown. */
+  hover(panel: string, inside: boolean): void {
+    if (inside) this.pointerIn.add(panel);
+    else this.pointerIn.delete(panel);
+    this.syncPin();
+  }
+
+  /** The keyboard focus enters or leaves a floating panel. */
+  focusPanel(panel: string, inside: boolean): void {
+    if (inside) this.focusIn.add(panel);
+    else this.focusIn.delete(panel);
+    this.syncPin();
+  }
+
+  private clearPanelHolds(): void {
+    this.pointerIn.clear();
+    this.focusIn.clear();
+    this.hud.pin(false);
+  }
+
+  private syncPin(): void {
+    this.hud.pin(this.pointerIn.size > 0 || this.focusIn.size > 0);
   }
 
   close(): void {
@@ -225,7 +294,7 @@ export class CombatOverlay implements OnDestroy {
 
   /** Asks the agent, in the campaign language, to find and set the battle map of the place. */
   async findMap(): Promise<void> {
-    this.chatOpen.set(true);
+    this.hud.setChat(true);
     try {
       await this.combatChat.send(this.i18n.t("combat.map.findPrompt"), crypto.randomUUID());
     } catch (error) {

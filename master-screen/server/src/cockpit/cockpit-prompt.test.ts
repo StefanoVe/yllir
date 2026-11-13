@@ -8,6 +8,8 @@ import type {
 import {
   SYSTEM_PROMPT,
   buildCombatSystemPrompt,
+  buildCardSystemPrompt,
+  buildCardUserPrompt,
   buildCombatUserPrompt,
   buildSystemPrompt,
   buildUserPrompt,
@@ -214,3 +216,20 @@ test("il prompt di sistema del combattimento nomina combat_condition; quello del
   expect(buildSystemPrompt({ language: "it", systemName: null })).not.toContain("combat_condition");
 });
 
+test("il prompt della scheda tronca il testo oltre 12000 caratteri e lo segnala", () => {
+  const long = "a".repeat(12500);
+  const prompt = buildCardUserPrompt("Creature/Guardia.md", long);
+  expect(prompt.startsWith("SHEET: Creature/Guardia.md\n\nTEXT:\n")).toBe(true);
+  expect(prompt.endsWith("\n[…]")).toBe(true);
+  expect(prompt.length).toBe("SHEET: Creature/Guardia.md\n\nTEXT:\n".length + 12000 + "\n[…]".length);
+  const short = buildCardUserPrompt("Creature/Guardia.md", "Morso.");
+  expect(short).toBe("SHEET: Creature/Guardia.md\n\nTEXT:\nMorso.");
+});
+
+test("il prompt di sistema della scheda nomina combat_card_set e la lingua della campagna", () => {
+  const prompt = buildCardSystemPrompt({ language: "it", systemName: null });
+  expect(prompt).toContain("combat_card_set");
+  expect(prompt).toContain("Italian");
+  expect(prompt).toContain("unspecified");
+  expect(buildCardSystemPrompt({ language: "en", systemName: "Prova" })).toContain("Prova");
+});

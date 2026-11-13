@@ -10,6 +10,9 @@
       <div class="now-text">
         <h3 id="turn-now-title" class="title">
           {{ i18n.t(n.pc ? "combat.turn.pc" : "combat.turn.now", { name: n.name }) }}
+          @if (n.basic) {
+          <span class="badge" [attr.title]="i18n.t('combat.card.basicTitle')">{{ i18n.t("combat.card.basic") }}</span>
+          }
         </h3>
         @if (n.hp !== undefined) {
         <p class="hp" [attr.title]="n.hpLabel">
@@ -23,23 +26,36 @@
       <span class="hp-fill" [style.width.%]="n.hpPct"></span>
     </span>
     }
-    @if (!n.pc) { @if (n.status === "loading") {
+    @if (!n.pc) {
+    @if (n.pending && !n.hasCard) {
+    <p class="reading" aria-live="polite"><span class="pulse" aria-hidden="true"></span>{{ i18n.t("combat.card.reading") }}</p>
+    }
+    @if (n.status === "loading") {
     <p class="muted">…</p>
     } @else if (n.status === "error") {
     <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
-    } @else if (n.groups.length) { @for (group of n.groups; track group.label) {
-    <h4 class="group-label">{{ group.label }}</h4>
-    <ul class="actions">
-      @for (action of group.actions; track $index) {
-      <li class="action" [attr.title]="action.text">
-        <span class="action-name">{{ action.name }}</span>
-        <span class="action-text">{{ action.text }}</span>
-      </li>
-      }
-    </ul>
-    } } @else {
+    } @else if (n.hasCard) {
+    @if (n.cardGroups.length) {
+    <ng-container *ngTemplateOutlet="cardRows; context: { $implicit: n.cardGroups, sub: false }" />
+    } @else {
     <p class="muted">{{ i18n.t("combat.turn.noneNow") }}</p>
-    } }
+    }
+    @if (n.traits.length) {
+    <details class="traits">
+      <summary>{{ i18n.t("combat.card.traits") }}</summary>
+      <ul class="trait-list">
+        @for (trait of n.traits; track $index) {
+        <li><b>{{ trait.name }}:</b> {{ trait.text }}</li>
+        }
+      </ul>
+    </details>
+    }
+    } @else if (n.groups.length) {
+    <ng-container *ngTemplateOutlet="parserRows; context: { $implicit: n.groups, sub: false }" />
+    } @else {
+    <p class="muted">{{ i18n.t("combat.turn.noneNow") }}</p>
+    }
+    }
     @if (!others().length) {
     <p class="muted card-foot">{{ i18n.t("combat.turn.noOthers") }}</p>
     }
@@ -61,25 +77,89 @@
           <span class="avatar sm initials" aria-hidden="true">{{ other.initials }}</span>
           }
           <h4 class="other-name">{{ other.name }}</h4>
+          @if (other.basic) {
+          <span class="badge" [attr.title]="i18n.t('combat.card.basicTitle')">{{ i18n.t("combat.card.basic") }}</span>
+          }
         </div>
+        @if (other.pending && !other.hasCard) {
+        <p class="reading" aria-live="polite"><span class="pulse" aria-hidden="true"></span>{{ i18n.t("combat.card.reading") }}</p>
+        }
         @if (other.status === "loading") {
         <p class="muted">…</p>
         } @else if (other.status === "error") {
         <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
-        } @else { @for (group of other.groups; track group.label) {
-        <h5 class="group-label">{{ group.label }}</h5>
-        <ul class="actions">
-          @for (action of group.actions; track $index) {
-          <li class="action" [attr.title]="action.text">
-            <span class="action-name">{{ action.name }}</span>
-            <span class="action-text">{{ action.text }}</span>
-          </li>
-          }
-        </ul>
-        } }
+        } @else if (other.hasCard) {
+        <ng-container *ngTemplateOutlet="cardRows; context: { $implicit: other.cardGroups, sub: true }" />
+        } @else {
+        <ng-container *ngTemplateOutlet="parserRows; context: { $implicit: other.groups, sub: true }" />
+        }
       </div>
       }
     </div>
   </details>
   }
 </section>
+
+<!-- An action card: one group per cost, one row per action (name and chips, trigger, effect). -->
+<ng-template #cardRows let-groups let-sub="sub">
+  @for (group of groups; track group.cost) {
+  @if (sub) {
+  <h5 class="group-label">{{ group.label }}</h5>
+  } @else {
+  <h4 class="group-label">{{ group.label }}</h4>
+  }
+  <ul class="actions">
+    @for (action of group.actions; track $index) {
+    <li class="action card-action" [attr.data-cost]="action.cost">
+      <div class="action-head">
+        <span class="action-name">{{ action.name }}</span>
+        @if (action.toHit !== undefined) {
+        <span class="chip hit">{{ toHitLabel(action.toHit) }}</span>
+        }
+        @for (die of action.damage ?? []; track $index) {
+        <span class="chip dmg">{{ die.dice }} {{ die.type }}</span>
+        }
+        @if (action.save; as save) {
+        <span class="chip save" [attr.title]="saveTitle(save)">{{ saveLabel(save) }}</span>
+        }
+        @if (action.range) {
+        <span class="chip">{{ action.range }}</span>
+        }
+        @if (action.area) {
+        <span class="chip">{{ action.area }}</span>
+        }
+        @if (action.recharge) {
+        <span class="chip">{{ rechargeLabel(action.recharge) }}</span>
+        }
+        @if (action.uses; as uses) {
+        <span class="chip">{{ uses.max }}/{{ uses.per }}</span>
+        }
+      </div>
+      @if (action.cost === "reaction" && action.trigger) {
+      <p class="trigger">{{ triggerLabel(action.trigger) }}</p>
+      }
+      <p class="effect">{{ action.effect }}</p>
+    </li>
+    }
+  </ul>
+  }
+</ng-template>
+
+<!-- The parser actions, the basic fallback: name and text, grouped by their group label. -->
+<ng-template #parserRows let-groups let-sub="sub">
+  @for (group of groups; track group.label) {
+  @if (sub) {
+  <h5 class="group-label">{{ group.label }}</h5>
+  } @else {
+  <h4 class="group-label">{{ group.label }}</h4>
+  }
+  <ul class="actions">
+    @for (action of group.actions; track $index) {
+    <li class="action" [attr.title]="action.text">
+      <span class="action-name">{{ action.name }}</span>
+      <span class="action-text">{{ action.text }}</span>
+    </li>
+    }
+  </ul>
+  }
+</ng-template>

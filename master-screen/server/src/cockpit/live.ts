@@ -26,6 +26,12 @@ import { StoreError } from "./store.js";
 import type { CockpitBattle } from "./ports.js";
 
 const TITLE_MAX = 120;
+
+/** What the live session needs from the card interpreter: start jobs, and say which sheets are being read. */
+export interface CardQueue {
+  request(sessionId: string, sheets: readonly string[]): void;
+  pending(): ReadonlySet<string>;
+}
 type Meta = { origin: "agent" | "dm"; turnId?: string; groupId?: string };
 
 export const isLiveAction = (action: CockpitAction) =>
@@ -99,7 +105,11 @@ function noticeOf(event: FrameworkCombatEvent): CombatNotice | null {
 }
 
 /** The framework combat as the cockpit shows it: participants in initiative order. */
-export function combatOf(state: FrameworkCombatState, meta: CombatMeta | null): Combat {
+export function combatOf(
+  state: FrameworkCombatState,
+  meta: CombatMeta | null,
+  pendingSheets?: ReadonlySet<string>,
+): Combat {
   const byId = new Map(state.combatants.map((p) => [p.id, p]));
   const ordered = [
     ...state.order.map((id) => byId.get(id)).filter((p): p is FrameworkCombatant => p !== undefined),
@@ -109,6 +119,10 @@ export function combatOf(state: FrameworkCombatState, meta: CombatMeta | null): 
     const notice = noticeOf(event);
     return notice ? [notice] : [];
   });
+  // Creatures whose action card is being interpreted right now (players never have one).
+  const cardPending = ordered
+    .filter((p) => p.side !== "pc" && p.sheet !== undefined && pendingSheets?.has(p.sheet))
+    .map((p) => p.id);
   return {
     notices: notices.slice(-20),
     title: meta?.title ?? "Combattimento",
@@ -117,6 +131,7 @@ export function combatOf(state: FrameworkCombatState, meta: CombatMeta | null): 
     participants: ordered.map((p) => combatantOf(p, meta?.participants[p.id])),
     notes: meta?.notes ?? "",
     ...(meta?.threadId ? { threadId: meta.threadId } : {}),
+    ...(cardPending.length > 0 ? { cardPending } : {}),
   };
 }
 
@@ -124,6 +139,7 @@ const sameRef = (a: SourceRef, b: SourceRef) => a.path === b.path && a.anchor ==
 
 export class CockpitLive {
   private threadTasks = new Map<string, Promise<string>>();
+  private cards?: CardQueue;
 
   constructor(
     private store: CockpitStore,
@@ -131,6 +147,11 @@ export class CockpitLive {
     /** Reads the HP and AC of a creature's sheet when it joins a fight without them. */
     private battle?: Pick<CockpitBattle, "vitals">,
   ) {}
+
+  /** Card interpreter: started for the creatures of every new fight or addition. */
+  setCards(cards: CardQueue): void {
+    this.cards = cards;
+  }
 
   /**
    * The combat thread of the active fight of a table session, created when missing.
@@ -223,7 +244,8 @@ export class CockpitLive {
       const list = await this.framework.log.list();
       if (list.ok) ledger = list.entries.map((entry) => ledgerEntryOf(entry, side.ledger[entry.id]));
       const state = await this.framework.combat.get();
-      if (state.ok && state.combat?.active) combat = combatOf(state.combat, side.combat);
+      if (state.ok && state.combat?.active)
+        combat = combatOf(state.combat, side.combat, this.cards?.pending());
     }
     return { ...session, state: { ...session.state, ledger, combat } };
   }
@@ -361,11 +383,13 @@ export class CockpitLive {
         const meta: CombatMeta = { title: action.title, notes: "", participants: {} };
         await this.store.sideUpdate(sessionId, (side) => ({ ...side, combat: meta }));
         for (const participant of action.participants) await this.addParticipant(sessionId, participant);
+        await this.requestCards(sessionId);
         return { type: "combat.start", label: "Inizia combattimento" };
       }
       case "combat.add": {
         await this.activeCombat();
         const id = await this.addParticipant(sessionId, action.participant);
+        await this.requestCards(sessionId);
         return { type: "combat.add", label: "Aggiunge combattente", targetId: id };
       }
       case "combat.update":
@@ -444,6 +468,20 @@ export class CockpitLive {
   }
 
   /** Adds one participant. Player characters keep only name, initiative and position. */
+  /** Starts the card interpreter for the creatures of the fight. Never fails the combat action. */
+  private async requestCards(sessionId: string): Promise<void> {
+    if (!this.cards) return;
+    try {
+      const state = await this.activeCombat();
+      const sheets = state.combatants
+        .filter((c) => c.side !== "pc" && c.sheet)
+        .map((c) => c.sheet!);
+      this.cards.request(sessionId, sheets);
+    } catch {
+      // The combat is already changed; the card is only a convenience.
+    }
+  }
+
   private async addParticipant(
     sessionId: string,
     p: Omit<Combatant, "id">,

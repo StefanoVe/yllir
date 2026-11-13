@@ -18,6 +18,8 @@ import { unavailableFramework, type CockpitFramework } from "./framework.js";
 import { readCampaignConfig, type CampaignConfig } from "./campaign-config.js";
 import { buildCombatSystemPrompt, buildSystemPrompt } from "./prompt.js";
 import type { SheetDeps } from "./authoring.js";
+import { CardInterpreter } from "./card-interpreter.js";
+import { LIVE_MODELS } from "./providers/claude.js";
 
 export interface CreateCockpitOptions {
   /** Campaign folder: the sheets are written under it, and the store's default container. */
@@ -163,6 +165,7 @@ export function createCockpit(options: CreateCockpitOptions) {
   });
   const tokens = new TurnTokens();
   const mcp = mcpHandler({ tokens, tools });
+  const mcpUrl = `http://127.0.0.1:${options.port}/mcp/cockpit`;
   const providerId: ProviderId = "claude";
   const providers: Partial<Record<ProviderId, Provider>> = {
     [providerId]: options.provider,
@@ -174,7 +177,7 @@ export function createCockpit(options: CreateCockpitOptions) {
     tokens,
     resolve,
     getPlotGraph,
-    mcpUrl: `http://127.0.0.1:${options.port}/mcp/cockpit`,
+    mcpUrl,
     systemPrompt: buildSystemPrompt({
       language: campaign.language,
       systemName: campaign.systemName,
@@ -194,14 +197,29 @@ export function createCockpit(options: CreateCockpitOptions) {
     live,
     provider: providerId,
   });
-  // A change made from the terminal (session log, combat) shows on the desk at once.
-  const unwatch = framework.watch?.(() => {
+  // Republishes every session's state (a change from the terminal, or a card that arrived).
+  const republishAll = () => {
     void store
       .list()
       .then((sessions) => Promise.all(sessions.map((item) => store.get(item.id))))
       .then((sessionsNow) => sessionsNow.forEach((session) => publishState(session)))
       .catch(() => {});
+  };
+  // A change made from the terminal (session log, combat) shows on the desk at once.
+  const unwatch = framework.watch?.(republishAll);
+  // Action cards of the creatures of a fight: a cheap model per sheet, published as they arrive.
+  const cards = new CardInterpreter({
+    provider: options.provider,
+    tokens,
+    mcpUrl,
+    battle: ports.battle,
+    model: LIVE_MODELS.haiku,
+    language: campaign.language,
+    systemName: campaign.systemName,
+    onChange: republishAll,
+    log: (message) => console.error("[cockpit] " + message),
   });
+  live.setCards(cards);
   return {
     /** SSE of one session, for the per-tab live stream. */
     async events(sessionId: string, lastEventId: string | null) {
@@ -218,6 +236,7 @@ export function createCockpit(options: CreateCockpitOptions) {
     },
     async close() {
       unwatch?.();
+      cards.close();
       await turns.close();
       tokens.close();
       bus.close();

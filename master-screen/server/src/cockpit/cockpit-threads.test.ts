@@ -80,5 +80,7 @@ test("table tools exclude combat and battle screen, combat tools include the sha
   assert.ok(combat.includes("ledger_note"));
   assert.ok(combat.includes("read_doc"));
   assert.ok(!combat.includes("board_place"));
-  assert.equal(table.length, COCKPIT_TOOL_NAMES.length - 11);
+  assert.ok(!table.includes("combat_card_set"));
+  assert.ok(!combat.includes("combat_card_set"));
+  assert.equal(table.length, COCKPIT_TOOL_NAMES.length - 12);
 });

@@ -12,14 +12,14 @@
   line-height: 1.4;
 }
 
-/* Cards: radius-lg, hairline border, surface, padding space-4 (see combat-overlay.css notes). */
+/* Cards are not surfaces of their own: the floating turn card behind them is translucent, and the
+   panel's text sits on it. Sections are separated by hairlines only. */
 .card {
   min-width: 0;
-  padding: var(--space-4);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-1);
+  padding: var(--space-2);
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .title {
@@ -154,6 +154,12 @@ h5 {
 }
 
 /* Out of turn: a card with a native disclosure (open on wide screens, folded on narrow). */
+.others {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
 .others > summary {
   cursor: pointer;
   list-style-position: outside;
@@ -198,6 +204,126 @@ h5 {
   color: var(--color-text-muted);
 }
 
+/* "basic" badge: the actions are the parser's, read without the agent's interpretation. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-0-5);
+  padding: 0 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.6;
+  vertical-align: middle;
+}
+
+/* "Reading the sheet": a pulsing dot while the card is written. */
+.reading {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.pulse {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: turn-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes turn-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+}
+
+/* Action card: name and chips on one line (wrapping), then the trigger and the effect. */
+.action-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+/* Chips: to-hit and save take the accent, damage the warm tone; the others are neutral. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip.hit,
+.chip.save {
+  color: var(--color-accent);
+}
+
+.chip.dmg {
+  color: var(--combat-warn);
+}
+
+.trigger {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.effect {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+/* Traits of the active creature: a compact disclosure under its actions. */
+.traits {
+  margin-top: var(--space-2);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-border);
+}
+
+.traits > summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+}
+
+.trait-list {
+  margin: var(--space-0-5) 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.trait-list b {
+  color: var(--color-text);
+  font-weight: 500;
+}
+
 /* Footer of the Now card: a one-line note under its actions, used for "nothing out of turn". */
 .card-foot {
   margin-top: var(--space-2);
@@ -208,5 +334,9 @@ h5 {
 @media (prefers-reduced-motion: reduce) {
   .others > summary {
     transition: none;
+  }
+
+  .pulse {
+    animation: none;
   }
 }

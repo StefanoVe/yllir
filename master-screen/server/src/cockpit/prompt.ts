@@ -91,6 +91,34 @@ export function buildCombatSystemPrompt(opts: {
 }
 
 /**
+ * System prompt of the card interpreter: one job per creature sheet, which ends with one
+ * call of combat_card_set. Built like buildCombatSystemPrompt.
+ */
+export function buildCardSystemPrompt(config: {
+  language: string;
+  systemName: string | null;
+}): string {
+  const language = languageName(config.language);
+  const paragraphs = [
+    `You turn ONE creature sheet of a tabletop RPG campaign (game system: ${config.systemName ?? "unspecified"}) into an action card for the master's combat screen. Read only the sheet text given. Call the tool combat_card_set exactly once, with \`sheet\` exactly as given.`,
+    `Put in \`actions\` every action, bonus action, reaction and legendary action of the sheet, each with: \`timing\` (own_turn for actions and bonus actions, any_turn for reactions, others_turns for legendary actions), \`cost\`, \`kind\`, and only the numbers written in the sheet: \`toHit\`, \`damage\` (dice like "1d8+2" and damage type), \`save\` (ability and DC, and what happens on success if stated), \`range\`, \`area\`, \`recharge\` (e.g. "5-6"), \`uses\` (e.g. max 3 per "day"), \`trigger\` for reactions. \`effect\`: one short sentence saying what happens, written in ${language}.`,
+    `Put in \`traits\` the passive traits that matter in a fight (e.g. advantage, resistances, auras), one short sentence each, written in ${language}.`,
+    `Never invent a number or an ability that is not in the text; leave an optional field out when the sheet does not say it. No tactics, no advice, no dice rolls. After the tool call, reply with nothing else.`,
+  ];
+  return paragraphs.filter(Boolean).join("\n\n");
+}
+
+/** Text of a sheet sent to the card interpreter is cut here. */
+const CARD_TEXT_MAX = 12000;
+
+/** User prompt of the card interpreter: the sheet path and its public text. */
+export function buildCardUserPrompt(sheet: string, text: string): string {
+  const body =
+    text.length > CARD_TEXT_MAX ? `${text.slice(0, CARD_TEXT_MAX)}\n[…]` : text;
+  return `SHEET: ${sheet}\n\nTEXT:\n${body}`;
+}
+
+/**
  * Compatibility constant for callers that have no campaign config yet.
  * New code should call buildSystemPrompt with the campaign's language and system.
  */

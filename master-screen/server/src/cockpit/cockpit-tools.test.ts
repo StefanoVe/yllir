@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { CockpitStore } from "./store.js";
 import { CockpitBus } from "./bus.js";
-import { COCKPIT_TOOL_NAMES, createCockpitTools, type ToolContext } from "./tools.js";
+import { CARD_TOOL_NAMES, COCKPIT_TOOL_NAMES, TABLE_TOOL_NAMES, createCockpitTools, type ToolContext } from "./tools.js";
 import { CockpitLive } from "./live.js";
 import { createFakeFramework } from "./test-helpers/fake-framework.js";
 import { fakeKindOf } from "./fake-ports.js";
@@ -21,7 +21,7 @@ import type {
 import { buildUserPrompt } from "./prompt.js";
 import { emptyState } from "./actions.js";
 import { markdownFiles } from "./test-helpers/walk.js";
-import type { Detail, MapAsset } from "./ports.js";
+import type { CockpitBattle, Detail, MapAsset } from "./ports.js";
 
 let root = "";
 afterEach(async () => {
@@ -62,7 +62,7 @@ const overlaps = (a: Frame | BoardModule, b: Frame | BoardModule) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 /** A store with one session, a fake archive and the cockpit tools bound to them. */
-async function setup(docs: Map<string, Detail>, maps: MapAsset[] = []) {
+async function setup(docs: Map<string, Detail>, maps: MapAsset[] = [], battle?: CockpitBattle) {
   root = await mkdtemp(path.join(tmpdir(), "cockpit-tools-"));
   const store = new CockpitStore(root);
   const session = await store.create({
@@ -121,6 +121,7 @@ async function setup(docs: Map<string, Detail>, maps: MapAsset[] = []) {
     bus,
     categories,
     live,
+    battle,
     // Written sheets enter the fake archive like a rescan would add them.
     sheets: (sessionId) => ({
       root,
@@ -907,3 +908,46 @@ test("combat_condition: il partecipante si trova per nome; ogni risultato di com
   await h.close();
 });
 
+test("combat_card_set passa l'input validato a setCard e rifiuta un'azione senza effetto", async () => {
+  const calls: Array<{ sheet: string; input: unknown }> = [];
+  const battle: CockpitBattle = {
+    find: async () => [],
+    setMap: async () => ({ map: null, positions: {}, revision: 0 }),
+    move: async () => ({ map: null, positions: {}, revision: 0 }),
+    setCard: async (sheet, input) => {
+      calls.push({ sheet, input });
+      return { sheet, sheetHash: "0123456789abcdef", actions: input.actions, at: "" };
+    },
+  };
+  const h = await setup(new Map(), [], battle);
+  const morso = {
+    name: "Morso",
+    timing: "own_turn",
+    cost: "action",
+    kind: "attack",
+    toHit: 5,
+    damage: [{ dice: "2d6+3", type: "perforante" }],
+    effect: "Morde un bersaglio vicino.",
+  };
+  const traits = [{ name: "Calore", text: "Scalda chi la tocca." }];
+  const ok = h.json(await h.call("combat_card_set", { sheet: "Creature/Verme.md", actions: [morso], traits }));
+  expect(ok).toEqual({ sheet: "Creature/Verme.md", actions: 1 });
+  expect(calls).toEqual([{ sheet: "Creature/Verme.md", input: { actions: [morso], traits } }]);
+
+  const senza = {
+    name: "Morso",
+    timing: "own_turn",
+    cost: "action",
+    kind: "attack",
+  };
+  const bad = await h.call("combat_card_set", { sheet: "Creature/Verme.md", actions: [senza] });
+  expect(bad.isError).toBe(true);
+  expect(calls).toHaveLength(1);
+  await h.close();
+});
+
+test("combat_card_set è solo dello strumento di carte, non della tavola", () => {
+  expect(COCKPIT_TOOL_NAMES).toContain("combat_card_set");
+  expect(CARD_TOOL_NAMES).toEqual(["combat_card_set"]);
+  expect(TABLE_TOOL_NAMES).not.toContain("combat_card_set");
+});

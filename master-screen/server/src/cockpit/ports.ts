@@ -1,7 +1,8 @@
 // The only way the cockpit reaches the rest of the server. The host implements these
 // ports (fake-ports.ts for now). Shapes are copied from the prototype's archive, maps,
 // images, music and plot modules: only the members the cockpit actually uses.
-import type { BattleView, CombatRules } from "../../../shared/src/types.js";
+import type { ActionCard, BattleView, CombatRules } from "../../../shared/src/types.js";
+import type { CardInput } from "./card-schema.js";
 
 export interface Heading {
   id: string;
@@ -198,6 +199,12 @@ export interface CockpitBattle {
   rules?(): Promise<CombatRules>;
   /** HP and AC from the public stats of a campaign sheet; null without a sheet or an adapter. */
   vitals?(sheet: string): Promise<{ hp?: number; ac?: number } | null>;
+  /** The public text of a campaign sheet and its hash; null when the path is not a readable campaign file. */
+  cardSource?(sheet: string): Promise<{ text: string; hash: string } | null>;
+  /** The action card of a sheet of the active session, or null when there is none or the sheet changed since. */
+  card?(sheet: string): Promise<ActionCard | null>;
+  /** Stores the action card of a sheet in the active session; throws when it is refused. */
+  setCard?(sheet: string, input: CardInput): Promise<ActionCard>;
 }
 
 export interface CockpitPorts {

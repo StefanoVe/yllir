@@ -17,7 +17,6 @@ import { DocumentsService } from "../support/documents.service";
 import { I18n } from "../../i18n";
 import { CombatantChip } from "./combatant-chip";
 import { CombatantRow } from "./combatant-row";
-import { TurnPanel } from "./turn-panel";
 import {
   type Cell,
   byInitiative,
@@ -39,14 +38,14 @@ interface Drag {
 let nextBoardId = 0;
 
 /**
- * The battle view: the turn panel, then the battle map with a grid and draggable chips (the
- * panel beside it on wide screens), or the combatants in initiative order when there is no map
- * or the preference is off. Chips move by drag and drop or with the arrow keys (grid only);
- * every move is saved with PUT /api/battle.
+ * The battle view: the battle map with a grid and draggable chips, filling its host, or the
+ * combatants in initiative order when there is no map or the preference is off. The turn and
+ * the other floating panels are the overlay's. Chips move by drag and drop or with the arrow
+ * keys (grid only); every move is saved with PUT /api/battle.
  */
 @Component({
   selector: "cockpit-battle-board",
-  imports: [Icon, CombatantChip, CombatantRow, TurnPanel],
+  imports: [Icon, CombatantChip, CombatantRow],
   templateUrl: "./battle-board.html",
   styleUrl: "./battle-board.css",
 })
@@ -82,7 +81,8 @@ export class BattleBoard {
     return grid ? String(grid.cols / grid.rows) : "";
   });
   readonly mapUrl = computed(() => {
-    const ref = this.battle()?.map?.ref;
+    const map = this.battle()?.map;
+    const ref = map?.plain ?? map?.ref;
     return ref ? this.documents.asset(ref) : "";
   });
   readonly placed = computed(() =>

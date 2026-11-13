@@ -1,0 +1,212 @@
+/*
+ * The mini player. The same dark palette as the bottom bar (the --ink-* tokens are declared here too),
+ * as a translucent surface that floats over a battle map. The parent positions the host.
+ */
+:host {
+  --ink-ground: #0e1311;
+  --ink-raised: #161d1a;
+  --ink-lift: #1e2723;
+  --ink-text: #ece5d2;
+  --ink-on-text: #0e1311;
+  --ink-muted: #9ba596;
+  --ink-accent: #d9a548;
+  --ink-on-accent: #0e1311;
+  --ink-line: rgb(236 229 210 / 0.09);
+
+  display: block;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-text);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--ink-text);
+  outline-offset: 2px;
+}
+
+/* Collapsed: one round button, 44px. */
+.round {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, white 10%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ink-raised, #161d1a) 78%, transparent);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+}
+
+.round:hover {
+  background: color-mix(in srgb, var(--ink-lift, #1e2723) 88%, transparent);
+}
+
+.round-art {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+}
+
+.round-note {
+  color: var(--ink-muted);
+}
+
+/* Equaliser: three bars along the bottom of the round button, CSS only. */
+.eq {
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 10px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.eq i {
+  display: block;
+  width: 3px;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--ink-accent);
+  transform-origin: bottom;
+  animation: eq 0.9s ease-in-out infinite;
+}
+
+.eq i:nth-child(2) {
+  animation-delay: -0.3s;
+}
+
+.eq i:nth-child(3) {
+  animation-delay: -0.6s;
+}
+
+@keyframes eq {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .eq i {
+    animation: none;
+    transform: scaleY(0.6);
+  }
+}
+
+/* Expanded: a compact card, about 280px wide. */
+.card {
+  box-sizing: border-box;
+  width: 280px;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, white 10%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ink-raised, #161d1a) 78%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.art {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+}
+
+.text {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.title,
+.sub {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.title.is-muted {
+  font-weight: 400;
+  color: var(--ink-muted);
+}
+
+.sub {
+  color: var(--ink-muted);
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.btn {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-text);
+  cursor: pointer;
+}
+
+.btn:hover:not(:disabled) {
+  background: var(--ink-lift);
+}
+
+.btn.play {
+  background: var(--ink-text);
+  color: var(--ink-on-text);
+}
+
+.btn.play:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink-text) 86%, var(--ink-accent));
+}
+
+.btn.on {
+  background: color-mix(in srgb, var(--ink-text) 14%, var(--ink-lift));
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* The inline volume slider under the row. */
+.volume {
+  margin-top: 8px;
+  padding: 0 6px;
+}

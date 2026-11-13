@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { CockpitStore, StoreError } from "./store.js";
 import { CockpitLive, combatOf } from "./live.js";
-import type { FrameworkCombatState } from "./framework.js";
+import type { FrameworkCombatant, FrameworkCombatState } from "./framework.js";
 import { parseAction } from "./actions.js";
 import { createFakeFramework } from "./test-helpers/fake-framework.js";
 import type { CockpitAction } from "../../../shared/src/cockpit-types.js";
@@ -304,4 +304,58 @@ test("combat.add: a sheet that cannot be read adds the creature without HP and A
   const ombra = fake.combat!.combatants.find((c) => c.name === "Ombra")!;
   expect(ombra.hp).toBe(undefined);
   expect(ombra.ac).toBe(undefined);
+});
+
+test("combatOf: cardPending lists only the creatures whose sheet is being read, and is absent when none is", () => {
+  const combatant = (id: string, side: "pc" | "enemy", sheet?: string) =>
+    ({
+      id,
+      name: id,
+      side,
+      initiative: 10,
+      hp: 5,
+      hpMax: 5,
+      conditions: [],
+      resources: {},
+      ...(sheet ? { sheet } : {}),
+    }) as unknown as FrameworkCombatant;
+  const state = {
+    active: true,
+    round: 1,
+    turn: 0,
+    order: ["pc-1", "e-1", "e-2"],
+    combatants: [combatant("pc-1", "pc", "Party/Lia.md"), combatant("e-1", "enemy", "Creature/Guardia.md"), combatant("e-2", "enemy", "Creature/Ombra.md")],
+    events: [],
+  } as unknown as FrameworkCombatState;
+  const meta = { title: "Porto", notes: "", participants: {} };
+
+  const pending = combatOf(state, meta, new Set(["Creature/Guardia.md", "Party/Lia.md"]));
+  expect(pending.cardPending).toEqual(["e-1"]);
+
+  const none = combatOf(state, meta, new Set());
+  expect("cardPending" in none).toBe(false);
+  expect("cardPending" in combatOf(state, meta)).toBe(false);
+});
+
+test("combat.add of an enemy with a sheet asks the card interpreter for that sheet", async () => {
+  root = await mkdtemp(path.join(tmpdir(), "cockpit-live-"));
+  const store = new CockpitStore(root);
+  const session = await store.create({ title: "Serata", provider: "claude", model: "fake" });
+  const fake = createFakeFramework();
+  const battle = { vitals: async () => null };
+  const live = new CockpitLive(store, fake.framework, battle);
+  const requests: { sessionId: string; sheets: readonly string[] }[] = [];
+  live.setCards({
+    request: (sessionId, sheets) => requests.push({ sessionId, sheets: [...sheets] }),
+    pending: () => new Set(),
+  });
+  await live.apply(session.id, { type: "combat.start", title: "Porto", participants: [] }, { origin: "agent" });
+  await live.apply(
+    session.id,
+    { type: "combat.add", participant: { name: "Ombra", kind: "enemy", initiative: 8, source: { path: "Creature/Ombra.md" }, conditions: [] } },
+    { origin: "agent" },
+  );
+  expect(requests.length).toBe(2);
+  expect(requests[1]!.sessionId).toBe(session.id);
+  expect(requests[1]!.sheets).toEqual(["Creature/Ombra.md"]);
 });

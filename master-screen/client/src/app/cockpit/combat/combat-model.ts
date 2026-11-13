@@ -1,4 +1,4 @@
-import type { BattleView, CombatRules } from "@shared/types";
+import type { ActionCard, BattleView, CardAction, CombatRules } from "@shared/types";
 import type {
   BoardModuleView,
   CockpitAction,
@@ -211,11 +211,40 @@ export function hpLow(hp?: number, maxHp?: number): boolean {
   return pct !== null && pct <= 25;
 }
 
-/** Key of a combatant's stats in the battle API cache: changes with its hit points. Player characters have none. */
+/**
+ * Key of a combatant's stats in the battle API cache: changes with its hit points, and with
+ * `pending` (its action card is being written), so the stats are asked again when the card
+ * arrives. Player characters have none.
+ */
 export function statsKey(
   c: Pick<Combatant, "kind" | "hp" | "maxHp" | "tempHp">,
+  pending = false,
 ): string | null {
-  return c.kind === "pc" ? null : `${c.hp ?? ""}/${c.maxHp ?? ""}/${c.tempHp ?? ""}`;
+  if (c.kind === "pc") return null;
+  const key = `${c.hp ?? ""}/${c.maxHp ?? ""}/${c.tempHp ?? ""}`;
+  return pending ? `${key}|p` : key;
+}
+
+/** Order in which the cost groups of an action card are shown. */
+export const CARD_COST_ORDER: CardAction["cost"][] = [
+  "action",
+  "bonus",
+  "movement",
+  "free",
+  "reaction",
+  "legendary",
+];
+
+/** The card's actions with one of the given timings, grouped by cost in CARD_COST_ORDER; empty groups are left out. */
+export function cardGroups(
+  card: ActionCard,
+  timings: CardAction["timing"][],
+): Array<{ cost: CardAction["cost"]; actions: CardAction[] }> {
+  const wanted = new Set(timings);
+  return CARD_COST_ORDER.map((cost) => ({
+    cost,
+    actions: card.actions.filter((a) => wanted.has(a.timing) && a.cost === cost),
+  })).filter((group) => group.actions.length > 0);
 }
 
 /** Label of a condition in the campaign language, or its id when the rules do not name it. */

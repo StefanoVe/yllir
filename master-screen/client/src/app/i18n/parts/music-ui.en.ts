@@ -76,4 +76,7 @@ export const musicUiEn = {
   'music.card.label': 'Now playing',
   'music.card.empty': 'Pick a track',
   'music.card.why': 'Why this fits',
+  'music.mini.label': 'Music',
+  'music.mini.collapse': 'Collapse the music player',
+  'music.mini.empty': 'Nothing playing',
 } as const;

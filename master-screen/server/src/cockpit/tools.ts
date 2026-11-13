@@ -27,6 +27,7 @@ import type { CockpitBus } from "./bus.js";
 import { stateView, type Resolver } from "./view.js";
 import type { TrackCache } from "./resolvers.js";
 import { combatantInputSchema } from "./actions.js";
+import { cardInputSchema, type CardInput } from "./card-schema.js";
 import { sessionOutline, type OutlineRef } from "./outline.js";
 import {
   SHEET_KINDS,
@@ -201,6 +202,7 @@ export const COCKPIT_TOOL_NAMES = [
   "find_battle_map",
   "battle_map_set",
   "battle_move",
+  "combat_card_set",
   "music_play",
   "music_stop",
   "open_source",
@@ -215,8 +217,10 @@ export const COMBAT_TOOL_NAMES = [
 const COMBAT_ONLY = new Set<string>([
   "combat_start", "combat_add", "combat_update", "combat_remove",
   "combat_turn", "combat_notes", "combat_end", "combat_condition",
-  "find_battle_map", "battle_map_set", "battle_move",
+  "find_battle_map", "battle_map_set", "battle_move", "combat_card_set",
 ]);
+/** Tools of the card interpreter: only publishing the card. */
+export const CARD_TOOL_NAMES = ["combat_card_set"] as const satisfies readonly (typeof COCKPIT_TOOL_NAMES)[number][];
 /** Tools of the table agent: everything except the combat and the battle screen. */
 export const TABLE_TOOL_NAMES = COCKPIT_TOOL_NAMES.filter((name) => !COMBAT_ONLY.has(name));
 const tool = (
@@ -1864,6 +1868,20 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
         return { id: target.id, positions: view.positions[target.id] };
       },
       (args) => `Pedina · ${args.participant}`,
+    ),
+  );
+  tools.push(
+    tool(
+      "combat_card_set",
+      "Pubblica sulla plancia del combattimento la scheda azioni interpretata di una creatura. sheet: il percorso della scheda esattamente come ricevuto. actions: ogni azione, azione bonus, reazione e azione leggendaria della scheda, con i numeri scritti nella scheda (tiro per colpire, danni, CD, gittata) e un effetto in una frase. traits: i tratti che contano in combattimento. Chiamalo una sola volta.",
+      cardInputSchema.extend({ sheet: z.string().min(1).max(500) }),
+      async (args) => {
+        if (!deps.battle?.setCard) throw new Error("La schermata di battaglia non è disponibile.");
+        const { sheet, ...input } = args as CardInput & { sheet: string };
+        const card = await deps.battle.setCard(String(sheet), input);
+        return { sheet: card.sheet, actions: card.actions.length };
+      },
+      (args) => `Scheda azioni · ${String(args.sheet).split("/").at(-1)}`,
     ),
   );
   return tools.map((item) => withToolLog(deps, item));

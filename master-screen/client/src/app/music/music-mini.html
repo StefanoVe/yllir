@@ -1,0 +1,60 @@
+@if (visible()) {
+  @if (!expanded()) {
+    <button type="button" class="round" [attr.aria-expanded]="false"
+            [attr.aria-label]="label('music.mini.label')" [attr.title]="label('music.mini.label')"
+            (click)="setExpanded(true)">
+      @if (player.current(); as track) {
+        <ms-music-art class="round-art" [track]="track" />
+      } @else {
+        <lucide-angular class="round-note" [img]="icons.Music" [size]="20" aria-hidden="true" />
+      }
+      @if (playing()) {
+        <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
+      }
+    </button>
+  } @else {
+    <section class="card" [attr.aria-label]="label('music.mini.label')">
+      <div class="row">
+        <ms-music-art class="art" [track]="player.current()" />
+
+        <div class="text">
+          @if (player.current(); as track) {
+            <p class="title" aria-live="polite">{{ titleOf(track) }}</p>
+            @if (track.docTitle) {
+              <p class="sub">{{ track.docTitle }}</p>
+            }
+          } @else {
+            <p class="title is-muted">{{ label('music.mini.empty') }}</p>
+          }
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn play" [disabled]="!canPlay()" [attr.aria-label]="playPauseLabel()"
+                  [attr.title]="playPauseLabel()" (click)="player.toggle()">
+            <lucide-angular [img]="busy() ? icons.Pause : icons.Play" [size]="18" aria-hidden="true" />
+          </button>
+          <button type="button" class="btn" [disabled]="!canPlay() || !player.hasNext()"
+                  [attr.aria-label]="label('music.next')" [attr.title]="label('music.next')" (click)="player.next()">
+            <lucide-angular [img]="icons.SkipForward" [size]="18" aria-hidden="true" />
+          </button>
+          <button type="button" class="btn" [class.on]="volumeOpen()" [attr.aria-expanded]="volumeOpen()"
+                  [attr.aria-controls]="volumeOpen() ? 'music-mini-volume' : null" [attr.aria-label]="volumeLabel()" [attr.title]="volumeLabel()"
+                  (click)="toggleVolume()">
+            <lucide-angular [img]="volumeIcon()" [size]="18" aria-hidden="true" />
+          </button>
+          <button type="button" class="btn" [attr.aria-label]="label('music.mini.collapse')"
+                  [attr.title]="label('music.mini.collapse')" (click)="setExpanded(false)">
+            <lucide-angular [img]="icons.ChevronDown" [size]="18" aria-hidden="true" />
+          </button>
+        </div>
+      </div>
+
+      @if (volumeOpen()) {
+        <div class="volume" id="music-mini-volume">
+          <ms-music-slider [value]="player.volume()" [max]="100" [label]="label('music.volume')"
+                           [valueText]="volumeLabel()" (moved)="onVolume($event)" />
+        </div>
+      }
+    </section>
+  }
+}

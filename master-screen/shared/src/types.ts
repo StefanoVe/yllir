@@ -204,9 +204,37 @@ export interface BoardGroup { id: string; turnId?: string; by: 'agent' | 'master
 
 // Battle view (server-owned, not canon, not undo): where the chips are on the battle map.
 export interface BattleView {
-  map?: { ref: string; cols?: number; rows?: number } | null;   // campaign-relative image path; grid when known
+  map?: { ref: string; cols?: number; rows?: number; plain?: string } | null;   // campaign-relative image path; grid when known; plain = same map without the grid, when that file exists (derived, never stored)
   positions: Record<string, { x: number; y: number }>;           // combatant id -> cell (or fraction 0..1 when no grid)
   revision: number;
+}
+
+/** One action of a creature as the combat agent read it from the public part of its sheet. Every value is written in the sheet; none is invented. */
+export interface CardAction {
+  name: string;
+  timing: 'own_turn' | 'any_turn' | 'others_turns';
+  cost: 'action' | 'bonus' | 'reaction' | 'legendary' | 'free' | 'movement';
+  kind: 'attack' | 'save' | 'spell' | 'utility' | 'movement';
+  toHit?: number;
+  damage?: Array<{ dice: string; type: string }>;
+  save?: { ability: string; dc: number; onSuccess?: string };
+  range?: string;
+  area?: string;
+  recharge?: string;
+  uses?: { max: number; per: string };
+  /** For reactions: what triggers it. */
+  trigger?: string;
+  /** One short sentence in the campaign language: what happens. */
+  effect: string;
+}
+
+/** The action card of one sheet, written by the combat agent; valid while the hash of the sheet's public text is unchanged. */
+export interface ActionCard {
+  sheet: string;
+  sheetHash: string;
+  actions: CardAction[];
+  traits?: Array<{ name: string; text: string }>;
+  at: string;
 }
 
 // Tooltip of a combatant chip, built by the game-system adapter from the sheet's public text.
@@ -216,6 +244,10 @@ export interface CombatantStats {
   actions: Array<{ name: string; text: string; group: string; groupLabel: string; timing: 'own_turn' | 'any_turn' | 'others_turns' }>;
   /** Artwork of the combatant's sheet (first image of its public part), as `/api/file?path=…`; never from the master-only block. */
   image?: string;
+  /** The agent's action card of the sheet, when one is ready and still valid. */
+  card?: ActionCard;
+  /** 'agent' when `card` is set, 'parser' when only the deterministic `actions` are available. */
+  source?: 'agent' | 'parser';
 }
 
 /** Conditions and durations of the game system, with labels in the campaign language. */

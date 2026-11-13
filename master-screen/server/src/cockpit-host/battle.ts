@@ -2,11 +2,13 @@
 // combat, written atomically), the players' list, the battle maps of the campaign with the sheet
 // that embeds them, and the stats tooltip of a combatant (the game system's own summary of the
 // public part of its sheet). Owner: cockpit host.
+import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
-import type { BattleView, CombatRules, CombatState, CombatantStats, LivePlayer } from '../../../shared/src/types.js';
+import type { ActionCard, BattleView, CombatRules, CombatState, CombatantStats, LivePlayer } from '../../../shared/src/types.js';
+import { cardInputSchema, type CardInput } from '../cockpit/card-schema.js';
 import { readCampaignConfig } from '../cockpit/campaign-config.js';
 import type { BattleMapOption, CockpitBattle, Detail } from '../cockpit/ports.js';
 import { campaignLanguage, type Lang } from '../chat/text.js';
@@ -21,6 +23,7 @@ import type { CampaignCategories } from './categories.js';
 import { loadCategoryEntries } from './categories.js';
 import { listMapAssets } from './maps.js';
 import { referencesOf } from './refs.js';
+import { SKILL_GRID, SKILL_MAP } from './files.js';
 
 export const MAX_POSITIONS = 300;
 const MAP_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
@@ -67,6 +70,22 @@ export const battlePatchSchema = z.strictObject({
 
 export type BattlePatch = z.infer<typeof battlePatchSchema>;
 
+/** The cards file of a session: the cards by sheet path. */
+const storedCardsSchema = z.object({
+  cards: z.record(
+    z.string(),
+    z.object({
+      sheet: z.string(),
+      sheetHash: z.string(),
+      at: z.string(),
+      actions: cardInputSchema.shape.actions,
+      traits: cardInputSchema.shape.traits,
+    }),
+  ),
+});
+
+const MAX_CARDS = 100;
+
 const storedSchema = z.object({
   map: z.object({ ref: z.string(), cols: z.number().int().optional(), rows: z.number().int().optional() }).nullable().optional(),
   positions: z.record(z.string(), z.object({ x: z.number(), y: z.number() })),
@@ -86,6 +105,12 @@ export interface BattleHost extends CockpitBattle {
   rules(): Promise<CombatRules>;
   /** HP and AC from the public stats of a sheet (first number of each line); null without a sheet or an adapter. */
   vitals(sheet: string): Promise<{ hp?: number; ac?: number } | null>;
+  /** The public text of a campaign sheet and its hash; null when the path is not a readable campaign file. */
+  cardSource(sheet: string): Promise<{ text: string; hash: string } | null>;
+  /** The action card of a sheet of the active session, or null when there is none or the sheet changed since. */
+  card(sheet: string): Promise<ActionCard | null>;
+  /** Stores the action card of a sheet in the active session; throws BattleError when it is refused. */
+  setCard(sheet: string, input: CardInput): Promise<ActionCard>;
 }
 
 export interface BattleDeps {
@@ -111,12 +136,52 @@ async function checkMapRef(root: string, ref: string): Promise<void> {
   if (!stat?.isFile()) throw bad();
 }
 
+const GRIDLESS_GENERIC = /-senza-griglia$/i;
+const TWIN_EXTENSIONS = ['.png', '.webp', '.jpg', '.jpeg'];
+
+/**
+ * The campaign-relative path of the same battle map without its baked-in grid, when that file exists.
+ * Images skill: "<slug>-map-grid" has "<slug>-map". Generic: "<name>" has "<name>-senza-griglia".
+ * A ref that is already gridless has no twin. Extensions: the ref's own first, then the usual ones.
+ */
+export async function plainTwinOf(root: string, ref: string): Promise<string | undefined> {
+  const dir = path.posix.dirname(ref);
+  const base = path.posix.basename(ref);
+  const ext = path.posix.extname(base);
+  const stem = base.slice(0, base.length - ext.length);
+  if (!MAP_EXTENSIONS.has(ext.toLowerCase())) return undefined;
+  let twinStem: string;
+  if (GRIDLESS_GENERIC.test(stem)) return undefined;
+  if (SKILL_GRID.test(stem)) twinStem = stem.replace(/-grid$/i, '');
+  else if (SKILL_MAP.test(stem)) return undefined;
+  else twinStem = `${stem}-senza-griglia`;
+  const exts = [ext, ...TWIN_EXTENSIONS].filter((value, index, all) => all.findIndex((other) => other.toLowerCase() === value.toLowerCase()) === index);
+  for (const candidate of exts) {
+    const rel = path.posix.join(dir, `${twinStem}${candidate}`);
+    const stat = await fs.stat(path.join(root, rel)).catch(() => null);
+    if (stat?.isFile()) return rel;
+  }
+  return undefined;
+}
+
+/** The view with the gridless twin of its map added as `plain`; the stored file never gets it. */
+async function withPlain(root: string, view: BattleView): Promise<BattleView> {
+  if (!view.map?.ref) return view;
+  const plain = await plainTwinOf(root, view.map.ref);
+  return plain ? { ...view, map: { ...view.map, plain } } : view;
+}
+
 /** The sheet without its master-only block, and without anything after an unclosed opening marker. */
 export function publicPartOf(text: string): string {
   let visible = text.replace(MASTER_BLOCK, '');
   const open = visible.search(/<!--\s*master\s*-->/);
   if (open >= 0) visible = visible.slice(0, open);
   return visible.replace(/<!--\s*\/master\s*-->/g, '');
+}
+
+/** Short hash of a text (sha256, first 16 hex characters): the key that ties a card to its sheet's public text. */
+export function hashOf(text: string): string {
+  return createHash('sha256').update(text).digest('hex').slice(0, 16);
 }
 
 /** Reads at most the first bytes of a file and returns its first `# ` heading, or null. */
@@ -318,6 +383,30 @@ export function createBattleHost(ctx: Ctx, deps: BattleDeps): BattleHost {
     return run;
   };
   const file = (sessionId: string) => path.join(liveDirOf(root), sessionId, 'battle.json');
+  const cardsFile = (sessionId: string) => path.join(liveDirOf(root), sessionId, 'cards.json');
+
+  /** The cards of a session by sheet path; empty when there is no file or it is damaged (logged). */
+  const readCards = async (sessionId: string): Promise<Record<string, ActionCard>> => {
+    let raw: string;
+    try {
+      raw = await fs.readFile(cardsFile(sessionId), 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') ctx.log('cards.json cannot be read; no action cards for this session');
+      return {};
+    }
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      // Handled below: unparsable content is a damaged file.
+    }
+    const checked = storedCardsSchema.safeParse(parsed);
+    if (!checked.success) {
+      ctx.log('cards.json is damaged; no action cards for this session');
+      return {};
+    }
+    return checked.data.cards as Record<string, ActionCard>;
+  };
 
   const activeSession = async (): Promise<string | null> => readActiveId(root);
 
@@ -368,7 +457,7 @@ export function createBattleHost(ctx: Ctx, deps: BattleDeps): BattleHost {
     async view() {
       const sessionId = await activeSession();
       if (sessionId === null) return null;
-      return serialize(() => readStored(sessionId));
+      return withPlain(root, await serialize(() => readStored(sessionId)));
     },
 
     async put(patch) {
@@ -378,7 +467,7 @@ export function createBattleHost(ctx: Ctx, deps: BattleDeps): BattleHost {
       if (!checked.success) throw new BattleError('Some of the information is not valid. Check it and try again.', 400);
       const body = checked.data;
       if (body.map) await checkMapRef(root, body.map.ref);
-      return serialize(async () => {
+      const next = await serialize(async () => {
         const current = await readStored(sessionId);
         const positions: BattleView['positions'] = { ...current.positions };
         for (const [id, value] of Object.entries(body.positions ?? {})) {
@@ -388,10 +477,11 @@ export function createBattleHost(ctx: Ctx, deps: BattleDeps): BattleHost {
         if (Object.keys(positions).length > MAX_POSITIONS) throw new BattleError('Too many chips on the battle screen.', 400);
         let map: BattleView['map'] = current.map ?? null;
         if (body.map !== undefined) map = body.map === null ? null : { ...body.map };
-        const next: BattleView = { map, positions, revision: current.revision + 1 };
-        await writeAtomic(file(sessionId), `${JSON.stringify(next, null, 2)}\n`);
-        return next;
+        const stored: BattleView = { map, positions, revision: current.revision + 1 };
+        await writeAtomic(file(sessionId), `${JSON.stringify(stored, null, 2)}\n`);
+        return stored;
       });
+      return withPlain(root, next);
     },
 
     async find(place = '') {
@@ -442,6 +532,7 @@ export function createBattleHost(ctx: Ctx, deps: BattleDeps): BattleHost {
         lines.push({ label: lang === 'it' ? 'Iniziativa' : 'Initiative', value: String(who.initiative) });
       }
       if (who.side === 'pc') return { lines, actions: [] };
+      const card = who.sheet ? await host.card(who.sheet) : null;
       const rules = await loadRules(ctx, root);
       const labels = labelsOf(lang, rules);
       // The vitals the combatant itself carries; the sheet's own lines for them are dropped only then.
@@ -478,7 +569,58 @@ export function createBattleHost(ctx: Ctx, deps: BattleDeps): BattleHost {
           }
         }
       }
-      return { lines: [...lines, ...sheetLines], actions, ...(image ? { image } : {}) };
+      return {
+        lines: [...lines, ...sheetLines],
+        actions,
+        ...(image ? { image } : {}),
+        ...(card ? { card, source: 'agent' as const } : { source: 'parser' as const }),
+      };
+    },
+
+    async cardSource(sheet) {
+      if (!isCampaignRef(sheet)) return null;
+      const raw = await fs.readFile(path.join(root, sheet), 'utf8').catch(() => null);
+      if (raw === null) return null;
+      const text = publicPartOf(raw);
+      return { text, hash: hashOf(text) };
+    },
+
+    async card(sheet) {
+      const sessionId = await activeSession();
+      if (sessionId === null) return null;
+      const stored = (await serialize(() => readCards(sessionId)))[sheet];
+      if (!stored) return null;
+      const source = await host.cardSource(sheet);
+      if (!source || source.hash !== stored.sheetHash) return null;
+      return stored;
+    },
+
+    async setCard(sheet, input) {
+      const sessionId = await activeSession();
+      if (sessionId === null) throw new BattleError('No session is open right now. Open one first.', 409);
+      const checked = cardInputSchema.safeParse(input);
+      if (!checked.success) throw new BattleError('The action card is not valid. Check it and try again.', 400);
+      const body = checked.data;
+      return serialize(async () => {
+        const source = await host.cardSource(sheet);
+        if (!source) throw new BattleError('The card must belong to a sheet of the campaign.', 400);
+        const card: ActionCard = {
+          sheet,
+          sheetHash: source.hash,
+          actions: body.actions,
+          ...(body.traits ? { traits: body.traits } : {}),
+          at: new Date().toISOString(),
+        };
+        const cards = await readCards(sessionId);
+        cards[sheet] = card;
+        const kept = Object.fromEntries(
+          Object.entries(cards)
+            .sort(([, a], [, b]) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0))
+            .slice(0, MAX_CARDS),
+        );
+        await writeAtomic(cardsFile(sessionId), `${JSON.stringify({ cards: kept }, null, 2)}\n`);
+        return card;
+      });
     },
 
     async vitals(sheet) {

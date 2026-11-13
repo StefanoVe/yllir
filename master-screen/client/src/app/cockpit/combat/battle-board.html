@@ -1,5 +1,4 @@
 <div class="board">
-  <cockpit-turn-panel class="turn" [combatants]="combatants()" [activeId]="activeId()" />
   <div class="field">
     @if (!hasMap() && showMaps()) {
     <button type="button" class="find-map" (click)="findMap.emit()">

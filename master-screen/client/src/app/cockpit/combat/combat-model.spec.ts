@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardModuleView, Combatant } from '@shared/cockpit-types';
+import type { ActionCard, CardAction } from '@shared/types';
 import {
   buildCombatStart,
   byInitiative,
+  cardGroups,
   cellAt,
   conditionSummary,
   fightCards,
@@ -13,6 +15,7 @@ import {
   noticeText,
   parseInitiative,
   percentAt,
+  statsKey,
   stepCell,
 } from './combat-model';
 import { DICTIONARIES, lookup, type TranslationKey, type TranslationParams } from '../../i18n';
@@ -180,5 +183,61 @@ describe('notices and conditions', () => {
     ]);
     expect(groups.map((g) => g.label)).toEqual(['Attacks', 'Reactions']);
     expect(groups[0]!.actions.map((a) => a.name)).toEqual(['a', 'c']);
+  });
+});
+
+describe('cardGroups', () => {
+  const act = (name: string, cost: CardAction['cost'], timing: CardAction['timing']): CardAction => ({
+    name,
+    cost,
+    timing,
+    kind: 'attack',
+    effect: name,
+  });
+  const card: ActionCard = {
+    sheet: 'Enemies/Ogre.md',
+    sheetHash: 'h',
+    at: '2026-11-13T10:00:00Z',
+    actions: [
+      act('Legend', 'legendary', 'others_turns'),
+      act('Parry', 'reaction', 'others_turns'),
+      act('Greatclub', 'action', 'own_turn'),
+      act('Shove', 'action', 'own_turn'),
+      act('Rush', 'movement', 'own_turn'),
+      act('Breath', 'free', 'any_turn'),
+      act('Bonus claw', 'bonus', 'own_turn'),
+      act('Hidden', 'action', 'others_turns'),
+    ],
+  };
+
+  it('groups the own-turn actions by cost in the fixed order and drops empty groups', () => {
+    const groups = cardGroups(card, ['own_turn']);
+    expect(groups.map((g) => g.cost)).toEqual(['action', 'bonus', 'movement']);
+    expect(groups[0]!.actions.map((a) => a.name)).toEqual(['Greatclub', 'Shove']);
+  });
+
+  it('keeps only the actions with one of the given timings', () => {
+    const groups = cardGroups(card, ['any_turn', 'others_turns']);
+    expect(groups.map((g) => g.cost)).toEqual(['action', 'free', 'reaction', 'legendary']);
+    expect(groups.flatMap((g) => g.actions.map((a) => a.name))).toEqual(['Hidden', 'Breath', 'Parry', 'Legend']);
+  });
+
+  it('returns no groups when no action matches', () => {
+    expect(cardGroups({ ...card, actions: [] }, ['own_turn'])).toEqual([]);
+  });
+});
+
+describe('statsKey with pending', () => {
+  const goblin = { kind: 'enemy' as const, hp: 7, maxHp: 7, tempHp: undefined };
+
+  it('differs when the card is pending, so the stats are asked again when it arrives', () => {
+    expect(statsKey(goblin, true)).not.toBe(statsKey(goblin, false));
+    expect(statsKey(goblin)).toBe(statsKey(goblin, false));
+    expect(statsKey(goblin, true)).toBe('7/7/|p');
+  });
+
+  it('stays null for player characters, pending or not', () => {
+    expect(statsKey({ kind: 'pc', hp: 7, maxHp: 7 }, true)).toBeNull();
+    expect(statsKey({ kind: 'pc', hp: 7, maxHp: 7 }, false)).toBeNull();
   });
 });

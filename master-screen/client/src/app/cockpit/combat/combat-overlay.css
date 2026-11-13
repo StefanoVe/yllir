@@ -1,5 +1,9 @@
 /*
- * Combat overlay: header, initiative strip, stage (battle board or initiative step) and chat.
+ * Combat overlay. Without a combat: the header and the initiative step, as before. With one:
+ * the battle map fills the whole overlay, under a thin translucent header, and the initiative
+ * band, the turn card, the chat drawer and the music player float over it. A rail of toggles
+ * opens and folds them. The floating layer fades out after four seconds without activity
+ * (combat-hud.service.ts); under 900 px the turn and the chat are bottom sheets instead.
  *
  * Brief rules not followed exactly, and why:
  * - Initiative strip tiles show initials only, never portraits: a portrait needs the stats of
@@ -8,11 +12,10 @@
  *   lives in support/confirm-button.css, outside this folder, so they keep their bordered 40 px
  *   style instead of the quiet 36 px icon button. Only the armed state is danger, as briefed.
  * - Map chips and the chip fallback in rows keep the 44 px token size of the chip component.
- * - Between 900 and 1199 px the turn column is 300 px (the brief fixes 360 px from 1200 px).
  * - The turn panel's "Out of turn" block is a <details> that is open on wide screens only.
  * - The newest-notice list opens as a popover under the header, not as a row of its own.
  * - The initiative step (before the fight starts) has its own stylesheet (initiative-step.css)
- *   and the overlay shows no chat until a combat is active.
+ *   and the overlay shows no panels until a combat is active.
  * - Row actions keep their full text as visually hidden text (so screen readers and the text
  *   check still see it), with the same text in a title tooltip.
  */
@@ -22,6 +25,10 @@
   --combat-warn: #b45309;
   --combat-ally: #0f766e;
   --combat-track: color-mix(in srgb, var(--color-text) 10%, transparent);
+  /* Header height, initiative band height (fixed), and the top of the floating panels under them. */
+  --bar-h: 48px;
+  --band-h: 64px;
+  --turn-top: calc(var(--bar-h) + 8px);
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -47,16 +54,31 @@
   display: block;
 }
 
-/* Header: one row, 56 px. */
+/* Header: one row, 48 px. With a combat it floats over the map (see .overlay.battle). */
 .bar {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  min-height: 56px;
-  padding: var(--space-1) var(--space-2);
+  height: 48px;
+  min-height: 48px;
+  box-sizing: border-box;
+  padding: 0 var(--space-2);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text-muted);
+}
+
+/* With a combat the header is translucent and sits on top of the map. */
+.overlay.battle .bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 5;
+  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom-color: transparent;
 }
 
 .bar .title {
@@ -107,9 +129,9 @@
 }
 
 .icon-button:focus-visible,
+.rail-button:focus-visible,
 .next-turn:focus-visible,
-.notice-toggle:focus-visible,
-.chat-toggle:focus-visible {
+.notice-toggle:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
@@ -219,19 +241,36 @@
   border: 0;
 }
 
-/* Initiative strip: one row of tiles in initiative order, wrapping when they do not fit. */
+/* Initiative band: one row of tiles in initiative order, scrolling sideways when they do not fit.
+   Its height is --band-h; the turn card starts under it (.overlay.band-open). */
 .strip {
-  padding: var(--space-1) var(--space-2);
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface);
+  top: calc(var(--bar-h) + 8px);
+  left: 64px;
+  z-index: 2;
+  box-sizing: border-box;
+  height: var(--band-h);
+  max-width: calc(100% - 120px);
+  padding: var(--space-1);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* With the turn card open on wide screens, the band stops before it: 64 px rail, 340 px card,
+   12 px right margin and a 16 px gap. */
+@media (min-width: 900px) {
+  .overlay.turn-open .strip {
+    max-width: calc(100% - 64px - 340px - 12px - 16px);
+  }
 }
 
 .strip-list {
+  height: 100%;
   margin: 0;
   padding: 0;
   list-style: none;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: var(--space-1);
 }
 
@@ -241,7 +280,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  flex: 0 1 180px;
+  flex: 0 0 180px;
   min-width: 128px;
   max-width: 220px;
   height: 44px;
@@ -343,11 +382,13 @@
   width: 0 !important;
 }
 
-/* Stage: the body (battle board or initiative step) and the floating chat. */
+/* Stage: the area under the header. With a combat it holds the map and the floating layer;
+   before a combat, the initiative step scrolls in the body. */
 .stage {
   position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
   display: flex;
 }
 
@@ -359,53 +400,139 @@
   padding: var(--space-2);
 }
 
-.body.with-chat {
-  padding-right: calc(min(380px, 100% - 2 * var(--space-2)) + 2 * var(--space-2));
-}
-
 .alert {
   margin: 0 0 var(--space-2);
   color: var(--color-danger);
 }
 
-.chat-panel {
+/* The battle map fills the stage, under the header. */
+.map-layer {
   position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  bottom: var(--space-2);
+  inset: 0;
+  min-width: 0;
+  background: var(--color-bg);
+}
+
+.floating-alert {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  z-index: 6;
+  transform: translateX(-50%);
+  max-width: calc(100% - 2 * var(--space-2));
+  margin: 0;
+  padding: var(--space-0-5) var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-2);
+}
+
+/* The floating layer over the map. It fades out (hud-hidden) when the HUD is idle or hidden by hand. */
+.hud {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  transition: opacity 200ms ease, visibility 200ms ease;
+}
+
+.hud.hud-hidden {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* Every floating panel: a translucent card. */
+.panel-card {
+  position: absolute;
+  pointer-events: auto;
+  background: color-mix(in srgb, var(--color-surface, #15171c) 80%, transparent);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in srgb, white 10%, transparent);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgb(0 0 0 / 0.35);
+  color: var(--color-text);
+}
+
+/* Toggle rail: a column of 40 px icon buttons under the header, at the top left. */
+.rail {
+  top: 56px;
+  left: 12px;
   z-index: 2;
-  width: min(380px, calc(100% - 2 * var(--space-2)));
   display: flex;
   flex-direction: column;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-2);
+  gap: 4px;
+  padding: 4px;
+}
+
+.rail-button {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-muted);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.rail-button:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.rail-button[aria-pressed="true"] {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+/* Turn card: at the right, under the header, and under the band when the band is open. */
+.turn-card {
+  top: var(--turn-top);
+  right: 12px;
+  z-index: 3;
+  width: 340px;
+  max-height: calc(100% - var(--turn-top) - 12px);
+  overflow: auto;
+}
+
+.overlay.band-open {
+  --turn-top: calc(var(--bar-h) + var(--band-h) + 16px);
+}
+
+/* Chat drawer: the full height at the right. */
+.chat-drawer {
+  top: 56px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 3;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.chat-panel.collapsed {
-  bottom: auto;
-  width: auto;
-}
-
-.chat-toggle {
+.drawer-head {
+  flex: none;
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  width: 100%;
   min-height: 44px;
-  padding: var(--space-0-5) var(--space-2);
-  border: 0;
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  font-weight: 600;
-  text-align: left;
+  padding: var(--space-0-5) var(--space-1) var(--space-0-5) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.chat-panel.collapsed .chat-toggle {
-  width: auto;
-  border-radius: var(--radius-lg);
+.drawer-title {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-weight: 600;
 }
 
 .chat {
@@ -413,67 +540,31 @@
   min-height: 0;
 }
 
-/* Wide screens: with the chat open it is a third column instead of covering the board. */
-@media (min-width: 1200px) {
-  .stage.chat-open {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) 360px;
-  }
-
-  .stage.chat-open .body {
-    grid-column: 1;
-    grid-row: 1;
-    padding-right: var(--space-2);
-  }
-
-  .stage.chat-open .chat-panel {
-    grid-column: 2;
-    grid-row: 1;
-    position: static;
-    width: auto;
-    border-radius: 0;
-    border-width: 0 0 0 1px;
-    box-shadow: none;
-  }
+/* Music player: bottom left. */
+.music-slot {
+  left: 12px;
+  bottom: 12px;
+  z-index: 2;
+  overflow: hidden;
 }
 
-/* Under 900 px: one column, the header wraps and the notice drops to a second line. */
+/* Under 900 px: no auto-hide; the turn and the chat are bottom sheets, full width and at most
+   60 % of the height, scrolling inside. */
 @media (max-width: 899px) {
-  .bar {
-    flex-wrap: wrap;
-    row-gap: var(--space-0-5);
-  }
-
-  .notice-strip {
-    order: 10;
-    flex: 1 0 100%;
-    max-width: none;
-  }
-}
-
-/* Under 900 px with the chat collapsed: a floating button at the bottom right, clear of the turn panel's title. */
-@media (max-width: 899px) {
-  .chat-panel.collapsed {
-    position: fixed;
+  .turn-card,
+  .chat-drawer {
     top: auto;
-    right: var(--space-4);
-    bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
-    z-index: 20;
+    left: 0;
+    right: 0;
+    bottom: 0;
     width: auto;
-    border-radius: var(--radius-pill);
-    box-shadow: var(--shadow-2);
+    max-height: 60vh;
+    z-index: 5;
+    border-radius: 14px 14px 0 0;
   }
 
-  .chat-panel.collapsed .chat-toggle {
-    min-height: 44px;
-    border-radius: var(--radius-pill);
-  }
-}
-
-/* Under 700 px the list is the order: the strip is hidden. */
-@media (max-width: 699px) {
-  .strip {
-    display: none;
+  .chat-drawer {
+    height: 60vh;
   }
 }
 
@@ -494,18 +585,14 @@
   }
 }
 
-@media (max-width: 760px) {
-  .body.with-chat {
-    padding-right: var(--space-2);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .icon-button,
+  .rail-button,
   .next-turn,
   .notice-toggle,
   .tile,
-  .tile-hp-fill {
+  .tile-hp-fill,
+  .hud {
     transition: none;
   }
 }

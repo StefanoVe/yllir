@@ -1,5 +1,13 @@
 @if (svc.open()) {
-<div class="overlay" role="dialog" aria-modal="true" aria-labelledby="combat-overlay-title">
+<div
+  class="overlay"
+  role="dialog"
+  aria-modal="true"
+  aria-labelledby="combat-overlay-title"
+  [class.battle]="!!combat()"
+  [class.band-open]="hud.initiative() && order().length > 0"
+  [class.turn-open]="hud.turn()"
+>
   <header class="bar">
     <ui-icon name="swords" [size]="20" />
     <h2 id="combat-overlay-title" class="title">{{ title() }}</h2>
@@ -49,6 +57,16 @@
       [confirmLabel]="i18n.t('combat.endConfirmShort')"
       (confirmed)="endCombat()"
     />
+    <button
+      type="button"
+      class="icon-button"
+      [attr.aria-pressed]="hud.hidden()"
+      [attr.title]="i18n.t(hud.hidden() ? 'combat.hud.show' : 'combat.hud.hide')"
+      [attr.aria-label]="i18n.t(hud.hidden() ? 'combat.hud.show' : 'combat.hud.hide')"
+      (click)="hud.toggleHidden()"
+    >
+      <ui-icon [name]="hud.hidden() ? 'eye' : 'hide'" [size]="18" />
+    </button>
     }
     <button
       type="button"
@@ -61,36 +79,9 @@
     </button>
   </header>
 
-  @if (combat(); as c) { @if (order().length) {
-  <section class="strip" [attr.aria-label]="i18n.t('combat.list')">
-    <ol class="strip-list">
-      @for (p of order(); track p.id) {
-      <li
-        class="tile"
-        [class.active]="p.id === c.activeId"
-        [class.defeated]="p.kind !== 'pc' && p.hp === 0"
-        [attr.data-side]="p.kind"
-      >
-        <span class="tile-avatar" aria-hidden="true">{{ initials(p.name) }}</span>
-        <span class="tile-name" [attr.title]="p.name">{{ p.name }}</span>
-        <span class="tile-init">{{ p.initiative ?? "—" }}</span>
-        @if (p.kind !== "pc" && hpPct(p) !== null) {
-        <span class="tile-hp" aria-hidden="true">
-          <span class="tile-hp-fill" [class.low]="hpLow(p)" [style.width.%]="hpPct(p)"></span>
-        </span>
-        }
-      </li>
-      }
-    </ol>
-  </section>
-  } }
-
-  <div class="stage" [class.chat-open]="!!combat() && chatOpen()">
-    <main class="body" [class.with-chat]="!!combat() && chatOpen()">
-      @if (error()) {
-      <p class="alert" role="alert">{{ error() }}</p>
-      }
-      @if (combat(); as c) {
+  <div class="stage">
+    @if (combat(); as c) {
+    <div class="map-layer">
       <cockpit-battle-board
         [combatants]="c.participants"
         [battle]="battle()"
@@ -99,32 +90,160 @@
         [rules]="rules()"
         (findMap)="findMap()"
       />
-      } @else {
+    </div>
+    @if (error()) {
+    <p class="alert floating-alert" role="alert">{{ error() }}</p>
+    }
+
+    <div class="hud" [class.hud-hidden]="!hud.visible()">
+      <nav
+        class="rail panel-card"
+        [attr.aria-label]="i18n.t('combat.hud.label')"
+        (pointerenter)="hover('rail', true)"
+        (pointerleave)="hover('rail', false)"
+        (focusin)="focusPanel('rail', true)"
+        (focusout)="focusPanel('rail', false)"
+      >
+        <button
+          type="button"
+          class="rail-button"
+          [attr.aria-pressed]="hud.initiative()"
+          [attr.aria-label]="i18n.t('combat.hud.initiative')"
+          [attr.title]="i18n.t('combat.hud.initiative')"
+          (click)="hud.toggle('initiative')"
+        >
+          <ui-icon name="listOrdered" [size]="18" />
+        </button>
+        <button
+          type="button"
+          class="rail-button"
+          [attr.aria-pressed]="hud.turn()"
+          [attr.aria-label]="i18n.t('combat.hud.turn')"
+          [attr.title]="i18n.t('combat.hud.turn')"
+          (click)="hud.toggle('turn')"
+        >
+          <ui-icon name="crosshair" [size]="18" />
+        </button>
+        <button
+          type="button"
+          class="rail-button"
+          [attr.aria-pressed]="hud.chat()"
+          [attr.aria-label]="i18n.t('combat.hud.chat')"
+          [attr.title]="i18n.t('combat.hud.chat')"
+          (click)="hud.toggle('chat')"
+        >
+          <ui-icon name="message" [size]="18" />
+        </button>
+        <button
+          type="button"
+          class="rail-button"
+          [attr.aria-pressed]="hud.music()"
+          [attr.aria-label]="i18n.t('combat.hud.music')"
+          [attr.title]="i18n.t('combat.hud.music')"
+          (click)="hud.toggle('music')"
+        >
+          <ui-icon name="music" [size]="18" />
+        </button>
+      </nav>
+
+      @if (hud.initiative() && order().length) {
+      <section
+        class="strip panel-card"
+        [attr.aria-label]="i18n.t('combat.list')"
+        (pointerenter)="hover('initiative', true)"
+        (pointerleave)="hover('initiative', false)"
+        (focusin)="focusPanel('initiative', true)"
+        (focusout)="focusPanel('initiative', false)"
+      >
+        <ol class="strip-list">
+          @for (p of order(); track p.id) {
+          <li
+            class="tile"
+            [class.active]="p.id === c.activeId"
+            [class.defeated]="p.kind !== 'pc' && p.hp === 0"
+            [attr.data-side]="p.kind"
+          >
+            <span class="tile-avatar" aria-hidden="true">{{ initials(p.name) }}</span>
+            <span class="tile-name" [attr.title]="p.name">{{ p.name }}</span>
+            <span class="tile-init">{{ p.initiative ?? "—" }}</span>
+            @if (p.kind !== "pc" && hpPct(p) !== null) {
+            <span class="tile-hp" aria-hidden="true">
+              <span class="tile-hp-fill" [class.low]="hpLow(p)" [style.width.%]="hpPct(p)"></span>
+            </span>
+            }
+          </li>
+          }
+        </ol>
+      </section>
+      }
+
+      @if (hud.turn()) {
+      <div
+        class="turn-card panel-card"
+        (pointerenter)="hover('turn', true)"
+        (pointerleave)="hover('turn', false)"
+        (focusin)="focusPanel('turn', true)"
+        (focusout)="focusPanel('turn', false)"
+      >
+        <cockpit-turn-panel
+          [combatants]="c.participants"
+          [activeId]="c.activeId"
+          [pending]="c.cardPending ?? []"
+        />
+      </div>
+      }
+
+      @if (hud.chat()) {
+      <aside
+        class="chat-drawer panel-card"
+        [attr.aria-label]="i18n.t('combat.chat.title')"
+        (pointerenter)="hover('chat', true)"
+        (pointerleave)="hover('chat', false)"
+        (focusin)="focusPanel('chat', true)"
+        (focusout)="focusPanel('chat', false)"
+      >
+        <header class="drawer-head">
+          <span class="drawer-title">
+            <ui-icon name="message" [size]="16" />
+            {{ i18n.t("combat.chat.title") }}
+          </span>
+          <button
+            type="button"
+            class="icon-button"
+            [attr.title]="i18n.t('combat.chat.collapse')"
+            [attr.aria-label]="i18n.t('combat.chat.collapse')"
+            (click)="hud.setChat(false)"
+          >
+            <ui-icon name="x" [size]="16" />
+          </button>
+        </header>
+        <cockpit-chat class="chat" [openSource]="openSource" [alwaysCompose]="true" [showHead]="false" />
+      </aside>
+      }
+
+      @if (hud.music()) {
+      <div
+        class="music-slot panel-card"
+        (pointerenter)="hover('music', true)"
+        (pointerleave)="hover('music', false)"
+        (focusin)="focusPanel('music', true)"
+        (focusout)="focusPanel('music', false)"
+      >
+        <ms-music-mini />
+      </div>
+      }
+    </div>
+    } @else {
+    <main class="body">
+      @if (error()) {
+      <p class="alert" role="alert">{{ error() }}</p>
+      }
       <cockpit-initiative-step
         [players]="players()"
         [cards]="cards()"
         [clicked]="svc.clicked()"
       />
-      }
     </main>
-
-    @if (combat()) {
-    <aside class="chat-panel" [class.collapsed]="!chatOpen()" [attr.aria-label]="i18n.t('combat.chat.title')">
-      <button
-        type="button"
-        class="chat-toggle"
-        [attr.aria-expanded]="chatOpen()"
-        [attr.title]="chatOpen() ? i18n.t('combat.chat.collapse') : i18n.t('combat.chat.expand')"
-        (click)="chatOpen.set(!chatOpen())"
-      >
-        <ui-icon name="chat" [size]="16" />
-        <span>{{ i18n.t("combat.chat.title") }}</span>
-        <ui-icon [name]="chatOpen() ? 'right' : 'left'" [size]="14" />
-      </button>
-      @if (chatOpen()) {
-      <cockpit-chat class="chat" [openSource]="openSource" [alwaysCompose]="true" [showHead]="false" />
-      }
-    </aside>
     }
   </div>
 </div>

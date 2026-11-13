@@ -190,6 +190,8 @@ export interface Combat {
   threadId?: string;
   /** Automatic changes made by the game system's rules, oldest first (last 20). */
   notices: CombatNotice[];
+  /** Combatants whose sheet is being interpreted into an action card right now. Absent when none. */
+  cardPending?: string[];
 }
 
 // ───────────────────────────── State ─────────────────────────────

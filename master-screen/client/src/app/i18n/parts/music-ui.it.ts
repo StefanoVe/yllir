@@ -76,4 +76,7 @@ export const musicUiIt = {
   'music.card.label': 'In riproduzione',
   'music.card.empty': 'Scegli un brano',
   'music.card.why': 'Perché questa scena',
+  'music.mini.label': 'Musica',
+  'music.mini.collapse': 'Riduci il lettore musicale',
+  'music.mini.empty': 'Nessun brano',
 } as const;
