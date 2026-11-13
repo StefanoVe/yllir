@@ -206,8 +206,8 @@ Sections are listed in their required order. Optional sections keep the order gi
 ### 4.2 Character (`template: npc`)
 
 - Category: `Personaggi/`. Metadata block: `id`, `kind: character`, `template: npc`, `provenance`, `location` (where it normally is).
-- Required: the title, `## Ruolo` (English: `## Role`), `## Aspetto e modi` (English: `## Appearance and manner`), `## Al tavolo` (English: `## At the table`) with voice, manner of speech and what the character wants.
-- Optional, in order: an image (portrait); `## Statistiche` (English: `## Statistics`), required when the character can fight (4.3); `## Da definire` (English: `## To define`).
+- Required: the title, `## Ruolo` (English: `## Role`), `## Aspetto e modi` (English: `## Appearance and manner`), `## Al tavolo` (English: `## At the table`) with voice, manner of speech and what the character wants, and `## Statistiche` (English: `## Statistics`) with the tables of 4.3 and at least one combat action, even for a character who does not seek a fight (a minimal profile, such as an unarmed strike).
+- Optional, in order: an image (portrait), before `## Ruolo`; `## Da definire` (English: `## To define`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), then any of `### Motivazioni` (English: `### Motives`), `### Segreti` (English: `### Secrets`), `### Agganci` (English: `### Hooks`).
 - Links to other subjects go in `relations`; the prose of `Ruolo` may describe them.
 
@@ -218,6 +218,8 @@ Validated: the sections, their order, `location` as a list of place ids, the sta
 `## Statistiche` (English: `## Statistics`) holds up to three tables, each under its `###` heading, in this order. Values come from the game system's adapter; the framework checks the shape.
 
 An amount the master rolls at the table (damage, healing, temporary hit points, a number of creatures) is written as its dice only, never with a precomputed result: `Colpisce: 1d6 + 1 danni perforanti`, not `Colpisce: 4 (1d6 + 1) danni perforanti`. A value the sheet fixes keeps its number (hit points in the Characteristics table). The adapter checks it.
+
+For `npc`, `vendor` and `enemy` the table `### Attacchi e capacità` (English: `### Attacks and abilities`) has at least one row.
 
 | Heading (it / en) | Columns (it / en) |
 |---|---|
@@ -246,7 +248,7 @@ Validated: the stock columns and order, and the required sections.
 
 - Category: `Creature/`. Metadata block: `id`, `kind: creature`, `template`, `provenance`, `location` (every place where it lives; `[]` when it wanders).
 - `enemy` fights; `creature` does not (animals, mounts).
-- Required: the title, `## Natura` (English: `## Nature`), public lore, and `## Statistiche` (English: `## Statistics`). An `enemy` has the tables (4.3). A `creature` writes in that section the sentence `Nessuna statistica: non combatte` (English: `No statistics: it does not fight`).
+- Required: the title, `## Natura` (English: `## Nature`), public lore, and `## Statistiche` (English: `## Statistics`). An `enemy` has the tables (4.3), with at least one combat action. A `creature` writes in that section the sentence `Nessuna statistica: non combatte` (English: `No statistics: it does not fight`).
 - Optional, in order: an image; `## Bottino` (English: `## Loot`); `## Da definire` (English: `## To define`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`): conduct, tactics, when it flees.
 
@@ -303,6 +305,7 @@ Validated by the world graph: `when` is a number, `participants` and `location` 
 
 - Any kind and template. Metadata block: `sketch: true`, `kind`, `provenance`, `location` and `relations` if any, `template`, and `when` for an event.
 - Content: the title and one sentence under the first required section of its template. The other sections are not written yet.
+- Validated: the title and the first required section only. A sketch has no statistics.
 - When the master names a sketch, or a session uses it, it is expanded into a full document.
 
 ### 4.13 Player character (`master-only`)

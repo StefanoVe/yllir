@@ -1,0 +1,7 @@
+id: combat-statistics-v1
+after: [metadata-comment-v1, statistics-tables-v1, scene-checks-v1]
+introduced_in: 0.57.0
+needed: detect
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs

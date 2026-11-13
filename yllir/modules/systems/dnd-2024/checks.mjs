@@ -103,6 +103,24 @@ function checkRolls(statistics, errors) {
   }
 }
 
+/**
+ * Rewrites every precomputed roll of a Statistics section's text as its dice only:
+ * "4 (1d6 + 1)" becomes "1d6 + 1". The hit points row is left unchanged.
+ * @param {string} statistics text of the Statistics section
+ * @returns {{ text: string, count: number }}
+ */
+export function fixRolls(statistics) {
+  let count = 0;
+  const text = String(statistics).split('\n').map((line) => {
+    if (HP_ROW_RE.test(line)) return line;
+    return line.replace(PRECOMPUTED_RE, (match) => {
+      count += 1;
+      return match.replace(/^\d+\s*\(\s*/, '').replace(/\s*\)$/, '');
+    });
+  }).join('\n');
+  return { text, count };
+}
+
 export function checkCreature(fields, statistics = '') {
   const errors = [];
   for (const field of ABILITIES) {

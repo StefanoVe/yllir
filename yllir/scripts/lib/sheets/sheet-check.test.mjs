@@ -26,7 +26,7 @@ function campaign(language = 'it') {
 
 const PLACE = '---\nid: borgo\n---\n\n# Borgo\n\nUn borgo di pietra.\n';
 
-const IT_BODY = [
+const IT_BODY_NO_STATS = [
   '# Oria Valdes',
   '',
   '## Ruolo',
@@ -42,6 +42,26 @@ const IT_BODY = [
   'Diffidente ma leale.',
   '',
 ].join('\n');
+
+// The Statistics section of a character: one characteristics table and one action (combat row).
+const IT_STATS_BLOCK = [
+  '## Statistiche',
+  '',
+  '### Caratteristiche',
+  '',
+  '| Caratteristica | Valore |',
+  '| --- | --- |',
+  '| CA | 12 |',
+  '',
+  '### Attacchi e capacità',
+  '',
+  '| Attacco o capacità | Dettagli |',
+  '| --- | --- |',
+  '| Pugnale | Attacco in mischia: +4, portata 1,5 m. Colpisce: 1d4 + 2 danni perforanti. |',
+  '',
+].join('\n');
+
+const IT_BODY = IT_BODY_NO_STATS + '\n' + IT_STATS_BLOCK;
 
 const IT_VENDOR_BODY =
   IT_BODY +
@@ -62,6 +82,12 @@ const IT_ENEMY_BODY = [
   '| --- | --- |',
   '| CA | 12 |',
   '| PF | 11 |',
+  '',
+  '### Attacchi e capacità',
+  '',
+  '| Attacco o capacità | Dettagli |',
+  '| --- | --- |',
+  '| Morso | Colpisce: 1d6 + 2 danni perforanti. |',
   '',
   '## Bottino',
   '',
@@ -149,6 +175,12 @@ test('a valid sheet with a master block and optional sections passes', () => {
     '| Caratteristica | Valore |',
     '| --- | --- |',
     '| CA | 12 |',
+    '',
+    '### Attacchi e capacità',
+    '',
+    '| Attacco o capacità | Dettagli |',
+    '| --- | --- |',
+    '| Pugnale | Colpisce: 1d4 + 2 danni perforanti. |',
     '',
     '## Assortimento',
     '',
@@ -240,14 +272,14 @@ test('section-order: required sections swapped', () => {
     '',
     'Leale.',
     '',
-  ].join('\n');
+  ].join('\n') + '\n' + IT_STATS_BLOCK;
   withCampaign({ 'Personaggi/Oria Valdes.md': sheet({ body }) }, (root) => {
     assert.deepEqual(codesOf(checkSheets(root)), ['section-order']);
   });
 });
 
 test('section-order: an optional section before a required one', () => {
-  const body = IT_BODY.replace(
+  const body = IT_BODY_NO_STATS.replace(
     '## Ruolo\n',
     '## Statistiche\n\nCA 12.\n\n## Ruolo\n',
   );
@@ -284,7 +316,7 @@ test('master-block: content after the master block', () => {
     'Segreto.',
     '<!-- /master -->',
     '',
-    'Testo dopo il blocco.',
+    '| Ultima | Testo dopo il blocco. |',
     '',
   ].join('\n');
   withCampaign({ 'Personaggi/Oria Valdes.md': sheet({ body }) }, (root) => {
@@ -337,6 +369,12 @@ test('a valid vendor sheet with every optional section in order passes', () => {
     '| Caratteristica | Valore |',
     '| --- | --- |',
     '| CA | 12 |',
+    '',
+    '### Attacchi e capacità',
+    '',
+    '| Attacco o capacità | Dettagli |',
+    '| --- | --- |',
+    '| Pugnale | Colpisce: 1d4 + 2 danni perforanti. |',
     '',
     '## Assortimento',
     '',
@@ -469,6 +507,12 @@ test('enemy: Loot before Nature is section-order', () => {
     '| --- | --- |',
     '| CA | 12 |',
     '',
+    '### Attacchi e capacità',
+    '',
+    '| Attacco o capacità | Dettagli |',
+    '| --- | --- |',
+    '| Morso | Colpisce: 1d6 + 2 danni perforanti. |',
+    '',
   ].join('\n');
   withCampaign({ 'Creature/Lupo.md': sheet({ id: 'lupo', template: 'enemy', body }) }, (root) => {
     assert.deepEqual(codesOf(checkSheets(root)), ['section-order']);
@@ -543,6 +587,12 @@ test('an en campaign works for an enemy with English headings', () => {
     '| Characteristic | Value |',
     '| --- | --- |',
     '| AC | 12 |',
+    '',
+    '### Attacks and abilities',
+    '',
+    '| Attack or ability | Details |',
+    '| --- | --- |',
+    '| Bite | Hits: 1d6 + 1 piercing damage. |',
     '',
     '## Loot',
     '',
@@ -621,6 +671,20 @@ test('an en campaign uses the English section names', () => {
     '',
     'Loyal.',
     '',
+    '## Statistics',
+    '',
+    '### Characteristics',
+    '',
+    '| Characteristic | Value |',
+    '| --- | --- |',
+    '| AC | 12 |',
+    '',
+    '### Attacks and abilities',
+    '',
+    '| Attack or ability | Details |',
+    '| --- | --- |',
+    '| Dagger | Hits: 1d4 + 2 piercing damage. |',
+    '',
     '## Stock',
     '',
     'Nails.',
@@ -649,7 +713,7 @@ test('a campaign in another language skips the section names', () => {
 });
 
 test('statistics must use the localized tables, including optional npc statistics', () => {
-  const npcWithStats = IT_BODY + '\n## Statistiche\n\n### Caratteristiche\n\n| Caratteristica | Valore |\n| --- | --- |\n| CA | 12 |\n';
+  const npcWithStats = IT_BODY;
   withCampaign({ 'Personaggi/Oria Valdes.md': sheet({ body: npcWithStats }) }, (root) => {
     assert.deepEqual(checkSheets(root).errors, []);
   });
@@ -679,4 +743,53 @@ test('a sheet with template item is still skipped', () => {
       assert.deepEqual(result.errors, []);
     },
   );
+});
+
+test('npc: a Statistics section is required, and the message names it', () => {
+  withCampaign({ 'Personaggi/Oria Valdes.md': sheet({ body: IT_BODY_NO_STATS }) }, (root) => {
+    const result = checkSheets(root);
+    assert.deepEqual(codesOf(result), ['section-missing']);
+    assert.match(result.errors[0].message, /Statistiche/);
+  });
+});
+
+test('npc: a Statistics section with a characteristics table and one action row passes', () => {
+  withCampaign({ 'Personaggi/Oria Valdes.md': sheet() }, (root) => {
+    assert.deepEqual(checkSheets(root).errors, []);
+  });
+});
+
+test('npc: an actions table with only header and separator is statistics-no-actions', () => {
+  const body = IT_BODY.replace(
+    '| Pugnale | Attacco in mischia: +4, portata 1,5 m. Colpisce: 1d4 + 2 danni perforanti. |\n',
+    '',
+  );
+  assert.notEqual(body, IT_BODY);
+  withCampaign({ 'Personaggi/Oria Valdes.md': sheet({ body }) }, (root) => {
+    const result = checkSheets(root);
+    assert.deepEqual(codesOf(result), ['statistics-no-actions']);
+    assert.match(result.errors[0].message, /Attacchi e capacità/);
+  });
+});
+
+test('npc sketch: only the title and the first required section are checked', () => {
+  const text = '---\nid: oria-valdes\ntemplate: npc\nlocation: [borgo]\nsketch: true\n---\n\n# Oria Valdes\n\n## Ruolo\n\nFabbra del borgo.\n';
+  withCampaign({ 'Personaggi/Oria Valdes.md': text }, (root) => {
+    const result = checkSheets(root);
+    assert.deepEqual(codesOf(result), []);
+  });
+});
+
+test('enemy: a Statistics section with only the placeholder is statistics-no-actions', () => {
+  const body = '# Lupo\n\n## Natura\n\nUn predatore grigio.\n\n## Statistiche\n\nDa definire.\n';
+  withCampaign({ 'Creature/Lupo.md': sheet({ id: 'lupo', template: 'enemy', body }) }, (root) => {
+    assert.deepEqual(codesOf(checkSheets(root)), ['statistics-no-actions']);
+  });
+});
+
+test('creature: a sheet without combat actions is not asked for an action', () => {
+  const body = '# Pesce\n\n## Natura\n\nUn pesce lento.\n\n## Statistiche\n\nNessuna statistica: non combatte.\n';
+  withCampaign({ 'Creature/Pesce.md': sheet({ id: 'pesce', template: 'creature', body }) }, (root) => {
+    assert.deepEqual(checkSheets(root).errors, []);
+  });
 });

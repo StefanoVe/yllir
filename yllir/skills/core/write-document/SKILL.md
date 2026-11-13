@@ -46,10 +46,11 @@ Read the template for the sections, their order and their required content in `$
 
 ## Step 4 — Rules values (only when the campaign has an adapter)
 
-Use this step for a creature or an item that has game statistics.
+Use this step for a character (`npc`, `vendor`), a creature that fights (`enemy`) or an item that has game statistics. Every character and every enemy has at least one combat action, even one who does not seek a fight.
 - If `system.adapter` is `none`: write the values in words (for example «difficile da ferire, colpisce forte»). Do not invent numbers.
 - Otherwise read the schema: `${CLAUDE_PLUGIN_ROOT}/modules/systems/<system.adapter>/adapter.yaml`, with the Read tool. It lists the fields, required or optional, and the value formats.
 - Write the values from your own knowledge of the game system, in the fields the schema names. Keep the arithmetic right: an ability modifier comes from its score, and a derived number (a bonus, a total) comes from its parts. The engine checks the shape and the arithmetic when you check the batch.
+- Write an amount that is rolled at the table (damage, healing, temporary hit points) as its dice only, never with a precomputed result: «Colpisce: 1d6 + 1 danni perforanti», not «Colpisce: 4 (1d6 + 1) danni perforanti». Hit points in the Characteristics table keep their number.
 - If you are not sure of a rule value, do not guess it: write it in words, and tell the master in the final message which value is not yet exact.
 - The statistic block goes in the public part of the document, in the sections of its template.
 

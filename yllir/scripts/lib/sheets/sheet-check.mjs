@@ -1,14 +1,16 @@
 // Checks NPC, vendor, enemy and creature sheets against the sheet model:
 // frontmatter, title, section names and order, the stock table of vendors, the
-// statistics phrase of creatures, and the master-only block. Deterministic: it
-// reports what does not match the model; it does not judge the content.
+// Statistics section of characters and enemies (localized tables, at least one
+// combat action), the statistics phrase of creatures, and the master-only block.
+// A sketch is checked only for its title and its first required section.
+// Deterministic: it reports what does not match the model; it does not judge the content.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseYamlLite } from '../yaml-lite.mjs';
 import { parseFrontmatter } from '../frontmatter.mjs';
 import { analyzeMarkdown } from '../zones.mjs';
-import { validateStatisticsTables } from '../statistics-tables.mjs';
+import { validateStatisticsTables, actionRowCount } from '../statistics-tables.mjs';
 import {
   readStructure,
   listCanonicalSheets,
@@ -21,7 +23,7 @@ import {
 const MODELS = {
   npc: {
     order: ['role', 'appearance', 'table', 'statistics', 'stock', 'todefine'],
-    required: ['role', 'appearance', 'table'],
+    required: ['role', 'appearance', 'table', 'statistics'],
   },
   vendor: {
     order: [
@@ -34,7 +36,7 @@ const MODELS = {
       'exceptions',
       'todefine',
     ],
-    required: ['role', 'appearance', 'table', 'stock'],
+    required: ['role', 'appearance', 'table', 'statistics', 'stock'],
   },
   enemy: {
     order: ['nature', 'statistics', 'loot', 'todefine'],
@@ -200,6 +202,7 @@ function checkSheet(rel, text, language, places, template) {
 
   const { data, body, bodyStartLine } = parseFrontmatter(text);
   const fm = data ?? {};
+  const sketch = fm.sketch === true || fm.sketch === 'true';
 
   if (typeof fm.id !== 'string' || fm.id === '') {
     add('missing-id', 'frontmatter has no id');
@@ -234,17 +237,18 @@ function checkSheet(rel, text, language, places, template) {
   }
 
   if (HEADINGS[language]) {
-    checkSections(lines, template, language, add);
+    checkSections(lines, template, language, add, sketch);
   }
 
   return errors;
 }
 
-function checkSections(lines, template, language, add) {
+function checkSections(lines, template, language, add, sketch = false) {
   const model = MODELS[template];
   const headings = HEADINGS[language];
   const order = model.order.map((key) => headings[key]);
-  const required = model.required.map((key) => headings[key]);
+  // A sketch has only its title and the first required section (see content-format.md, 4.12).
+  const required = (sketch ? model.required.slice(0, 1) : model.required).map((key) => headings[key]);
 
   // Each `##` section outside the master block, with the lines it contains.
   const sections = [];
@@ -301,6 +305,8 @@ function checkSections(lines, template, language, add) {
     checkStockTable(stock, language, add);
   }
 
+  if (sketch) return;
+
   const statistics = sections.find((section) => section.name === headings.statistics);
   if (template === 'creature' && statistics && NO_STATISTICS_PHRASE[language]) {
     const phrase = NO_STATISTICS_PHRASE[language];
@@ -317,6 +323,16 @@ function checkSections(lines, template, language, add) {
     const content = statistics.lines.map((line) => line.text).join('\n');
     const validation = validateStatisticsTables(content, language);
     if (!validation.ok) add('statistics-table', validation.reason ?? `section "${statistics.name}" must use the localized statistics tables`);
+    else if (
+      ['npc', 'vendor', 'enemy'].includes(template) &&
+      actionRowCount(content, language) === 0
+    ) {
+      const actionsHeading = language === 'it' ? 'Attacchi e capacità' : 'Attacks and abilities';
+      add(
+        'statistics-no-actions',
+        `the Statistics section has no combat action: add at least one row to the table "${actionsHeading}"`,
+      );
+    }
   }
 }
 

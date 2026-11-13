@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inspectStatisticsTables, convertStatisticsTables, validateStatisticsTables } from './statistics-tables.mjs';
+import { inspectStatisticsTables, convertStatisticsTables, validateStatisticsTables, actionRowCount } from './statistics-tables.mjs';
 import { validateSheet } from './adapter-ops.mjs';
 
 test('converts only clear labelled rows and preserves outside bytes', async () => {
@@ -86,4 +86,24 @@ test('preserves CRLF bytes before and after a converted section', async () => {
   const result = convertStatisticsTables(input, 'en');
   assert.ok(result.markdown.startsWith('before\r\n## Statistics\r\n'));
   assert.ok(result.markdown.endsWith('\r\n## Loot\r\n\r\ncoin\r\n'));
+});
+
+test('actionRowCount counts the data rows of the actions table, not its header and separator', () => {
+  const two = '## Statistiche\n\n### Attacchi e capacità\n\n| Attacco o capacità | Dettagli |\n| --- | --- |\n| Pugnale | Colpisce: 1d4 danni. |\n| Morso | Colpisce: 1d6 danni. |\n';
+  assert.equal(actionRowCount(two, 'it'), 2);
+  const none = '## Statistiche\n\n### Attacchi e capacità\n\n| Attacco o capacità | Dettagli |\n| --- | --- |\n';
+  assert.equal(actionRowCount(none, 'it'), 0);
+  const noHeading = '## Statistiche\n\n### Caratteristiche\n\n| Caratteristica | Valore |\n| --- | --- |\n| CA | 12 |\n';
+  assert.equal(actionRowCount(noHeading, 'it'), 0);
+  const en = '## Statistics\n\n### Attacks and abilities\n\n| Attack or ability | Details |\n| --- | --- |\n| Dagger | Hits: 1d4 damage. |\n';
+  assert.equal(actionRowCount(en, 'en'), 1);
+});
+
+test('findStatisticsSections returns the content range under the Statistiche heading', async () => {
+  const { findStatisticsSections } = await import('./statistics-tables.mjs');
+  const text = '# Titolo\n\n## Statistiche\n\n### Caratteristiche\n\n| Caratteristica | Valore |\n| --- | --- |\n| CA | 12 |\n\n## Al tavolo\n\nTesto.\n';
+  const ranges = findStatisticsSections(text, 'it');
+  assert.equal(ranges.length, 1);
+  assert.ok(text.slice(ranges[0].start, ranges[0].end).includes('### Caratteristiche'));
+  assert.ok(!text.slice(ranges[0].start, ranges[0].end).includes('## Statistiche'));
 });

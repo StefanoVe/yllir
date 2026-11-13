@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkCreature, checkSceneCheck } from './checks.mjs';
+import { checkCreature, checkSceneCheck, fixRolls } from './checks.mjs';
 
 function codes(fields) {
   return checkCreature(fields).map((entry) => entry.code);
@@ -135,4 +135,27 @@ test('two precomputed amounts on one line give two precomputed-roll errors', () 
 
 test('checkCreature without a statistics argument still passes', () => {
   assert.deepEqual(checkCreature({ str: '14' }), []);
+});
+
+test('fixRolls writes a precomputed roll as its dice only and counts it', () => {
+  const spear = 'Lancia | Colpisce: 4 (1d6 + 1) danni perforanti.';
+  const result = fixRolls(spear);
+  assert.equal(result.text, 'Lancia | Colpisce: 1d6 + 1 danni perforanti.');
+  assert.equal(result.count, 1);
+});
+
+test('fixRolls fixes every amount of a line and counts each one', () => {
+  const result = fixRolls('Colpisce: 4 (1d6 + 1) danni, oppure 9 (2d8) danni.');
+  assert.equal(result.text, 'Colpisce: 1d6 + 1 danni, oppure 2d8 danni.');
+  assert.equal(result.count, 2);
+});
+
+test('fixRolls leaves the hit points row unchanged', () => {
+  const row = '| PF | 11 (2d8 + 2) |';
+  assert.deepEqual(fixRolls(row), { text: row, count: 0 });
+});
+
+test('after fixRolls the statistics pass checkCreature', () => {
+  const result = fixRolls('| Lancia | Colpisce: 4 (1d6 + 1) danni perforanti. |\n| PF | 11 (2d8 + 2) |');
+  assert.deepEqual(checkCreature({}, result.text), []);
 });

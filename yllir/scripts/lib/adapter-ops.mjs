@@ -174,3 +174,15 @@ export async function loadSceneValueCheck(adapter) {
   }
   return typeof checks.checkSceneCheck === 'function' ? checks.checkSceneCheck : null;
 }
+
+/** The adapter's fixRolls (from its checks module), or null when the adapter has no checks file, it cannot be imported, or it does not export fixRolls. */
+export async function loadRollFix(adapter) {
+  if (!adapter || typeof adapter.checksPath !== 'string') return null;
+  let checks;
+  try {
+    checks = await import(pathToFileURL(adapter.checksPath).href);
+  } catch {
+    return null;
+  }
+  return typeof checks.fixRolls === 'function' ? checks.fixRolls : null;
+}

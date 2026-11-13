@@ -502,7 +502,13 @@ async function adapterErrors(dir, files) {
     const text = readText(path.join(dir, file));
     if (text === null) continue;
     const { data } = parseFrontmatter(text);
-    const kind = data?.template === 'enemy' ? 'creature' : itemFolders.some((f) => isInside(file, f)) ? 'item' : null;
+    // A sketch is not checked by the adapter: it has no statistics yet.
+    const sketch = data?.sketch === true || data?.sketch === 'true';
+    const kind = sketch
+      ? null
+      : ['enemy', 'npc', 'vendor'].includes(data?.template)
+        ? 'creature'
+        : itemFolders.some((f) => isInside(file, f)) ? 'item' : null;
     if (kind === null) continue;
     const checked = await validateSheet(loaded.adapter, kind, text, lang);
     for (const error of checked.errors) out.push(normalize('adapter', error, file));

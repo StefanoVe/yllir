@@ -37,6 +37,21 @@ Parla poco e guarda negli occhi chi le parla.
 
 Può cucire un mantello per il gruppo in cambio di pelli di capra.
 
+## Statistiche
+
+### Caratteristiche
+
+| Caratteristica | Valore |
+| --- | --- |
+| CA | 10 |
+| PF | 6 |
+
+### Attacchi e capacità
+
+| Attacco o capacità | Dettagli |
+| --- | --- |
+| Ago da sarta | Attacco in mischia: +1, portata 1,5 m. Colpisce: 1d4 danni perforanti. |
+
 <!-- master -->
 ## Master
 

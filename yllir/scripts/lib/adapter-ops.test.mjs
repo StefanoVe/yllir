@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadAdapter, pluginRootFromHere } from './adapter.mjs';
-import { cardFields, progressionEvent, validateSheet } from './adapter-ops.mjs';
+import { cardFields, loadRollFix, progressionEvent, validateSheet } from './adapter-ops.mjs';
 
 const adapter = loadAdapter(pluginRootFromHere(), 'dnd-2024').adapter;
 const completeStats = 'CA 12 · PF 20 · Velocità 9 · FOR 10 · DES 11 · COS 12 · INT 13 · SAG 14 · CAR 15';
@@ -158,4 +158,9 @@ test('creature attack with a precomputed roll fails with precomputed-roll', asyn
 test('adapter checks are skipped for non-combat creatures', async () => {
   const text = '---\nid: synthetic-creature\ntemplate: creature\n---\n\n# Compagno\n\n## Statistiche\n\n### Caratteristiche\n\n| Caratteristica | Valore |\n| --- | --- |\n| FOR | 14 (+9) |';
   assert.deepEqual(await validateSheet(adapter, 'creature', text, 'it'), { ok: true, errors: [] });
+});
+
+test('loadRollFix gives the fixRolls of the dnd-2024 checks, and null without a checks file', async () => {
+  assert.equal(typeof (await loadRollFix(adapter)), 'function');
+  assert.equal(await loadRollFix({ id: 'no-checks' }), null);
 });

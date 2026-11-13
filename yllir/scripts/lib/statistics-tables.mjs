@@ -65,7 +65,30 @@ export function validateStatisticsTables(source, language = 'en', { allowNoncomb
   return { ok: parsed.status === 'compliant', reason: parsed.reason ?? null };
 }
 
-function findStatisticsSections(text, language) {
+/**
+ * Number of data rows in the actions table (### Attacchi e capacità / ### Attacks and abilities)
+ * of a Statistics section's text (the text under ## Statistics, without the ## heading).
+ * The header row and the separator row (| --- | --- |) are not counted. 0 when there is no such table.
+ */
+export function actionRowCount(source, language = 'en') {
+  const actions = (LABELS[language] ?? LABELS.en).actions;
+  const { lines } = analyzeMarkdown(String(source));
+  let inActions = false;
+  const tableLines = [];
+  for (const line of lines) {
+    if (line.inMaster) continue;
+    if (line.block === 'heading' && line.level <= 3) {
+      if (inActions) break;
+      inActions = line.level === 3 && line.headingText === actions;
+      continue;
+    }
+    if (inActions && line.block === 'table') tableLines.push(line.text);
+  }
+  const dataLines = tableLines.slice(1).filter((text) => !/^\s*\|?\s*:?-{3,}/.test(text));
+  return Math.max(0, dataLines.length);
+}
+
+export function findStatisticsSections(text, language) {
   const { lines } = analyzeMarkdown(text);
   const offsets = [];
   let offset = 0;
