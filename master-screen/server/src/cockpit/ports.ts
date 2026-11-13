@@ -172,6 +172,8 @@ export interface CockpitCategories {
   folderFor(kind: "npc" | "enemy" | "item" | "location"): string | null;
   /** Folder of the player characters (sheets and their sessions), or null. */
   playersFolder(): string | null;
+  /** True when the path is inside an external (shared, read-only) category. Optional: absent means never. */
+  isExternal?(relPath: string): boolean;
 }
 
 /** A battle map the master can show on the battle screen, with the sheet that embeds it. */

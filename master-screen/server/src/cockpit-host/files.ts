@@ -2,6 +2,7 @@
 // labels, the URL the client reads them from, and the area of a path. Owner: cockpit host.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { containingRoot, externalFolderRoots, type ExternalFolder } from '../docs/external.js';
 
 export const RASTER_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 /** Folders never walked for images (dot folders are skipped by name). */
@@ -26,10 +27,19 @@ export const THUMBNAIL = /-thumbnail$/i;
 
 const TYPE_SUFFIX = /-(veduta|pianta|mappa|carta)$/i;
 
-/** Every raster image of the campaign, dot folders and build folders left out, symlinks never followed. */
+/**
+ * Every raster image of the campaign, dot folders and build folders left out. Symlinks are never
+ * followed, except inside external categories: there the folder is walked through its links, each
+ * real directory once, and a link is listed only when its real place is inside the campaign or
+ * inside that external folder's real root.
+ */
 export async function listRasterImages(root: string): Promise<RasterFile[]> {
   const found: RasterFile[] = [];
-  const walk = async (dirAbs: string, relDir: string): Promise<void> => {
+  const campaignReal = await fs.realpath(root).catch(() => root);
+  const externals: ExternalFolder[] = await externalFolderRoots(root).catch(() => []);
+  const visited = new Set<string>();
+
+  const walk = async (dirAbs: string, relDir: string, follow: boolean): Promise<void> => {
     let entries;
     try {
       entries = await fs.readdir(dirAbs, { withFileTypes: true });
@@ -37,11 +47,27 @@ export async function listRasterImages(root: string): Promise<RasterFile[]> {
       return;
     }
     for (const entry of entries) {
-      if (entry.name.startsWith('.') || SKIPPED_DIRS.has(entry.name) || entry.isSymbolicLink()) continue;
+      if (entry.name.startsWith('.') || SKIPPED_DIRS.has(entry.name)) continue;
       const rel = relDir === '' ? entry.name : `${relDir}/${entry.name}`;
       const abs = path.join(dirAbs, entry.name);
+      if (!follow && entry.isSymbolicLink()) continue;
+      if (!follow && externals.some((external) => external.folder === rel)) continue;
+      if (follow) {
+        if (!(await linkedInside(abs, rel))) continue;
+        const stat = await fs.stat(abs).catch(() => null);
+        if (stat?.isDirectory()) {
+          const real = await fs.realpath(abs).catch(() => null);
+          if (real === null || visited.has(real)) continue;
+          visited.add(real);
+          await walk(abs, rel, true);
+          continue;
+        }
+        if (!stat?.isFile() || !RASTER_EXTENSIONS.has(path.posix.extname(entry.name).toLowerCase())) continue;
+        found.push({ rel, mtimeMs: stat.mtimeMs });
+        continue;
+      }
       if (entry.isDirectory()) {
-        await walk(abs, rel);
+        await walk(abs, rel, false);
         continue;
       }
       if (!entry.isFile() || !RASTER_EXTENSIONS.has(path.posix.extname(entry.name).toLowerCase())) continue;
@@ -49,7 +75,20 @@ export async function listRasterImages(root: string): Promise<RasterFile[]> {
       if (stat) found.push({ rel, mtimeMs: stat.mtimeMs });
     }
   };
-  await walk(root, '');
+
+  /** A linked entry is kept only when its real place is a root the campaign may read. */
+  const linkedInside = async (abs: string, rel: string): Promise<boolean> => {
+    const real = await fs.realpath(abs).catch(() => null);
+    if (real === null) return false;
+    return containingRoot(campaignReal, externals, real, rel) !== null;
+  };
+
+  await walk(root, '', false);
+  for (const external of externals) {
+    if (visited.has(external.realRoot)) continue;
+    visited.add(external.realRoot);
+    await walk(external.realRoot, external.folder, true);
+  }
   return found.sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
 }
 

@@ -21,7 +21,8 @@ import type {
 import { buildUserPrompt } from "./prompt.js";
 import { emptyState } from "./actions.js";
 import { markdownFiles } from "./test-helpers/walk.js";
-import type { CockpitBattle, Detail, MapAsset } from "./ports.js";
+import type { CockpitArchive, CockpitBattle, Detail, Hit, MapAsset } from "./ports.js";
+import { CampaignCategories, categoryEntries } from "../cockpit-host/categories.js";
 
 let root = "";
 afterEach(async () => {
@@ -62,7 +63,12 @@ const overlaps = (a: Frame | BoardModule, b: Frame | BoardModule) =>
   a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 
 /** A store with one session, a fake archive and the cockpit tools bound to them. */
-async function setup(docs: Map<string, Detail>, maps: MapAsset[] = [], battle?: CockpitBattle) {
+async function setup(
+  docs: Map<string, Detail>,
+  maps: MapAsset[] = [],
+  battle?: CockpitBattle,
+  options: { categories?: CampaignCategories; search?: CockpitArchive["search"] } = {},
+) {
   root = await mkdtemp(path.join(tmpdir(), "cockpit-tools-"));
   const store = new CockpitStore(root);
   const session = await store.create({
@@ -92,7 +98,7 @@ async function setup(docs: Map<string, Detail>, maps: MapAsset[] = [], battle?: 
   };
   const live = new CockpitLive(store, fake.framework);
   await live.ensure(session.id);
-  const categories = {
+  const categories = options.categories ?? {
     kindOf: fakeKindOf,
     folderFor: (kind: "npc" | "enemy" | "item" | "location") =>
       ({ npc: "NPCs", enemy: "Enemies", item: "Items", location: "World" })[kind],
@@ -107,7 +113,7 @@ async function setup(docs: Map<string, Detail>, maps: MapAsset[] = [], battle?: 
   const bus = new CockpitBus(1000);
   const tools = createCockpitTools({
     store,
-    archive: { docs, search: () => ({ hits: [], total: 0 }) },
+    archive: { docs, search: options.search ?? (() => ({ hits: [], total: 0 })) },
     maps: () => maps,
     tracks,
     getPlotGraph: () => ({
@@ -950,4 +956,49 @@ test("combat_card_set è solo dello strumento di carte, non della tavola", () =>
   expect(COCKPIT_TOOL_NAMES).toContain("combat_card_set");
   expect(CARD_TOOL_NAMES).toEqual(["combat_card_set"]);
   expect(TABLE_TOOL_NAMES).not.toContain("combat_card_set");
+});
+
+test("un documento di una cartella esterna si legge e si cerca, ma non si riscrive", async () => {
+  const raw = "# Raatnagar\nCittà sul delta.";
+  const docs = new Map<string, Detail>();
+  docs.set("shared/Luoghi/Raatnagar.md", detail("shared/Luoghi/Raatnagar.md", raw, headingsOf(raw), "Raatnagar"));
+  const categories = new CampaignCategories();
+  categories.load(
+    categoryEntries([
+      { id: "shared", folder: "shared", type: "external" },
+      { id: "characters", folder: "Personaggi", type: "subjects" },
+    ]),
+  );
+  const hit: Hit = {
+    path: "shared/Luoghi/Raatnagar.md",
+    title: "Raatnagar",
+    category: "shared",
+    area: "Luoghi",
+    scope: "Campagna",
+    master: false,
+    excerpt: "Città sul delta",
+    anchor: "raatnagar",
+  };
+  const h = await setup(docs, [], undefined, {
+    categories,
+    search: () => ({ hits: [hit], total: 1 }),
+  });
+  const { call, json } = h;
+
+  const read = await call("read_doc", { path: "shared/Luoghi/Raatnagar.md" });
+  expect(read.isError).toBeUndefined();
+  expect(read.content[0]!.text).toContain("Città sul delta");
+
+  const found = json(await call("search_docs", { query: "delta" }));
+  expect(found.map((item: Hit) => item.path)).toEqual(["shared/Luoghi/Raatnagar.md"]);
+
+  // A symbolic link that leaves the campaign is not a document of any category: refused as before.
+  const outside = await call("read_doc", { path: "linked.md" });
+  expect(outside.isError).toBe(true);
+  expect(outside.content[0]!.text).toContain("Percorso fuori");
+
+  const written = await call("sheet_update", { path: "shared/Luoghi/Raatnagar.md", markdown: "Nuovo testo." });
+  expect(written.isError).toBe(true);
+  expect(written.content[0]!.text).toContain("Il documento appartiene al mondo condiviso ed è in sola lettura");
+  await h.close();
 });

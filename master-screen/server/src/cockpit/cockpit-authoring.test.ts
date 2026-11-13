@@ -66,3 +66,18 @@ test("sheet_update rewrites only the sheets this session created, keeping the me
   expect(created.path).toBe("NPCs/Ada.md");
   expect(fake.engineCalls.map((call) => call[0])).toEqual(["check", "review", "commit"]);
 });
+
+test("an external category is read-only: sheet_update and sheet_create refuse its documents", async () => {
+  root = await mkdtemp(path.join(tmpdir(), "cockpit-authoring-"));
+  const fake = createFakeFramework();
+  const base = deps(fake);
+  const sheetDeps: SheetDeps = {
+    ...base,
+    categories: { ...base.categories, isExternal: (rel) => rel.startsWith("shared/") },
+    created: async () => [{ path: "shared/Luoghi/Raatnagar.md", title: "Raatnagar" }],
+  };
+  await expect(updateSheet(sheetDeps, { path: "shared/Luoghi/Raatnagar.md", body: "x" })).rejects.toThrow(
+    "Il documento appartiene al mondo condiviso ed è in sola lettura",
+  );
+  expect(fake.engineCalls).toEqual([]);
+});

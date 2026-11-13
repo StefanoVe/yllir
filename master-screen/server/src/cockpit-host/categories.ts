@@ -61,6 +61,16 @@ export function kindOfCategory(entry: CategoryEntry): CockpitKind {
   return ID_KINDS[entry.id.toLowerCase()] ?? TYPE_KINDS[entry.type] ?? 'other';
 }
 
+/**
+ * The kind of a document of an external category, from the first sub-folder under the external
+ * folder (Luoghi → location, Personaggi → npc...). Unknown names, and plot or session names,
+ * give lore: an external world never holds plot or sessions.
+ */
+export function externalKindOf(subFolder: string | undefined): CockpitKind {
+  const kind = subFolder === undefined ? undefined : ID_KINDS[subFolder.toLowerCase()];
+  return kind === undefined || kind === 'plot' || kind === 'session' ? 'lore' : kind;
+}
+
 /** A plot file is a session when it is the main file of its own folder or lies in an Eventi/Events folder. */
 export function isSessionFile(insideFolder: string): boolean {
   const segments = insideFolder.split('/');
@@ -123,19 +133,29 @@ export class CampaignCategories implements CockpitCategories {
     return this.entryFor(relPath)?.folder;
   }
 
+  /** True when the path is inside an external category: a shared world, read-only for the cockpit. */
+  isExternal(relPath: string): boolean {
+    return this.entryFor(relPath)?.type === 'external';
+  }
+
   kindOf(relPath: string): CockpitKind {
     const entry = this.entryFor(relPath);
     if (entry === undefined) return 'other';
+    if (entry.type === 'external') {
+      const inside = relPath.slice(entry.folder.length + 1).split('/');
+      return inside.length < 2 ? 'lore' : externalKindOf(inside[0]);
+    }
     const kind = kindOfCategory(entry);
     if (kind === 'plot' && isSessionFile(relPath.slice(entry.folder.length + 1))) return 'session';
     return kind;
   }
 
+  /** New sheets never go to an external folder. */
   folderFor(kind: 'npc' | 'enemy' | 'item' | 'location'): string | null {
-    return this.entries.find((entry) => kindOfCategory(entry) === kind)?.folder ?? null;
+    return this.entries.find((entry) => entry.type !== 'external' && kindOfCategory(entry) === kind)?.folder ?? null;
   }
 
   playersFolder(): string | null {
-    return this.entries.find((entry) => kindOfCategory(entry) === 'pc')?.folder ?? null;
+    return this.entries.find((entry) => entry.type !== 'external' && kindOfCategory(entry) === 'pc')?.folder ?? null;
   }
 }

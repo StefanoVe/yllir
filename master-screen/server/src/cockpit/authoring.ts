@@ -175,6 +175,7 @@ export async function createSheet(
       `Area inesistente in ${folder}/: «${area}». Aree disponibili: ${areas.join(", ")}`,
     );
   const rel = [folder, area, `${title}.md`].filter(Boolean).join("/");
+  refuseExternal(deps, rel);
   const same = [...all.values()].find(
     (doc) => doc.path === rel || (doc.master === false && folded(doc.title) === folded(title)),
   );
@@ -205,6 +206,7 @@ export async function updateSheet(
   input: { path: string; body: string },
 ): Promise<WrittenSheet> {
   const body = checkBody(input.body);
+  refuseExternal(deps, input.path);
   const created = (await deps.created()).find((sheet) => sheet.path === input.path);
   if (!created)
     throw new Error(
@@ -218,6 +220,12 @@ export async function updateSheet(
   await writeDraft(deps.root, input.path, text);
   await save(deps, input.path, messagesFor(deps.language).updated(created.title), `Rewrite the body of the sheet "${created.title}" created at the table`);
   return { path: input.path, title: created.title };
+}
+
+/** A document of an external category belongs to the shared world: nothing writes it. */
+function refuseExternal(deps: SheetDeps, rel: string) {
+  if (deps.categories.isExternal?.(rel))
+    throw new Error("Il documento appartiene al mondo condiviso ed è in sola lettura");
 }
 
 async function writeDraft(root: string, rel: string, text: string) {
