@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, it, before, after } from 'node:test';
-import { isAllowed, isAllowedCommand, isDraftPath, isWritablePath, type GateContext } from './gate.js';
+import { isAllowed, isAllowedCommand, isDraftPath, isReadablePath, isWritablePath, type GateContext } from './gate.js';
+import { worldFixture } from '../docs/test-support.js';
 
 let tmp: string;
 let campaign: string;
@@ -317,4 +318,50 @@ testIt('reads are confined to the campaign and the framework; sub-agents are all
   assert.equal(isAllowed('Glob', { pattern: '**/*.md' }, ctx).allow, true);
   assert.equal(isAllowed('Task', {}, ctx).allow, true);
   assert.equal(isAllowed('WebFetch', {}, ctx).allow, true);
+});
+
+describe('external categories: readable, never writable', () => {
+  let world: Awaited<ReturnType<typeof worldFixture>>;
+  let external: GateContext;
+  let plain: GateContext;
+
+  before(async () => {
+    world = await worldFixture();
+    external = { campaignRoot: world.campaign, frameworkRoot: framework, externalRoots: [fs.realpathSync(world.world)] };
+    plain = { campaignRoot: world.campaign, frameworkRoot: framework };
+  });
+
+  after(() => {
+    fs.rmSync(world.base, { recursive: true, force: true });
+  });
+
+  it('allows Read, Glob and Grep on a document of the external folder, by its link path or real path', () => {
+    const linkPath = 'shared/Luoghi/Raatnagar.md';
+    const realPath = path.join(world.world, 'Luoghi', 'Raatnagar.md');
+    for (const name of ['Read', 'Grep']) {
+      assert.equal(allowed(isAllowed(name, { file_path: linkPath }, external)), true, name);
+      assert.equal(allowed(isAllowed(name, { file_path: realPath }, external)), true, name);
+    }
+    assert.equal(allowed(isAllowed('Glob', { pattern: '**/*.md', path: 'shared' }, external)), true);
+  });
+
+  it('refuses the same reads without the external roots', () => {
+    assert.equal(isReadablePath('shared/Luoghi/Raatnagar.md', plain), false);
+    assert.equal(allowed(isAllowed('Read', { file_path: 'shared/Luoghi/Raatnagar.md' }, plain)), false);
+  });
+
+  it('denies Write and Edit on the external folder, and keeps the draft and writable checks as they were', () => {
+    for (const name of ['Write', 'Edit']) {
+      assert.equal(allowed(isAllowed(name, { file_path: 'shared/Luoghi/Raatnagar.md' }, external)), false, name);
+      assert.equal(allowed(isAllowed(name, { file_path: path.join(world.world, 'Luoghi', 'Raatnagar.md') }, external)), false, name);
+    }
+    assert.equal(isWritablePath('shared/Luoghi/Raatnagar.md', external), false);
+    assert.equal(isDraftPath('shared/Luoghi/Raatnagar.md', external), false);
+  });
+
+  it('still refuses a link that leaves the external folder or the campaign', () => {
+    for (const file of ['linked.md', 'linkdir/secret.md', 'shared/Luoghi/alias-secret.md', '../outside/secret.md']) {
+      assert.equal(allowed(isAllowed('Read', { file_path: file }, external)), false, file);
+    }
+  });
 });

@@ -92,7 +92,7 @@ const moduleCache = new Map<string, Promise<unknown>>();
  * Loads `<framework>/scripts/lib/<name>.mjs` once and returns its exports.
  * A failed load is not cached, so a later call retries.
  */
-export function loadFrameworkModule<T = Record<string, unknown>>(ctx: Ctx, name: string): Promise<T> {
+export function loadFrameworkModule<T = Record<string, unknown>>(ctx: Pick<Ctx, 'frameworkRoot'>, name: string): Promise<T> {
   if (!/^[a-z0-9-]+$/.test(name)) {
     return Promise.reject(new Error(`invalid framework module name: ${name}`));
   }

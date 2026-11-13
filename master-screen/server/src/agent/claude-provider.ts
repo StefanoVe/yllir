@@ -19,6 +19,7 @@ import { runEngine } from '../engine.js';
 import { describeTool, narrationActivity, type ActivityRoots } from '../chat/activity.js';
 import { suggestMusic } from '../music/suggest.js';
 import { validateOpenPath } from '../chat/paths.js';
+import { externalRealRoots } from '../docs/external.js';
 import { TEXTS, campaignLanguage, type Lang } from '../chat/text.js';
 import { stripLeadingNarration } from './answer.js';
 import { isAllowed, type GateContext } from './gate.js';
@@ -293,7 +294,11 @@ async function* runTurn(ctx: Ctx, executable: string, input: AgentRunInput): Asy
   if (input.signal.aborted) controller.abort();
   else input.signal.addEventListener('abort', abortFromCaller, { once: true });
 
-  const gate: GateContext = { campaignRoot: input.cwd, frameworkRoot: input.frameworkRoot };
+  const gate: GateContext = {
+    campaignRoot: input.cwd,
+    frameworkRoot: input.frameworkRoot,
+    externalRoots: await externalRealRoots(input.cwd),
+  };
   const state: RunState = { finished: false, answer: '' };
 
   const searchDocs = tool(

@@ -5,6 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { Ctx } from '../context.js';
 import { loadFrameworkModule } from '../engine.js';
+import { containingRoot, externalFolderRoots, isUnderFolder } from './external.js';
 
 export interface PublicTextModule {
   MASTER_MARKER: string;
@@ -34,7 +35,7 @@ export interface DocModules {
   subjects: SubjectsModule;
 }
 
-export async function loadDocModules(ctx: Ctx): Promise<DocModules> {
+export async function loadDocModules(ctx: Pick<Ctx, 'frameworkRoot'>): Promise<DocModules> {
   const [publicText, frontmatter, fold, yaml, subjects] = await Promise.all([
     loadFrameworkModule<PublicTextModule>(ctx, 'public-text'),
     loadFrameworkModule<FrontmatterModule>(ctx, 'frontmatter'),
@@ -59,7 +60,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-export async function readCampaignConfig(ctx: Ctx, mods: DocModules): Promise<CampaignConfig> {
+export async function readCampaignConfig(ctx: Pick<Ctx, 'campaignRoot'>, mods: DocModules): Promise<CampaignConfig> {
   const closed: CampaignConfig = { ok: false, data: {}, isPublic: () => false, structure: [] };
   let text: string;
   try {
@@ -105,19 +106,20 @@ const SKIPPED_NAMES = new Set(['.git', 'node_modules']);
 // Generated agent instructions at the campaign root: not campaign documents.
 const ROOT_EXCLUDED_NAMES = new Set(['CLAUDE.md', 'AGENTS.md']);
 
-function isInside(realRoot: string, real: string): boolean {
-  const rel = path.relative(realRoot, real);
-  return rel !== '' && rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel);
-}
-
 /**
  * Every Markdown file of the campaign, sorted by path. `.campaign/`, `.git` and
  * node_modules are skipped, and so are CLAUDE.md and AGENTS.md at the campaign root
  * (generated agent instructions). Symlinked files count only when their target is
- * inside the campaign; symlinked folders are not followed.
+ * inside the campaign, or inside the real folder of an external category (where symlinked
+ * folders are followed too, each real folder once). Outside external folders symlinked
+ * folders are not followed. Listed paths are the campaign-relative ones, through the links.
  */
 export async function listCampaignDocuments(root: string): Promise<CampaignDocFile[]> {
   const realRoot = await fs.realpath(root);
+  const externals = await externalFolderRoots(root);
+  const inExternal = (rel: string): boolean => externals.some((entry) => isUnderFolder(rel, entry.folder));
+  // Real folders already entered through a link: a link back to one of them is not followed again.
+  const entered = new Set<string>([realRoot]);
   const out: CampaignDocFile[] = [];
 
   async function walk(dirAbs: string, relDir: string, atRoot: boolean): Promise<void> {
@@ -136,13 +138,25 @@ export async function listCampaignDocuments(root: string): Promise<CampaignDocFi
         await walk(abs, rel, false);
         continue;
       }
+      if (entry.isSymbolicLink() && inExternal(rel) && (await isDirectory(abs))) {
+        if (name === 'img' || name.startsWith('.')) continue;
+        try {
+          const real = await fs.realpath(abs);
+          if (entered.has(real) || containingRoot(realRoot, externals, real, rel) === null) continue;
+          entered.add(real);
+        } catch {
+          continue;
+        }
+        await walk(abs, rel, false);
+        continue;
+      }
       if (!(entry.isFile() || entry.isSymbolicLink())) continue;
       if (!name.toLowerCase().endsWith('.md')) continue;
       try {
         const real = await fs.realpath(abs);
-        if (!isInside(realRoot, real)) continue;
-        const realRel = path.relative(realRoot, real).split(path.sep);
-        if (isForbidden(realRel)) continue;
+        const base = containingRoot(realRoot, externals, real, rel);
+        if (base === null) continue;
+        if (isForbidden(path.relative(base, real).split(path.sep))) continue;
         const stat = await fs.stat(real);
         if (!stat.isFile()) continue;
         out.push({ rel, mtimeMs: stat.mtimeMs });
@@ -157,6 +171,14 @@ export async function listCampaignDocuments(root: string): Promise<CampaignDocFi
   return out;
 }
 
+async function isDirectory(abs: string): Promise<boolean> {
+  try {
+    return (await fs.stat(abs)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
 function isForbidden(segments: string[]): boolean {
   return segments[0] === '.campaign' || segments.includes('.git');
 }
@@ -169,9 +191,10 @@ export interface ResolvedFile {
 }
 
 /**
- * Resolves a client-supplied path to a regular file inside the campaign. Returns null
+ * Resolves a client-supplied path to a regular file inside the campaign, or inside the real
+ * folder of an external category when the path starts with that folder. Returns null
  * for anything absolute, containing "..", inside `.campaign/` or `.git`, missing, not a
- * regular file, or whose real location (after symlinks) is outside the campaign.
+ * regular file, or whose real location (after symlinks) is outside those roots.
  */
 export async function resolveCampaignFile(root: string, rel: unknown): Promise<ResolvedFile | null> {
   if (typeof rel !== 'string' || rel === '' || rel.includes('\0')) return null;
@@ -181,11 +204,13 @@ export async function resolveCampaignFile(root: string, rel: unknown): Promise<R
   try {
     const realRoot = await fs.realpath(root);
     const real = await fs.realpath(path.join(root, ...segments));
-    if (!isInside(realRoot, real)) return null;
-    if (isForbidden(path.relative(realRoot, real).split(path.sep))) return null;
+    const reqRel = segments.join('/');
+    const base = containingRoot(realRoot, await externalFolderRoots(root), real, reqRel);
+    if (base === null) return null;
+    if (isForbidden(path.relative(base, real).split(path.sep))) return null;
     const stat = await fs.stat(real);
     if (!stat.isFile()) return null;
-    return { abs: real, rel: segments.join('/') };
+    return { abs: real, rel: reqRel };
   } catch {
     return null;
   }

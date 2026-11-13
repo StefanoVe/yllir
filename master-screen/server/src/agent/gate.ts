@@ -8,6 +8,8 @@ export interface GateContext {
   campaignRoot: string;
   /** Yllir plugin root: the scripts the agent may run live here. */
   frameworkRoot: string;
+  /** Real folders of the external categories (absolute): readable, never writable. */
+  externalRoots?: string[];
 }
 
 export type GateDecision = { allow: true } | { allow: false; reason: string };
@@ -161,7 +163,8 @@ export function isReadablePath(value: unknown, ctx: GateContext): boolean {
   const campaign = path.resolve(ctx.campaignRoot);
   const target = path.resolve(campaign, value);
   const real = realpathLenient(target);
-  return [ctx.campaignRoot, ctx.frameworkRoot].some((root) => {
+  const readable = [ctx.campaignRoot, ctx.frameworkRoot, ...(ctx.externalRoots ?? [])];
+  return readable.some((root) => {
     const base = realpathLenient(root);
     return real === base || isInside(real, base);
   });

@@ -11,6 +11,7 @@ import { createApp } from './app.js';
 import { createCtx } from './context.js';
 import { agentStatus } from './agent/index.js';
 import { startWatcher } from './docs/watcher.js';
+import { setExternalFrameworkRoot } from './docs/external.js';
 import { startLiveWatcher } from './live/watcher.js';
 
 const DEFAULT_PORT = 4317;
@@ -221,6 +222,7 @@ async function main(): Promise<void> {
   const url = `http://127.0.0.1:${port}`;
   const log = stderrLine;
 
+  setExternalFrameworkRoot(frameworkRoot);
   const ctx = createCtx({
     campaignRoot,
     frameworkRoot,
