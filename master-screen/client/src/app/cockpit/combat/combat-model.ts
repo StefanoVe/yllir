@@ -1,9 +1,14 @@
-import type { BattleView } from "@shared/types";
+import type { BattleView, CombatRules } from "@shared/types";
 import type {
   BoardModuleView,
   CockpitAction,
+  CombatNotice,
   Combatant,
 } from "@shared/cockpit-types";
+import type { TranslationKey, TranslationParams } from "../../i18n";
+
+/** Translation function of the campaign language (`I18n.t`). */
+export type Translate = (key: TranslationKey, params?: TranslationParams) => string;
 
 /** A character or creature card on the board that can take part in a fight. */
 export interface FightCard {
@@ -198,4 +203,69 @@ export function stepCell(
 export function hpPercent(hp?: number, maxHp?: number): number | null {
   if (hp === undefined || !maxHp || maxHp <= 0) return null;
   return clamp(Math.round((hp / maxHp) * 100), 0, 100);
+}
+
+/** Key of a combatant's stats in the battle API cache: changes with its hit points. Player characters have none. */
+export function statsKey(
+  c: Pick<Combatant, "kind" | "hp" | "maxHp" | "tempHp">,
+): string | null {
+  return c.kind === "pc" ? null : `${c.hp ?? ""}/${c.maxHp ?? ""}/${c.tempHp ?? ""}`;
+}
+
+/** Label of a condition in the campaign language, or its id when the rules do not name it. */
+export function conditionLabel(id: string, rules: CombatRules | null): string {
+  return rules?.conditions.find((c) => c.id === id)?.label ?? id;
+}
+
+/** Label of a duration in the campaign language, or its id when the rules do not name it. */
+export function durationLabel(id: string, rules: CombatRules | null): string {
+  return rules?.durations.find((d) => d.id === id)?.label ?? id;
+}
+
+/** A condition pill: its label, then its duration and, for rounds, how many are left. */
+export function conditionSummary(
+  id: string,
+  detail: { duration?: string; rounds?: number } | undefined,
+  rules: CombatRules | null,
+  t: Translate,
+): string {
+  const parts = [conditionLabel(id, rules)];
+  if (detail?.duration) parts.push(durationLabel(detail.duration, rules));
+  if (detail?.duration === "rounds" && detail.rounds !== undefined)
+    parts.push(t("combat.condition.rounds", { n: detail.rounds }));
+  return parts.join(" · ");
+}
+
+/** One automatic change of the rules as a sentence in the campaign language. */
+export function noticeText(
+  notice: CombatNotice,
+  rules: CombatRules | null,
+  t: Translate,
+): string {
+  if (notice.kind === "condition-ended")
+    return t("combat.notice.conditionEnded", {
+      name: notice.name,
+      condition: notice.condition ? conditionLabel(notice.condition, rules) : "",
+    });
+  if (notice.kind === "defeated") return t("combat.notice.defeated", { name: notice.name });
+  if (notice.kind === "unconscious") return t("combat.notice.unconscious", { name: notice.name });
+  if (notice.newRound && notice.round !== undefined)
+    return t("combat.notice.round", { round: notice.round, name: notice.name });
+  return t("combat.notice.turn", { name: notice.name });
+}
+
+export interface ActionGroup<A> {
+  label: string;
+  actions: A[];
+}
+
+/** Groups actions by their group label, keeping the first appearance order. */
+export function groupActions<A extends { groupLabel: string }>(actions: A[]): ActionGroup<A>[] {
+  const groups = new Map<string, A[]>();
+  for (const action of actions) {
+    const list = groups.get(action.groupLabel);
+    if (list) list.push(action);
+    else groups.set(action.groupLabel, [action]);
+  }
+  return [...groups].map(([label, list]) => ({ label, actions: list }));
 }

@@ -50,6 +50,13 @@ export function registerBattleRoutes(app: Router, battle: BattleHost): void {
   );
 
   app.get(
+    '/battle/rules',
+    wrap(async (_req, res) => {
+      res.json(await battle.rules());
+    }),
+  );
+
+  app.get(
     '/battle/stats/:combatantId',
     wrap(async (req, res) => {
       const id = String(req.params.combatantId);

@@ -1,0 +1,47 @@
+:host {
+  display: inline-block;
+}
+
+/* Styles of the button live here: the consumer's component styles do not reach this view. */
+.icon-button {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-0-5);
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+
+.icon-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.icon-button:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.icon-button.armed {
+  width: auto;
+  min-width: 40px;
+  padding: 0 var(--space-1);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.confirm-text {
+  white-space: nowrap;
+}

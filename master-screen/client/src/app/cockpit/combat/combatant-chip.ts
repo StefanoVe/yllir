@@ -11,14 +11,15 @@ import type { CombatantStats } from "@shared/types";
 import type { Combatant } from "@shared/cockpit-types";
 import { I18n } from "../../i18n";
 import { BattleApi } from "./battle-api";
-import { hpPercent, initials } from "./combat-model";
+import { hpPercent, initials, statsKey } from "./combat-model";
 
 let nextId = 0;
 
 /**
- * One combatant as a round token: initials, a small hit point bar for non-player
- * characters, and a tooltip on hover or focus. Player characters show name and
- * initiative only; the others load their stats from the battle endpoints.
+ * One combatant as a round token: its portrait when the sheet has artwork (initials otherwise),
+ * a small hit point bar for non-player characters, and a tooltip on hover or focus. Player
+ * characters show name and initiative only and never load stats; the others load their stats
+ * as soon as they render, so the portrait shows without a hover.
  */
 @Component({
   selector: "cockpit-combatant-chip",
@@ -34,8 +35,16 @@ export class CombatantChip {
   readonly open = signal(false);
   readonly statsState = signal<"loading" | "ready" | "error">("loading");
   readonly stats = signal<CombatantStats | null>(null);
-  readonly initials = computed(() => initials(this.combatant().name));
+  /** Artwork that failed to load: the initials show instead. */
+  readonly failedImage = signal<string | null>(null);
+  readonly key = computed(() => statsKey(this.combatant()));
   readonly isPc = computed(() => this.combatant().kind === "pc");
+  readonly image = computed(() => (this.isPc() ? null : (this.stats()?.image ?? null)));
+  readonly showImage = computed(() => {
+    const src = this.image();
+    return src !== null && src !== this.failedImage();
+  });
+  readonly initials = computed(() => initials(this.combatant().name));
   readonly hp = computed(() =>
     hpPercent(this.combatant().hp, this.combatant().maxHp),
   );
@@ -49,14 +58,14 @@ export class CombatantChip {
           : String(c.initiative),
     });
   });
+  private loadSeq = 0;
 
   constructor() {
-    // Hit points changed while the tooltip is open: fetch again (the cache decides).
+    // Loads when the chip renders and again when its hit points change; the battle API cache decides.
     effect(() => {
-      const c = this.combatant();
-      void c.hp;
+      const key = this.key();
       untracked(() => {
-        if (this.open() && !this.isPc()) void this.loadStats();
+        if (key !== null) void this.loadStats();
       });
     });
   }
@@ -72,15 +81,17 @@ export class CombatantChip {
 
   private async loadStats(): Promise<void> {
     const c = this.combatant();
+    const key = statsKey(c);
+    if (key === null) return;
+    const seq = ++this.loadSeq;
     this.statsState.set("loading");
     try {
-      const value = await this.battle.stats(
-        c.id,
-        `${c.hp ?? ""}/${c.maxHp ?? ""}`,
-      );
+      const value = await this.battle.stats(c.id, key);
+      if (seq !== this.loadSeq) return;
       this.stats.set(value);
       this.statsState.set("ready");
     } catch {
+      if (seq !== this.loadSeq) return;
       this.statsState.set("error");
     }
   }

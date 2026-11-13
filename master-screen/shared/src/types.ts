@@ -211,7 +211,16 @@ export interface BattleView {
 // Tooltip of a combatant chip, built by the game-system adapter from the sheet's public text.
 export interface CombatantStats {
   lines: Array<{ label: string; value: string }>;   // e.g. AC, HP, speed
-  actions: Array<{ name: string; text: string }>;   // attacks and other actions
+  /** Attacks and other actions. group and timing come from the adapter's action groups; groupLabel is the group's label in the campaign language. */
+  actions: Array<{ name: string; text: string; group: string; groupLabel: string; timing: 'own_turn' | 'any_turn' | 'others_turns' }>;
+  /** Artwork of the combatant's sheet (first image of its public part), as `/api/file?path=…`; never from the master-only block. */
+  image?: string;
+}
+
+/** Conditions and durations of the game system, with labels in the campaign language. */
+export interface CombatRules {
+  conditions: { id: string; label: string }[];
+  durations: { id: string; label: string }[];
 }
 
 // A player character as listed for the initiative popup (name and sheet only, no stats).

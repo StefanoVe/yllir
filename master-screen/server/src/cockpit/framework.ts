@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { query as sdkQuery, type Options, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
-import type { CombatOp, CombatState, LiveSession, LogEntry, LogKind } from "../../../shared/src/types.js";
+import type { CombatOp, CombatState, Combatant as SharedCombatant, LiveSession, LogEntry, LogKind } from "../../../shared/src/types.js";
 import { findClaudeCode } from "../agent/claude-provider.js";
 import type { Ctx } from "../context.js";
 import { loadFrameworkModule, runEngine, type EngineResult } from "../engine.js";
@@ -54,9 +54,38 @@ export interface CockpitLog {
 
 /** The combat of the active live session. */
 export interface CockpitCombat {
-  get(): Promise<LibResult<{ sessionId: string; combat: CombatState | null }>>;
+  get(): Promise<LibResult<{ sessionId: string; combat: FrameworkCombatState | null }>>;
   apply(op: CombatOp): Promise<LibResult<{ combat: CombatState }>>;
 }
+
+/** A condition as the framework keeps it: duration and rounds only when the rule has them. */
+export interface FrameworkCondition {
+  id: string;
+  duration?: string;
+  rounds?: number;
+  note?: string;
+}
+
+/** Automatic change written by the game system's rules into the combat events (see encounter.mjs). */
+export type FrameworkNotice =
+  | { kind: "condition-ended"; id: string; name: string; condition: string }
+  | { kind: "defeated"; id: string; name: string }
+  | { kind: "unconscious"; id: string; name: string }
+  | { kind: "turn"; id: string; name: string; round: number; newRound: boolean };
+
+export interface FrameworkCombatEvent {
+  at: string;
+  text: string;
+  notice?: FrameworkNotice;
+}
+
+export type FrameworkCombatant = Omit<SharedCombatant, "conditions"> & { conditions: FrameworkCondition[] };
+
+/** The combat state as the framework writes it (combat.json): the shared shape plus the optional rule fields. */
+export type FrameworkCombatState = Omit<CombatState, "combatants" | "events"> & {
+  combatants: FrameworkCombatant[];
+  events: FrameworkCombatEvent[];
+};
 
 /** Result of one engine command: its JSON and exit code (see engine.mjs). */
 export type EngineRun = EngineResult<unknown>;
@@ -273,7 +302,7 @@ export function createCampaignFramework(ctx: Ctx, options: CampaignFrameworkOpti
     },
     combat: {
       get: () =>
-        combatCall(async (lib) => (lib.getCombat as unknown as (r: string) => LibResult<{ sessionId: string; combat: CombatState | null }>)(root)),
+        combatCall(async (lib) => (lib.getCombat as unknown as (r: string) => LibResult<{ sessionId: string; combat: FrameworkCombatState | null }>)(root)),
       apply: (op) =>
         combatCall(async (lib) =>
           (lib.applyOp as unknown as (r: string, o: CombatOp) => Promise<LibResult<{ combat: CombatState }>>)(root, op),

@@ -184,6 +184,7 @@ export function createCockpit(options: CreateCockpitOptions) {
       systemName: campaign.systemName,
     }),
     hydrate: (session) => live.hydrate(session),
+    combatRules: async () => (await ports.battle?.rules?.()) ?? { conditions: [], durations: [] },
   });
   const api = cockpitApi({
     store,

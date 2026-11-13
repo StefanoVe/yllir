@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { BattleView, CombatantStats } from '@shared/types';
+import type { BattleView, CombatantStats, CombatRules } from '@shared/types';
 import type { BoardModuleView, Combat, CockpitSessionView } from '@shared/cockpit-types';
 import { CockpitService } from '../cockpit.service';
 import { PrefsService } from '../../core/prefs.service';
@@ -55,6 +55,7 @@ const COMBAT: Combat = {
   round: 2,
   activeId: 'c-ogre',
   notes: '',
+  notices: [],
   participants: [
     { id: 'c-mira', name: 'Mira', kind: 'pc', initiative: 14, conditions: [] },
     { id: 'c-ogre', name: 'Ogre', kind: 'enemy', initiative: 9, hp: 20, maxHp: 30, conditions: [] },
@@ -67,9 +68,14 @@ const MAP: BattleView = {
   revision: 1,
 };
 
+const RULES: CombatRules = {
+  conditions: [{ id: 'prone', label: 'Prone' }],
+  durations: [{ id: 'until_removed', label: 'Until removed' }],
+};
+
 const OGRE_STATS: CombatantStats = {
   lines: [{ label: 'AC', value: '13' }],
-  actions: [{ name: 'Claw', text: '+5 to hit, 1d6+3 slashing' }],
+  actions: [{ name: 'Claw', text: '+5 to hit, 1d6+3 slashing', group: 'attack', groupLabel: 'Attacks', timing: 'own_turn' }],
 };
 
 interface Call {
@@ -92,6 +98,7 @@ function installServer(options: { battle: BattleView | null; stats?: Record<stri
       const method = init?.method ?? 'GET';
       const body = init?.body ? JSON.parse(String(init.body)) : undefined;
       calls.push({ url, method, body });
+      if (url === '/api/battle/rules') return json(RULES);
       if (url === '/api/battle/players')
         return json({ players: [{ name: 'Mira', ref: 'Players/Mira.md' }, { name: 'Tor', ref: 'Players/Tor.md' }] });
       if (url === '/api/battle' && (method === 'GET' || method === 'PUT')) return json(options.battle);
@@ -219,7 +226,58 @@ describe('Combat overlay', () => {
     expect(root.querySelector('.round')?.textContent).toContain('Round 2');
   });
 
-  it('moves a token from the tray onto the grid with a PUT that names the cell', async () => {
+  it('shows the newest notice of the combat on a strip under the title bar', async () => {
+    installServer({ battle: null });
+    const notices = [
+      { at: '2026-11-12T10:00:00Z', kind: 'defeated' as const, id: 'c-goblin', name: 'Goblin' },
+      { at: '2026-11-12T10:05:00Z', kind: 'unconscious' as const, id: 'c-mira', name: 'Mira' },
+    ];
+    TestBed.inject(CockpitService).session.set(session([], { ...COMBAT, notices }));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('.notice-strip .notice-text')?.textContent).toContain('Mira is unconscious');
+    expect(root.querySelector('.notice-list')).toBeNull();
+    root.querySelector<HTMLButtonElement>('.notice-toggle')!.click();
+    fixture.detectChanges();
+    const items = [...root.querySelectorAll('.notice-list li')].map((li) => li.textContent?.trim());
+    expect(items).toEqual(['Mira is unconscious', 'Goblin is defeated']);
+  });
+
+  it('announces only the notices that come after the overlay opened', async () => {
+    installServer({ battle: null });
+    const cockpit = TestBed.inject(CockpitService);
+    cockpit.session.set(session([], { ...COMBAT, notices: [{ at: '2026-11-12T10:00:00Z', kind: 'defeated', id: 'c-goblin', name: 'Goblin' }] }));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('.sr-only')?.textContent?.trim()).toBe('');
+
+    cockpit.session.set(session([], { ...COMBAT, notices: [
+      { at: '2026-11-12T10:00:00Z', kind: 'defeated', id: 'c-goblin', name: 'Goblin' },
+      { at: '2026-11-12T10:10:00Z', kind: 'turn', id: 'c-ogre', name: 'Ogre', round: 3, newRound: true },
+    ] }));
+    await settle(fixture);
+    expect(root.querySelector('.sr-only')?.textContent?.trim()).toBe("Round 3: Ogre's turn");
+  });
+
+  it('renders the turn panel while a combat is active', async () => {
+    installServer({ battle: null, stats: { 'c-ogre': OGRE_STATS } });
+    TestBed.inject(CockpitService).session.set(session([], COMBAT));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('cockpit-turn-panel')).not.toBeNull();
+    expect(root.querySelector('cockpit-turn-panel')?.textContent).toContain('Turn of Ogre');
+    expect(root.querySelector('cockpit-turn-panel')?.textContent).toContain('Claw');
+  });
+
+    it('moves a token from the tray onto the grid with a PUT that names the cell', async () => {
     const calls = installServer({ battle: MAP });
     TestBed.inject(PrefsService).setCampaign('test');
     TestBed.inject(CockpitService).session.set(session([], COMBAT));

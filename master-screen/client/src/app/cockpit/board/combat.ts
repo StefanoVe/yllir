@@ -1,5 +1,6 @@
 import { Component, computed, inject, input, output } from "@angular/core";
 import { Icon } from "../support/icon";
+import { ConfirmButton } from "../support/confirm-button";
 import { I18n } from "../../i18n";
 import type { Combat, CockpitAction } from "@shared/cockpit-types";
 export function nextCombatTurn(combat: Combat) {
@@ -15,7 +16,7 @@ export function nextCombatTurn(combat: Combat) {
 @Component({
   selector: "cockpit-combat",
   standalone: true,
-  imports: [Icon],
+  imports: [Icon, ConfirmButton],
   templateUrl: "./combat.html",
   styleUrl: "./combat.css",
 })
@@ -31,7 +32,6 @@ export class CombatView {
     this.action.emit({ type: "combat.turn", ...nextCombatTurn(this.combat()) });
   }
   end() {
-    if (confirm(this.i18n.t("liveAgent.combat.confirmEnd")))
-      this.action.emit({ type: "combat.end" });
+    this.action.emit({ type: "combat.end" });
   }
 }

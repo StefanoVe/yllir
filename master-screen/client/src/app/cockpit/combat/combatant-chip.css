@@ -23,6 +23,16 @@
   user-select: none;
 }
 
+.portrait {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
 .token[data-side="pc"] {
   background: var(--color-accent);
   color: var(--color-accent-contrast);

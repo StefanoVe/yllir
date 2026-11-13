@@ -6,10 +6,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { z } from 'zod';
-import type { BattleView, CombatState, CombatantStats, LivePlayer } from '../../../shared/src/types.js';
+import type { BattleView, CombatRules, CombatState, CombatantStats, LivePlayer } from '../../../shared/src/types.js';
 import { readCampaignConfig } from '../cockpit/campaign-config.js';
 import type { BattleMapOption, CockpitBattle, Detail } from '../cockpit/ports.js';
 import { campaignLanguage, type Lang } from '../chat/text.js';
+import { resolveReference } from '../cockpit/vendor/markdown-reference.js';
 import type { Ctx } from '../context.js';
 import { loadFrameworkModule } from '../engine.js';
 import { writeAtomic } from '../live/board.js';
@@ -23,6 +24,8 @@ import { referencesOf } from './refs.js';
 
 export const MAX_POSITIONS = 300;
 const MAP_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
+const IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif']);
+const IMAGE_REF = /!\[[^\]]*\]\(([^)]+)\)/g;
 const MASTER_BLOCK = /<!--\s*master\s*-->[\s\S]*?<!--\s*\/master\s*-->/g;
 const HEAD_BYTES = 8192;
 const SKIPPED_DIRS = new Set(['node_modules', 'dist', 'test-results']);
@@ -79,6 +82,8 @@ export interface BattleHost extends CockpitBattle {
   put(patch: BattlePatch): Promise<BattleView>;
   /** The tooltip of a combatant of the active combat, or null when there is no such combatant. */
   stats(combatantId: string): Promise<CombatantStats | null>;
+  /** Conditions and durations of the game system with labels in the campaign language; empty without an adapter. */
+  rules(): Promise<CombatRules>;
 }
 
 export interface BattleDeps {
@@ -176,10 +181,66 @@ async function mapCellsBySheet(root: string): Promise<Map<string, { cols: number
   return out;
 }
 
+type Timing = CombatantStats['actions'][number]['timing'];
+/** A label in both languages, as the adapter writes it. */
+type LabelRow = { it?: unknown; en?: unknown } | undefined;
+type ActionGroupRow = { id?: unknown; timing?: unknown; label?: LabelRow };
+
+/** The game system's adapter, with the fields the battle screen reads; the rest is kept as is. */
+type Adapter = {
+  creature_sheet?: { required?: Array<{ id?: unknown; label_it?: unknown; label_en?: unknown }> };
+  action_groups?: ActionGroupRow[];
+  condition_labels?: Record<string, LabelRow>;
+  duration_labels?: Record<string, LabelRow>;
+} & Record<string, unknown>;
+
 /** The game system's rules module and adapter, or nothing when the campaign has none or it cannot be loaded. */
 interface Rules {
-  adapter?: { creature_sheet?: { required?: Array<{ id?: unknown; label_it?: unknown; label_en?: unknown }> } } & Record<string, unknown>;
-  statSummary?: (adapter: unknown, markdown: string) => { lines: CombatantStats['lines']; actions: CombatantStats['actions'] };
+  adapter?: Adapter;
+  statSummary?: (
+    adapter: unknown,
+    markdown: string,
+  ) => { lines: CombatantStats['lines']; actions: Array<{ name: string; text: string; group?: string; timing?: string }> };
+}
+
+/** The label in the campaign language, then English, then the fallback (the id). */
+function labelIn(lang: Lang, row: LabelRow, fallback: string): string {
+  const pick = (value: unknown) => (typeof value === 'string' && value !== '' ? value : undefined);
+  return pick(row?.[lang]) ?? pick(row?.en) ?? fallback;
+}
+
+/** The label row of one id of an adapter's label map (own keys only). */
+function rowOf(labels: Record<string, LabelRow> | undefined, id: string): LabelRow {
+  return labels && Object.prototype.hasOwnProperty.call(labels, id) ? labels[id] : undefined;
+}
+
+function timingOf(value: unknown): Timing | undefined {
+  return value === 'own_turn' || value === 'any_turn' || value === 'others_turns' ? value : undefined;
+}
+
+/** One action of the summary with its group and timing; older adapters give neither, so: group "actions", timing own_turn. */
+export function actionOf(
+  lang: Lang,
+  rules: Rules,
+  action: { name: string; text: string; group?: string; timing?: string },
+): CombatantStats['actions'][number] {
+  const group = typeof action.group === 'string' && action.group !== '' ? action.group : 'actions';
+  const row = (rules.adapter?.action_groups ?? []).find((item) => item.id === group);
+  const timing = timingOf(action.timing) ?? timingOf(row?.timing) ?? 'own_turn';
+  return { name: action.name, text: action.text, group, groupLabel: labelIn(lang, row?.label, group), timing };
+}
+
+/**
+ * The first Markdown image of the public text, when it is a campaign file with an image extension.
+ * The reference is resolved from the sheet, the same way the cockpit resolves images of documents.
+ */
+export function imageOf(sheet: string, publicText: string): string | undefined {
+  const ref = [...publicText.matchAll(IMAGE_REF)]
+    .map((match) => resolveReference(sheet, match[1]!))
+    .find((item) => item !== null && !item.external);
+  if (!ref) return undefined;
+  if (!isCampaignRef(ref.path) || !IMAGE_EXTENSIONS.has(path.posix.extname(ref.path).toLowerCase())) return undefined;
+  return `/api/file?path=${encodeURIComponent(ref.path)}`;
 }
 
 async function loadRules(ctx: Ctx, root: string): Promise<Rules> {
@@ -364,15 +425,34 @@ export function createBattleHost(ctx: Ctx, deps: BattleDeps): BattleHost {
       const taken = new Set([labels.hp, labels.ac].map((label) => label.toLocaleLowerCase('it')));
       let sheetLines: CombatantStats['lines'] = [];
       let actions: CombatantStats['actions'] = [];
-      if (who.sheet && isCampaignRef(who.sheet) && rules.statSummary) {
+      let image: string | undefined;
+      if (who.sheet && isCampaignRef(who.sheet)) {
         const text = await fs.readFile(path.join(root, who.sheet), 'utf8').catch(() => null);
         if (text !== null) {
-          const summary = rules.statSummary(rules.adapter, publicPartOf(text));
-          sheetLines = summary.lines.filter((line) => !taken.has(line.label.toLocaleLowerCase('it')));
-          actions = summary.actions;
+          const visible = publicPartOf(text);
+          image = imageOf(who.sheet, visible);
+          if (rules.statSummary) {
+            const summary = rules.statSummary(rules.adapter, visible);
+            sheetLines = summary.lines.filter((line) => !taken.has(line.label.toLocaleLowerCase('it')));
+            actions = summary.actions.map((action) => actionOf(lang, rules, action));
+          }
         }
       }
-      return { lines: [...lines, ...sheetLines], actions };
+      return { lines: [...lines, ...sheetLines], actions, ...(image ? { image } : {}) };
+    },
+
+    async rules() {
+      const lang = campaignLanguage(root);
+      const { adapter } = await loadRules(ctx, root);
+      if (!adapter) return { conditions: [], durations: [] };
+      const named = (ids: unknown, labels: Record<string, LabelRow> | undefined) =>
+        (Array.isArray(ids) ? ids : []).flatMap((id) =>
+          typeof id === 'string' ? [{ id, label: labelIn(lang, rowOf(labels, id), id) }] : [],
+        );
+      return {
+        conditions: named(adapter.conditions, adapter.condition_labels),
+        durations: named(adapter.condition_durations, adapter.duration_labels),
+      };
     },
   };
   return host;

@@ -164,7 +164,20 @@ export interface Combatant {
   tempHp?: number;
   phase?: string;
   conditions: string[];
+  /** Conditions with their duration, as the framework keeps them. */
+  conditionDetails?: { id: string; duration?: string; rounds?: number }[];
   resources?: Record<string, number>;
+}
+
+/** Automatic changes made by the game system's rules, oldest first (last 20). */
+export interface CombatNotice {
+  at: string;
+  kind: "condition-ended" | "defeated" | "unconscious" | "turn";
+  id: string;
+  name: string;
+  condition?: string;
+  round?: number;
+  newRound?: boolean;
 }
 
 export interface Combat {
@@ -175,6 +188,8 @@ export interface Combat {
   notes: string;
   /** The combat thread (the fight's own chat), once its chat has started. */
   threadId?: string;
+  /** Automatic changes made by the game system's rules, oldest first (last 20). */
+  notices: CombatNotice[];
 }
 
 // ───────────────────────────── State ─────────────────────────────
@@ -306,7 +321,15 @@ export type CockpitAction =
   | { type: "combat.remove"; id: string }
   | { type: "combat.turn"; activeId: string | null; round?: number }
   | { type: "combat.notes"; notes: string }
-  | { type: "combat.end" };
+  | { type: "combat.end" }
+  | {
+      type: "combat.condition";
+      id: string;
+      condition: string;
+      remove?: boolean;
+      duration?: string;
+      rounds?: number;
+    };
 
 /** Compact, human-readable record of an applied action (chat chips, history). */
 export interface ActionSummary {

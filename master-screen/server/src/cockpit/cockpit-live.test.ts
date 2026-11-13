@@ -4,7 +4,9 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { CockpitStore, StoreError } from "./store.js";
-import { CockpitLive } from "./live.js";
+import { CockpitLive, combatOf } from "./live.js";
+import type { FrameworkCombatState } from "./framework.js";
+import { parseAction } from "./actions.js";
 import { createFakeFramework } from "./test-helpers/fake-framework.js";
 import type { CockpitAction } from "../../../shared/src/cockpit-types.js";
 
@@ -161,4 +163,97 @@ test("the board and the ledger of one agent turn share one undo group", async ()
   );
   expect(second.group.id).toBe(first.group.id);
   expect(second.group.actions.map((a) => a.type)).toEqual(["ledger.add", "position.set"]);
+});
+
+test("combat: notices come from the rule events (last 20, oldest first); condition details keep duration and rounds", () => {
+  const events: FrameworkCombatState["events"] = [
+    { at: "t0", text: "Inizio" },
+    ...Array.from({ length: 22 }, (_, i) => ({
+      at: `t${i + 1}`,
+      text: "Turno",
+      notice: { kind: "turn" as const, id: "c-1", name: "Ada", round: 1, newRound: i === 0 },
+    })),
+    { at: "t23", text: "Ogre a terra: fine", notice: { kind: "condition-ended", id: "c-2", name: "Ogre", condition: "prone" } },
+    { at: "t24", text: "Ogre caduto", notice: { kind: "defeated", id: "c-2", name: "Ogre" } },
+    { at: "t25", text: "Fine" },
+  ];
+  const state: FrameworkCombatState = {
+    active: true,
+    round: 1,
+    turn: 1,
+    order: ["c-1", "c-2"],
+    combatants: [
+      { id: "c-1", name: "Ada", side: "pc", initiative: 14, conditions: [], resources: {} },
+      {
+        id: "c-2",
+        name: "Ogre",
+        side: "enemy",
+        initiative: 9,
+        hp: 0,
+        conditions: [{ id: "blinded" }, { id: "prone", duration: "until_removed" }, { id: "stunned", duration: "rounds", rounds: 2 }],
+        resources: {},
+      },
+    ],
+    events,
+    revision: 30,
+  };
+  const combat = combatOf(state, null);
+  expect(combat.notices).toHaveLength(20);
+  expect(combat.notices[0]).toEqual({ at: "t5", kind: "turn", id: "c-1", name: "Ada", round: 1, newRound: false });
+  expect(combat.notices[18]).toEqual({ at: "t23", kind: "condition-ended", id: "c-2", name: "Ogre", condition: "prone" });
+  expect(combat.notices[19]).toEqual({ at: "t24", kind: "defeated", id: "c-2", name: "Ogre" });
+
+  const ogre = combat.participants[1]!;
+  expect(ogre.conditions).toEqual(["blinded", "prone", "stunned"]);
+  expect(ogre.conditionDetails).toEqual([
+    { id: "blinded" },
+    { id: "prone", duration: "until_removed" },
+    { id: "stunned", duration: "rounds", rounds: 2 },
+  ]);
+  expect(combatOf({ ...state, events: [{ at: "t0", text: "solo testo" }] }, null).notices).toEqual([]);
+});
+
+test("combat.condition adds and removes a condition through the framework; players and rounds without rounds are refused", async () => {
+  const h = await setup();
+  await h.run({
+    type: "combat.start",
+    title: "Porto",
+    participants: [
+      { name: "Ada", kind: "pc", initiative: 10, conditions: [] },
+      { name: "Guardia", kind: "enemy", initiative: 14, hp: 20, maxHp: 20, conditions: [] },
+    ],
+  });
+  const combat = (await h.state()).combat!;
+  const guard = combat.participants.find((p) => p.name === "Guardia")!.id;
+  const ada = combat.participants.find((p) => p.name === "Ada")!.id;
+
+  const added = await h.run({ type: "combat.condition", id: guard, condition: "prone" });
+  expect(added.group.actions.at(-1)).toMatchObject({ type: "combat.condition", label: "Condizione · Guardia", targetId: guard });
+  expect((await h.state()).combat!.participants.find((p) => p.id === guard)!.conditions).toEqual(["prone"]);
+
+  await h.run({ type: "combat.condition", id: guard, condition: "stunned", duration: "rounds", rounds: 2 });
+  const stunned = (await h.state()).combat!.participants.find((p) => p.id === guard)!;
+  expect(stunned.conditionDetails!.at(-1)).toEqual({ id: "stunned", duration: "rounds", rounds: 2 });
+
+  await h.run({ type: "combat.condition", id: guard, condition: "prone", remove: true });
+  expect((await h.state()).combat!.participants.find((p) => p.id === guard)!.conditions).toEqual(["stunned"]);
+
+  await expect(
+    h.run({ type: "combat.condition", id: ada, condition: "prone" }),
+  ).rejects.toThrow("solo nome, iniziativa e posizione");
+  await expect(
+    h.run({ type: "combat.condition", id: guard, condition: "blinded", rounds: 2 }),
+  ).rejects.toMatchObject({ status: 400, message: "I round valgono solo con la durata in round" });
+  await expect(
+    h.run({ type: "combat.condition", id: "c-999", condition: "prone" }),
+  ).rejects.toMatchObject({ status: 404 });
+});
+
+test("combat.condition is a strict action: unknown fields and empty conditions are refused", () => {
+  expect(() => parseAction({ type: "combat.condition", id: "c-1", condition: "prone", extra: true })).toThrow();
+  expect(() => parseAction({ type: "combat.condition", id: "c-1", condition: "" })).toThrow();
+  expect(parseAction({ type: "combat.condition", id: "c-1", condition: "prone", duration: "rounds", rounds: 3 })).toMatchObject({
+    type: "combat.condition",
+    rounds: 3,
+  });
 });

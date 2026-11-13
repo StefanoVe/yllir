@@ -1,6 +1,10 @@
 <div class="row" [class.active]="active()" [class.defeated]="defeated()">
   <div class="head">
+    @if (portrait(); as src) {
+    <img class="row-portrait" [attr.src]="src" alt="" draggable="false" (error)="portraitFailed.set(src)" />
+    } @else {
     <cockpit-combatant-chip [combatant]="combatant()" [active]="active()" />
+    }
     <span class="row-name">{{ combatant().name }}</span>
     <span class="row-meta">{{ i18n.t("combat.stats.initiative") }} {{ combatant().initiative ?? "—" }}</span>
   </div>
@@ -10,8 +14,18 @@
     @if (combatant().hp !== undefined || combatant().maxHp !== undefined) {
     <span class="hp">{{ hpText() }}</span>
     }
-    @for (condition of combatant().conditions; track $index) {
-    <span class="pill">{{ condition }}</span>
+    @for (pill of pills(); track pill.id) {
+    <span class="pill">
+      <span>{{ pill.text }}</span>
+      <button
+        type="button"
+        class="pill-remove"
+        [attr.aria-label]="i18n.t('combat.condition.remove', { label: pill.label })"
+        (click)="removeCondition(pill.id)"
+      >
+        <ui-icon name="x" [size]="12" />
+      </button>
+    </span>
     }
     @if (combatant().phase) {
     <span class="phase">{{ combatant().phase }}</span>
@@ -76,24 +90,64 @@
     >
       <ui-icon name="plus" [size]="16" />
     </button>
+    <ui-confirm-button
+      icon="enemy"
+      [label]="i18n.t('combat.defeat')"
+      [confirmLabel]="i18n.t('combat.defeatConfirmShort')"
+      (confirmed)="defeat()"
+    />
+    <ui-confirm-button
+      icon="trash"
+      [label]="i18n.t('combat.remove')"
+      [confirmLabel]="i18n.t('combat.removeConfirmShort')"
+      (confirmed)="remove()"
+    />
+  </div>
+
+  <div class="add-condition" role="group" [attr.aria-label]="i18n.t('combat.condition.add')">
+    @if (addable().length) {
+    <select
+      class="select"
+      [attr.aria-label]="i18n.t('combat.condition.pick')"
+      (change)="pickCondition($event)"
+    >
+      @for (c of addable(); track c.id) {
+      <option [value]="c.id" [selected]="c.id === conditionChoice()">{{ c.label }}</option>
+      }
+    </select>
+    @if (durations().length) {
+    <select
+      class="select"
+      [attr.aria-label]="i18n.t('combat.condition.duration')"
+      (change)="pickDuration($event)"
+    >
+      @for (d of durations(); track d.id) {
+      <option [value]="d.id" [selected]="d.id === durationChoice()">{{ d.label }}</option>
+      }
+    </select>
+    }
+    @if (roundsChosen()) {
+    <input
+      type="number"
+      class="rounds"
+      min="1"
+      step="1"
+      [attr.aria-label]="i18n.t('combat.condition.roundsInput')"
+      [value]="newRounds()"
+      (input)="pickRounds($event)"
+    />
+    }
     <button
       type="button"
-      class="icon-button"
-      [attr.title]="i18n.t('combat.defeat')"
-      [attr.aria-label]="i18n.t('combat.defeat')"
-      (click)="defeat()"
+      class="text-button"
+      [disabled]="!conditionChoice()"
+      (click)="addCondition()"
     >
-      <ui-icon name="enemy" [size]="16" />
+      {{ i18n.t("combat.condition.add") }}
     </button>
-    <button
-      type="button"
-      class="icon-button"
-      [attr.title]="i18n.t('combat.remove')"
-      [attr.aria-label]="i18n.t('combat.remove')"
-      (click)="remove()"
-    >
-      <ui-icon name="trash" [size]="16" />
-    </button>
+    } @else if (rules()) {
+    <p class="muted">{{ i18n.t("combat.condition.none") }}</p>
+    }
   </div>
   @if (error()) {
   <p class="alert" role="alert">{{ error() }}</p>

@@ -1,7 +1,7 @@
 // The only way the cockpit reaches the rest of the server. The host implements these
 // ports (fake-ports.ts for now). Shapes are copied from the prototype's archive, maps,
 // images, music and plot modules: only the members the cockpit actually uses.
-import type { BattleView } from "../../../shared/src/types.js";
+import type { BattleView, CombatRules } from "../../../shared/src/types.js";
 
 export interface Heading {
   id: string;
@@ -194,6 +194,8 @@ export interface CockpitBattle {
   setMap(map: { ref: string; cols?: number; rows?: number }): Promise<BattleView>;
   /** Moves one chip (combatant id) to a cell. */
   move(id: string, x: number, y: number): Promise<BattleView>;
+  /** Condition and duration labels of the game system, in the campaign language. */
+  rules?(): Promise<CombatRules>;
 }
 
 export interface CockpitPorts {

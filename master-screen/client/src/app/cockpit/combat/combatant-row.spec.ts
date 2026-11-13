@@ -1,17 +1,28 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { CombatantStats } from '@shared/types';
+import type { CombatantStats, CombatRules } from '@shared/types';
 import type { Combatant, CockpitSessionView } from '@shared/cockpit-types';
 import { CockpitService } from '../cockpit.service';
 import { CombatantRow, hpAfterDamage, hpAfterHeal, parseAmount } from './combatant-row';
 
 const OGRE_STATS: CombatantStats = {
   lines: [{ label: 'AC', value: '13' }],
-  actions: [{ name: 'Claw', text: '+5 to hit, 1d6+3 slashing' }],
+  actions: [{ name: 'Claw', text: '+5 to hit, 1d6+3 slashing', group: 'attack', groupLabel: 'Attacks', timing: 'own_turn' }],
 };
 
 const OGRE: Combatant = { id: 'c-ogre', name: 'Ogre', kind: 'enemy', initiative: 9, hp: 20, maxHp: 30, conditions: ['Prone'], phase: 'Enraged' };
 const MIRA: Combatant = { id: 'c-mira', name: 'Mira', kind: 'pc', initiative: 14, conditions: [] };
+
+const RULES: CombatRules = {
+  conditions: [
+    { id: 'prone', label: 'Prone' },
+    { id: 'stunned', label: 'Stunned' },
+  ],
+  durations: [
+    { id: 'rounds', label: 'Rounds' },
+    { id: 'until_removed', label: 'Until removed' },
+  ],
+};
 
 function session(): CockpitSessionView {
   return {
@@ -42,7 +53,7 @@ interface Call {
 }
 
 /** Records every request; the stats endpoint answers with the Ogre's sheet. */
-function installServer(): Call[] {
+function installServer(stats: CombatantStats = OGRE_STATS): Call[] {
   const calls: Call[] = [];
   vi.stubGlobal(
     'fetch',
@@ -51,7 +62,7 @@ function installServer(): Call[] {
       const method = init?.method ?? 'GET';
       const body = init?.body ? JSON.parse(String(init.body)) : undefined;
       calls.push({ url, method, body });
-      const payload = url.startsWith('/api/battle/stats/') ? OGRE_STATS : {};
+      const payload = url.startsWith('/api/battle/stats/') ? stats : {};
       return Promise.resolve(new Response(JSON.stringify(payload), { status: 200, headers: { 'content-type': 'application/json' } }));
     }),
   );
@@ -77,11 +88,23 @@ describe('CombatantRow', () => {
     vi.unstubAllGlobals();
   });
 
-  function create(combatant: Combatant) {
+  function create(combatant: Combatant, rules: CombatRules | null = RULES) {
     const fixture = TestBed.createComponent(CombatantRow);
     fixture.componentRef.setInput('combatant', combatant);
+    fixture.componentRef.setInput('rules', rules);
     fixture.detectChanges();
     return fixture;
+  }
+
+  function setSelect(root: HTMLElement, label: string, value: string, fixture: ComponentFixture<CombatantRow>) {
+    const select = root.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
+    select.value = value;
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  function sentActions(calls: Call[]) {
+    return calls.filter((call) => call.method === 'POST').map((call) => (call.body as { actions: unknown[] }).actions);
   }
 
   it('shows the stats and every attack of an enemy without a hover', async () => {
@@ -171,6 +194,99 @@ describe('CombatantRow', () => {
     await settle(fixture);
     const root = fixture.nativeElement as HTMLElement;
     expect(root.querySelector('.row')?.classList.contains('defeated')).toBe(true);
+  });
+
+  it('shows the label and the duration of each condition from the rules', async () => {
+    installServer();
+    const fixture = create({
+      ...OGRE,
+      conditions: ['prone'],
+      conditionDetails: [{ id: 'prone', duration: 'rounds', rounds: 2 }],
+    });
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const pill = root.querySelector('.pill')?.textContent ?? '';
+    expect(pill).toContain('Prone');
+    expect(pill).toContain('Rounds');
+    expect(pill).toContain('2 round');
+  });
+
+  it('removes a condition with a remove action when its × is pressed', async () => {
+    const calls = installServer();
+    const fixture = create({ ...OGRE, conditions: ['prone'] });
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    root.querySelector<HTMLButtonElement>('button[aria-label="Remove Prone"]')!.click();
+    await settle(fixture);
+
+    expect(sentActions(calls)).toEqual([[{ type: 'combat.condition', id: 'c-ogre', condition: 'prone', remove: true }]]);
+  });
+
+  it('adds a condition with the default duration until it is removed', async () => {
+    const calls = installServer();
+    const fixture = create(OGRE);
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const add = root.querySelector<HTMLButtonElement>('button.text-button')!;
+    expect(add.disabled).toBe(false);
+    add.click();
+    await settle(fixture);
+
+    expect(sentActions(calls)).toEqual([[{ type: 'combat.condition', id: 'c-ogre', condition: 'prone', duration: 'until_removed' }]]);
+  });
+
+  it('offers only the conditions the combatant does not have yet', async () => {
+    installServer();
+    const fixture = create({ ...OGRE, conditions: ['prone'] });
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const options = [...root.querySelectorAll<HTMLOptionElement>('select[aria-label="Condition to add"] option')];
+    expect(options.map((option) => option.value)).toEqual(['stunned']);
+  });
+
+  it('adds a condition with its rounds only for the rounds duration', async () => {
+    const calls = installServer();
+    const fixture = create(OGRE);
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    setSelect(root, 'Condition to add', 'stunned', fixture);
+    setSelect(root, 'Duration', 'rounds', fixture);
+    const rounds = root.querySelector<HTMLInputElement>('input.rounds')!;
+    rounds.value = '3';
+    rounds.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    root.querySelector<HTMLButtonElement>('button.text-button')!.click();
+    await settle(fixture);
+
+    expect(sentActions(calls)).toEqual([
+      [{ type: 'combat.condition', id: 'c-ogre', condition: 'stunned', duration: 'rounds', rounds: 3 }],
+    ]);
+  });
+
+  it('hides the rounds input for a duration without rounds', async () => {
+    installServer();
+    const fixture = create(OGRE);
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('input.rounds')).toBeNull();
+    setSelect(root, 'Duration', 'rounds', fixture);
+    expect(root.querySelector('input.rounds')).not.toBeNull();
+  });
+
+  it('shows the portrait of the sheet in place of the chip when the stats have artwork', async () => {
+    installServer({ ...OGRE_STATS, image: '/api/file?path=Enemies%2Fogre.png' });
+    const fixture = create(OGRE);
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const portrait = root.querySelector<HTMLImageElement>('img.row-portrait');
+    expect(portrait?.getAttribute('src')).toBe('/api/file?path=Enemies%2Fogre.png');
+    expect(root.querySelector('cockpit-combatant-chip')).toBeNull();
   });
 });
 

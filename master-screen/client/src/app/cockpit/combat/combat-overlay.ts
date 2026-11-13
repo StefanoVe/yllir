@@ -8,9 +8,10 @@ import {
   signal,
   untracked,
 } from "@angular/core";
-import type { BattleView, LivePlayer } from "@shared/types";
-import type { SourceRef } from "@shared/cockpit-types";
+import type { BattleView, CombatRules, LivePlayer } from "@shared/types";
+import type { CombatNotice, SourceRef } from "@shared/cockpit-types";
 import { Icon } from "../support/icon";
+import { ConfirmButton } from "../support/confirm-button";
 import { CockpitService } from "../cockpit.service";
 import { OverlayService } from "../support/overlay.service";
 import { Chat } from "../chat/chat";
@@ -20,7 +21,7 @@ import { BattleApi } from "./battle-api";
 import { BattleMapPrefs } from "./battle-maps-pref";
 import { CombatOverlayService } from "./combat-overlay.service";
 import { CombatChatService } from "./combat-chat.service";
-import { fightCards, nextTurnId } from "./combat-model";
+import { fightCards, nextTurnId, noticeText } from "./combat-model";
 import { InitiativeStep } from "./initiative-step";
 import { BattleBoard } from "./battle-board";
 
@@ -30,7 +31,7 @@ import { BattleBoard } from "./battle-board";
  */
 @Component({
   selector: "cockpit-combat-overlay",
-  imports: [Icon, Chat, InitiativeStep, BattleBoard],
+  imports: [Icon, ConfirmButton, Chat, InitiativeStep, BattleBoard],
   templateUrl: "./combat-overlay.html",
   styleUrl: "./combat-overlay.css",
   providers: [CombatChatService, { provide: ChatSource, useExisting: CombatChatService }],
@@ -47,8 +48,12 @@ export class CombatOverlay implements OnDestroy {
   private ensuring = false;
   readonly players = signal<LivePlayer[]>([]);
   readonly battle = signal<BattleView | null>(null);
+  readonly rules = signal<CombatRules | null>(null);
   readonly error = signal("");
   readonly chatOpen = signal(true);
+  readonly noticesOpen = signal(false);
+  /** The `at` of the newest notice when the overlay opened: only later notices are announced. */
+  private readonly noticeMark = signal("");
   readonly combat = computed(() => this.api.session()?.state.combat ?? null);
   readonly cards = computed(() =>
     fightCards(this.api.session()?.state.board.modules ?? []),
@@ -57,6 +62,14 @@ export class CombatOverlay implements OnDestroy {
   readonly nextId = computed(() => {
     const c = this.combat();
     return c ? nextTurnId(c.participants, c.activeId) : null;
+  });
+  readonly newest = computed<CombatNotice | null>(() => this.combat()?.notices.at(-1) ?? null);
+  /** The last ten notices, newest first. */
+  readonly recentNotices = computed(() => [...(this.combat()?.notices ?? [])].reverse().slice(0, 10));
+  /** The newest notice, only when it came after the overlay opened. */
+  readonly announced = computed(() => {
+    const n = this.newest();
+    return n && n.at > this.noticeMark() ? this.noticeLine(n) : "";
   });
   readonly title = computed(() => {
     const combat = this.combat();
@@ -91,6 +104,12 @@ export class CombatOverlay implements OnDestroy {
           this.combatChat
             .bind(tableId, threadId)
             .catch((error: unknown) => this.error.set(String(error)));
+      });
+    });
+    effect(() => {
+      const open = this.svc.open();
+      untracked(() => {
+        if (open) this.noticeMark.set(this.newest()?.at ?? "");
       });
     });
     // Opening the overlay or any cockpit state change (also one that keeps the revision, such
@@ -131,13 +150,20 @@ export class CombatOverlay implements OnDestroy {
     this.svc.close();
   }
 
+  /** A notice as a sentence in the campaign language. */
+  noticeLine(notice: CombatNotice): string {
+    return noticeText(notice, this.rules(), (key, params) => this.i18n.t(key, params));
+  }
+
   async load(): Promise<void> {
-    const [players, battle] = await Promise.allSettled([
+    const [players, battle, rules] = await Promise.allSettled([
       this.battleApi.players(),
       this.battleApi.battle(),
+      this.battleApi.rules(),
     ]);
     if (players.status === "fulfilled") this.players.set(players.value);
     if (battle.status === "fulfilled") this.battle.set(battle.value);
+    if (rules.status === "fulfilled") this.rules.set(rules.value);
     this.error.set(
       players.status === "rejected" || battle.status === "rejected"
         ? this.i18n.t("combat.error.load")
@@ -157,7 +183,6 @@ export class CombatOverlay implements OnDestroy {
   }
 
   async endCombat(): Promise<void> {
-    if (!confirm(this.i18n.t("combat.endConfirm"))) return;
     try {
       await this.api.action({ type: "combat.end" });
     } catch {

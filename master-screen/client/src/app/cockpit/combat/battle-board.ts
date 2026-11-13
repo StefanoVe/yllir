@@ -10,13 +10,14 @@ import {
   untracked,
   viewChild,
 } from "@angular/core";
-import type { BattleView } from "@shared/types";
+import type { BattleView, CombatRules } from "@shared/types";
 import type { Combatant } from "@shared/cockpit-types";
 import { Icon } from "../support/icon";
 import { DocumentsService } from "../support/documents.service";
 import { I18n } from "../../i18n";
 import { CombatantChip } from "./combatant-chip";
 import { CombatantRow } from "./combatant-row";
+import { TurnPanel } from "./turn-panel";
 import {
   type Cell,
   byInitiative,
@@ -36,13 +37,14 @@ interface Drag {
 }
 
 /**
- * The battle view: the battle map with a grid and draggable chips, or the combatants in
- * initiative order when there is no map or the preference is off. Chips move by drag and
- * drop or with the arrow keys (grid only); every move is saved with PUT /api/battle.
+ * The battle view: the turn panel, then the battle map with a grid and draggable chips (the
+ * panel beside it on wide screens), or the combatants in initiative order when there is no map
+ * or the preference is off. Chips move by drag and drop or with the arrow keys (grid only);
+ * every move is saved with PUT /api/battle.
  */
 @Component({
   selector: "cockpit-battle-board",
-  imports: [Icon, CombatantChip, CombatantRow],
+  imports: [Icon, CombatantChip, CombatantRow, TurnPanel],
   templateUrl: "./battle-board.html",
   styleUrl: "./battle-board.css",
 })
@@ -54,6 +56,7 @@ export class BattleBoard {
   battle = input<BattleView | null>(null);
   showMaps = input(true);
   activeId = input<string | null>(null);
+  rules = input<CombatRules | null>(null);
   findMap = output<void>();
   readonly positions = signal<Record<string, Cell>>({});
   readonly moveError = signal("");

@@ -267,6 +267,16 @@ export const actionSchema = z.discriminatedUnion("type", [
     .object({ type: z.literal("combat.notes"), notes: z.string().max(4000) })
     .strict(),
   z.object({ type: z.literal("combat.end") }).strict(),
+  z
+    .object({
+      type: z.literal("combat.condition"),
+      id,
+      condition: z.string().min(1).max(80),
+      remove: z.boolean().optional(),
+      duration: z.string().min(1).max(40).optional(),
+      rounds: z.number().int().min(1).max(1000).optional(),
+    })
+    .strict(),
 ]);
 
 export class ActionError extends Error {
@@ -745,6 +755,7 @@ function applyRecordAction(
     case "combat.turn":
     case "combat.notes":
     case "combat.end":
+    case "combat.condition":
       // The ledger and the combat live in the framework libraries: see live.ts.
       throw new ActionError("Azione gestita dal registro della sessione live");
   }

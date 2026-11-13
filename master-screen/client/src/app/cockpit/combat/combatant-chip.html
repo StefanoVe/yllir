@@ -10,7 +10,11 @@
   (focus)="show()"
   (blur)="hide()"
 >
+  @if (showImage()) {
+  <img class="portrait" [attr.src]="image()" alt="" draggable="false" (error)="failedImage.set(image())" />
+  } @else {
   <span class="initials" aria-hidden="true">{{ initials() }}</span>
+  }
   @if (!isPc() && hp() !== null) {
   <span class="hp" aria-hidden="true"><span class="hp-fill" [style.width.%]="hp()"></span></span>
   }

@@ -874,3 +874,36 @@ test("sheet_create scrive la scheda, la mostra e sheet_update la riscrive", asyn
   expect(locked.isError).toBe(true);
   await h.close();
 });
+
+test("combat_condition: il partecipante si trova per nome; ogni risultato di combattimento riporta solo gli avvisi nuovi", async () => {
+  const h = await setup(new Map());
+  await h.call("combat_start", {
+    title: "Porto",
+    participants: [
+      { name: "Custode", kind: "enemy", initiative: 12, hp: 5, maxHp: 20 },
+      { name: "Ada", kind: "pc", initiative: 10 },
+    ],
+  });
+  const added = h.json(await h.call("combat_condition", { participant: "custode", condition: "prone" }));
+  expect(added.participant.conditions).toEqual(["prone"]);
+  expect(added.notices).toEqual([]);
+  const id = added.participant.id as string;
+
+  // Damage that takes the creature to 0 hp: the result carries the defeat, once.
+  const hurt = h.json(await h.call("combat_update", { id, patch: { hp: 0 } }));
+  expect(hurt.notices.map((n: { kind: string; name: string }) => [n.kind, n.name])).toEqual([["defeated", "Custode"]]);
+  const turn = h.json(await h.call("combat_turn", { activeId: id }));
+  expect(turn.notices).toEqual([]);
+
+  const removed = h.json(await h.call("combat_condition", { participant: id, condition: "prone", remove: true }));
+  expect(removed.participant.conditions).toEqual([]);
+  expect(removed.notices).toEqual([]);
+
+  expect((await h.call("combat_condition", { participant: "Ada", condition: "prone" })).isError).toBe(true);
+  expect((await h.call("combat_condition", { participant: "Nessuno", condition: "prone" })).isError).toBe(true);
+  expect((await h.call("combat_condition", { participant: id, condition: "prone", rounds: 2 })).isError).toBe(true);
+  const ended = h.json(await h.call("combat_end", {}));
+  expect(ended.notices).toEqual([]);
+  await h.close();
+});
+

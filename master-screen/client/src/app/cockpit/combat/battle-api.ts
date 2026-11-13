@@ -1,5 +1,10 @@
 import { Injectable } from "@angular/core";
-import type { BattleView, CombatantStats, LivePlayer } from "@shared/types";
+import type {
+  BattleView,
+  CombatantStats,
+  CombatRules,
+  LivePlayer,
+} from "@shared/types";
 import type { Cell } from "./combat-model";
 
 /** Client of the battle endpoints (`/api/battle/*`). Stats are cached per combatant until its hit points change. */
@@ -9,6 +14,7 @@ export class BattleApi {
     string,
     { key: string; value: Promise<CombatantStats> }
   >();
+  private rulesCache: Promise<CombatRules> | null = null;
 
   async players(): Promise<LivePlayer[]> {
     const value = await this.request<{ players: LivePlayer[] }>(
@@ -43,6 +49,18 @@ export class BattleApi {
         this.statsCache.delete(combatantId);
     });
     return value;
+  }
+
+  /** Conditions and durations of the game system. Fetched once; a failed request is fetched again. */
+  rules(): Promise<CombatRules> {
+    if (!this.rulesCache) {
+      const value = this.request<CombatRules>("/api/battle/rules");
+      this.rulesCache = value;
+      value.catch(() => {
+        if (this.rulesCache === value) this.rulesCache = null;
+      });
+    }
+    return this.rulesCache;
   }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {

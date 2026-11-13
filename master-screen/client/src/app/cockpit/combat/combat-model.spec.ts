@@ -4,14 +4,18 @@ import {
   buildCombatStart,
   byInitiative,
   cellAt,
+  conditionSummary,
   fightCards,
+  groupActions,
   hpPercent,
   nextTurnId,
   initials,
+  noticeText,
   parseInitiative,
   percentAt,
   stepCell,
 } from './combat-model';
+import { DICTIONARIES, lookup, type TranslationKey, type TranslationParams } from '../../i18n';
 
 describe('combat model', () => {
   it('reads an empty initiative as not rolled and accepts a decimal comma', () => {
@@ -139,5 +143,42 @@ describe('nextTurnId', () => {
   it('returns null when nobody can take the turn', () => {
     expect(nextTurnId([], null)).toBeNull();
     expect(nextTurnId([foe('ogre', 9, 0), foe('imp', 5, 0)], null)).toBeNull();
+  });
+});
+
+describe('notices and conditions', () => {
+  const t = (key: TranslationKey, params?: TranslationParams) => lookup(DICTIONARIES, 'en', key, params);
+  const rules = {
+    conditions: [{ id: 'prone', label: 'Prone' }, { id: 'stunned', label: 'Stunned' }],
+    durations: [{ id: 'until_removed', label: 'Until removed' }, { id: 'rounds', label: 'Rounds' }],
+  };
+  const at = '2026-11-13T10:00:00Z';
+
+  it('writes each kind of notice as a sentence, with the condition label', () => {
+    expect(noticeText({ at, kind: 'condition-ended', id: 'c-ogre', name: 'Ogre', condition: 'prone' }, rules, t)).toBe('Ogre: Prone ends');
+    expect(noticeText({ at, kind: 'defeated', id: 'c-ogre', name: 'Ogre' }, rules, t)).toBe('Ogre is defeated');
+    expect(noticeText({ at, kind: 'unconscious', id: 'c-mira', name: 'Mira' }, rules, t)).toBe('Mira is unconscious');
+    expect(noticeText({ at, kind: 'turn', id: 'c-ogre', name: 'Ogre' }, rules, t)).toBe("It is Ogre's turn");
+    expect(noticeText({ at, kind: 'turn', id: 'c-ogre', name: 'Ogre', round: 3, newRound: true }, rules, t)).toBe("Round 3: Ogre's turn");
+  });
+
+  it('falls back to the condition id when the rules do not name it', () => {
+    expect(noticeText({ at, kind: 'condition-ended', id: 'c-ogre', name: 'Ogre', condition: 'Blessed' }, null, t)).toBe('Ogre: Blessed ends');
+  });
+
+  it('summarises a condition with its duration and rounds', () => {
+    expect(conditionSummary('prone', { duration: 'until_removed' }, rules, t)).toBe('Prone · Until removed');
+    expect(conditionSummary('stunned', { duration: 'rounds', rounds: 2 }, rules, t)).toBe('Stunned · Rounds · 2 round');
+    expect(conditionSummary('prone', undefined, null, t)).toBe('prone');
+  });
+
+  it('groups actions by group label in first-appearance order', () => {
+    const groups = groupActions([
+      { name: 'a', groupLabel: 'Attacks' },
+      { name: 'b', groupLabel: 'Reactions' },
+      { name: 'c', groupLabel: 'Attacks' },
+    ]);
+    expect(groups.map((g) => g.label)).toEqual(['Attacks', 'Reactions']);
+    expect(groups[0]!.actions.map((a) => a.name)).toEqual(['a', 'c']);
   });
 });

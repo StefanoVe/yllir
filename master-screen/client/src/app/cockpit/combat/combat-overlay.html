@@ -18,15 +18,13 @@
     }
     <span class="spacer"></span>
     @if (combat()) {
-    <button
-      type="button"
-      class="icon-button"
-      [attr.title]="i18n.t('combat.end')"
-      [attr.aria-label]="i18n.t('combat.end')"
-      (click)="endCombat()"
-    >
-      <ui-icon name="stop" [size]="18" />
-    </button>
+    <ui-confirm-button
+      icon="stop"
+      [size]="18"
+      [label]="i18n.t('combat.end')"
+      [confirmLabel]="i18n.t('combat.endConfirmShort')"
+      (confirmed)="endCombat()"
+    />
     }
     <button
       type="button"
@@ -39,6 +37,30 @@
     </button>
   </header>
 
+  @if (combat(); as c) { @if (newest(); as n) {
+  <div class="notice-strip">
+    <button
+      type="button"
+      class="notice-toggle"
+      [attr.aria-expanded]="noticesOpen()"
+      [attr.title]="i18n.t('combat.notice.list')"
+      (click)="noticesOpen.set(!noticesOpen())"
+    >
+      <ui-icon name="flag" [size]="14" />
+      <span class="notice-text">{{ noticeLine(n) }}</span>
+      <ui-icon [name]="noticesOpen() ? 'up' : 'down'" [size]="14" />
+    </button>
+    <span class="sr-only" aria-live="polite">{{ announced() }}</span>
+    @if (noticesOpen()) {
+    <ol class="notice-list" [attr.aria-label]="i18n.t('combat.notice.list')">
+      @for (item of recentNotices(); track $index) {
+      <li>{{ noticeLine(item) }}</li>
+      }
+    </ol>
+    }
+  </div>
+  } }
+
   <div class="stage">
     <main class="body" [class.with-chat]="chatOpen()">
       @if (error()) {
@@ -50,6 +72,7 @@
         [battle]="battle()"
         [showMaps]="prefs.showMaps()"
         [activeId]="c.activeId"
+        [rules]="rules()"
         (findMap)="findMap()"
       />
       } @else {

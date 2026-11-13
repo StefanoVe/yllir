@@ -5,6 +5,7 @@ import type {
   CockpitState,
 } from "../../../shared/src/cockpit-types.js";
 import type { Resolver } from "./view.js";
+import type { CombatRules } from "../../../shared/src/types.js";
 
 const LANGUAGE_NAMES: Record<string, string> = {
   it: "Italian",
@@ -78,6 +79,7 @@ export function buildCombatSystemPrompt(opts: {
     opts.systemName ? `The game system is ${opts.systemName}.` : "",
     `Reply to the master in ${language}.`,
     `Combat rules: use only data from the sheets of the combatants or from the master's declarations. For player characters record only name, initiative and position: no hit points, conditions, resources or actions. Do not advance the turn with combat_turn until the master explicitly orders it. Enemy hit points, conditions and resources change only on the master's declaration. Use the combatant ids of the COMBAT line of the digest. When the master names a combatant with a misspelled or partial name, match it to the COMBAT line; if two match, ask.`,
+    `Conditions: add or remove them only with combat_condition, using the ids of the CONDITIONS and DURATIONS lines (match the master's words to the labels; if none matches, say so and name the nearest ones). Player characters get no conditions. After every combat tool call read \`notices\` in its result and tell the master each one in a short sentence with the labels: a condition that ended, a creature defeated, a player character unconscious, and after a turn change who is up and the new round when there is one.`,
     `Sheets: when the master asks about a creature's statistics or abilities, or adds a creature to the fight, read its sheet with search_docs and read_doc and answer from it. If a name is not in the sources, say so without inventing it.`,
     `Battle map: when the master asks for it, or the fight starts without one, find the battle map of the place with find_battle_map and show it with battle_map_set. Move a chip with battle_move only when the master says where it is.`,
     `Session log: use ledger_note only for an outcome the master declares that matters beyond this fight (a creature dies, flees or surrenders, a prisoner is taken, an item is found, a decision of the group). Its evidence is the id of the NEW MASTER MESSAGE. Never log damage, turns or rounds.`,
@@ -219,6 +221,16 @@ export function combatLine(combat: NonNullable<CockpitState["combat"]>): string 
   return `COMBAT: ${combat.title}, round ${combat.round}, active ${combat.participants.find((p) => p.id === combat.activeId)?.name || "none"}; ${combat.participants.map((p) => `${p.id} · ${p.name} (${p.kind}, initiative ${p.initiative ?? "—"}${p.kind === "pc" ? "" : `, HP ${p.hp ?? "—"}/${p.maxHp ?? "—"}${p.conditions.length ? `, ${p.conditions.join("/")}` : ""}`})`).join("; ")}. Notes: ${combat.notes.slice(0, 500)}`;
 }
 
+/** The last five automatic notices of the fight, oldest first, or none. */
+function recentNoticesLine(notices: NonNullable<CockpitState["combat"]>["notices"]): string {
+  const lines = notices.slice(-5).map((n) =>
+    [n.kind, n.name, n.condition, n.round !== undefined ? `round ${n.round}` : ""]
+      .filter(Boolean)
+      .join(" "),
+  );
+  return lines.join(", ") || "none";
+}
+
 /**
  * Digest of a combat thread turn: the place and the party of the table, the
  * fight from the table's state, the thread's recent messages and the new one.
@@ -227,11 +239,20 @@ export function buildCombatUserPrompt(
   table: CockpitSession,
   thread: CockpitSession,
   message: ChatMessage,
+  extras: { rules?: CombatRules } = {},
 ): string {
+  const rules = extras.rules;
   const header = [
     `PLACE: ${table.state.position.location || "unknown"} · ${table.state.position.moment || "unknown moment"}`,
     `PARTY: ${table.state.party.join(", ") || "not specified"}`,
     table.state.combat ? combatLine(table.state.combat) : "COMBAT: none active",
+    ...(rules
+      ? [
+          `CONDITIONS: ${rules.conditions.map((c) => `${c.id} (${c.label})`).join(", ") || "none"}`,
+          `DURATIONS: ${rules.durations.map((d) => `${d.id} (${d.label})`).join(", ") || "none"}`,
+        ]
+      : []),
+    `RECENT NOTICES: ${recentNoticesLine(table.state.combat?.notices ?? [])}`,
   ];
   const priorMessages = thread.messages
     .filter((item) => item.id !== message.id)

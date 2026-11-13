@@ -19,6 +19,7 @@ import {
   type ToolContext,
 } from "./tools.js";
 import type { PlotGraph } from "./ports.js";
+import type { CombatRules } from "../../../shared/src/types.js";
 import {
   buildCombatSystemPrompt,
   buildCombatUserPrompt,
@@ -66,6 +67,8 @@ export interface TurnManagerDeps {
   combatSystemPrompt?: string;
   /** Fills the ledger and combat of a session from the framework before the digest is built. */
   hydrate?: (session: CockpitSession) => Promise<CockpitSession>;
+  /** Condition and duration labels for the combat digest. Errors leave the digest without them. */
+  combatRules?: () => Promise<CombatRules>;
   idleTimeoutMs?: number;
   turnTimeoutMs?: number;
 }
@@ -314,13 +317,16 @@ export class TurnManager {
           const userMessage = stored.messages.find(
             (item) => item.id === messageId,
           )!;
+          const rules = this.deps.combatRules
+            ? await this.deps.combatRules().catch(() => undefined)
+            : undefined;
           input = {
             sessionId,
             turnId,
             model: stored.model,
             systemPrompt:
               this.deps.combatSystemPrompt ?? DEFAULT_COMBAT_SYSTEM_PROMPT,
-            userPrompt: buildCombatUserPrompt(table, stored, userMessage),
+            userPrompt: buildCombatUserPrompt(table, stored, userMessage, { rules }),
             mcp: { url: this.deps.mcpUrl, token },
             tools: COMBAT_TOOL_NAMES,
             ...(resume ? { resume } : {}),

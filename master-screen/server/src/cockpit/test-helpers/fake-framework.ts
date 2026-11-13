@@ -2,7 +2,7 @@
 // it through createCockpit({ framework }) and never run the real libraries. It follows the
 // same result shapes: { ok: true, ... } or { ok: false, error: { code, message } }.
 import type { CombatOp, CombatState, Combatant, LiveSession, LogEntry, LogKind } from "../../../../shared/src/types.js";
-import type { CockpitFramework, EngineRun, LogInput, LogPatch } from "../framework.js";
+import type { CockpitFramework, EngineRun, FrameworkCombatEvent, LogInput, LogPatch } from "../framework.js";
 import type { LibResult } from "../framework.js";
 
 const fail = (code: string, message: string) => ({ ok: false as const, error: { code, message } });
@@ -142,7 +142,15 @@ export function createFakeFramework(options: { reviewApproves?: boolean; withRev
       case "damage": {
         const c = byId(op.id);
         if (!c) return "not-found";
-        c.hp = Math.max(0, (c.hp ?? 0) - op.amount);
+        const before = c.hp ?? 0;
+        c.hp = Math.max(0, before - op.amount);
+        // Like the rules module: a creature that reaches 0 hp is defeated, with a notice.
+        if (before > 0 && c.hp === 0)
+          (combat.events as FrameworkCombatEvent[]).push({
+            at: new Date().toISOString(),
+            text: `${c.name} sconfitto`,
+            notice: { kind: "defeated", id: c.id, name: c.name },
+          });
         return combat;
       }
       case "heal": {
@@ -154,7 +162,11 @@ export function createFakeFramework(options: { reviewApproves?: boolean; withRev
       case "condition-add": {
         const c = byId(op.id);
         if (!c) return "not-found";
-        c.conditions.push({ id: op.condition, duration: op.duration ?? "" });
+        c.conditions.push({
+          id: op.condition,
+          duration: op.duration ?? "",
+          ...(op.rounds !== undefined ? { rounds: op.rounds } : {}),
+        });
         return combat;
       }
       case "condition-remove": {

@@ -6,6 +6,33 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  min-width: 0;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* Wide screens: the map on the left, the turn panel in a column on the right. */
+@media (min-width: 900px) {
+  .board.with-map {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+    align-items: start;
+  }
+
+  .board.with-map .field {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .board.with-map .turn {
+    grid-column: 2;
+    grid-row: 1;
+  }
 }
 
 .find-map {

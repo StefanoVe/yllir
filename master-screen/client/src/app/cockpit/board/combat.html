@@ -10,14 +10,13 @@
       (click)="next()"
     >
       <ui-icon name="right" [size]="16" /></button
-    ><button
-      class="icon-button"
-      [title]="i18n.t('liveAgent.combat.end')"
-[attr.aria-label]="i18n.t('liveAgent.combat.end')"
-      (click)="end()"
-    >
-      <ui-icon name="stop" [size]="16" />
-    </button>
+    ><ui-confirm-button
+      icon="stop"
+      [size]="16"
+      [label]="i18n.t('liveAgent.combat.end')"
+      [confirmLabel]="i18n.t('combat.endConfirmShort')"
+      (confirmed)="end()"
+    />
   </header>
   <table>
     <thead>

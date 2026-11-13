@@ -1,0 +1,16 @@
+<button
+  type="button"
+  [class]="buttonClass() + (armed() ? ' armed' : '')"
+  [disabled]="disabled()"
+  [attr.title]="label()"
+  [attr.aria-label]="armed() ? confirmLabel() : label()"
+  [attr.aria-pressed]="armed() ? 'true' : 'false'"
+  (click)="onClick()"
+  (blur)="disarm()"
+  (keydown.escape)="onEscape($event)"
+>
+  <ui-icon [name]="icon()" [size]="size()" />
+  @if (armed()) {
+  <span class="confirm-text">{{ confirmLabel() }}</span>
+  }
+</button>

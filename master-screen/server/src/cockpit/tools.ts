@@ -15,6 +15,7 @@ import type {
 import type {
   CardColor,
   CockpitAction,
+  CombatNotice,
   ModuleInput,
   ModuleKind,
   ModuleRef,
@@ -128,6 +129,10 @@ const fieldDescriptions: Record<string, string> = {
   from: "ID della carta o del riquadro di partenza.",
   to: "ID della carta o del riquadro di arrivo.",
   label: "Etichetta breve della freccia.",
+  condition: "Id della condizione, dalla riga CONDITIONS del digest.",
+  duration: "Id della durata, dalla riga DURATIONS del digest, facoltativo.",
+  rounds: "Numero di round, solo con durata rounds.",
+  remove: "Se true, toglie la condizione invece di aggiungerla.",
 };
 function describeInputFields<S extends z.ZodObject<z.ZodRawShape>>(
   schema: S,
@@ -192,6 +197,7 @@ export const COCKPIT_TOOL_NAMES = [
   "combat_turn",
   "combat_notes",
   "combat_end",
+  "combat_condition",
   "find_battle_map",
   "battle_map_set",
   "battle_move",
@@ -203,12 +209,12 @@ export const COCKPIT_TOOL_NAMES = [
 export const COMBAT_TOOL_NAMES = [
   "search_docs", "read_doc", "ledger_note",
   "combat_start", "combat_add", "combat_update", "combat_remove",
-  "combat_turn", "combat_notes", "combat_end",
+  "combat_turn", "combat_notes", "combat_end", "combat_condition",
   "find_battle_map", "battle_map_set", "battle_move",
 ] as const satisfies readonly (typeof COCKPIT_TOOL_NAMES)[number][];
 const COMBAT_ONLY = new Set<string>([
   "combat_start", "combat_add", "combat_update", "combat_remove",
-  "combat_turn", "combat_notes", "combat_end",
+  "combat_turn", "combat_notes", "combat_end", "combat_condition",
   "find_battle_map", "battle_map_set", "battle_move",
 ]);
 /** Tools of the table agent: everything except the combat and the battle screen. */
@@ -366,6 +372,50 @@ function apply(
         title: summary?.label || "Azione applicata",
       };
     });
+}
+
+/** Finds a combatant of the fight by id, or else by name (case and spaces ignored). */
+function findParticipant<T extends { id: string; name: string }>(participants: T[], wanted: string): T {
+  const folded = (value: string) => value.toLocaleLowerCase("it").trim();
+  const byId = participants.filter((p) => p.id === wanted);
+  const byName = participants.filter((p) => folded(p.name) === folded(wanted));
+  const matches = byId.length ? byId : byName;
+  if (matches.length === 0) throw new Error("Partecipante non trovato nello scontro");
+  if (matches.length > 1) throw new Error("Più partecipanti hanno questo nome: indica l'id");
+  return matches[0]!;
+}
+
+/** The automatic notices of the fight as they are now, oldest first. */
+async function combatNotices(deps: CockpitToolsDeps, sessionId: string): Promise<CombatNotice[]> {
+  const session = await deps.live.hydrate(await deps.store.get(sessionId));
+  return session.state.combat?.notices ?? [];
+}
+
+const sameNotice = (a: CombatNotice, b: CombatNotice) =>
+  a.at === b.at && a.kind === b.kind && a.id === b.id && a.condition === b.condition;
+
+/** The notices after the last one seen before the call (all of them when none was seen). */
+function newNotices(before: CombatNotice[], after: CombatNotice[]): CombatNotice[] {
+  const last = before.at(-1);
+  if (!last) return after;
+  let index = -1;
+  after.forEach((notice, i) => {
+    if (sameNotice(notice, last)) index = i;
+  });
+  // The list keeps only the last 20: when the seen one has rolled off, every notice left is new.
+  return after.slice(index + 1);
+}
+
+/** Runs one combat call and adds to its result the notices it produced (`notices`). */
+async function withNotices<T extends object>(
+  deps: CockpitToolsDeps,
+  sessionId: string,
+  run: () => Promise<T>,
+): Promise<T & { notices: CombatNotice[] }> {
+  const before = await combatNotices(deps, sessionId);
+  const value = await run();
+  const after = await combatNotices(deps, sessionId);
+  return { ...value, notices: newNotices(before, after) };
 }
 
 const cardColorSchema = z.enum(["red", "amber", "green", "blue", "violet"]);
@@ -1668,10 +1718,50 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
         description,
         schema,
         (args, context) =>
-          apply(deps, verifyCombatSources(deps, action(args)), context),
+          withNotices(deps, context.sessionId, () =>
+            apply(deps, verifyCombatSources(deps, action(args)), context),
+          ),
         () => label,
       ),
     );
+  tools.push(
+    tool(
+      "combat_condition",
+      "Aggiunge o toglie una condizione a un nemico o alleato dello scontro, solo su dichiarazione del master. condition e duration sono id delle righe CONDIZIONI e DURATE del digest (mai l'etichetta); rounds solo con duration rounds. Restituisce lo stato aggiornato del combattente e gli avvisi automatici.",
+      z
+        .object({
+          participant: z.string().min(1).max(200),
+          condition: z.string().min(1).max(80),
+          remove: z.boolean().optional(),
+          duration: z.string().min(1).max(40).optional(),
+          rounds: z.number().int().min(1).max(1000).optional(),
+        })
+        .strict(),
+      (args, context) =>
+        withNotices(deps, context.sessionId, async () => {
+          const session = await deps.live.hydrate(await deps.store.get(context.sessionId));
+          const combat = session.state.combat;
+          if (!combat) throw new Error("Nessun combattimento attivo");
+          const target = findParticipant(combat.participants, String(args.participant));
+          const applied = await apply(
+            deps,
+            {
+              type: "combat.condition",
+              id: target.id,
+              condition: String(args.condition),
+              ...(args.remove === true ? { remove: true } : {}),
+              ...(args.duration !== undefined ? { duration: String(args.duration) } : {}),
+              ...(args.rounds !== undefined ? { rounds: Number(args.rounds) } : {}),
+            },
+            context,
+          );
+          const after = await deps.live.hydrate(await deps.store.get(context.sessionId));
+          const participant = after.state.combat?.participants.find((p) => p.id === target.id);
+          return { ...applied, participant };
+        }),
+      (args) => `Condizione · ${args.participant}`,
+    ),
+  );
   tools.push(
     tool(
       "music_play",
@@ -1769,15 +1859,9 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
         const session = await deps.live.hydrate(await deps.store.get(context.sessionId));
         const combat = session.state.combat;
         if (!combat) throw new Error("Nessun combattimento attivo");
-        const wanted = String(args.participant);
-        const folded = (value: string) => value.toLocaleLowerCase("it").trim();
-        const byId = combat.participants.filter((p) => p.id === wanted);
-        const byName = combat.participants.filter((p) => folded(p.name) === folded(wanted));
-        const matches = byId.length ? byId : byName;
-        if (matches.length === 0) throw new Error("Partecipante non trovato nello scontro");
-        if (matches.length > 1) throw new Error("Più partecipanti hanno questo nome: indica l'id");
-        const view = await deps.battle.move(matches[0]!.id, Number(args.x), Number(args.y));
-        return { id: matches[0]!.id, positions: view.positions[matches[0]!.id] };
+        const target = findParticipant(combat.participants, String(args.participant));
+        const view = await deps.battle.move(target.id, Number(args.x), Number(args.y));
+        return { id: target.id, positions: view.positions[target.id] };
       },
       (args) => `Pedina · ${args.participant}`,
     ),

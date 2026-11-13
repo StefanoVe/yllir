@@ -1,0 +1,44 @@
+<section class="panel" aria-labelledby="turn-now-title">
+  @if (now(); as n) {
+  <div class="now">
+  <h3 id="turn-now-title" class="title">
+    {{ i18n.t(n.pc ? "combat.turn.pc" : "combat.turn.now", { name: n.name }) }}
+  </h3>
+  @if (!n.pc) { @if (n.status === "loading") {
+  <p class="muted">…</p>
+  } @else if (n.status === "error") {
+  <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
+  } @else if (n.groups.length) { @for (group of n.groups; track group.label) {
+  <h4>{{ group.label }}</h4>
+  <ul class="actions">
+    @for (action of group.actions; track $index) {
+    <li><strong>{{ action.name }}</strong> {{ action.text }}</li>
+    }
+  </ul>
+  } } @else {
+  <p class="muted">{{ i18n.t("combat.turn.noneNow") }}</p>
+  } }
+  </div>
+  }
+
+  <h3 class="title out-of-turn">{{ i18n.t("combat.turn.others") }}</h3>
+  @if (others().length) { @for (other of others(); track other.id) {
+  <div class="other">
+    <h4 class="other-name">{{ other.name }}</h4>
+    @if (other.status === "loading") {
+    <p class="muted">…</p>
+    } @else if (other.status === "error") {
+    <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
+    } @else { @for (group of other.groups; track group.label) {
+    <h5>{{ group.label }}</h5>
+    <ul class="actions">
+      @for (action of group.actions; track $index) {
+      <li><strong>{{ action.name }}</strong> {{ action.text }}</li>
+      }
+    </ul>
+    } }
+  </div>
+  } } @else {
+  <p class="muted">{{ i18n.t("combat.turn.noOthers") }}</p>
+  }
+</section>

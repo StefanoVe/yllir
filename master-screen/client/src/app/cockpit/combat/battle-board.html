@@ -1,62 +1,65 @@
-<div class="board">
-  @if (!hasMap() && showMaps()) {
-  <button type="button" class="find-map" (click)="findMap.emit()">
-    <ui-icon name="map" [size]="16" />{{ i18n.t("combat.map.find") }}
-  </button>
-  } @if (moveError()) {
-  <p class="alert" role="alert">{{ moveError() }}</p>
-  } @if (hasMap()) {
-  <div class="map-scroll">
-    <div class="map" #mapFrame role="group" [attr.aria-label]="i18n.t('combat.map.label')">
-      <img class="map-image" [src]="mapUrl()" alt="" draggable="false" />
-      @if (grid(); as g) {
-      <div class="grid" aria-hidden="true" [style.--cols]="g.cols" [style.--rows]="g.rows"></div>
-      }
-      @for (c of placed(); track c.id) {
-      <cockpit-combatant-chip
-        class="placed"
-        [class.dragging]="drag()?.id === c.id"
-        [combatant]="c"
-        [active]="activeId() === c.id"
-        [style.left.%]="percent(positions()[c.id]!).left"
-        [style.top.%]="percent(positions()[c.id]!).top"
-        (pointerdown)="pointerDown($event, c)"
-        (pointermove)="pointerMove($event)"
-        (pointerup)="pointerUp()"
-        (pointercancel)="pointerCancel()"
-        (keydown)="key($event, c)"
-      />
-      }
+<div class="board" [class.with-map]="hasMap()">
+  <cockpit-turn-panel class="turn" [combatants]="combatants()" [activeId]="activeId()" />
+  <div class="field">
+    @if (!hasMap() && showMaps()) {
+    <button type="button" class="find-map" (click)="findMap.emit()">
+      <ui-icon name="map" [size]="16" />{{ i18n.t("combat.map.find") }}
+    </button>
+    } @if (moveError()) {
+    <p class="alert" role="alert">{{ moveError() }}</p>
+    } @if (hasMap()) {
+    <div class="map-scroll">
+      <div class="map" #mapFrame role="group" [attr.aria-label]="i18n.t('combat.map.label')">
+        <img class="map-image" [src]="mapUrl()" alt="" draggable="false" />
+        @if (grid(); as g) {
+        <div class="grid" aria-hidden="true" [style.--cols]="g.cols" [style.--rows]="g.rows"></div>
+        }
+        @for (c of placed(); track c.id) {
+        <cockpit-combatant-chip
+          class="placed"
+          [class.dragging]="drag()?.id === c.id"
+          [combatant]="c"
+          [active]="activeId() === c.id"
+          [style.left.%]="percent(positions()[c.id]!).left"
+          [style.top.%]="percent(positions()[c.id]!).top"
+          (pointerdown)="pointerDown($event, c)"
+          (pointermove)="pointerMove($event)"
+          (pointerup)="pointerUp()"
+          (pointercancel)="pointerCancel()"
+          (keydown)="key($event, c)"
+        />
+        }
+      </div>
     </div>
-  </div>
-  <p class="hint muted">{{ i18n.t("combat.map.keys") }}</p>
-  @if (tray().length) {
-  <section class="tray" [attr.aria-label]="i18n.t('combat.tray')">
-    <h3>{{ i18n.t("combat.tray") }}</h3>
-    <div class="tray-chips">
-      @for (c of tray(); track c.id) {
-      <cockpit-combatant-chip
-        class="tray-chip"
-        [class.dragging]="drag()?.id === c.id"
-        [combatant]="c"
-        [active]="activeId() === c.id"
-        (pointerdown)="pointerDown($event, c)"
-        (pointermove)="pointerMove($event)"
-        (pointerup)="pointerUp()"
-        (pointercancel)="pointerCancel()"
-      />
+    <p class="hint muted">{{ i18n.t("combat.map.keys") }}</p>
+    @if (tray().length) {
+    <section class="tray" [attr.aria-label]="i18n.t('combat.tray')">
+      <h3>{{ i18n.t("combat.tray") }}</h3>
+      <div class="tray-chips">
+        @for (c of tray(); track c.id) {
+        <cockpit-combatant-chip
+          class="tray-chip"
+          [class.dragging]="drag()?.id === c.id"
+          [combatant]="c"
+          [active]="activeId() === c.id"
+          (pointerdown)="pointerDown($event, c)"
+          (pointermove)="pointerMove($event)"
+          (pointerup)="pointerUp()"
+          (pointercancel)="pointerCancel()"
+        />
+        }
+      </div>
+    </section>
+    } } @else {
+    <ol class="list" [attr.aria-label]="i18n.t('combat.list')">
+      @for (c of ordered(); track c.id) {
+      <li>
+        <cockpit-combatant-row [combatant]="c" [active]="activeId() === c.id" [rules]="rules()" />
+      </li>
       }
-    </div>
-  </section>
-  } } @else {
-  <ol class="list" [attr.aria-label]="i18n.t('combat.list')">
-    @for (c of ordered(); track c.id) {
-    <li>
-      <cockpit-combatant-row [combatant]="c" [active]="activeId() === c.id" />
-    </li>
+    </ol>
     }
-  </ol>
-  }
+  </div>
 </div>
 @if (dragged(); as c) {
 <span

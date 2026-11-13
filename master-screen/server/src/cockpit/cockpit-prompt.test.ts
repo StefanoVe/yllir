@@ -165,3 +165,52 @@ test("il digest di scontro riporta la linea COMBAT del tavolo o 'none active' e 
   expect(withoutCombat).toContain("COMBAT: none active");
   expect(withoutCombat).toContain("msg-combat");
 });
+
+test("il digest di scontro elenca condizioni e durate con etichetta e gli avvisi recenti", () => {
+  const combat = {
+    title: "Imboscata",
+    round: 2,
+    activeId: "c1",
+    participants: [{ id: "c1", name: "Ada", kind: "pc", initiative: 15, conditions: [] }],
+    notes: "",
+    notices: [
+      { at: "t1", kind: "turn", id: "c1", name: "Ada", round: 1, newRound: false },
+      { at: "t2", kind: "condition-ended", id: "c2", name: "Ogre", condition: "prone" },
+      { at: "t3", kind: "defeated", id: "c2", name: "Ogre" },
+    ],
+  } as unknown as NonNullable<CockpitState["combat"]>;
+  const rules = {
+    conditions: [{ id: "prone", label: "Prono" }],
+    durations: [{ id: "rounds", label: "Round" }],
+  };
+  const table = {
+    id: "table",
+    title: "Tavolo",
+    provider: "claude",
+    model: "m",
+    createdAt: "",
+    updatedAt: "",
+    revision: 0,
+    state: { ...emptyState(), combat },
+    history: [],
+    messages: [],
+    turns: [],
+  } as unknown as CockpitSession;
+  const thread = { ...table, id: "thread", state: emptyState(), messages: [] } as unknown as CockpitSession;
+  const message: ChatMessage = { id: "msg", role: "dm", text: "Ada attacca", at: "", turnId: "t", status: "complete" };
+  const digest = buildCombatUserPrompt(table, thread, message, { rules });
+  expect(digest).toContain("CONDITIONS: prone (Prono)");
+  expect(digest).toContain("DURATIONS: rounds (Round)");
+  expect(digest).toContain("RECENT NOTICES: turn Ada round 1, condition-ended Ogre prone, defeated Ogre");
+  const plain = buildCombatUserPrompt(table, thread, message);
+  expect(plain).not.toContain("CONDITIONS:");
+  expect(buildCombatUserPrompt({ ...table, state: emptyState() } as unknown as CockpitSession, thread, message)).toContain(
+    "RECENT NOTICES: none",
+  );
+});
+
+test("il prompt di sistema del combattimento nomina combat_condition; quello del tavolo no", () => {
+  expect(buildCombatSystemPrompt({ language: "it", systemName: null })).toContain("combat_condition");
+  expect(buildSystemPrompt({ language: "it", systemName: null })).not.toContain("combat_condition");
+});
+

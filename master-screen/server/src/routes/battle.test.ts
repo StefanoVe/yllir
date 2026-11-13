@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import type { CombatantStats, LivePlayer } from '../../../shared/src/types.js';
+import type { CombatRules, CombatantStats, LivePlayer } from '../../../shared/src/types.js';
+import { actionOf, imageOf } from '../cockpit-host/battle.js';
 import { COMBAT_LIB, LOG_LIB } from '../live/framework.js';
 import { get, makeCampaign, send, startApp, type Harness } from '../live/test-support.js';
 
@@ -203,5 +204,103 @@ describe('GET /api/battle/stats/:combatantId', () => {
 
     assert.equal((await get(h, '/battle/stats/c-999')).status, 404);
     assert.equal((await get(h, '/battle/stats/' + encodeURIComponent('bad id'))).status, 404);
+  });
+});
+
+describe('GET /api/battle/rules', () => {
+  it('lists the conditions and the durations of the game system, each with a label', async () => {
+    if (!REAL_LIBS) return;
+    const h = await setup();
+    const res = await get(h, '/battle/rules');
+    assert.equal(res.status, 200, res.text);
+    const rules = res.json as CombatRules;
+    const blinded = rules.conditions.find((item) => item.id === 'blinded');
+    assert.ok(blinded, 'blinded is listed');
+    assert.ok(blinded.label.length > 0, 'the condition has a label');
+    assert.ok(rules.conditions.some((item) => item.id === 'prone'));
+    const until = rules.durations.find((item) => item.id === 'until_save');
+    assert.ok(until, 'until_save is listed');
+    assert.ok(until.label.length > 0, 'the duration has a label');
+  });
+});
+
+describe('stats of a creature: image and actions', () => {
+  it('returns the first image of the public part, never one from the master-only block', async () => {
+    if (!REAL_LIBS) return;
+    const PUBLIC = '# Verme\n\n![Verme di brace](img/verme.png)\n\nCA: 13\n\n<!-- master -->\n![Segreto](img/segreto.png)\n<!-- /master -->\n';
+    const MASTER_ONLY = '# Ombra\n\nCA: 11\n\n<!-- master -->\n![Segreto](img/segreto.png)\n<!-- /master -->\n';
+    const h = await setup({
+      'Creature/Verme.md': PUBLIC,
+      'Creature/Ombra.md': MASTER_ONLY,
+      'Creature/img/verme.png': PNG,
+      'Creature/img/segreto.png': PNG,
+    });
+    await openSession(h);
+    await send(h, 'POST', '/live/combat', { op: 'start' });
+    let res = await send(h, 'POST', '/live/combat', { op: 'add', name: 'Verme', side: 'enemy', initiative: 12, hp: 45, hpMax: 45, sheet: 'Creature/Verme.md' });
+    assert.equal(res.status, 200, res.text);
+    res = await send(h, 'POST', '/live/combat', { op: 'add', name: 'Ombra', side: 'enemy', initiative: 8, hp: 20, hpMax: 20, sheet: 'Creature/Ombra.md' });
+    assert.equal(res.status, 200, res.text);
+    const combatants = (res.json as { combat: { combatants: Array<{ id: string; name: string }> } }).combat.combatants;
+    const verme = combatants.find((c) => c.name === 'Verme')!.id;
+    const ombra = combatants.find((c) => c.name === 'Ombra')!.id;
+
+    const shown = (await get(h, `/battle/stats/${verme}`)).json as CombatantStats;
+    assert.equal(shown.image, `/api/file?path=${encodeURIComponent('Creature/img/verme.png')}`);
+    assert.ok(!JSON.stringify(shown).includes('segreto'), 'the master-only image is never returned');
+
+    const hidden = (await get(h, `/battle/stats/${ombra}`)).json as CombatantStats;
+    assert.equal(hidden.image, undefined, 'an image only inside the master block gives no image');
+  });
+
+  it('gives each action its group, timing and group label', async () => {
+    if (!REAL_LIBS) return;
+    const SHEET_ACTIONS = '# Lupo\n\n## Azioni\n\n**Morso.** Colpisce per 1d6 danni.\n';
+    const h = await setup({ 'Creature/Lupo.md': SHEET_ACTIONS });
+    await openSession(h);
+    await send(h, 'POST', '/live/combat', { op: 'start' });
+    const res = await send(h, 'POST', '/live/combat', { op: 'add', name: 'Lupo', side: 'enemy', initiative: 10, hp: 11, hpMax: 11, sheet: 'Creature/Lupo.md' });
+    assert.equal(res.status, 200, res.text);
+    const id = (res.json as { combat: { combatants: Array<{ id: string }> } }).combat.combatants[0]!.id;
+    const stats = (await get(h, `/battle/stats/${id}`)).json as CombatantStats;
+    assert.equal(stats.actions.length, 1);
+    const [action] = stats.actions;
+    assert.equal(action!.name, 'Morso');
+    assert.equal(action!.text, 'Colpisce per 1d6 danni.');
+    assert.ok(action!.group.length > 0, 'a group is always given');
+    assert.ok(action!.groupLabel.length > 0, 'a group label is always given');
+    assert.ok(['own_turn', 'any_turn', 'others_turns'].includes(action!.timing));
+  });
+});
+
+describe('the defaults of the stats helpers', () => {
+  it('gives group "actions", timing own_turn and the group id as label when the summary has none', () => {
+    const action = actionOf('en', {}, { name: 'Artiglio', text: '+5, 1d6+3 taglienti' });
+    assert.deepEqual(action, { name: 'Artiglio', text: '+5, 1d6+3 taglienti', group: 'actions', groupLabel: 'actions', timing: 'own_turn' });
+  });
+
+  it('takes the label in the campaign language, then English, from the adapter action groups', () => {
+    const rules = {
+      adapter: {
+        action_groups: [
+          { id: 'reactions', timing: 'others_turns', label: { it: 'Reazioni', en: 'Reactions' } },
+          { id: 'bonus', timing: 'any_turn', label: { en: 'Bonus actions' } },
+        ],
+      },
+    };
+    assert.deepEqual(actionOf('it', rules, { name: 'Parata', text: 't', group: 'reactions', timing: 'others_turns' }), {
+      name: 'Parata', text: 't', group: 'reactions', groupLabel: 'Reazioni', timing: 'others_turns',
+    });
+    assert.equal(actionOf('it', rules, { name: 'Balzo', text: 't', group: 'bonus' }).groupLabel, 'Bonus actions');
+    assert.deepEqual(actionOf('it', rules, { name: 'Balzo', text: 't', group: 'bonus' }).timing, 'any_turn');
+    assert.equal(actionOf('en', rules, { name: 'X', text: 't', group: 'unknown-group' }).groupLabel, 'unknown-group');
+  });
+
+  it('reads the image of a sheet only from a campaign file with an image extension', () => {
+    assert.equal(imageOf('Creature/Verme.md', '![v](img/v.png)'), `/api/file?path=${encodeURIComponent('Creature/img/v.png')}`);
+    assert.equal(imageOf('Creature/Verme.md', '![v](https://example.com/v.png)'), undefined);
+    assert.equal(imageOf('Creature/Verme.md', '![v](../../secret.png)'), undefined);
+    assert.equal(imageOf('Creature/Verme.md', '![v](notes.txt)'), undefined);
+    assert.equal(imageOf('Creature/Verme.md', 'nessuna immagine'), undefined);
   });
 });

@@ -8,13 +8,19 @@ import type {
   CockpitAction,
   CockpitSession,
   Combat,
+  CombatNotice,
   Combatant,
   LedgerEntry,
   LedgerKind,
   SourceRef,
 } from "../../../shared/src/cockpit-types.js";
-import type { CombatOp, CombatState, Combatant as FwCombatant, LogEntry, LogKind } from "../../../shared/src/types.js";
-import type { CockpitFramework } from "./framework.js";
+import type { CombatOp, CombatState, LogEntry, LogKind } from "../../../shared/src/types.js";
+import type {
+  CockpitFramework,
+  FrameworkCombatant,
+  FrameworkCombatEvent,
+  FrameworkCombatState,
+} from "./framework.js";
 import type { CombatMeta, CockpitStore, LedgerMeta } from "./store.js";
 import { StoreError } from "./store.js";
 
@@ -58,7 +64,7 @@ function ledgerEntryOf(entry: LogEntry, meta: LedgerMeta | undefined): LedgerEnt
 }
 
 function combatantOf(
-  p: FwCombatant,
+  p: FrameworkCombatant,
   meta: CombatMeta["participants"][string] | undefined,
 ): Combatant {
   return {
@@ -72,18 +78,38 @@ function combatantOf(
     ...(meta?.tempHp !== undefined ? { tempHp: meta.tempHp } : {}),
     ...(meta?.phase ? { phase: meta.phase } : {}),
     conditions: p.conditions.map((c) => c.id),
+    conditionDetails: p.conditions.map((c) => ({
+      id: c.id,
+      ...(c.duration !== undefined ? { duration: c.duration } : {}),
+      ...(c.rounds !== undefined ? { rounds: c.rounds } : {}),
+    })),
     resources: { ...p.resources },
   };
 }
 
+/** The cockpit notice of one framework event, or null when the event has none. */
+function noticeOf(event: FrameworkCombatEvent): CombatNotice | null {
+  const notice = event.notice;
+  if (!notice) return null;
+  const base = { at: event.at, kind: notice.kind, id: notice.id, name: notice.name };
+  if (notice.kind === "condition-ended") return { ...base, condition: notice.condition };
+  if (notice.kind === "turn") return { ...base, round: notice.round, newRound: notice.newRound };
+  return base;
+}
+
 /** The framework combat as the cockpit shows it: participants in initiative order. */
-export function combatOf(state: CombatState, meta: CombatMeta | null): Combat {
+export function combatOf(state: FrameworkCombatState, meta: CombatMeta | null): Combat {
   const byId = new Map(state.combatants.map((p) => [p.id, p]));
   const ordered = [
-    ...state.order.map((id) => byId.get(id)).filter((p): p is FwCombatant => p !== undefined),
+    ...state.order.map((id) => byId.get(id)).filter((p): p is FrameworkCombatant => p !== undefined),
     ...state.combatants.filter((p) => !state.order.includes(p.id)),
   ];
+  const notices = state.events.flatMap((event) => {
+    const notice = noticeOf(event);
+    return notice ? [notice] : [];
+  });
   return {
+    notices: notices.slice(-20),
     title: meta?.title ?? "Combattimento",
     round: Math.max(1, state.round),
     activeId: state.active ? (state.order[state.turn] ?? null) : null,
@@ -314,7 +340,7 @@ export class CockpitLive {
     return result.combat;
   }
 
-  private async activeCombat(): Promise<CombatState> {
+  private async activeCombat(): Promise<FrameworkCombatState> {
     const current = await this.framework.combat.get();
     if (!current.ok) throw new StoreError(current.error.message, 409);
     if (!current.combat?.active) throw new StoreError("Nessun combattimento attivo", 409);
@@ -369,6 +395,27 @@ export class CockpitLive {
         await this.activeCombat();
         await this.run({ op: "end" });
         return { type: "combat.end", label: "Fine combattimento" };
+      }
+      case "combat.condition": {
+        if (action.rounds !== undefined && action.duration !== "rounds")
+          throw new StoreError("I round valgono solo con la durata in round", 400);
+        const state = await this.activeCombat();
+        const current = state.combatants.find((c) => c.id === action.id);
+        if (!current) throw new StoreError("Combattente non trovato", 404);
+        if (current.side === "pc")
+          throw new StoreError("Per i personaggi giocanti si registrano solo nome, iniziativa e posizione", 409);
+        if (action.remove) {
+          await this.run({ op: "condition-remove", id: action.id, condition: action.condition });
+        } else {
+          await this.run({
+            op: "condition-add",
+            id: action.id,
+            condition: action.condition,
+            ...(action.duration !== undefined ? { duration: action.duration } : {}),
+            ...(action.rounds !== undefined ? { rounds: action.rounds } : {}),
+          });
+        }
+        return { type: "combat.condition", label: `Condizione · ${current.name}`, targetId: action.id };
       }
       default:
         throw new StoreError("Azione non prevista");

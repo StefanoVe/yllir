@@ -1,0 +1,67 @@
+:host {
+  display: block;
+  min-width: 0;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+
+.title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  overflow-wrap: anywhere;
+}
+
+.out-of-turn {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-border);
+}
+
+h4,
+h5 {
+  margin: var(--space-0-5) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+h5 {
+  font-style: italic;
+}
+
+.other {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.other-name {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.actions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  overflow-wrap: anywhere;
+}
+
+.muted {
+  margin: 0;
+  color: var(--color-text-muted);
+}
