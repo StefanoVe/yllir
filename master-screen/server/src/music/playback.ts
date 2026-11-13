@@ -3,8 +3,9 @@
 // through the URL rebuilt from the video id, SoundCloud through its cleaned track link. Every failure
 // becomes the `error` phase; nothing here throws into
 // the server. Owner: music engineer.
-import type { MusicCommand, MusicPlayback as PlaybackState } from '../../../shared/src/types.js';
+import type { MusicCommand, MusicPlayback as PlaybackState, ScreenSettings } from '../../../shared/src/types.js';
 import type { Ctx } from '../context.js';
+import { readSettings } from '../settings/store.js';
 import { loadMusicEntries, type EntriesResult } from './library.js';
 import { classifyMusicUrl } from './provider.js';
 import { findMusicTools, MpvProcess, type MpvSpawnOptions, type ToolsResult } from './mpv.js';
@@ -73,6 +74,10 @@ export class MusicPlayback {
   private token = 0;
   /** Pause asked while the track is still loading: applied when it is ready. */
   private wantPaused = false;
+  /** Fade length from the campaign settings, used when the options do not give one. */
+  private settingFadeMs?: number;
+  /** True once the master sent a volume or loop command. */
+  private levelsCommanded = false;
   private fadeTimer: NodeJS.Timeout | null = null;
   private publishTimer: NodeJS.Timeout | null = null;
   private failTimer: NodeJS.Timeout | null = null;
@@ -151,6 +156,21 @@ export class MusicPlayback {
     return this.reply();
   }
 
+  /**
+   * Takes the music settings. The fade length always applies. Volume and loop apply only while
+   * idle: a track that is playing keeps the values the master is using.
+   */
+  applySettings(music: ScreenSettings['music'], options: { startup?: boolean } = {}): void {
+    this.settingFadeMs = music.fadeSeconds * 1000;
+    if (this.closed) return;
+    // A startup read that finishes after the master set a level must not overwrite it.
+    const keepLevels = options.startup === true && this.levelsCommanded;
+    if (this.state.phase === 'idle' && this.state.trackId === null && !keepLevels) {
+      this.set({ volume: music.volume, loop: music.loop });
+      this.publishNow();
+    }
+  }
+
   /** Ramps the volume to 0 over the fade length, then stops and restores the volume value. */
   fadeout(): PlaybackState {
     if (!this.canControl()) return this.reply();
@@ -158,7 +178,7 @@ export class MusicPlayback {
     if ((this.state.phase !== 'playing' && this.state.phase !== 'paused') || this.fadeTimer !== null) {
       return this.reply();
     }
-    const fadeMs = this.opts.fadeMs ?? DEFAULT_FADE_MS;
+    const fadeMs = this.opts.fadeMs ?? this.settingFadeMs ?? DEFAULT_FADE_MS;
     const steps = Math.max(1, Math.round(fadeMs / FADE_STEP_MS));
     let step = 0;
     this.fadeTimer = setInterval(() => {
@@ -188,6 +208,7 @@ export class MusicPlayback {
   volume(value: number): PlaybackState {
     if (this.closed || !Number.isFinite(value)) return this.reply();
     this.cancelFade();
+    this.levelsCommanded = true;
     const level = Math.min(100, Math.max(0, Math.round(value)));
     this.set({ volume: level });
     if (this.proc?.running) this.proc.send(['set_property', 'volume', level]);
@@ -196,6 +217,7 @@ export class MusicPlayback {
 
   loop(value: boolean): PlaybackState {
     if (this.closed) return this.snapshot();
+    this.levelsCommanded = true;
     this.set({ loop: value });
     if (this.proc?.running) this.proc.send(['set_property', 'loop-file', value ? 'inf' : 'no']);
     return this.reply();
@@ -503,6 +525,11 @@ export function parseMusicCommand(body: unknown): ParseResult {
 
 const controllers = new WeakMap<Ctx, MusicPlayback>();
 
+/** The playback controller of a campaign if one exists. Never creates one. */
+export function existingPlayback(ctx: Ctx): MusicPlayback | undefined {
+  return controllers.get(ctx);
+}
+
 /**
  * The playback controller of a campaign, created on first use. It spawns nothing by itself: mpv
  * starts on the first play. Closed with the context (ctx.onClose), so shutdown kills mpv.
@@ -519,6 +546,9 @@ export function playbackFor(ctx: Ctx): MusicPlayback {
     controllers.set(ctx, controller);
     const created = controller;
     ctx.onClose(() => created.shutdown());
+    void readSettings(ctx)
+      .then(({ settings }) => created.applySettings(settings.music, { startup: true }))
+      .catch(() => {});
   }
   return controller;
 }

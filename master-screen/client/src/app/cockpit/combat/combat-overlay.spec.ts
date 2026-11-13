@@ -7,6 +7,30 @@ import { PrefsService } from '../../core/prefs.service';
 import { CombatOverlay } from './combat-overlay';
 import { CombatOverlayService } from './combat-overlay.service';
 import { BattleMapPrefs } from './battle-maps-pref';
+import { signal } from '@angular/core';
+import type { ScreenSettings, ScreenSettingsPatch } from '@shared/types';
+import { DEFAULT_SCREEN_SETTINGS, SettingsService } from '../../core/settings.service';
+
+
+/** Stands in for SettingsService: the settings change at once, without a server. */
+function fakeSettingsService() {
+  const settings = signal<ScreenSettings>(structuredClone(DEFAULT_SCREEN_SETTINGS));
+  return {
+    settings,
+    update(patch: ScreenSettingsPatch) {
+      const merge = (base: Record<string, unknown>, change: Record<string, unknown>): Record<string, unknown> => {
+        const next: Record<string, unknown> = { ...base };
+        for (const [key, value] of Object.entries(change)) {
+          const current = next[key];
+          const plain = typeof value === 'object' && value !== null && !Array.isArray(value);
+          next[key] = plain && typeof current === 'object' && current !== null ? merge(current as Record<string, unknown>, value as Record<string, unknown>) : value;
+        }
+        return next;
+      };
+      settings.set(merge(settings() as unknown as Record<string, unknown>, patch as Record<string, unknown>) as unknown as ScreenSettings);
+    },
+  };
+}
 
 const STAMP = '2026-11-12T10:00:00Z';
 
@@ -143,6 +167,7 @@ describe('Combat overlay', () => {
 
   beforeEach(() => {
     localStorage.clear();
+    TestBed.configureTestingModule({ providers: [{ provide: SettingsService, useValue: fakeSettingsService() }] });
     // The combat chat follows the combat thread through its own event stream.
     vi.stubGlobal('EventSource', class { addEventListener() {} removeEventListener() {} close() {} });
     Element.prototype.setPointerCapture = () => undefined;

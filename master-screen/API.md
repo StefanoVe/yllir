@@ -342,3 +342,14 @@ Server endpoints (under `/api`; both modules answer `{enabled:false,...}` with n
 | GET `/print/files/:name` | | the generated PDF (name validated `^sheets-[0-9TZ-]+\.pdf$`, `Content-Disposition: inline`) |
 
 The server only runs the CLIs through `execFile` (never a shell), one build or sheet job at a time (409 plain message if busy), a 120 s timeout, and publishes SSE `files` when canon files change as it already does. Client: route `/encyclopedia` (build button, report with the checks as plain sentences, an Open-preview link and an embedded preview, base address shown with a hint that it can be changed in the campaign settings through the assistant, and a calm note that publishing is not configured) and route `/print` (card list with a state chip per card using icon + text, select all/none, personal-card copies per character, generate-sheets button, PDF link opening inline, per-card render button); rail icons only when the module is on.
+
+## Settings (master screen settings)
+
+Saved in the campaign file `.campaign/master-screen.yaml` (snake_case keys, written only for the values the master changed) and committed to the campaign's git history, one commit per save, touching only that file. The API uses the camelCase names of `ScreenSettings` (`shared/src/types.ts`); the mapping to the file keys is one table in `server/src/settings/schema.ts`.
+
+| Method and path | Request | Response |
+|---|---|---|
+| GET `/settings` | | `SettingsResponse` (`settings`, `defaults`, `canSave`, `explicit` as dotted camelCase paths) |
+| PUT `/settings` | `ScreenSettingsPatch` (any subset, two levels deep, unknown keys rejected) | `SettingsResponse`; publishes SSE `settings` with the merged settings |
+
+Errors: 400 `{ error: 'Invalid settings' }` for a body that does not validate; 409 when the campaign folder is not a git repository (nothing is written, `canSave` is false); 500 `{ error: 'Settings could not be saved.' }` when the write or commit fails. A missing or unreadable settings file gives the defaults, never an error.

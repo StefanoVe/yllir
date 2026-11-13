@@ -1,10 +1,11 @@
-import { Component, DestroyRef, ElementRef, HostListener, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, DOCUMENT, DestroyRef, ElementRef, HostListener, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Music, MessageSquare, Printer, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
-import { filter, map } from 'rxjs';
+import { filter, map, take } from 'rxjs';
 import { LiveService } from '../core/live.service';
+import { SettingsService } from '../core/settings.service';
 import { MusicApiService } from '../music/music-api.service';
 import { MusicDock } from '../music/music-dock';
 import { MusicPlayerService } from '../music/music-player.service';
@@ -35,6 +36,8 @@ export class Shell {
   private readonly music = inject(MusicPlayerService);
   private readonly musicApi = inject(MusicApiService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly settingsService = inject(SettingsService);
+  private readonly document = inject(DOCUMENT);
 
   readonly icons = { MessageSquare, Dices, GitBranch, Library, Music, BookOpen, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
   /** The connection notice shows only after the stream has been down for a while, so load and blips do not flash it. */
@@ -44,10 +47,21 @@ export class Shell {
   readonly musicEnabled = computed(() => this.status.modules()?.music === true);
   readonly encyclopediaEnabled = computed(() => this.status.modules()?.encyclopedia === true);
   readonly printEnabled = computed(() => this.status.modules()?.print === true);
-  /** The bottom bar is shown whenever music is on; it also shows while a track or a suggestion is there. */
-  readonly dockVisible = computed(
-    () => this.musicEnabled() || this.music.current() !== null || this.musicApi.suggestions().length > 0,
-  );
+  /** Rail entries the master can hide in the settings: shown only when the module is on AND the rail flag is on. */
+  private readonly railSettings = computed(() => this.settingsService.settings().ui.rail);
+  readonly showPlot = computed(() => this.railSettings().plot);
+  readonly showDocs = computed(() => this.railSettings().docs);
+  readonly showMusic = computed(() => this.musicEnabled() && this.railSettings().music);
+  readonly showEncyclopedia = computed(() => this.encyclopediaEnabled() && this.railSettings().encyclopedia);
+  readonly showPrint = computed(() => this.printEnabled() && this.railSettings().print);
+  /** The bottom bar: 'always' shows it whenever music is on; 'playing' only while a track or a suggestion is there. */
+  readonly dockVisible = computed(() => {
+    const playing = this.music.current() !== null || this.musicApi.suggestions().length > 0;
+    return this.settingsService.settings().music.dock === 'playing' ? playing : this.musicEnabled() || playing;
+  });
+
+  /** The URL the first navigation ended on (null until it ends). */
+  private readonly firstUrl = signal<string | null>(null);
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -67,6 +81,33 @@ export class Shell {
       const name = this.campaignName();
       this.i18n.language();
       untracked(() => this.titleService.setTitle(this.titleFor(url, name)));
+    });
+    // Density and motion from the settings, as attributes on <html> (styles.css reads them).
+    effect(() => {
+      const ui = this.settingsService.settings().ui;
+      this.document.documentElement.dataset['density'] = ui.density;
+      this.document.documentElement.dataset['motion'] = ui.motion;
+    });
+    // The start page opens once per app load: after both the settings are loaded and the first navigation
+    // has ended, and only when that navigation landed on Home (a deep link is never redirected).
+    // Later returns to Home are never redirected.
+    this.router.events
+      .pipe(
+        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+        take(1),
+      )
+      .subscribe((event) => this.firstUrl.set(event.urlAfterRedirects));
+    let startPageChecked = false;
+    effect(() => {
+      const first = this.firstUrl();
+      if (startPageChecked || first === null || !this.settingsService.loaded()) return;
+      startPageChecked = true;
+      untracked(() => {
+        const page = this.settingsService.settings().ui.startPage;
+        if (page !== 'home' && first === '/') {
+          void this.router.navigate([`/${page}`], { replaceUrl: true });
+        }
+      });
     });
     // Show the connection notice only after 4 seconds offline; hide it at once when connected.
     effect(() => {

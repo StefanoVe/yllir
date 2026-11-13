@@ -75,9 +75,10 @@
   outline-offset: 2px;
 }
 
-/* Groups: home, table, plot, music | search, settings | preview, theme (pushed to the bottom). */
-.rail > .rail-item:nth-last-child(4)::after,
-.rail > .rail-item:nth-last-child(2)::after {
+/* Groups: navigation | search | preview, theme, settings (the last group is pushed to the bottom).
+   Classes mark the first item of each group after the first: rail-sep draws the line above it,
+   rail-bottom pushes it and the rest of its group down. */
+.rail-item.rail-sep::after {
   content: "";
   position: absolute;
   top: calc(var(--space-1) * -1 - 1px);
@@ -86,7 +87,7 @@
   border-top: 1px solid var(--color-border);
 }
 
-.rail > .rail-item:nth-last-child(2) {
+.rail-item.rail-bottom {
   margin-top: auto;
 }
 
@@ -188,12 +189,11 @@
   }
 
   /* Groups are not drawn on the bottom bar. */
-  .rail > .rail-item:nth-last-child(4)::after,
-  .rail > .rail-item:nth-last-child(2)::after {
+  .rail-item.rail-sep::after {
     display: none;
   }
 
-  .rail > .rail-item:nth-last-child(2) {
+  .rail-item.rail-bottom {
     margin-top: 0;
   }
 

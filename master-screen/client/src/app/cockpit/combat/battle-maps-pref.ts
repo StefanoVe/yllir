@@ -1,5 +1,5 @@
-import { Injectable, computed, inject, signal } from "@angular/core";
-import { PrefsService } from "../../core/prefs.service";
+import { Injectable, computed, inject } from "@angular/core";
+import { SettingsService } from "../../core/settings.service";
 
 export const SHOW_BATTLE_MAPS_KEY = "showBattleMaps";
 
@@ -8,19 +8,13 @@ export function readShowBattleMaps(raw: string | null): boolean {
   return raw !== "false";
 }
 
-/** The "show battle maps" preference of this campaign (Settings). Default on. */
+/** The "show battle maps" setting of this campaign (combat.showMaps in the settings). Default on. */
 @Injectable({ providedIn: "root" })
 export class BattleMapPrefs {
-  private readonly prefs = inject(PrefsService);
-  private readonly version = signal(0);
-  readonly showMaps = computed(() => {
-    this.prefs.slug();
-    this.version();
-    return readShowBattleMaps(this.prefs.get(SHOW_BATTLE_MAPS_KEY));
-  });
+  private readonly settings = inject(SettingsService);
+  readonly showMaps = computed(() => this.settings.settings().combat.showMaps);
 
   set(on: boolean): void {
-    this.prefs.set(SHOW_BATTLE_MAPS_KEY, on ? "true" : "false");
-    this.version.update((value) => value + 1);
+    this.settings.update({ combat: { showMaps: on } });
   }
 }

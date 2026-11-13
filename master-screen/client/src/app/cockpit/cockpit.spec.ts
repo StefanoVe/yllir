@@ -2,10 +2,33 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CockpitSessionSummary, CockpitSessionView } from '@shared/cockpit-types';
+import { signal } from '@angular/core';
+import type { ScreenSettings, ScreenSettingsPatch } from '@shared/types';
+import { DEFAULT_SCREEN_SETTINGS, SettingsService } from '../core/settings.service';
 import { StatusService } from '../core/status.service';
 import { MusicApiService } from '../music/music-api.service';
 import { MusicPlayerService } from '../music/music-player.service';
 import { Cockpit } from './cockpit';
+
+/** Stands in for SettingsService: the settings change at once, without a server. */
+function fakeSettingsService() {
+  const settings = signal<ScreenSettings>(structuredClone(DEFAULT_SCREEN_SETTINGS));
+  return {
+    settings,
+    update(patch: ScreenSettingsPatch) {
+      const merge = (base: Record<string, unknown>, change: Record<string, unknown>): Record<string, unknown> => {
+        const next: Record<string, unknown> = { ...base };
+        for (const [key, value] of Object.entries(change)) {
+          const current = next[key];
+          const plain = typeof value === 'object' && value !== null && !Array.isArray(value);
+          next[key] = plain && typeof current === 'object' && current !== null ? merge(current as Record<string, unknown>, value as Record<string, unknown>) : value;
+        }
+        return next;
+      };
+      settings.set(merge(settings() as unknown as Record<string, unknown>, patch as Record<string, unknown>) as unknown as ScreenSettings);
+    },
+  };
+}
 
 const SESSION: CockpitSessionView = {
   id: 's1',
@@ -69,6 +92,7 @@ describe('Cockpit (live table)', () => {
       imports: [Cockpit],
       providers: [
         provideRouter([]),
+        { provide: SettingsService, useValue: fakeSettingsService() },
         { provide: StatusService, useValue: { modules: () => ({ music: false, print: false, encyclopedia: false }) } },
         { provide: MusicPlayerService, useValue: { current: () => null, toggle() {}, playTrack() {} } },
         { provide: MusicApiService, useValue: { tracks: async () => ({ enabled: false, tracks: [] }) } },

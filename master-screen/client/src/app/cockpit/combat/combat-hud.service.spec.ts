@@ -1,6 +1,9 @@
 import { TestBed } from '@angular/core/testing';
+import { signal, type WritableSignal } from '@angular/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CombatHud, HUD_IDLE_MS, HUD_STORAGE_KEY } from './combat-hud.service';
+import { DEFAULT_SCREEN_SETTINGS, SettingsService } from '../../core/settings.service';
+import type { ScreenSettings } from '@shared/types';
 
 /** Fake matchMedia: `matches` tells which queries match; `changes` fires the listeners of a query. */
 function stubMedia(matches: Record<string, boolean>) {
@@ -25,8 +28,13 @@ function stubMedia(matches: Record<string, boolean>) {
 const NARROW = '(max-width: 899px)';
 const WIDE = '(min-width: 1200px)';
 
+/** The fake settings of each test: `fake.settings` is the signal the HUD reads, set it before creating the HUD. */
+let fake: { settings: WritableSignal<ScreenSettings> };
+
 function hud(): CombatHud {
-  TestBed.configureTestingModule({ providers: [CombatHud] });
+  TestBed.configureTestingModule({
+    providers: [CombatHud, { provide: SettingsService, useValue: fake }],
+  });
   return TestBed.inject(CombatHud);
 }
 
@@ -34,6 +42,7 @@ describe('CombatHud', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     localStorage.clear();
+    fake = { settings: signal(structuredClone(DEFAULT_SCREEN_SETTINGS)) };
   });
 
   afterEach(() => {
@@ -54,12 +63,46 @@ describe('CombatHud', () => {
     expect(service.visible()).toBe(true);
   });
 
+  it('starts the panels from the settings', () => {
+    stubMedia({});
+    fake.settings.update((s) => ({
+      ...s,
+      combat: { ...s.combat, panels: { initiative: false, turn: false, chat: true, music: true } },
+    }));
+    const service = hud();
+    expect(service.initiative()).toBe(false);
+    expect(service.turn()).toBe(false);
+    expect(service.chat()).toBe(true);
+    expect(service.music()).toBe(true);
+  });
+
+  it('folds the chat at start when the settings open both turn and chat below 1200 px', () => {
+    stubMedia({});
+    fake.settings.update((s) => ({
+      ...s,
+      combat: { ...s.combat, panels: { ...s.combat.panels, turn: true, chat: true } },
+    }));
+    const service = hud();
+    expect(service.turn()).toBe(true);
+    expect(service.chat()).toBe(false);
+  });
+
   it('folds the turn card and keeps the chat folded on narrow screens by default', () => {
     stubMedia({ [NARROW]: true });
     const service = hud();
     expect(service.narrow()).toBe(true);
     expect(service.turn()).toBe(false);
     expect(service.chat()).toBe(false);
+  });
+
+  it('keeps the turn card folded on narrow screens even when the settings open it', () => {
+    stubMedia({ [NARROW]: true });
+    fake.settings.update((s) => ({
+      ...s,
+      combat: { ...s.combat, panels: { ...s.combat.panels, turn: true } },
+    }));
+    const service = hud();
+    expect(service.turn()).toBe(false);
   });
 
   it('keeps turn and chat exclusive below 1200 px', () => {
@@ -127,6 +170,40 @@ describe('CombatHud', () => {
     expect(service.visible()).toBe(true);
   });
 
+  it('fades out after autoHideSeconds from the settings', () => {
+    stubMedia({});
+    fake.settings.update((s) => ({ ...s, combat: { ...s.combat, autoHideSeconds: 7 } }));
+    const service = hud();
+    service.activity();
+    vi.advanceTimersByTime(6000);
+    expect(service.idle()).toBe(false);
+    vi.advanceTimersByTime(1000);
+    expect(service.idle()).toBe(true);
+  });
+
+  it('never fades out when auto-hide is off in the settings', () => {
+    stubMedia({});
+    fake.settings.update((s) => ({ ...s, combat: { ...s.combat, autoHide: false } }));
+    const service = hud();
+    service.activity();
+    vi.advanceTimersByTime(60_000);
+    expect(service.idle()).toBe(false);
+    expect(service.visible()).toBe(true);
+  });
+
+  it('cancels a pending fade when auto-hide is turned off during the fight', () => {
+    stubMedia({});
+    const service = hud();
+    service.activity();
+    vi.advanceTimersByTime(HUD_IDLE_MS - 1000);
+
+    fake.settings.update((s) => ({ ...s, combat: { ...s.combat, autoHide: false } }));
+    TestBed.flushEffects();
+    vi.advanceTimersByTime(HUD_IDLE_MS * 3);
+    expect(service.idle()).toBe(false);
+    expect(service.visible()).toBe(true);
+  });
+
   it('does not fade out while a panel holds the pointer or the focus', () => {
     stubMedia({});
     const service = hud();
@@ -163,30 +240,49 @@ describe('CombatHud', () => {
     expect(service.visible()).toBe(true);
   });
 
-  it('remembers the panels and the hidden state in localStorage', () => {
+  it('remembers only the hidden state in localStorage, not the panels', () => {
     stubMedia({});
     const service = hud();
     service.toggle('music');
     service.toggle('initiative');
     service.toggle('chat');
-    service.toggleHidden();
+    expect(localStorage.getItem(HUD_STORAGE_KEY)).toBeNull();
 
-    const stored = JSON.parse(localStorage.getItem(HUD_STORAGE_KEY) ?? '{}');
-    // Opening the chat below 1200 px folds the turn card.
-    expect(stored).toEqual({ initiative: false, turn: false, chat: true, music: false, hidden: true });
+    service.toggleHidden();
+    expect(JSON.parse(localStorage.getItem(HUD_STORAGE_KEY) ?? '{}')).toEqual({ hidden: true });
 
     const again = TestBed.runInInjectionContext(() => new CombatHud());
-    expect(again.music()).toBe(false);
-    expect(again.initiative()).toBe(false);
-    expect(again.turn()).toBe(false);
-    expect(again.chat()).toBe(true);
     expect(again.hidden()).toBe(true);
+    // Panels come from the settings again, not from the previous fight.
+    expect(again.music()).toBe(true);
+    expect(again.initiative()).toBe(true);
+    expect(again.turn()).toBe(true);
+    expect(again.chat()).toBe(false);
+  });
+
+  it('reads the old stored shape: hidden is kept, the panel flags are ignored', () => {
+    stubMedia({});
+    localStorage.setItem(
+      HUD_STORAGE_KEY,
+      JSON.stringify({ initiative: false, turn: false, chat: true, music: false, hidden: true }),
+    );
+    fake.settings.update((s) => ({
+      ...s,
+      combat: { ...s.combat, panels: { initiative: true, turn: true, chat: false, music: true } },
+    }));
+    const service = hud();
+    expect(service.hidden()).toBe(true);
+    expect(service.initiative()).toBe(true);
+    expect(service.turn()).toBe(true);
+    expect(service.chat()).toBe(false);
+    expect(service.music()).toBe(true);
   });
 
   it('uses the defaults when the stored state is not valid JSON', () => {
     stubMedia({});
     localStorage.setItem(HUD_STORAGE_KEY, '{not json');
     const service = hud();
+    expect(service.hidden()).toBe(false);
     expect(service.initiative()).toBe(true);
     expect(service.chat()).toBe(false);
   });
@@ -202,5 +298,7 @@ describe('CombatHud', () => {
     const service = hud();
     expect(() => service.toggle('music')).not.toThrow();
     expect(service.music()).toBe(false);
+    expect(() => service.toggleHidden()).not.toThrow();
+    expect(service.hidden()).toBe(true);
   });
 });

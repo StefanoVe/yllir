@@ -6,6 +6,7 @@ import { chatStepsEn } from './parts/chat-steps.en';
 import { musicUiEn } from './parts/music-ui.en';
 import { liveModelEn } from './parts/live-model.en';
 import { polishEn } from './parts/polish.en';
+import { settingsPageEn } from './parts/settings-page.en';
 
 export const en = {
   ...liveAgentEn,
@@ -16,6 +17,7 @@ export const en = {
   ...musicUiEn,
   ...liveModelEn,
   ...polishEn,
+  ...settingsPageEn,
   'nav.home': 'Home',
   'nav.search': 'Search',
   'nav.liveTable': 'Live table',

@@ -41,15 +41,29 @@ function asObject(value: unknown): Record<string, unknown> {
     throw new StoreError("Corpo JSON non valido");
   return value as Record<string, unknown>;
 }
-/** Maps the master's short model choice to the model id; a missing choice is Haiku. */
-function liveModelOf(value: unknown): string {
-  if (value === undefined) return LIVE_MODELS.haiku;
+/** Maps the master's short model choice to the model id; a missing choice is the fallback. */
+function liveModelOf(value: unknown, fallback: LiveModelChoice): string {
+  if (value === undefined) return LIVE_MODELS[fallback];
   if (
     typeof value !== "string" ||
     !Object.prototype.hasOwnProperty.call(LIVE_MODELS, value)
   )
     throw new StoreError("Modello non valido");
   return LIVE_MODELS[value as LiveModelChoice];
+}
+/** The default models from the settings; Haiku when they are not set or cannot be read. */
+async function defaultModelsOf(
+  deps: CockpitApiDeps,
+): Promise<{ live: LiveModelChoice; combat: LiveModelChoice }> {
+  const haiku: { live: LiveModelChoice; combat: LiveModelChoice } = {
+    live: "haiku",
+    combat: "haiku",
+  };
+  try {
+    return (await deps.defaultModels?.()) ?? haiku;
+  } catch {
+    return haiku;
+  }
 }
 const errorResponse = (error: unknown) => {
   const status =
@@ -71,6 +85,8 @@ export interface CockpitApiDeps {
   resolve: Parameters<typeof sessionView>[1];
   /** The only provider of the cockpit. */
   provider: "claude";
+  /** Default models of the live table and of combat, read when a session or a thread is created. */
+  defaultModels?: () => Promise<{ live: LiveModelChoice; combat: LiveModelChoice }>;
 }
 export function cockpitApi(deps: CockpitApiDeps) {
   return async (request: Request): Promise<Response | null> => {
@@ -94,10 +110,11 @@ export function cockpitApi(deps: CockpitApiDeps) {
           input.title.length > 200
         )
           throw new StoreError("Titolo non valido");
+        const defaults = await defaultModelsOf(deps);
         const session = await deps.store.create({
           title: input.title,
           provider: deps.provider,
-          model: liveModelOf(input.model),
+          model: liveModelOf(input.model, defaults.live),
         });
         // The session opens the framework's live session (or joins the one already open).
         await deps.live.ensure(session.id).catch(() => {});
@@ -129,7 +146,7 @@ export function cockpitApi(deps: CockpitApiDeps) {
           );
         if (route === "" && request.method === "PATCH") {
           const input = asObject(await body(request));
-          const model = liveModelOf(input.model);
+          const model = liveModelOf(input.model, "haiku");
           await deps.store.setProviderSession(id, { model });
           return json(
             sessionView(
@@ -157,10 +174,12 @@ export function cockpitApi(deps: CockpitApiDeps) {
             ),
           }));
         }
-        if (route === "combat/thread" && request.method === "POST")
+        if (route === "combat/thread" && request.method === "POST") {
+          const defaults = await defaultModelsOf(deps);
           return json({
-            threadId: await deps.live.combatThread(id, LIVE_MODELS.haiku),
+            threadId: await deps.live.combatThread(id, LIVE_MODELS[defaults.combat]),
           });
+        }
         if (route === "messages" && request.method === "POST") {
           const input = asObject(await body(request));
           if (

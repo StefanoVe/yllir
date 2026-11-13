@@ -19,7 +19,7 @@ import { readCampaignConfig, type CampaignConfig } from "./campaign-config.js";
 import { buildCombatSystemPrompt, buildSystemPrompt } from "./prompt.js";
 import type { SheetDeps } from "./authoring.js";
 import { CardInterpreter } from "./card-interpreter.js";
-import { LIVE_MODELS } from "./providers/claude.js";
+import { LIVE_MODELS, type LiveModelChoice } from "./providers/claude.js";
 
 export interface CreateCockpitOptions {
   /** Campaign folder: the sheets are written under it, and the store's default container. */
@@ -34,6 +34,8 @@ export interface CreateCockpitOptions {
   framework?: CockpitFramework;
   /** Language and game system for the prompt. Read from campaign.yaml under `root` when omitted. */
   campaign?: CampaignConfig;
+  /** Default models of the live table and of combat. Haiku for both when omitted. */
+  defaultModels?: () => Promise<{ live: LiveModelChoice; combat: LiveModelChoice }>;
 }
 
 export function createCockpit(options: CreateCockpitOptions) {
@@ -196,6 +198,7 @@ export function createCockpit(options: CreateCockpitOptions) {
     resolve,
     live,
     provider: providerId,
+    defaultModels: options.defaultModels,
   });
   // Republishes every session's state (a change from the terminal, or a card that arrived).
   const republishAll = () => {

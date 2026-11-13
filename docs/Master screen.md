@@ -38,6 +38,7 @@ Questo documento descrive il master screen: la parte del framework che il master
 - **Vista per i giocatori (Deciso, 2026-11-12).** Per ora non c'è. L'anteprima «vista giocatori» (nasconde il blocco riservato) resta solo un controllo del master.
 - **Enciclopedia pubblica (Deciso, 2026-11-12): opzione A.** È una sezione del master screen che genera il sito statico e lo mostra in anteprima. Il sito è il bersaglio dei QR della stampa, quindi gli indirizzi si legano a un identificativo stabile e non al nome del file. **Solo in locale per ora** (decisione dell'autore, 2026-11-12): il sito si genera in `.campaign/cache/encyclopedia/` e non viene pubblicato; nessuna credenziale e nessun dominio. La pubblicazione su un host resta da decidere.
 - **Interfaccia (Deciso, 2026-11-12).** Moderna e semplice da usare, ma abbastanza funzionale. È coerente con le icone con tooltip decise sopra.
+- **Impostazioni del master screen (Deciso, 2026-11-13).** L'icona delle impostazioni sta nel gruppo in fondo alla barra laterale, insieme all'anteprima pubblica e al tema, e apre una pagina. Le impostazioni su come funziona il master screen si salvano nel file della campagna `.campaign/master-screen.yaml`, sotto git, e valgono su ogni browser; il file contiene solo ciò che il master ha cambiato, il resto prende i valori predefiniti, uguali al comportamento precedente. Tema, dimensione del testo, preferiti e recenti restano sul computer, separati per campagna.
 - **Stile dell'interfaccia (Deciso, 2026-11-13).** Monocromo secondo il tema, taccuino in flat design squadrato; i nodi della mappa della trama e della tela del cockpit sono pezzi di carta strappata, i popup dei documenti pagine di quaderno. Precisa la decisione «Interfaccia» del 2026-11-12. Regole complete in [Linee guida dell'interfaccia](Linee%20guida%20dell'interfaccia.md).
 
 ### Strumenti della sessione live estratti (Deciso)
@@ -92,6 +93,7 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 - **Mappa della trama.** Nodi per sessioni e scene; collegamenti dal campo `depends_on` delle sessioni. La mappa distingue dipendenze reali da semplice ordine nel file. Proposta: tenere la distinzione e spiegarla con una legenda, senza icone ambigue.
 - **Galleria** delle immagini e delle carte, con ingrandimento.
 - **Controlli.** Un pannello delle Impostazioni mostra i collegamenti rotti, i file non indicizzati e le esclusioni, con un pulsante per ricontrollare.
+- **Impostazioni.** Una pagina divisa in sezioni con un indice: Tavolo (modello dell'agente del tavolo e di quello dello scontro), Scontro (mostra mappe di battaglia, pannelli aperti all'avvio, scomparsa automatica dei pannelli e dopo quanti secondi), Musica (volume iniziale, durata della dissolvenza, ripetizione, barra della musica sempre visibile o solo quando suona), Aspetto e navigazione (tema, dimensione del testo, densità, animazioni ridotte, pagina iniziale, voci della barra laterale da mostrare), Controlli e Informazioni. Ogni modifica si salva da sola e la pagina mostra se il salvataggio è riuscito; ogni sezione ha «ripristina i valori predefiniti». Senza git la pagina lo dice e non salva.
 
 ### Sessione live e scontri
 
@@ -125,7 +127,7 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 - **Nessun aggiornamento ottimistico.** Ciò che compare sullo schermo è ciò che è stato davvero scritto. Vale per la musica come per tutto il resto.
 - **Il master decide, l'agente propone.** Le scelte di trama, di regole e di contenuto restano al master; l'agente indica le opzioni.
 - **Funziona senza rete** per tutto ciò che non è esplicitamente online (musica da piattaforme di streaming, ricerche di immagini remote).
-- **Preferenze locali.** Preferiti, recenti, tema e dimensione del testo si salvano sul computer e restano separati per campagna.
+- **Preferenze locali e impostazioni della campagna.** Preferiti, recenti, tema e dimensione del testo si salvano sul computer e restano separati per campagna. Le impostazioni su come funziona il master screen stanno nel file della campagna (vedi le decisioni dell'autore, 2026-11-13).
 - **Stile visivo.** Segue le [Linee guida dell'interfaccia](Linee%20guida%20dell'interfaccia.md).
 
 ## Architettura proposta
@@ -156,7 +158,7 @@ Componenti:
 4. **Aggiornamento in tempo reale.** Un osservatore dei file rileva ogni creazione, modifica, rinomina ed eliminazione, qualunque ne sia l'autore: l'agente nel master screen, l'agente nel terminale o il master con un editor. La vista si aggiorna da questo flusso, così il master screen non è un secondo motore.
 5. **Stato di sessione.** Chat, registro, tela libera e combattimento vivono in `.campaign/state/`, separata dal canone (vedi [Architettura](Architettura.md#3-campagna-generata)): è lo stato operativo della campagna e non modifica i file del canone. Se il master chiede una modifica canonica, questa passa dal motore di scrittura (`commit`), con i suoi controlli (Riprogettazione, sezione 2).
 6. **Moduli.** Musica, stampa e le funzioni da decidere sono moduli attivati dalla configurazione della campagna. Se un modulo è spento, la sua sezione non compare.
-7. **Preferenze.** Solo sul computer del master, mai nei file della campagna.
+7. **Preferenze e impostazioni (Deciso, 2026-11-13).** Le preferenze del computer (tema, dimensione del testo, preferiti, recenti) restano nel browser. Le impostazioni di funzionamento stanno in `.campaign/master-screen.yaml`: il server le controlla, le scrive e salva una versione con git limitata a quel file. Non sono canone, quindi non passano dal motore di scrittura, e il pannello «cosa è cambiato» non le mostra.
 
 Principio guida: il master screen è un modo di guardare la campagna, non un luogo in cui succedono cose che il terminale non può fare. Ogni operazione deve poter essere eseguita anche dal terminale o dall'app di Claude.
 

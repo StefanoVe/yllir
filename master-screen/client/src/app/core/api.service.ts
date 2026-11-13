@@ -6,7 +6,9 @@ import type {
   DiffResponse,
   DocResponse,
   DocsResponse,
+  ScreenSettingsPatch,
   SearchResponse,
+  SettingsResponse,
   StatusResponse,
   UndoResponse,
 } from '@shared/types';
@@ -89,13 +91,22 @@ export class ApiService {
     return this.request('POST', '/checks/run');
   }
 
+  settings(): Promise<SettingsResponse> {
+    return this.request('GET', '/settings');
+  }
+
+  /** Saves a partial patch of the master screen settings. Rejects with 409 when the campaign is not a git repository. */
+  saveSettings(patch: ScreenSettingsPatch): Promise<SettingsResponse> {
+    return this.request('PUT', '/settings', { body: patch });
+  }
+
   shutdown(): Promise<{ ok: true }> {
     return this.request('POST', '/shutdown');
   }
 
   /** Rejects with an ApiFailure (`{ error, status, message? }`) that keeps the server's error text; never with a raw Error. */
   private async request<T>(
-    method: 'GET' | 'POST',
+    method: 'GET' | 'POST' | 'PUT',
     path: string,
     options: { query?: Query; body?: unknown } = {},
   ): Promise<T> {

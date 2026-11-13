@@ -1,128 +1,431 @@
-<h1>{{ t('settings.title') }}</h1>
+<header class="page-head">
+  <h1>{{ t('settings.title') }}</h1>
+  <p class="save-state" role="status" aria-live="polite" [class.error]="!canSave() || settingsService.saveState() === 'error'">
+    @if (!canSave()) {
+      <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
+      <span>{{ t('settingsPage.noHistory') }}</span>
+    } @else if (settingsService.saveState() === 'saving') {
+      <lucide-angular [img]="icons.LoaderCircle" [size]="16" aria-hidden="true" class="spin" />
+      <span>{{ t('settingsPage.saving') }}</span>
+    } @else if (settingsService.saveState() === 'saved') {
+      <lucide-angular [img]="icons.Check" [size]="16" aria-hidden="true" />
+      <span>{{ t('settingsPage.saved') }}</span>
+    } @else if (settingsService.saveState() === 'error') {
+      <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
+      <span>{{ settingsService.saveError() }}</span>
+    }
+  </p>
+</header>
 
-<div class="cards">
-  <section class="card" aria-labelledby="settings-appearance">
-    <h2 id="settings-appearance">{{ t('settings.appearance') }}</h2>
+<div class="layout">
+  <nav class="toc" [attr.aria-label]="t('settingsPage.sectionsNav')">
+    @for (item of tocItems(); track item.id) {
+      <a class="toc-link" [attr.href]="'#' + item.id" [class.active]="activeId() === item.id"
+         [attr.aria-current]="activeId() === item.id ? 'true' : null" (click)="jump($event, item.id)">{{ t(item.label) }}</a>
+    }
+  </nav>
 
-    <p class="label" id="settings-theme-label">{{ t('nav.theme') }}</p>
-    <div class="segmented" role="group" aria-labelledby="settings-theme-label">
-      @for (option of themeOptions; track option.pref) {
-        <button type="button" class="segment" [class.active]="isTheme(option.pref)" [attr.aria-pressed]="isTheme(option.pref)"
-                [attr.aria-label]="themeLabel(option.pref)" [title]="themeLabel(option.pref)" (click)="setTheme(option.pref)">
-          <lucide-angular [img]="option.icon === 'monitor' ? icons.Monitor : option.icon === 'sun' ? icons.Sun : icons.Moon"
-                          [size]="18" aria-hidden="true" />
-          <span>{{ themeShortLabel(option.pref) }}</span>
-        </button>
-      }
-    </div>
-
-    <label class="label" for="settings-text-size">{{ t('settings.textSize') }}: {{ scaleLabel() }}</label>
-    <input id="settings-text-size" class="range" type="range" [min]="scaleMin" [max]="scaleMax" [step]="scaleStep"
-           [value]="textScale()" [attr.aria-valuetext]="scaleLabel()" (input)="onScale($any($event.target).value)" />
-    <p class="muted">{{ t('settings.textSizeHint') }}</p>
-  </section>
-
-  <section class="card" aria-labelledby="settings-combat">
-    <h2 id="settings-combat">{{ t('combat.settings.heading') }}</h2>
-    <label class="toggle">
-      <input type="checkbox" [checked]="showBattleMaps()" (change)="setShowBattleMaps($any($event.target).checked)" />
-      <span>{{ t('combat.settings.showMaps') }}</span>
-    </label>
-    <p class="muted">{{ t('combat.settings.showMapsHint') }}</p>
-  </section>
-
-  <section class="card" aria-labelledby="settings-checks">
-    <div class="card-head">
-      <h2 id="settings-checks">{{ t('settings.checks') }}</h2>
-      <button type="button" class="icon-btn" [disabled]="checking()"
-              [attr.aria-label]="checking() ? t('settings.checking') : t('settings.checkAgain')"
-              [title]="checking() ? t('settings.checking') : t('settings.checkAgain')" (click)="runChecks()">
-        <lucide-angular [img]="checking() ? icons.LoaderCircle : icons.RefreshCw" [size]="18" aria-hidden="true"
-                        [class.spin]="checking()" />
-      </button>
-    </div>
-
-    @if (checkError(); as message) {
-      <p class="error" role="alert">{{ message }}</p>
+  <div class="sections">
+    @if (settingsService.loadError() !== null) {
+      <p class="banner" role="alert">{{ t('settingsPage.loadError') }}</p>
     }
 
-    @if (checks(); as result) {
-      <ul class="summary">
-        @for (line of lines(); track $index) {
-          <li [class.warn]="line.broken">{{ line.text }}</li>
-        }
-      </ul>
-      @if (checkedTime() !== '') {
-        <p class="muted">{{ t('settings.checkedAt', { time: checkedTime() }) }}</p>
-      }
-
-      @if (result.brokenLinks.length > 0) {
-        <details>
-          <summary>{{ t('settings.brokenList') }} ({{ result.brokenLinks.length }})</summary>
-          <ul class="plain">
-            @for (link of result.brokenLinks; track $index) {
-              <li>{{ linkLine(link.from, link.to) }}</li>
-            }
-          </ul>
-        </details>
-      }
-      @if (result.sketches.length > 0) {
-        <details>
-          <summary>{{ t('settings.sketchesList') }} ({{ result.sketches.length }})</summary>
-          <ul class="plain">
-            @for (path of result.sketches; track path) {
-              <li>{{ path }}</li>
-            }
-          </ul>
-        </details>
-      }
-      @if (result.exclusions.length > 0) {
-        <details>
-          <summary>{{ t('settings.exclusionsList') }} ({{ result.exclusions.length }})</summary>
-          <ul class="plain">
-            @for (item of result.exclusions; track $index) {
-              <li>{{ item }}</li>
-            }
-          </ul>
-        </details>
-      }
-    } @else if (checkError() === null) {
-      <p class="muted" role="status">{{ t('settings.loading') }}</p>
-    }
-  </section>
-
-  <section class="card" aria-labelledby="settings-about">
-    <h2 id="settings-about">{{ t('settings.about') }}</h2>
-    <dl class="facts">
-      <dt>{{ t('settings.campaign') }}</dt>
-      <dd>{{ campaign()?.name ?? '' }}</dd>
-      <dt>{{ t('settings.version') }}</dt>
-      <dd>{{ framework() }}</dd>
-      <dt>{{ t('settings.assistant') }}</dt>
-      <dd>
-        @if (agent()?.available) {
-          {{ t('settings.agentReady') }}
+    <!-- Table -->
+    <section class="card" id="s-table" aria-labelledby="h-table">
+      <div class="card-head">
+        <h2 id="h-table">{{ t('settingsPage.section.table') }}</h2>
+        <button type="button" class="link-btn" (click)="resetTable()" [disabled]="sectionIsDefault('table') || !canSave()">{{ t('settingsPage.reset') }}</button>
+      </div>
+      <div class="rows">
+        @if (settingsService.loaded()) {
+          <div class="row">
+            <div class="row-text">
+              <span class="row-label" id="l-live-model">{{ t('settingsPage.liveModel.label') }}</span>
+              <span class="row-hint">{{ t('settingsPage.liveModel.hint') }}</span>
+            </div>
+            <div class="row-control">
+              <div class="segmented" role="radiogroup" aria-labelledby="l-live-model">
+                @for (option of modelOptions; track option.value) {
+                  <button type="button" class="segment" role="radio" [class.active]="shown().live.model === option.value"
+                          [attr.aria-checked]="shown().live.model === option.value" [title]="option.title ? t(option.title) : ''"
+                          [disabled]="!canSave()" (click)="setLive({ model: option.value })">{{ t(option.label) }}</button>
+                }
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-text">
+              <span class="row-label" id="l-combat-model">{{ t('settingsPage.combatModel.label') }}</span>
+              <span class="row-hint">{{ t('settingsPage.combatModel.hint') }}</span>
+            </div>
+            <div class="row-control">
+              <div class="segmented" role="radiogroup" aria-labelledby="l-combat-model">
+                @for (option of modelOptions; track option.value) {
+                  <button type="button" class="segment" role="radio" [class.active]="shown().combat.model === option.value"
+                          [attr.aria-checked]="shown().combat.model === option.value" [title]="option.title ? t(option.title) : ''"
+                          [disabled]="!canSave()" (click)="setCombat({ model: option.value })">{{ t(option.label) }}</button>
+                }
+              </div>
+            </div>
+          </div>
         } @else {
-          {{ t('settings.agentUnavailable') }}
-          @if (agent()?.reason; as reason) {
-            <span class="muted block">{{ reason }}</span>
+          @for (n of skeletonRows; track n) {
+            <div class="row-skel" aria-hidden="true"></div>
           }
         }
-      </dd>
-    </dl>
-  </section>
+      </div>
+    </section>
 
-  <section class="card" aria-labelledby="settings-modules">
-    <h2 id="settings-modules">{{ t('settings.modules') }}</h2>
-    <ul class="modules">
-      @for (row of moduleRows(); track row.id) {
-        <li>
-          <span class="dot" [class.on]="row.on" aria-hidden="true"></span>
-          <span class="module-name">{{ moduleLabel(row.id) }}</span>
-          <span class="state" [class.on]="row.on">{{ row.on ? t('settings.on') : t('settings.off') }}</span>
-        </li>
+    <!-- Combat -->
+    <section class="card" id="s-combat" aria-labelledby="h-combat">
+      <div class="card-head">
+        <h2 id="h-combat">{{ t('combat.settings.heading') }}</h2>
+        <button type="button" class="link-btn" (click)="resetCombat()" [disabled]="sectionIsDefault('combat') || !canSave()">{{ t('settingsPage.reset') }}</button>
+      </div>
+      <div class="rows">
+        @if (settingsService.loaded()) {
+          <div class="row">
+            <div class="row-text">
+              <span class="row-label" id="l-show-maps">{{ t('combat.settings.showMaps') }}</span>
+              <span class="row-hint">{{ t('combat.settings.showMapsHint') }}</span>
+            </div>
+            <div class="row-control">
+              <button type="button" class="switch" role="switch" aria-labelledby="l-show-maps"
+                      [attr.aria-checked]="shown().combat.showMaps" [disabled]="!canSave()"
+                      (click)="setCombat({ showMaps: !shown().combat.showMaps })"><span class="thumb"></span></button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-text">
+              <span class="row-label" id="l-panels">{{ t('settingsPage.combat.panels') }}</span>
+              <span class="row-hint">{{ t('settingsPage.combat.panelsHint') }}</span>
+            </div>
+            <div class="row-control chips" role="group" aria-labelledby="l-panels">
+              @for (panel of panelOptions; track panel.key) {
+                <button type="button" class="chip" [attr.aria-pressed]="shown().combat.panels[panel.key]"
+                        [disabled]="!canSave()" (click)="togglePanel(panel.key)">
+                  @if (shown().combat.panels[panel.key]) {
+                    <lucide-angular [img]="icons.Check" [size]="14" aria-hidden="true" />
+                  }
+                  {{ t(panel.label) }}
+                </button>
+              }
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-text">
+              <span class="row-label" id="l-autohide">{{ t('settingsPage.combat.autoHide') }}</span>
+              <span class="row-hint">{{ t('settingsPage.combat.autoHideHint') }}</span>
+            </div>
+            <div class="row-control">
+              <button type="button" class="switch" role="switch" aria-labelledby="l-autohide"
+                      [attr.aria-checked]="shown().combat.autoHide" [disabled]="!canSave()"
+                      (click)="setCombat({ autoHide: !shown().combat.autoHide })"><span class="thumb"></span></button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-text">
+              <span class="row-label" id="l-autohide-seconds">{{ t('settingsPage.combat.autoHideSeconds') }}</span>
+              <span class="row-hint">{{ t('settingsPage.combat.autoHideSecondsHint') }}</span>
+            </div>
+            <div class="row-control slider">
+              <input type="range" class="range" min="2" max="15" step="1" aria-labelledby="l-autohide-seconds"
+                     [attr.aria-valuetext]="shown().combat.autoHideSeconds + ' s'" [value]="shown().combat.autoHideSeconds"
+                     [disabled]="!canSave() || !shown().combat.autoHide" (input)="onAutoHideSeconds($any($event.target).value)" />
+              <output class="value">{{ shown().combat.autoHideSeconds }} s</output>
+            </div>
+          </div>
+        } @else {
+          @for (n of skeletonRows; track n) {
+            <div class="row-skel" aria-hidden="true"></div>
+          }
+        }
+      </div>
+    </section>
+
+    <!-- Music, only when the music module is on -->
+    @if (musicOn()) {
+      <section class="card" id="s-music" aria-labelledby="h-music">
+        <div class="card-head">
+          <h2 id="h-music">{{ t('nav.music') }}</h2>
+          <button type="button" class="link-btn" (click)="resetSection('music')" [disabled]="sectionIsDefault('music') || !canSave()">{{ t('settingsPage.reset') }}</button>
+        </div>
+        <div class="rows">
+          @if (settingsService.loaded()) {
+            <div class="row">
+              <div class="row-text">
+                <span class="row-label" id="l-volume">{{ t('music.volume') }}</span>
+                <span class="row-hint">{{ t('settingsPage.music.volumeHint') }}</span>
+              </div>
+              <div class="row-control slider">
+                <input type="range" class="range" min="0" max="100" step="5" aria-labelledby="l-volume"
+                       [attr.aria-valuetext]="shown().music.volume + '%'" [value]="shown().music.volume"
+                       [disabled]="!canSave()" (input)="onVolume($any($event.target).value)" />
+                <output class="value">{{ shown().music.volume }}%</output>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-label" id="l-fade">{{ t('settingsPage.music.fade') }}</span>
+                <span class="row-hint">{{ t('settingsPage.music.fadeHint') }}</span>
+              </div>
+              <div class="row-control slider">
+                <input type="range" class="range" min="1" max="10" step="1" aria-labelledby="l-fade"
+                       [attr.aria-valuetext]="shown().music.fadeSeconds + ' s'" [value]="shown().music.fadeSeconds"
+                       [disabled]="!canSave()" (input)="onFadeSeconds($any($event.target).value)" />
+                <output class="value">{{ shown().music.fadeSeconds }} s</output>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-label" id="l-loop">{{ t('music.loop') }}</span>
+                <span class="row-hint">{{ t('settingsPage.music.loopHint') }}</span>
+              </div>
+              <div class="row-control">
+                <button type="button" class="switch" role="switch" aria-labelledby="l-loop"
+                        [attr.aria-checked]="shown().music.loop" [disabled]="!canSave()"
+                        (click)="setMusic({ loop: !shown().music.loop })"><span class="thumb"></span></button>
+              </div>
+            </div>
+            <div class="row">
+              <div class="row-text">
+                <span class="row-label" id="l-dock">{{ t('settingsPage.music.dock') }}</span>
+                <span class="row-hint">{{ t('settingsPage.music.dockHint') }}</span>
+              </div>
+              <div class="row-control">
+                <div class="segmented" role="radiogroup" aria-labelledby="l-dock">
+                  @for (option of dockOptions; track option.value) {
+                    <button type="button" class="segment" role="radio" [class.active]="shown().music.dock === option.value"
+                            [attr.aria-checked]="shown().music.dock === option.value" [disabled]="!canSave()"
+                            (click)="setMusic({ dock: option.value })">{{ t(option.label) }}</button>
+                  }
+                </div>
+              </div>
+            </div>
+          } @else {
+            @for (n of skeletonRows; track n) {
+              <div class="row-skel" aria-hidden="true"></div>
+            }
+          }
+        </div>
+      </section>
+    }
+
+    <!-- Appearance -->
+    <section class="card" id="s-appearance" aria-labelledby="h-appearance">
+      <div class="card-head">
+        <h2 id="h-appearance">{{ t('settings.appearance') }}</h2>
+        <button type="button" class="link-btn" (click)="resetSection('ui')" [disabled]="sectionIsDefault('ui') || !canSave()">{{ t('settingsPage.reset') }}</button>
+      </div>
+      <div class="rows local">
+        <div class="row">
+          <div class="row-text">
+            <span class="row-label" id="l-theme">{{ t('nav.theme') }}</span>
+            <span class="row-hint">{{ t('settingsPage.theme.hint') }}</span>
+          </div>
+          <div class="row-control">
+            <div class="segmented" role="radiogroup" aria-labelledby="l-theme">
+              @for (option of themeOptions; track option.pref) {
+                <button type="button" class="segment" role="radio" [class.active]="isTheme(option.pref)"
+                        [attr.aria-checked]="isTheme(option.pref)" [title]="themeLabel(option.pref)" (click)="setTheme(option.pref)">
+                  <lucide-angular [img]="option.icon === 'monitor' ? icons.Monitor : option.icon === 'sun' ? icons.Sun : icons.Moon"
+                                  [size]="18" aria-hidden="true" />
+                  <span>{{ themeShortLabel(option.pref) }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="row-text">
+            <span class="row-label" id="l-text-size">{{ t('settings.textSize') }}</span>
+            <span class="row-hint">{{ t('settings.textSizeHint') }}</span>
+          </div>
+          <div class="row-control slider">
+            <input type="range" class="range" id="settings-text-size" [min]="scaleMin" [max]="scaleMax" [step]="scaleStep"
+                   aria-labelledby="l-text-size" [value]="textScale()" [attr.aria-valuetext]="scaleLabel()"
+                   (input)="onScale($any($event.target).value)" />
+            <output class="value">{{ scaleLabel() }}</output>
+          </div>
+        </div>
+      </div>
+      <p class="note">{{ t('settingsPage.localNote') }}</p>
+
+      <div class="rows">
+        @if (settingsService.loaded()) {
+          <div class="row">
+            <div class="row-text">
+              <span class="row-label" id="l-density">{{ t('settingsPage.ui.density') }}</span>
+              <span class="row-hint">{{ t('settingsPage.ui.densityHint') }}</span>
+            </div>
+            <div class="row-control">
+              <div class="segmented" role="radiogroup" aria-labelledby="l-density">
+                @for (option of densityOptions; track option.value) {
+                  <button type="button" class="segment" role="radio" [class.active]="shown().ui.density === option.value"
+                          [attr.aria-checked]="shown().ui.density === option.value" [disabled]="!canSave()"
+                          (click)="setUi({ density: option.value })">{{ t(option.label) }}</button>
+                }
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-text">
+              <span class="row-label" id="l-motion">{{ t('settingsPage.ui.motion') }}</span>
+              <span class="row-hint">{{ t('settingsPage.ui.motionHint') }}</span>
+            </div>
+            <div class="row-control">
+              <div class="segmented" role="radiogroup" aria-labelledby="l-motion">
+                @for (option of motionOptions; track option.value) {
+                  <button type="button" class="segment" role="radio" [class.active]="shown().ui.motion === option.value"
+                          [attr.aria-checked]="shown().ui.motion === option.value" [disabled]="!canSave()"
+                          (click)="setUi({ motion: option.value })">{{ t(option.label) }}</button>
+                }
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-text">
+              <span class="row-label" id="l-start">{{ t('settingsPage.ui.startPage') }}</span>
+              <span class="row-hint">{{ t('settingsPage.ui.startPageHint') }}</span>
+            </div>
+            <div class="row-control">
+              <div class="segmented four" role="radiogroup" aria-labelledby="l-start">
+                @for (option of startOptions; track option.value) {
+                  <button type="button" class="segment" role="radio" [class.active]="shown().ui.startPage === option.value"
+                          [attr.aria-checked]="shown().ui.startPage === option.value" [disabled]="!canSave()"
+                          (click)="setUi({ startPage: option.value })">{{ t(option.label) }}</button>
+                }
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="row-text">
+              <span class="row-label" id="l-rail">{{ t('settingsPage.ui.rail') }}</span>
+              <span class="row-hint">{{ t('settingsPage.ui.railHint') }}</span>
+            </div>
+            <div class="row-control chips" role="group" aria-labelledby="l-rail">
+              @for (item of railOptions(); track item.key) {
+                <button type="button" class="chip" [attr.aria-pressed]="shown().ui.rail[item.key]"
+                        [disabled]="!canSave()" (click)="toggleRail(item.key)">
+                  @if (shown().ui.rail[item.key]) {
+                    <lucide-angular [img]="icons.Check" [size]="14" aria-hidden="true" />
+                  }
+                  {{ t(item.label) }}
+                </button>
+              }
+            </div>
+          </div>
+        } @else {
+          @for (n of skeletonRows; track n) {
+            <div class="row-skel" aria-hidden="true"></div>
+          }
+        }
+      </div>
+    </section>
+
+    <!-- Checks -->
+    <section class="card" id="s-checks" aria-labelledby="h-checks">
+      <div class="card-head">
+        <h2 id="h-checks">{{ t('settings.checks') }}</h2>
+        <button type="button" class="icon-btn" [disabled]="checking()"
+                [attr.aria-label]="checking() ? t('settings.checking') : t('settings.checkAgain')"
+                [title]="checking() ? t('settings.checking') : t('settings.checkAgain')" (click)="runChecks()">
+          <lucide-angular [img]="checking() ? icons.LoaderCircle : icons.RefreshCw" [size]="18" aria-hidden="true"
+                          [class.spin]="checking()" />
+        </button>
+      </div>
+
+      @if (checkError(); as message) {
+        <p class="error" role="alert">{{ message }}</p>
       }
-    </ul>
-    <p class="muted">{{ t('settings.modulesNote') }}</p>
-  </section>
+
+      @if (checks(); as result) {
+        <div class="kpis">
+          @for (kpi of kpis(); track $index) {
+            <div class="kpi" [class.warn]="kpi.warn" [title]="kpi.title">
+              <span class="kpi-count" [class.zero]="kpi.count === 0">{{ kpi.count }}</span>
+              <span class="kpi-label">
+                @if (kpi.warn) {
+                  <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
+                }
+                {{ t(kpi.label) }}
+              </span>
+            </div>
+          }
+        </div>
+        @if (checkedTime() !== '') {
+          <p class="muted">{{ t('settings.checkedAt', { time: checkedTime() }) }}</p>
+        }
+
+        @if (result.brokenLinks.length > 0) {
+          <details>
+            <summary>{{ t('settings.brokenList') }} ({{ result.brokenLinks.length }})</summary>
+            <ul class="plain">
+              @for (link of result.brokenLinks; track $index) {
+                <li>{{ linkLine(link.from, link.to) }}</li>
+              }
+            </ul>
+          </details>
+        }
+        @if (result.sketches.length > 0) {
+          <details>
+            <summary>{{ t('settings.sketchesList') }} ({{ result.sketches.length }})</summary>
+            <ul class="plain">
+              @for (path of result.sketches; track path) {
+                <li>{{ path }}</li>
+              }
+            </ul>
+          </details>
+        }
+        @if (result.exclusions.length > 0) {
+          <details>
+            <summary>{{ t('settings.exclusionsList') }} ({{ result.exclusions.length }})</summary>
+            <ul class="plain">
+              @for (item of result.exclusions; track $index) {
+                <li>{{ item }}</li>
+              }
+            </ul>
+          </details>
+        }
+      } @else if (checkError() === null) {
+        <div class="kpis" aria-hidden="true">
+          @for (n of skeletonRows; track n) {
+            <div class="kpi-skel"></div>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- About -->
+    <section class="card" id="s-about" aria-labelledby="h-about">
+      <h2 id="h-about">{{ t('settings.about') }}</h2>
+      <dl class="facts">
+        <dt>{{ t('settings.campaign') }}</dt>
+        <dd>{{ campaign()?.name ?? '' }}</dd>
+        <dt>{{ t('settings.version') }}</dt>
+        <dd>{{ framework() }}</dd>
+        <dt>{{ t('settings.assistant') }}</dt>
+        <dd>
+          @if (agent()?.available) {
+            {{ t('settings.agentReady') }}
+          } @else {
+            {{ t('settings.agentUnavailable') }}
+            @if (agent()?.reason; as reason) {
+              <span class="muted block">{{ reason }}</span>
+            }
+          }
+        </dd>
+      </dl>
+      <p class="sub-label">{{ t('settings.modules') }}</p>
+      <ul class="pills">
+        @for (row of moduleRows(); track row.id) {
+          <li class="pill">
+            <span class="dot" [class.on]="row.on" aria-hidden="true"></span>
+            <span>{{ moduleLabel(row.id) }} · {{ row.on ? t('settings.on') : t('settings.off') }}</span>
+          </li>
+        }
+      </ul>
+      <p class="muted">{{ t('settings.modulesNote') }}</p>
+    </section>
+  </div>
 </div>

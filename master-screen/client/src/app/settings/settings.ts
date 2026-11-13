@@ -1,9 +1,20 @@
-import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { LoaderCircle, LucideAngularModule, Monitor, Moon, RefreshCw, Sun } from 'lucide-angular';
-import type { ChecksResponse, ModuleId } from '@shared/types';
+import {
+  Component,
+  DestroyRef,
+  ElementRef,
+  afterNextRender,
+  afterRenderEffect,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
+import { Check, LoaderCircle, LucideAngularModule, Monitor, Moon, RefreshCw, Sun, TriangleAlert } from 'lucide-angular';
+import type { ChecksResponse, ModuleId, ScreenModel, ScreenSettings, ScreenSettingsPatch } from '@shared/types';
 import { ApiService, isApiFailure } from '../core/api.service';
 import { PrefsService } from '../core/prefs.service';
-import { BattleMapPrefs } from '../cockpit/combat/battle-maps-pref';
+import { SettingsService } from '../core/settings.service';
 import { StatusService } from '../core/status.service';
 import { ThemePref, ThemeService } from '../core/theme.service';
 import { I18n, type TranslationKey } from '../i18n';
@@ -22,6 +33,66 @@ const THEME_OPTIONS: Array<{ pref: ThemePref; key: TranslationKey; icon: 'monito
   { pref: 'system', key: 'theme.system', icon: 'monitor' },
   { pref: 'light', key: 'theme.light', icon: 'sun' },
   { pref: 'dark', key: 'theme.dark', icon: 'moon' },
+];
+
+type SectionKey = 'table' | 'combat' | 'music' | 'ui';
+type PanelKey = keyof ScreenSettings['combat']['panels'];
+type RailKey = keyof ScreenSettings['ui']['rail'];
+
+interface Option<T extends string> {
+  value: T;
+  label: TranslationKey;
+  title?: TranslationKey;
+}
+
+interface TocItem {
+  id: string;
+  label: TranslationKey;
+}
+
+interface Kpi {
+  count: number;
+  label: TranslationKey;
+  title: string;
+  warn: boolean;
+}
+
+const MODEL_OPTIONS: Option<ScreenModel>[] = [
+  { value: 'haiku', label: 'liveModel.haiku', title: 'liveModel.haiku.desc' },
+  { value: 'sonnet', label: 'liveModel.sonnet', title: 'liveModel.sonnet.desc' },
+  { value: 'opus', label: 'liveModel.opus', title: 'liveModel.opus.desc' },
+];
+const DENSITY_OPTIONS: Option<ScreenSettings['ui']['density']>[] = [
+  { value: 'comfortable', label: 'settingsPage.density.comfortable' },
+  { value: 'compact', label: 'settingsPage.density.compact' },
+];
+const MOTION_OPTIONS: Option<ScreenSettings['ui']['motion']>[] = [
+  { value: 'system', label: 'settingsPage.motion.system' },
+  { value: 'reduced', label: 'settingsPage.motion.reduced' },
+];
+const START_OPTIONS: Option<ScreenSettings['ui']['startPage']>[] = [
+  { value: 'home', label: 'nav.home' },
+  { value: 'live', label: 'nav.liveTable' },
+  { value: 'plot', label: 'nav.plot' },
+  { value: 'docs', label: 'nav.documents' },
+];
+const DOCK_OPTIONS: Option<ScreenSettings['music']['dock']>[] = [
+  { value: 'always', label: 'settingsPage.music.dock.always' },
+  { value: 'playing', label: 'settingsPage.music.dock.playing' },
+];
+const PANEL_OPTIONS: { key: PanelKey; label: TranslationKey }[] = [
+  { key: 'initiative', label: 'settingsPage.combat.panel.initiative' },
+  { key: 'turn', label: 'settingsPage.combat.panel.turn' },
+  { key: 'chat', label: 'settingsPage.combat.panel.chat' },
+  { key: 'music', label: 'nav.music' },
+];
+/** Sidebar items. Items with a module are offered only when that module is on. */
+const RAIL_OPTIONS: { key: RailKey; label: TranslationKey; module: ModuleId | null }[] = [
+  { key: 'plot', label: 'nav.plot', module: null },
+  { key: 'docs', label: 'nav.documents', module: null },
+  { key: 'music', label: 'nav.music', module: 'music' },
+  { key: 'encyclopedia', label: 'nav.encyclopedia', module: 'encyclopedia' },
+  { key: 'print', label: 'nav.print', module: 'print' },
 ];
 
 export interface CheckLine {
@@ -64,23 +135,47 @@ export class Settings {
   private readonly prefs = inject(PrefsService);
   private readonly theme = inject(ThemeService);
   private readonly status = inject(StatusService);
-  private readonly battleMaps = inject(BattleMapPrefs);
-  readonly showBattleMaps = this.battleMaps.showMaps;
+  private readonly host = inject(ElementRef) as ElementRef<HTMLElement>;
+  readonly settingsService = inject(SettingsService);
   readonly i18n = inject(I18n);
 
-  readonly icons = { LoaderCircle, Monitor, Moon, RefreshCw, Sun };
+  readonly icons = { Check, LoaderCircle, Monitor, Moon, RefreshCw, Sun, TriangleAlert };
   readonly themeOptions = THEME_OPTIONS;
+  readonly modelOptions = MODEL_OPTIONS;
+  readonly densityOptions = DENSITY_OPTIONS;
+  readonly motionOptions = MOTION_OPTIONS;
+  readonly startOptions = START_OPTIONS;
+  readonly dockOptions = DOCK_OPTIONS;
+  readonly panelOptions = PANEL_OPTIONS;
+  readonly skeletonRows = [1, 2, 3];
   readonly scaleMin = TEXT_SCALE_MIN;
   readonly scaleMax = TEXT_SCALE_MAX;
   readonly scaleStep = TEXT_SCALE_STEP;
+
+  /** What the page shows (saved settings plus the change waiting for the save). */
+  readonly shown = this.settingsService.shown;
+  readonly defaults = this.settingsService.defaults;
+  readonly canSave = this.settingsService.canSave;
 
   readonly textScale = signal(100);
   readonly checks = signal<ChecksResponse | null>(null);
   readonly checkError = signal<string | null>(null);
   readonly checking = signal(false);
+  readonly activeId = signal('s-table');
   readonly lines = computed<CheckLine[]>(() => {
     const result = this.checks();
     return result ? checkSummary(result, (key, params) => this.t(key, params)) : [];
+  });
+  readonly kpis = computed<Kpi[]>(() => {
+    const result = this.checks();
+    if (!result) return [];
+    const lines = this.lines();
+    const broken = result.brokenLinks.length;
+    return [
+      { count: broken, label: 'settings.brokenList', title: lines[0]?.text ?? '', warn: broken > 0 },
+      { count: result.sketches.length, label: 'settings.sketchesList', title: lines[1]?.text ?? '', warn: false },
+      { count: result.exclusions.length, label: 'settings.exclusionsList', title: lines[2]?.text ?? '', warn: false },
+    ];
   });
   readonly checkedTime = computed(() => {
     const iso = this.checks()?.checkedAt;
@@ -93,11 +188,26 @@ export class Settings {
   readonly campaign = computed(() => this.status.campaign());
   readonly framework = computed(() => this.status.status()?.frameworkVersion ?? '');
   readonly agent = computed(() => this.status.status()?.agent ?? null);
+  readonly musicOn = computed(() => this.status.modules()?.music === true);
   readonly moduleRows = computed(() => {
     const modules = this.status.modules();
     if (!modules) return [];
     return MODULE_ORDER.map((id) => ({ id, on: modules[id] === true }));
   });
+  readonly railOptions = computed(() => {
+    const modules = this.status.modules();
+    return RAIL_OPTIONS.filter((item) => item.module === null || modules?.[item.module] === true);
+  });
+  readonly tocItems = computed<TocItem[]>(() => [
+    { id: 's-table', label: 'settingsPage.section.table' },
+    { id: 's-combat', label: 'combat.settings.heading' },
+    ...(this.musicOn() ? [{ id: 's-music', label: 'nav.music' as TranslationKey }] : []),
+    { id: 's-appearance', label: 'settings.appearance' },
+    { id: 's-checks', label: 'settings.checks' },
+    { id: 's-about', label: 'settings.about' },
+  ]);
+
+  private observer: IntersectionObserver | null = null;
 
   constructor() {
     effect(() => {
@@ -105,6 +215,12 @@ export class Settings {
       const saved = readTextScale(this.prefs);
       untracked(() => this.textScale.set(saved));
     });
+    afterNextRender(() => this.startScrollSpy());
+    afterRenderEffect(() => {
+      this.tocItems();
+      untracked(() => this.observeSections());
+    });
+    inject(DestroyRef).onDestroy(() => this.observer?.disconnect());
     void this.loadChecks();
   }
 
@@ -168,9 +284,101 @@ export class Settings {
     return this.t('settings.linkLine', { from, to });
   }
 
-  setShowBattleMaps(on: boolean): void {
-    this.battleMaps.set(on);
+  readonly scaleLabel = computed(() => this.t('settings.textSizeValue', { percent: this.textScale() }));
+
+  // Sections: reset and default state. `ui` is the Appearance section.
+
+  /** True when the settings file sets nothing that belongs to the section. */
+  sectionIsDefault(section: SectionKey): boolean {
+    return !this.settingsService.explicit().some((path) => this.ownsPath(section, path));
   }
 
-  readonly scaleLabel = computed(() => this.t('settings.textSizeValue', { percent: this.textScale() }));
+  private ownsPath(section: SectionKey, path: string): boolean {
+    if (section === 'table') return path.startsWith('live.') || path === 'combat.model';
+    if (section === 'combat') return path.startsWith('combat.') && path !== 'combat.model';
+    return path.startsWith(`${section}.`);
+  }
+
+  /** Table owns the live model and the combat model; both go back to their defaults. */
+  resetTable(): void {
+    this.settingsService.update({ live: this.defaults().live, combat: { model: this.defaults().combat.model } });
+  }
+
+  /** Combat resets everything except the model, which belongs to the Table section. */
+  resetCombat(): void {
+    this.settingsService.update({ combat: { ...this.defaults().combat, model: this.shown().combat.model } });
+  }
+
+  resetSection(section: 'music' | 'ui'): void {
+    this.settingsService.reset(section);
+  }
+
+  // Changes. Each one is queued by SettingsService and saved after a short pause.
+
+  setLive(patch: NonNullable<ScreenSettingsPatch['live']>): void {
+    this.settingsService.update({ live: patch });
+  }
+
+  setCombat(patch: NonNullable<ScreenSettingsPatch['combat']>): void {
+    this.settingsService.update({ combat: patch });
+  }
+
+  setMusic(patch: NonNullable<ScreenSettingsPatch['music']>): void {
+    this.settingsService.update({ music: patch });
+  }
+
+  setUi(patch: NonNullable<ScreenSettingsPatch['ui']>): void {
+    this.settingsService.update({ ui: patch });
+  }
+
+  togglePanel(key: PanelKey): void {
+    const panels = this.shown().combat.panels;
+    this.setCombat({ panels: { ...panels, [key]: !panels[key] } });
+  }
+
+  toggleRail(key: RailKey): void {
+    const rail = this.shown().ui.rail;
+    this.setUi({ rail: { ...rail, [key]: !rail[key] } });
+  }
+
+  onAutoHideSeconds(raw: string): void {
+    this.setCombat({ autoHideSeconds: Number(raw) });
+  }
+
+  onVolume(raw: string): void {
+    this.setMusic({ volume: Number(raw) });
+  }
+
+  onFadeSeconds(raw: string): void {
+    this.setMusic({ fadeSeconds: Number(raw) });
+  }
+
+  // Scroll spy and table of contents.
+
+  private startScrollSpy(): void {
+    if (typeof IntersectionObserver === 'undefined') return;
+    this.observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) this.activeId.set(entry.target.id);
+        }
+      },
+      { rootMargin: '-20% 0px -70% 0px' },
+    );
+    this.observeSections();
+  }
+
+  private observeSections(): void {
+    const observer = this.observer;
+    if (!observer) return;
+    observer.disconnect();
+    this.host.nativeElement.querySelectorAll<HTMLElement>('section[id]').forEach((section) => observer.observe(section));
+  }
+
+  jump(event: Event, id: string): void {
+    event.preventDefault();
+    this.activeId.set(id);
+    const target = this.host.nativeElement.querySelector<HTMLElement>(`#${id}`);
+    target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }
 }

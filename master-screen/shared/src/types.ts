@@ -70,6 +70,41 @@ export type ChatModel = 'sonnet' | 'opus' | 'haiku';
 export type ChatEffort = 'low' | 'medium' | 'high' | 'max';
 export interface ChatChoice { model?: ChatModel; effort?: ChatEffort }
 
+// Master screen settings, saved in <campaign>/.campaign/master-screen.yaml.
+export type ScreenModel = 'haiku' | 'sonnet' | 'opus';
+export interface ScreenSettings {
+  live: { model: ScreenModel };
+  combat: {
+    model: ScreenModel;
+    showMaps: boolean;
+    panels: { initiative: boolean; turn: boolean; chat: boolean; music: boolean };
+    autoHide: boolean;
+    autoHideSeconds: number; // integer 2..15
+  };
+  music: { volume: number /* integer 0..100 */; fadeSeconds: number /* integer 1..10 */; loop: boolean; dock: 'always' | 'playing' };
+  ui: {
+    density: 'comfortable' | 'compact';
+    motion: 'system' | 'reduced';
+    startPage: 'home' | 'live' | 'plot' | 'docs';
+    rail: { plot: boolean; docs: boolean; music: boolean; encyclopedia: boolean; print: boolean };
+  };
+}
+/** Any subset of ScreenSettings, two levels deep (combat.panels and ui.rail may be partial too). */
+export type ScreenSettingsPatch = {
+  live?: Partial<ScreenSettings['live']>;
+  combat?: Partial<Omit<ScreenSettings['combat'], 'panels'>> & { panels?: Partial<ScreenSettings['combat']['panels']> };
+  music?: Partial<ScreenSettings['music']>;
+  ui?: Partial<Omit<ScreenSettings['ui'], 'rail'>> & { rail?: Partial<ScreenSettings['ui']['rail']> };
+};
+export interface SettingsResponse {
+  settings: ScreenSettings;
+  defaults: ScreenSettings;
+  /** False when the campaign folder is not a git repository: nothing can be saved. */
+  canSave: boolean;
+  /** Keys that the file sets explicitly, as dotted paths (e.g. "combat.showMaps"). */
+  explicit: string[];
+}
+
 export interface ChecksResponse {
   // checkedLinks (optional, added later): total number of links that were checked
 
@@ -91,7 +126,8 @@ export type LiveEvent =
   | { event: 'status'; data: StatusResponse }
   | { event: 'live'; data: { revision: string } }
   | { event: 'music'; data: { tracks: MusicTrack[]; reason?: string } }
-  | { event: 'musicstate'; data: MusicPlayback };
+  | { event: 'musicstate'; data: MusicPlayback }
+  | { event: 'settings'; data: ScreenSettings };
 
 // ---------------------------------------------------------------------------
 // Live session (phase 2). State files live in <campaign>/.campaign/state/live/.

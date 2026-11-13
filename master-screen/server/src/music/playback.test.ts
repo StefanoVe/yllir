@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { after, describe, it } from 'node:test';
-import type { MusicPlayback as PlaybackState } from '../../../shared/src/types.js';
+import type { MusicPlayback as PlaybackState, ScreenSettings } from '../../../shared/src/types.js';
 import { createCtx } from '../context.js';
 import { makeCampaign, tempDir } from '../live/test-support.js';
 import { loadMusicEntries, loadMusicLibrary } from './library.js';
@@ -48,7 +48,7 @@ interface Rig {
 
 const savedLog = process.env.FAKE_MPV_LOG;
 
-async function rig(opts: { tools?: ToolsResult; fadeMs?: number } = {}): Promise<Rig> {
+async function rig(opts: { tools?: ToolsResult; fadeMs?: number; omitFadeMs?: boolean } = {}): Promise<Rig> {
   const campaign = makeCampaign({ 'campaign.yaml': MUSIC_ON_YAML, 'Places/Test/Test.md': TEST_SHEET });
   cleanup.push(campaign);
   const ctx = createCtx({ campaignRoot: campaign, frameworkRoot: REAL_FRAMEWORK, port: 0, log: () => undefined });
@@ -70,7 +70,7 @@ async function rig(opts: { tools?: ToolsResult; fadeMs?: number } = {}): Promise
       spawned.push(proc);
       return proc;
     },
-    fadeMs: opts.fadeMs ?? 200,
+    ...(opts.omitFadeMs ? {} : { fadeMs: opts.fadeMs ?? 200 }),
     publishIntervalMs: 250,
   });
   const library = await loadMusicLibrary(ctx);
@@ -425,5 +425,75 @@ describe('MusicPlayback', () => {
     assert.ok(pid !== undefined);
     await r.close();
     assert.throws(() => process.kill(pid, 0));
+  });
+
+  it('applySettings while idle sets volume and loop, publishes once, and never spawns mpv', async () => {
+    const r = await rig();
+    try {
+      const before = r.states.length;
+      const music: ScreenSettings['music'] = { volume: 35, fadeSeconds: 2, loop: false, dock: 'always' };
+      r.playback.applySettings(music);
+      const state = r.playback.snapshot();
+      assert.equal(state.volume, 35);
+      assert.equal(state.loop, false);
+      assert.equal(state.phase, 'idle');
+      assert.equal(r.states.length, before + 1);
+      assert.equal(r.states[r.states.length - 1].volume, 35);
+      assert.equal(r.spawned.length, 0);
+      assert.equal(fs.existsSync(r.logFile), false);
+    } finally {
+      await r.close();
+    }
+  });
+
+  it('applySettings while a track plays leaves volume and loop alone', async () => {
+    const r = await rig();
+    try {
+      r.playback.play(r.trackId('Forest theme'));
+      await waitFor(() => r.playback.snapshot().phase === 'playing');
+      const music: ScreenSettings['music'] = { volume: 20, fadeSeconds: 2, loop: false, dock: 'always' };
+      r.playback.applySettings(music);
+      const state = r.playback.snapshot();
+      assert.equal(state.volume, 80);
+      assert.equal(state.loop, true);
+      assert.equal(state.phase, 'playing');
+    } finally {
+      await r.close();
+    }
+  });
+
+  it('a startup read does not overwrite a volume the master already set', async () => {
+    const r = await rig();
+    try {
+      r.playback.volume(40);
+      r.playback.applySettings({ volume: 90, fadeSeconds: 2, loop: false, dock: 'always' }, { startup: true });
+      assert.equal(r.playback.snapshot().volume, 40);
+      assert.equal(r.playback.snapshot().loop, true);
+    } finally {
+      await r.close();
+    }
+  });
+
+  it('fadeout uses the settings fade length when no fadeMs option is given', async () => {
+    const r = await rig({ omitFadeMs: true });
+    try {
+      r.playback.play(r.trackId('Forest theme'));
+      await waitFor(() => r.playback.snapshot().phase === 'playing');
+      // One second: ten steps of 100 ms, so the ramp sends 9 volume values (72 down to 8) before stop.
+      r.playback.applySettings({ volume: 80, fadeSeconds: 1, loop: true, dock: 'always' });
+      const sentBefore = sentCommands(r.logFile).length;
+      r.playback.fadeout();
+      await waitFor(() => r.playback.snapshot().phase === 'idle');
+      await waitFor(() => sentCommands(r.logFile).some((c) => c[0] === 'stop'));
+      const sent = sentCommands(r.logFile).slice(sentBefore);
+      const stopAt = sent.findIndex((c) => c[0] === 'stop');
+      const rampVolumes = sent
+        .slice(0, stopAt)
+        .filter((c) => c[0] === 'set_property' && c[1] === 'volume' && c[2] !== 80)
+        .map((c) => c[2]);
+      assert.deepEqual(rampVolumes, [72, 64, 56, 48, 40, 32, 24, 16, 8]);
+    } finally {
+      await r.close();
+    }
   });
 });

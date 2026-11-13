@@ -8,6 +8,7 @@ import { ClaudeProvider } from "./providers/claude.js";
 import { createCampaignFramework } from "./framework.js";
 import { createHostPorts } from "../cockpit-host/index.js";
 import type { BattleHost } from "../cockpit-host/battle.js";
+import { readSettings } from "../settings/store.js";
 
 export interface CampaignCockpit {
   cockpit: Cockpit;
@@ -23,6 +24,10 @@ export function createCampaignCockpit(ctx: Ctx): CampaignCockpit {
     provider: new ClaudeProvider({ cacheDir: ctx.state.dir }),
     ports,
     framework: createCampaignFramework(ctx),
+    defaultModels: async () => {
+      const { settings } = await readSettings(ctx);
+      return { live: settings.live.model, combat: settings.combat.model };
+    },
   });
   return { cockpit, battle: ports.battle };
 }

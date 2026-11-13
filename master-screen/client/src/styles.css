@@ -133,6 +133,16 @@
   --scrollbar-thumb: #4a5361;
 }
 
+/* Compact density (set on <html> from the settings): tighter spacing, same scale names. */
+:root[data-density="compact"] {
+  --space-1: 6px;
+  --space-2: 12px;
+  --space-3: 18px;
+  --space-4: 24px;
+  --space-5: 32px;
+  --space-6: 40px;
+}
+
 *,
 *::before,
 *::after {
@@ -300,6 +310,16 @@ textarea:focus-visible {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Reduced motion chosen in the settings, whatever the system says. */
+:root[data-motion="reduced"] *,
+:root[data-motion="reduced"] *::before,
+:root[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* Visually hidden, still read by screen readers. */

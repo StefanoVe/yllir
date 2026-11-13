@@ -8,41 +8,41 @@
        [attr.aria-label]="i18n.t('nav.liveTable')" [title]="i18n.t('nav.liveTable')">
       <lucide-angular [img]="icons.Dices" [size]="20" aria-hidden="true" />
     </a>
-    <a class="rail-item" routerLink="/plot" routerLinkActive="active" ariaCurrentWhenActive="page"
-       [attr.aria-label]="i18n.t('nav.plot')" [title]="i18n.t('nav.plot')">
-      <lucide-angular [img]="icons.GitBranch" [size]="20" aria-hidden="true" />
-    </a>
-    <a class="rail-item" routerLink="/docs" routerLinkActive="active" ariaCurrentWhenActive="page"
-       [attr.aria-label]="i18n.t('nav.documents')" [title]="i18n.t('nav.documents')">
-      <lucide-angular [img]="icons.Library" [size]="20" aria-hidden="true" />
-    </a>
-    @if (musicEnabled()) {
+    @if (showPlot()) {
+      <a class="rail-item" routerLink="/plot" routerLinkActive="active" ariaCurrentWhenActive="page"
+         [attr.aria-label]="i18n.t('nav.plot')" [title]="i18n.t('nav.plot')">
+        <lucide-angular [img]="icons.GitBranch" [size]="20" aria-hidden="true" />
+      </a>
+    }
+    @if (showDocs()) {
+      <a class="rail-item" routerLink="/docs" routerLinkActive="active" ariaCurrentWhenActive="page"
+         [attr.aria-label]="i18n.t('nav.documents')" [title]="i18n.t('nav.documents')">
+        <lucide-angular [img]="icons.Library" [size]="20" aria-hidden="true" />
+      </a>
+    }
+    @if (showMusic()) {
       <a class="rail-item" routerLink="/music" routerLinkActive="active" ariaCurrentWhenActive="page"
          [attr.aria-label]="i18n.t('nav.music')" [title]="i18n.t('nav.music')">
         <lucide-angular [img]="icons.Music" [size]="20" aria-hidden="true" />
       </a>
     }
-    @if (encyclopediaEnabled()) {
+    @if (showEncyclopedia()) {
       <a class="rail-item" routerLink="/encyclopedia" routerLinkActive="active" ariaCurrentWhenActive="page"
          [attr.aria-label]="i18n.t('nav.encyclopedia')" [title]="i18n.t('nav.encyclopedia')">
         <lucide-angular [img]="icons.BookOpen" [size]="20" aria-hidden="true" />
       </a>
     }
-    @if (printEnabled()) {
+    @if (showPrint()) {
       <a class="rail-item" routerLink="/print" routerLinkActive="active" ariaCurrentWhenActive="page"
          [attr.aria-label]="i18n.t('nav.print')" [title]="i18n.t('nav.print')">
         <lucide-angular [img]="icons.Printer" [size]="20" aria-hidden="true" />
       </a>
     }
-    <button type="button" class="rail-item" aria-haspopup="dialog" [class.active]="palette.open()"
+    <button type="button" class="rail-item rail-sep" aria-haspopup="dialog" [class.active]="palette.open()"
             [attr.aria-label]="i18n.t('nav.search')" [title]="i18n.t('nav.search')" (click)="palette.show()">
       <lucide-angular [img]="icons.Search" [size]="20" aria-hidden="true" />
     </button>
-    <a class="rail-item" routerLink="/settings" routerLinkActive="active" ariaCurrentWhenActive="page"
-       [attr.aria-label]="i18n.t('nav.settings')" [title]="i18n.t('nav.settings')">
-      <lucide-angular [img]="icons.Settings" [size]="20" aria-hidden="true" />
-    </a>
-    <button type="button" class="rail-item" [class.active]="viewMode.viewMode() === 'public'"
+    <button type="button" class="rail-item rail-sep rail-bottom" [class.active]="viewMode.viewMode() === 'public'"
             [attr.aria-pressed]="viewMode.viewMode() === 'public'"
             [attr.aria-label]="previewLabel()" [title]="previewLabel()"
             (click)="viewMode.toggle()">
@@ -53,6 +53,10 @@
             (click)="theme.cycle()">
       <lucide-angular [img]="icons.SunMoon" [size]="20" aria-hidden="true" />
     </button>
+    <a class="rail-item" routerLink="/settings" routerLinkActive="active" ariaCurrentWhenActive="page"
+       [attr.aria-label]="i18n.t('nav.settings')" [title]="i18n.t('nav.settings')">
+      <lucide-angular [img]="icons.Settings" [size]="20" aria-hidden="true" />
+    </a>
   </nav>
 
   <main class="main" id="main" tabindex="-1" [class.has-dock]="dockVisible()">
@@ -70,7 +74,9 @@
     }
     <router-outlet />
   </main>
-  <ms-music-dock />
+  @if (dockVisible()) {
+    <ms-music-dock />
+  }
 </div>
 
 @if (palette.open()) {
