@@ -5,6 +5,16 @@
     <h2 id="combat-overlay-title">{{ title() }}</h2>
     @if (combat(); as c) {
     <span class="round">{{ i18n.t("combat.round", { n: c.round }) }}</span>
+    <button
+      type="button"
+      class="next-turn"
+      [disabled]="!nextId()"
+      [attr.title]="i18n.t('combat.next')"
+      (click)="nextTurn()"
+    >
+      <ui-icon name="chevron" [size]="16" />
+      <span>{{ i18n.t("combat.next") }}</span>
+    </button>
     }
     <span class="spacer"></span>
     @if (combat()) {

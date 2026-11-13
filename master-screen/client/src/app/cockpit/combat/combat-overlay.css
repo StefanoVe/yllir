@@ -60,6 +60,34 @@
   background: var(--color-surface-2);
 }
 
+.icon-button:focus-visible,
+.next-turn:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.next-turn {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.next-turn:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+
+.next-turn:disabled {
+  opacity: 0.45;
+}
+
 .stage {
   position: relative;
   flex: 1;

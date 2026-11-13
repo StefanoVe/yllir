@@ -147,28 +147,5 @@
 }
 
 .list li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-}
-
-.list li.active {
-  border-color: var(--color-focus);
-  box-shadow: var(--shadow-1);
-}
-
-.row-name {
-  flex: 1;
   min-width: 0;
-  font-weight: 600;
-}
-
-.row-meta {
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
 }

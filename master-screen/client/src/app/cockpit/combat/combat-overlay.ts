@@ -20,7 +20,7 @@ import { BattleApi } from "./battle-api";
 import { BattleMapPrefs } from "./battle-maps-pref";
 import { CombatOverlayService } from "./combat-overlay.service";
 import { CombatChatService } from "./combat-chat.service";
-import { fightCards } from "./combat-model";
+import { fightCards, nextTurnId } from "./combat-model";
 import { InitiativeStep } from "./initiative-step";
 import { BattleBoard } from "./battle-board";
 
@@ -53,7 +53,11 @@ export class CombatOverlay implements OnDestroy {
   readonly cards = computed(() =>
     fightCards(this.api.session()?.state.board.modules ?? []),
   );
-  readonly revision = computed(() => this.api.session()?.revision ?? 0);
+  /** The combatant who takes the turn next, or null when nobody can. */
+  readonly nextId = computed(() => {
+    const c = this.combat();
+    return c ? nextTurnId(c.participants, c.activeId) : null;
+  });
   readonly title = computed(() => {
     const combat = this.combat();
     if (combat) return combat.title;
@@ -89,10 +93,11 @@ export class CombatOverlay implements OnDestroy {
             .catch((error: unknown) => this.error.set(String(error)));
       });
     });
-    // Opening the overlay or any cockpit state change refetches the players and the battle view.
+    // Opening the overlay or any cockpit state change (also one that keeps the revision, such
+    // as a saved battle map) refetches the players and the battle view.
     effect(() => {
       const open = this.svc.open();
-      this.revision();
+      this.api.stateTick();
       untracked(() => {
         if (open) void this.load();
       });
@@ -138,6 +143,17 @@ export class CombatOverlay implements OnDestroy {
         ? this.i18n.t("combat.error.load")
         : "",
     );
+  }
+
+  /** Passes the turn to the next combatant in initiative order. */
+  async nextTurn(): Promise<void> {
+    const id = this.nextId();
+    if (!id) return;
+    try {
+      await this.api.action({ type: "combat.turn", activeId: id });
+    } catch {
+      this.error.set(this.i18n.t("combat.error.turn"));
+    }
   }
 
   async endCombat(): Promise<void> {

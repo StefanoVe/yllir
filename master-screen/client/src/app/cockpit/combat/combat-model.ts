@@ -109,6 +109,27 @@ export function byInitiative<T extends { initiative: number | null }>(
   });
 }
 
+/**
+ * The next combatant to take the turn, in initiative order: the first one after the active
+ * combatant, wrapping around. Defeated non-player characters are skipped. Without an active
+ * combatant it is the first one. Null when nobody can take the turn.
+ */
+export function nextTurnId(
+  participants: Combatant[],
+  activeId: string | null,
+): string | null {
+  const order = byInitiative(participants);
+  const count = order.length;
+  if (count === 0) return null;
+  const index = activeId === null ? -1 : order.findIndex((c) => c.id === activeId);
+  for (let step = 1; step <= count; step++) {
+    const candidate = order[(index + step) % count]!;
+    if (candidate.kind !== "pc" && candidate.hp === 0) continue;
+    return candidate.id;
+  }
+  return null;
+}
+
 /** Up to two letters for a token: first letters of the first two words. */
 export function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);

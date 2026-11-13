@@ -279,7 +279,7 @@ describe('Combat overlay', () => {
     expect(tooltip).toContain('Mira');
     expect(tooltip).toContain('14');
     expect(tooltip).not.toContain('Claw');
-    expect(calls.some((call) => call.url.startsWith('/api/battle/stats/'))).toBe(false);
+    expect(calls.some((call) => call.url === '/api/battle/stats/c-mira')).toBe(false);
   });
 
   it('lists the combatants in initiative order when the battle map preference is off', async () => {
@@ -323,6 +323,27 @@ describe('Combat overlay', () => {
     await settle(fixture);
     const message = calls.find((call) => call.url === '/api/cockpit/sessions/th1/messages');
     expect((message?.body as { text: string }).text).toBe('Find and set the battle map of the current place.');
+  });
+
+  it('fetches the battle map again when the state changes without a new revision', async () => {
+    const server: { battle: BattleView | null } = { battle: null };
+    const calls = installServer(server);
+    TestBed.inject(PrefsService).setCampaign('test');
+    const cockpit = TestBed.inject(CockpitService);
+    cockpit.session.set(session([], COMBAT));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('img.map-image')).toBeNull();
+
+    // The assistant saves the map: the server re-publishes the state with the same revision.
+    server.battle = MAP;
+    cockpit.stateTick.update((n) => n + 1);
+    await settle(fixture);
+
+    expect(calls.filter((call) => call.url === '/api/battle' && call.method === 'GET').length).toBe(2);
+    expect(root.querySelector('img.map-image')).not.toBeNull();
   });
 });
 

@@ -1,0 +1,102 @@
+<div class="row" [class.active]="active()" [class.defeated]="defeated()">
+  <div class="head">
+    <cockpit-combatant-chip [combatant]="combatant()" [active]="active()" />
+    <span class="row-name">{{ combatant().name }}</span>
+    <span class="row-meta">{{ i18n.t("combat.stats.initiative") }} {{ combatant().initiative ?? "—" }}</span>
+  </div>
+
+  @if (!isPc()) {
+  <div class="status">
+    @if (combatant().hp !== undefined || combatant().maxHp !== undefined) {
+    <span class="hp">{{ hpText() }}</span>
+    }
+    @for (condition of combatant().conditions; track $index) {
+    <span class="pill">{{ condition }}</span>
+    }
+    @if (combatant().phase) {
+    <span class="phase">{{ combatant().phase }}</span>
+    }
+  </div>
+
+  @if (statsState() === "loading") {
+  <p class="muted">…</p>
+  } @else if (statsState() === "error") {
+  <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
+  } @else if (stats(); as s) {
+  @if (s.lines.length) {
+  <dl class="lines">
+    @for (line of s.lines; track $index) {
+    <div class="line">
+      <dt>{{ line.label }}</dt>
+      <dd>{{ line.value }}</dd>
+    </div>
+    }
+  </dl>
+  }
+  @if (s.actions.length) {
+  <h4>{{ i18n.t("combat.stats.actions") }}</h4>
+  <ul class="actions">
+    @for (action of s.actions; track $index) {
+    <li><strong>{{ action.name }}</strong> {{ action.text }}</li>
+    }
+  </ul>
+  }
+  @if (!s.lines.length && !s.actions.length) {
+  <p class="muted">{{ i18n.t("combat.stats.none") }}</p>
+  }
+  }
+
+  <div class="controls" role="group" [attr.aria-label]="i18n.t('combat.actions')">
+    <input
+      type="number"
+      class="amount"
+      min="1"
+      step="1"
+      [attr.aria-label]="i18n.t('combat.amount')"
+      [value]="amount()"
+      (input)="onAmount($event)"
+    />
+    <button
+      type="button"
+      class="icon-button"
+      [disabled]="!canChangeHp()"
+      [attr.title]="i18n.t('combat.damage')"
+      [attr.aria-label]="i18n.t('combat.damage')"
+      (click)="damage()"
+    >
+      <ui-icon name="minus" [size]="16" />
+    </button>
+    <button
+      type="button"
+      class="icon-button"
+      [disabled]="!canChangeHp()"
+      [attr.title]="i18n.t('combat.heal')"
+      [attr.aria-label]="i18n.t('combat.heal')"
+      (click)="heal()"
+    >
+      <ui-icon name="plus" [size]="16" />
+    </button>
+    <button
+      type="button"
+      class="icon-button"
+      [attr.title]="i18n.t('combat.defeat')"
+      [attr.aria-label]="i18n.t('combat.defeat')"
+      (click)="defeat()"
+    >
+      <ui-icon name="enemy" [size]="16" />
+    </button>
+    <button
+      type="button"
+      class="icon-button"
+      [attr.title]="i18n.t('combat.remove')"
+      [attr.aria-label]="i18n.t('combat.remove')"
+      (click)="remove()"
+    >
+      <ui-icon name="trash" [size]="16" />
+    </button>
+  </div>
+  @if (error()) {
+  <p class="alert" role="alert">{{ error() }}</p>
+  }
+  }
+</div>

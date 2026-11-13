@@ -45,6 +45,8 @@ export class CockpitService implements ChatSource {
   lastGroup = signal<ActionGroup | null>(null);
   chatError = signal("");
   modal = signal<CockpitModal>(null);
+  /** Bumped on every snapshot and state event: views that read other endpoints (the battle screen) refetch on it. */
+  readonly stateTick = signal(0);
   private generation = 0;
   private source: EventSource | null = null;
   private readonly i18n = inject(I18n);
@@ -158,11 +160,13 @@ export class CockpitService implements ChatSource {
   private apply(event: CockpitEvent) {
     if (event.type === "snapshot") {
       this.session.set(event.session);
+      this.stateTick.update((n) => n + 1);
       return;
     }
     const current = this.session();
     if (!current) return;
     if (event.type === "state") {
+      this.stateTick.update((n) => n + 1);
       this.session.set({
         ...current,
         revision: event.revision,

@@ -51,13 +51,8 @@
   } } @else {
   <ol class="list" [attr.aria-label]="i18n.t('combat.list')">
     @for (c of ordered(); track c.id) {
-    <li [class.active]="activeId() === c.id">
-      <cockpit-combatant-chip [combatant]="c" [active]="activeId() === c.id" />
-      <span class="row-name">{{ c.name }}</span>
-      <span class="row-meta">{{ i18n.t("combat.stats.initiative") }} {{ c.initiative ?? "—" }}</span>
-      @if (c.kind !== "pc" && (c.hp !== undefined || c.maxHp !== undefined)) {
-      <span class="row-meta">{{ i18n.t("combat.chip.hp", { hp: c.hp ?? "—", max: c.maxHp ?? "—" }) }}</span>
-      }
+    <li>
+      <cockpit-combatant-row [combatant]="c" [active]="activeId() === c.id" />
     </li>
     }
   </ol>

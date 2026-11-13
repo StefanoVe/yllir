@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { BoardModuleView } from '@shared/cockpit-types';
+import type { BoardModuleView, Combatant } from '@shared/cockpit-types';
 import {
   buildCombatStart,
   byInitiative,
   cellAt,
   fightCards,
   hpPercent,
+  nextTurnId,
   initials,
   parseInitiative,
   percentAt,
@@ -102,5 +103,41 @@ describe('combat model', () => {
       { cardId: '1', name: 'A', path: 'NPCs/A.md', kind: 'npc' },
       { cardId: '2', name: 'B', path: 'Enemies/B.md', kind: 'enemy' },
     ]);
+  });
+});
+
+describe('nextTurnId', () => {
+  const pc = (id: string, initiative: number | null): Combatant => ({ id, name: id, kind: 'pc', initiative, conditions: [] });
+  const foe = (id: string, initiative: number | null, hp?: number): Combatant => ({ id, name: id, kind: 'enemy', initiative, hp, conditions: [] });
+  const order = [pc('mira', 14), foe('ogre', 9, 20), foe('imp', 5, 4)];
+
+  it('gives the turn to the next combatant in initiative order and wraps around', () => {
+    expect(nextTurnId(order, 'mira')).toBe('ogre');
+    expect(nextTurnId(order, 'ogre')).toBe('imp');
+    expect(nextTurnId(order, 'imp')).toBe('mira');
+  });
+
+  it('skips defeated creatures but never skips player characters', () => {
+    const list = [pc('mira', 14), foe('ogre', 9, 0), foe('imp', 5, 4), pc('tor', 1)];
+    expect(nextTurnId(list, 'mira')).toBe('imp');
+    expect(nextTurnId(list, 'imp')).toBe('tor');
+    const pcAtZero: Combatant = { ...pc('tor', 1), hp: 0 };
+    expect(nextTurnId([pc('mira', 14), pcAtZero], 'mira')).toBe('tor');
+  });
+
+  it('starts with the first combatant when there is no active one', () => {
+    expect(nextTurnId(order, null)).toBe('mira');
+    expect(nextTurnId(order, 'unknown')).toBe('mira');
+  });
+
+  it('returns the first playable one when everyone but the player characters is defeated', () => {
+    const list = [foe('ogre', 9, 0), pc('mira', 14), foe('imp', 5, 0)];
+    expect(nextTurnId(list, 'ogre')).toBe('mira');
+    expect(nextTurnId(list, 'mira')).toBe('mira');
+  });
+
+  it('returns null when nobody can take the turn', () => {
+    expect(nextTurnId([], null)).toBeNull();
+    expect(nextTurnId([foe('ogre', 9, 0), foe('imp', 5, 0)], null)).toBeNull();
   });
 });

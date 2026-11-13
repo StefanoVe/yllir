@@ -16,6 +16,7 @@ import { Icon } from "../support/icon";
 import { DocumentsService } from "../support/documents.service";
 import { I18n } from "../../i18n";
 import { CombatantChip } from "./combatant-chip";
+import { CombatantRow } from "./combatant-row";
 import {
   type Cell,
   byInitiative,
@@ -41,7 +42,7 @@ interface Drag {
  */
 @Component({
   selector: "cockpit-battle-board",
-  imports: [Icon, CombatantChip],
+  imports: [Icon, CombatantChip, CombatantRow],
   templateUrl: "./battle-board.html",
   styleUrl: "./battle-board.css",
 })
