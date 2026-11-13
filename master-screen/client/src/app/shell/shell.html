@@ -12,6 +12,10 @@
        [attr.aria-label]="i18n.t('nav.plot')" [title]="i18n.t('nav.plot')">
       <lucide-angular [img]="icons.GitBranch" [size]="20" aria-hidden="true" />
     </a>
+    <a class="rail-item" routerLink="/docs" routerLinkActive="active" ariaCurrentWhenActive="page"
+       [attr.aria-label]="i18n.t('nav.documents')" [title]="i18n.t('nav.documents')">
+      <lucide-angular [img]="icons.Library" [size]="20" aria-hidden="true" />
+    </a>
     @if (musicEnabled()) {
       <a class="rail-item" routerLink="/music" routerLinkActive="active" ariaCurrentWhenActive="page"
          [attr.aria-label]="i18n.t('nav.music')" [title]="i18n.t('nav.music')">

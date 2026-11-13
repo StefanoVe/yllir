@@ -1,0 +1,311 @@
+:host {
+  display: block;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Sticky toolbar: title, filter and count stay in view while the list scrolls. */
+.toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-2) 0 var(--space-1);
+  background: var(--color-bg);
+}
+
+.toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+h1 {
+  flex: none;
+  margin: 0;
+}
+
+.search {
+  position: relative;
+  flex: 1 1 280px;
+  max-width: 480px;
+}
+
+.search-icon {
+  position: absolute;
+  top: 50%;
+  left: 12px;
+  translate: 0 -50%;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+/* Icon-side padding is 2px smaller than the text padding, so the icon optically sits at the same inset. */
+.field {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 44px 10px 38px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-base);
+  transition-property: border-color;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+/* The clear button is a circle inside the field: the field's own clear control is hidden. */
+.field::-webkit-search-cancel-button {
+  display: none;
+}
+
+.icon-btn {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  translate: 0 -50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  transition-property: background-color, color, scale;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+.count {
+  flex: none;
+  margin-left: auto;
+  padding: 2px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Category chips: wrap onto new lines, never scroll sideways. */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+  -webkit-tap-highlight-color: transparent;
+  transition-property: background-color, border-color, scale;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+}
+
+.chip-count {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.group {
+  margin-top: var(--space-3);
+}
+
+.group-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.group-count {
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Rows fill the width in as many columns as fit: one column on phones. */
+.docs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.docs li {
+  min-width: 0;
+}
+
+/* Row radius 12 = avatar radius 6 + padding 6. */
+.doc {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-height: 44px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  transition-property: background-color, border-color, scale;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+.avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.doc-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lock {
+  flex: none;
+  display: inline-flex;
+  color: var(--color-text-muted);
+}
+
+/* Empty, no-results and error states: a quiet centred block. */
+.state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-2);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.state-block lucide-angular {
+  color: var(--color-text-muted);
+}
+
+.state {
+  margin: 0;
+  color: var(--color-text-muted);
+  text-wrap: balance;
+}
+
+.btn {
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  -webkit-tap-highlight-color: transparent;
+  transition-property: background-color, border-color, scale;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+
+/* Loading: placeholder rows in the same grid, same height and radius as the rows. */
+.skeleton-row {
+  display: block;
+  height: 44px;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .skeleton-row {
+    animation: documents-skeleton-pulse 1.4s ease-in-out infinite;
+  }
+
+  .doc:not(:disabled):active,
+  .chip:not(:disabled):active,
+  .btn:not(:disabled):active,
+  .icon-btn:not(:disabled):active {
+    scale: 0.96;
+  }
+}
+
+@keyframes documents-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Hover only where a pointer can hover, so touch screens do not keep a stuck highlight. */
+@media (hover: hover) {
+  .doc:hover {
+    background: var(--color-surface-2);
+    border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  }
+
+  .chip:hover:not([aria-pressed="true"]) {
+    background: var(--color-surface-2);
+  }
+
+  .btn:hover {
+    background: var(--color-surface-2);
+  }
+
+  .icon-btn:hover {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
+}
+
+.field:focus-visible,
+.doc:focus-visible,
+.chip:focus-visible,
+.btn:focus-visible,
+.icon-btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}

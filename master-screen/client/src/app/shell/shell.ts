@@ -2,7 +2,7 @@ import { Component, DestroyRef, ElementRef, HostListener, computed, effect, inje
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Music, MessageSquare, Printer, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
+import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Music, MessageSquare, Printer, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
 import { filter, map } from 'rxjs';
 import { LiveService } from '../core/live.service';
 import { MusicApiService } from '../music/music-api.service';
@@ -36,7 +36,7 @@ export class Shell {
   private readonly musicApi = inject(MusicApiService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  readonly icons = { MessageSquare, Dices, GitBranch, Music, BookOpen, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
+  readonly icons = { MessageSquare, Dices, GitBranch, Library, Music, BookOpen, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
   /** The connection notice shows only after the stream has been down for a while, so load and blips do not flash it. */
   readonly showOffline = signal(false);
   private offlineTimer: ReturnType<typeof setTimeout> | undefined;
@@ -109,6 +109,7 @@ export class Shell {
     const page = path === '/' ? this.i18n.t('nav.home') : path.startsWith('/search') ? this.i18n.t('nav.search') : path.startsWith('/settings') ? this.i18n.t('nav.settings')
       : path.startsWith('/live') ? this.i18n.t('nav.liveTable') : path.startsWith('/plot') ? this.i18n.t('nav.plot')
       : path.startsWith('/music') ? this.i18n.t('nav.music')
+      : path.startsWith('/docs') ? this.i18n.t('nav.documents')
       : path.startsWith('/encyclopedia') ? this.i18n.t('nav.encyclopedia') : path.startsWith('/print') ? this.i18n.t('nav.print') : '';
     if (path.startsWith('/doc/')) return campaign;
     if (page === '') return campaign;

@@ -92,3 +92,18 @@ describe('Shell encyclopedia and print entries', () => {
     expect(fixture.nativeElement.querySelector('a[href="/print"]')).toBeNull();
   });
 });
+
+describe('Shell documents entry', () => {
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('shows the documents icon right after the plot icon, whatever the modules', () => {
+    const fixture = setupModules({ music: false, print: false, encyclopedia: false });
+    const hrefs = [...fixture.nativeElement.querySelectorAll('nav a.rail-item')].map((a) => (a as HTMLAnchorElement).getAttribute('href'));
+    expect(hrefs.indexOf('/docs')).toBe(hrefs.indexOf('/plot') + 1);
+    const docs = fixture.nativeElement.querySelector('a[href="/docs"]') as HTMLAnchorElement;
+    expect(docs.getAttribute('aria-label')).toBe('Documents');
+    expect(docs.getAttribute('title')).toBe('Documents');
+  });
+});

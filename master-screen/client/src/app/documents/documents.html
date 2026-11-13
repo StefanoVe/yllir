@@ -1,0 +1,98 @@
+<div class="toolbar">
+  <div class="toolbar-row">
+    <h1>{{ s.t('documents.title') }}</h1>
+
+    <div class="search">
+      <lucide-angular class="search-icon" [img]="icons.Search" [size]="16" aria-hidden="true" />
+      <input #filterField class="field" type="search" autocomplete="off" spellcheck="false"
+             [attr.aria-label]="s.t('documents.filter')" [attr.placeholder]="s.t('documents.filter')"
+             [value]="filter()" (input)="onFilter($any($event.target).value)"
+             (keydown.escape)="onFilterEscape($event)" />
+      @if (filter() !== '') {
+        <button type="button" class="icon-btn clear" [attr.aria-label]="s.t('documents.clear')"
+                [title]="s.t('documents.clear')" (click)="clearFilter()">
+          <lucide-angular [img]="icons.X" [size]="16" aria-hidden="true" />
+        </button>
+      }
+    </div>
+
+    @if (!loading() && !error()) {
+      <span class="count" [title]="s.t('documents.count')">
+        <span>{{ orderedSources().length }}</span> / <span>{{ docs().length }}</span>
+      </span>
+    }
+  </div>
+</div>
+
+@if (!error() && !loading() && docs().length > 0) {
+  <div class="chips">
+    <button type="button" class="chip" [attr.aria-pressed]="category() === null"
+            (click)="selectCategory(null)">
+      <span>{{ s.t('documents.all') }}</span>
+      <span class="chip-count">{{ docs().length }}</span>
+    </button>
+    @for (chip of chips(); track chip.category) {
+      <button type="button" class="chip" [attr.data-category]="chip.category"
+              [attr.aria-pressed]="category() === chip.category" (click)="selectCategory(chip.category)">
+        <span>{{ chip.category === '' ? s.t('documents.noCategory') : humanize(chip.category) }}</span>
+        <span class="chip-count">{{ chip.count }}</span>
+      </button>
+    }
+  </div>
+}
+
+@if (error(); as message) {
+  <div class="state-block" role="alert">
+    <p class="state">{{ message }}</p>
+    <button type="button" class="btn" (click)="load()">{{ s.t('documents.retry') }}</button>
+  </div>
+} @else if (loading()) {
+  <div class="loading" role="status">
+    <span class="sr-only">{{ s.t('panels.common.loading') }}</span>
+    <ul class="docs" aria-hidden="true">
+      @for (row of skeletonRows; track row) {
+        <li class="skeleton-row"></li>
+      }
+    </ul>
+  </div>
+} @else if (docs().length === 0) {
+  <div class="state-block">
+    <lucide-angular [img]="icons.Files" [size]="18" aria-hidden="true" />
+    <p class="state">{{ s.t('documents.empty') }}</p>
+  </div>
+} @else if (groups().length === 0) {
+  <div class="state-block">
+    <lucide-angular [img]="icons.FileSearch" [size]="18" aria-hidden="true" />
+    <p class="state">{{ s.t('documents.noResults') }}</p>
+    <button type="button" class="btn" (click)="clearFilters()">{{ s.t('documents.clearFilters') }}</button>
+  </div>
+}
+
+@for (group of groups(); track group.category; let g = $index) {
+  <section class="group" [attr.aria-labelledby]="'documents-group-' + g">
+    <h2 class="group-title" [id]="'documents-group-' + g">
+      <span class="group-name">{{ group.title }}</span>
+      <span class="group-count">{{ group.docs.length }}</span>
+    </h2>
+    <ul class="docs">
+      @for (doc of group.docs; track doc.path) {
+        <li>
+          <button type="button" class="doc" [title]="doc.title + ' — ' + doc.path" (click)="open(doc)">
+            <span class="avatar" aria-hidden="true">{{ initialOf(doc.title) }}</span>
+            <span class="doc-title">{{ doc.title }}</span>
+            @if (doc.masterOnly) {
+              <span class="lock" [title]="s.t('reader.masterOnly')">
+                <lucide-angular [img]="icons.Lock" [size]="14" [strokeWidth]="1.75" aria-hidden="true" />
+                <span class="sr-only">{{ s.t('reader.masterOnly') }}</span>
+              </span>
+            }
+          </button>
+        </li>
+      }
+    </ul>
+  </section>
+}
+
+@if (opened(); as source) {
+  <cockpit-document-modal [source]="source" [siblings]="orderedSources()" (close)="opened.set(null)" />
+}

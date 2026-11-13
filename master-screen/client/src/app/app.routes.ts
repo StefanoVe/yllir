@@ -43,5 +43,9 @@ export const routes: Routes = [
     path: 'print',
     loadComponent: () => import('./print/print').then((m) => m.PrintPage),
   },
+  {
+    path: 'docs',
+    loadComponent: () => import('./documents/documents').then((m) => m.DocumentsPage),
+  },
   { path: '**', redirectTo: '' },
 ];

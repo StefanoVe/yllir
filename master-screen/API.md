@@ -135,7 +135,7 @@ The live table (cockpit) has its own turn manager, `server/src/cockpit/turns.ts`
 
 ## Client rules
 
-- Angular standalone components, signals, lazy routes. Routes: `/` (chat + changes), `/doc/:path*` (reader), `/search`, `/settings`, `/live` (the live table, see "Live table (cockpit)"), `/plot` (plot map).
+- Angular standalone components, signals, lazy routes. Routes: `/` (chat + changes), `/doc/:path*` (reader), `/search`, `/settings`, `/live` (the live table, see "Live table (cockpit)"), `/plot` (plot map), `/docs` (documents explorer).
 - One `EventSource` on `/api/events`, reconnecting with backoff. It stays open while the tab is hidden (the server uses the open stream to know the screen is still there).
 - Icons only in the navigation (Lucide), each with a tooltip and an `aria-label`; no text labels next to icons. Page content may contain text.
 - Words shown to the master: document, scene, sheet, session, character. Never: commit, index, canon, frontmatter, token, provider, sha.
