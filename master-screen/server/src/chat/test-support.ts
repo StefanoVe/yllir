@@ -4,8 +4,14 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import express from 'express';
+import type { AgentProvider } from '../agent/provider.js';
 import type { AgentStatus, Ctx } from '../context.js';
 import { createCtx } from '../context.js';
+import { registerChatRoutes } from '../routes/chat.js';
+import { startServer, type RunningServer } from '../testing.js';
+import type { ChatService } from './index.js';
+import type { ChatChoice, ChatMessage } from '../../../shared/src/types.js';
 import type { Bus } from '../bus.js';
 
 export interface Recorded {
@@ -78,4 +84,27 @@ export async function waitFor(check: () => boolean, label = 'condition', timeout
     if (Date.now() - started > timeoutMs) throw new Error(`timed out waiting for ${label}`);
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
+}
+
+/** Submits a message to the most recently updated conversation (the only one in single-conversation tests). */
+export function submitTo(service: ChatService, text: string, choice?: ChatChoice) {
+  return service.runner.submit(service.store.currentId(), text, choice);
+}
+
+/** Messages of the most recently updated conversation. */
+export function messagesOf(service: ChatService): ChatMessage[] {
+  return service.store.messages(service.store.currentId());
+}
+
+/** Serves the chat routes of the campaign over HTTP under /api, with the given provider (null: no agent). */
+export async function serveChat(campaign: TestCampaign, provider: AgentProvider | null): Promise<RunningServer> {
+  return startServer((port) => {
+    campaign.ctx.port = port;
+    const app = express();
+    app.use(express.json({ limit: '64kb' }));
+    const api = express.Router();
+    registerChatRoutes(api, campaign.ctx, { provider });
+    app.use('/api', api);
+    return app;
+  });
 }

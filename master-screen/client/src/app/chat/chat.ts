@@ -16,7 +16,7 @@ import {
 import { NgTemplateOutlet } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
-import type { ChatMessage, ChatResponse, StepKind, Turn, TurnStep } from '@shared/types';
+import type { ChatMessage, Conversation, ConversationsResponse, StepKind, Turn, TurnStep } from '@shared/types';
 import {
   LucideAngularModule,
   ArrowDown,
@@ -32,28 +32,36 @@ import {
   LoaderCircle,
   Music,
   PencilLine,
+  Plus,
   Save,
   Search,
   Send,
   Sparkles,
   Square,
+  Trash2,
   Users,
 } from 'lucide-angular';
 import { ApiService, isApiFailure } from '../core/api.service';
 import { LiveService } from '../core/live.service';
 import { ChatLiveSession } from './chat-live-session';
 import { StatusService } from '../core/status.service';
+import { PrefsService } from '../core/prefs.service';
+import { CampaignTurnService } from '../core/campaign-turn.service';
 import { I18n, type TranslationKey } from '../i18n';
+import { formatRelative } from '../changes/relative-time';
 import {
   ChatState,
   EMPTY_CHAT_STATE,
   addMessage,
   applyDelta,
+  emptyStateFor,
   isActiveTurn,
   isFailedTurn,
   mergeFetched,
   setTurn,
 } from './chat-state';
+import { CONVERSATION_PREF_KEY, displayTitle, pickSelectedId } from './conversations';
+import { HelpersIndicator } from './helpers-indicator';
 import { FocusMessageService } from './focus-message.service';
 import { docUrl } from './doc-link';
 import { renderChatMarkdown } from './chat-markdown';
@@ -106,7 +114,7 @@ function groupRows<T extends ChatMessage>(messages: readonly T[]): { message: T;
 /** The conversation with the assistant: messages, composer and the status line of the current turn. */
 @Component({
   selector: 'ms-chat',
-  imports: [LucideAngularModule, NgTemplateOutlet, RouterLink, ChatRich],
+  imports: [LucideAngularModule, NgTemplateOutlet, RouterLink, ChatRich, HelpersIndicator],
   templateUrl: './chat.html',
   styleUrl: './chat.css',
 })
@@ -116,6 +124,8 @@ export class Chat implements OnInit {
   private readonly live = inject(LiveService);
   private readonly liveSession = inject(ChatLiveSession);
   private readonly statusService = inject(StatusService);
+  private readonly prefs = inject(PrefsService);
+  private readonly campaignTurns = inject(CampaignTurnService);
   private readonly router = inject(Router);
   private readonly focus = inject(FocusMessageService);
   private readonly injector = inject(Injector);
@@ -137,7 +147,9 @@ export class Chat implements OnInit {
     Sparkles,
     Image,
     ListChecks,
+    Plus,
     Save,
+    Trash2,
     Users,
     Music,
     ExternalLink,
@@ -163,6 +175,19 @@ export class Chat implements OnInit {
   readonly sendError = signal<string | null>(null);
   readonly stopError = signal<string | null>(null);
   readonly jumpVisible = signal(false);
+  /** All conversations of the campaign, newest first. */
+  readonly conversations = signal<Conversation[]>([]);
+  /** The queued or running turn of the whole campaign, whatever its conversation (kept by CampaignTurnService). */
+  readonly campaignTurn = this.campaignTurns.turn;
+  /** True from the moment another conversation is picked until its history has loaded. */
+  readonly switching = signal(false);
+  /** Whether the conversation list popover is open. */
+  readonly listOpen = signal(false);
+  /** The row whose delete confirmation is shown, if any. */
+  readonly pendingDelete = signal<string | null>(null);
+  /** The conversation whose deletion is in progress, if any. */
+  readonly deleting = signal<string | null>(null);
+  readonly listError = signal<string | null>(null);
   /** The model and thinking choice for the next message. Saved in localStorage. */
   readonly choice = signal<ChatChoice>(loadChatChoice());
   /** The open selector menu, if any. Only one is open at a time. */
@@ -174,12 +199,36 @@ export class Chat implements OnInit {
   private ticker: ReturnType<typeof setInterval> | null = null;
   /** False while the reader has scrolled up in the step list: new steps do not move it. */
   private stepsPinned = true;
+  /** True once the master picked a conversation: a saved choice that arrives late no longer overrides it. */
+  private userChose = false;
 
   readonly agent = computed(() => this.statusService.status()?.agent ?? null);
   readonly agentAvailable = computed(() => this.agent()?.available === true);
+  /** The conversation shown, or null before the first load has picked one. */
+  readonly shownId = computed(() => this.state().conversationId);
+  readonly shownTitle = computed(() => {
+    const id = this.shownId();
+    const found = this.conversations().find((conversation) => conversation.id === id);
+    return displayTitle(found?.title, this.t('chat.conversations.untitled'));
+  });
   readonly canSend = computed(
-    () => this.agentAvailable() && this.draft().trim().length > 0 && !this.sending(),
+    () =>
+      this.agentAvailable() &&
+      this.shownId() !== null &&
+      !this.switching() &&
+      this.draft().trim().length > 0 &&
+      !this.sending(),
   );
+  /**
+   * The shown conversation waits for a turn of another conversation. The shown one is queued and
+   * the campaign's running turn belongs to a different conversation.
+   */
+  readonly queuedElsewhere = computed(() => {
+    const shown = this.activeTurn();
+    const busy = this.campaignTurn();
+    if (shown?.state !== 'queued' || !isActiveTurn(busy) || busy.id === shown.id) return false;
+    return busy.conversationId !== undefined && busy.conversationId !== this.shownId();
+  });
   readonly messages = computed(() => this.state().messages);
   readonly rows = computed(() =>
     groupRows(this.messages()).map((row) => ({
@@ -214,6 +263,12 @@ export class Chat implements OnInit {
       const request = this.focus.request();
       if (request) untracked(() => this.highlight(request.id));
     });
+    // The saved conversation needs the campaign slug, which arrives with the status: restore it then,
+    // unless the master has already picked another conversation.
+    effect(() => {
+      const slug = this.prefs.slug();
+      untracked(() => this.restoreSavedAfterSlug(slug));
+    });
     // One clock runs only while a step is running, and stops with the turn or the view.
     effect(() => {
       const running = this.hasRunningStep();
@@ -226,7 +281,7 @@ export class Chat implements OnInit {
     this.live
       .on('message')
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((message: ChatMessage) => this.update((s) => addMessage(s, message)));
+      .subscribe((message) => this.update((s) => addMessage(s, message)));
     this.live
       .on('delta')
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -234,46 +289,251 @@ export class Chat implements OnInit {
     this.live
       .on('turn')
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((turn: Turn) => this.update((s) => setTurn(s, turn)));
+      .subscribe((turn) => this.update((s) => setTurn(s, turn)));
+    this.live
+      .on('conversations')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => void this.refresh());
     this.live
       .on('open')
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(({ path }) => void this.router.navigateByUrl(docUrl(path)));
-    this.live.resync$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.load());
-    void this.load();
+    this.live.resync$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.refresh());
+    void this.refresh();
   }
 
-  /** Loads the stored conversation. Shown messages that the server does not list yet are kept. */
-  async load(): Promise<void> {
+  /**
+   * Reloads the conversation list and the campaign's turn, then makes sure the shown conversation
+   * is still there (else it picks one) and loads its history.
+   */
+  async refresh(): Promise<void> {
+    let list: ConversationsResponse;
     try {
-      const response: ChatResponse = await this.api.chat();
+      list = await this.api.conversations();
+    } catch {
+      this.listError.set(this.i18n.t('chat.conversations.loadError'));
+      this.loaded.set(true);
+      this.switching.set(false);
+      return;
+    }
+    this.conversations.set(list.conversations);
+    this.listError.set(null);
+
+    const shown = this.shownId();
+    const stillThere = shown !== null && list.conversations.some((conversation) => conversation.id === shown);
+    if (!stillThere) this.enter(pickSelectedId(list.conversations, this.savedConversationId(), list.currentId));
+    await this.load();
+  }
+
+  /**
+   * Loads the history of the shown conversation. Shown messages that the server does not list yet are
+   * kept. A response that arrives after the master picked another conversation is dropped.
+   */
+  async load(): Promise<void> {
+    const id = this.shownId();
+    if (id === null) return;
+    try {
+      const response = await this.api.chat(id);
+      if (this.shownId() !== id) return;
       this.update((s) => mergeFetched(s, response));
       this.loadError.set(null);
     } catch {
+      if (this.shownId() !== id) return;
       this.loadError.set(this.i18n.t('chat.loadError'));
     } finally {
-      this.loaded.set(true);
-      this.scheduleScroll();
+      if (this.shownId() === id) {
+        this.loaded.set(true);
+        this.switching.set(false);
+        this.scheduleScroll();
+      }
     }
   }
 
-  /** Sends the draft. The composer is cleared and the bubble shown only once the server accepted it. */
+  /** Sends the draft to the shown conversation. The composer is cleared and the bubble shown only once the server accepted it. */
   async send(): Promise<void> {
-    if (!this.canSend()) return;
+    const conversationId = this.shownId();
+    if (!this.canSend() || conversationId === null) return;
     const sent = this.draft();
     const text = sent.trim();
     this.sending.set(true);
     this.sendError.set(null);
     try {
-      await this.api.sendMessage(text, this.choice());
+      await this.api.sendMessage(text, this.choice(), conversationId);
       if (this.draft() === sent) this.draft.set('');
       this.resizeLater();
-      void this.load();
+      void this.refresh();
     } catch (failure) {
       this.sendError.set((isApiFailure(failure) ? failure.error : this.i18n.t('errors.generic')));
     } finally {
       this.sending.set(false);
     }
+  }
+
+  /** Makes `id` the shown conversation: the shown state is reset, the history is loaded by the caller. */
+  private enter(id: string): void {
+    if (id === this.shownId()) return;
+    this.state.set(emptyStateFor(id));
+    this.loaded.set(false);
+    this.switching.set(true);
+    this.pinned = true;
+    this.jumpVisible.set(false);
+    this.prefs.set(CONVERSATION_PREF_KEY, id);
+  }
+
+  private savedConversationId(): string | null {
+    return this.prefs.get(CONVERSATION_PREF_KEY);
+  }
+
+  /**
+   * Called when the campaign slug becomes known. The first load may have run before it, so the saved
+   * conversation was not read: it is shown now, when it is still listed and the master has not picked one.
+   */
+  private restoreSavedAfterSlug(slug: string | null): void {
+    if (slug === null || this.userChose) return;
+    const saved = this.savedConversationId();
+    if (saved === null || saved === this.shownId()) return;
+    if (!this.conversations().some((conversation) => conversation.id === saved)) return;
+    this.enter(saved);
+    void this.load();
+  }
+
+  /** Shows another conversation picked from the list. */
+  select(id: string): void {
+    this.userChose = true;
+    this.closeList(true);
+    if (id === this.shownId()) return;
+    this.enter(id);
+    void this.load();
+  }
+
+  /** Creates a conversation and shows it. */
+  async createConversation(): Promise<void> {
+    this.userChose = true;
+    this.listError.set(null);
+    try {
+      const created = await this.api.createConversation();
+      this.conversations.update((list) => [created, ...list.filter((conversation) => conversation.id !== created.id)]);
+      this.closeList(true);
+      this.enter(created.id);
+      await this.load();
+    } catch (failure) {
+      this.listError.set(isApiFailure(failure) ? failure.error : this.i18n.t('errors.generic'));
+    }
+  }
+
+  /** Deletes a conversation after the inline confirmation. The server cancels its turns; the shown one is replaced by the server's current one. */
+  async deleteConversation(id: string): Promise<void> {
+    this.deleting.set(id);
+    this.listError.set(null);
+    try {
+      await this.api.deleteConversation(id);
+      const wasShown = id === this.shownId();
+      const list = await this.api.conversations();
+      this.conversations.set(list.conversations);
+      this.pendingDelete.set(null);
+      if (wasShown) {
+        this.enter(list.currentId);
+        await this.load();
+      }
+    } catch (failure) {
+      this.listError.set(isApiFailure(failure) ? failure.error : this.i18n.t('errors.generic'));
+    } finally {
+      this.deleting.set(null);
+    }
+  }
+
+  /** The title shown on a row of the list. */
+  titleOf(conversation: Conversation): string {
+    return displayTitle(conversation.title, this.t('chat.conversations.untitled'));
+  }
+
+  relativeOf(conversation: Conversation): string {
+    return formatRelative(conversation.updatedAt, Date.now(), this.i18n.language());
+  }
+
+  toggleList(): void {
+    if (this.listOpen()) {
+      this.closeList(true);
+      return;
+    }
+    this.listError.set(null);
+    this.pendingDelete.set(null);
+    this.listOpen.set(true);
+    afterNextRender(() => this.focusCurrentItem(), { injector: this.injector });
+  }
+
+  /** Closes the list. Focus goes back to its button when `restoreFocus` is set. */
+  closeList(restoreFocus: boolean): void {
+    if (!this.listOpen()) return;
+    this.listOpen.set(false);
+    this.pendingDelete.set(null);
+    if (restoreFocus) this.host.nativeElement.querySelector<HTMLElement>('[data-conv-trigger]')?.focus();
+  }
+
+  askDelete(id: string): void {
+    this.pendingDelete.set(id);
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>('[data-conv-cancel]')?.focus(),
+      { injector: this.injector },
+    );
+  }
+
+  cancelDelete(): void {
+    const id = this.pendingDelete();
+    this.pendingDelete.set(null);
+    if (id === null) return;
+    afterNextRender(
+      () => this.host.nativeElement.querySelector<HTMLElement>(`[data-conv-del="${id}"]`)?.focus(),
+      { injector: this.injector },
+    );
+  }
+
+  /** Escape cancels a pending delete first, then closes the list. Arrow keys, Home and End move between its buttons. */
+  onConversationKeydown(event: KeyboardEvent): void {
+    if (!this.listOpen()) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (this.pendingDelete() !== null) this.cancelDelete();
+      else this.closeList(true);
+      return;
+    }
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    const items = this.conversationItems();
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    switch (event.key) {
+      case 'ArrowDown':
+        items[at < 0 ? 0 : Math.min(at + 1, items.length - 1)]?.focus();
+        break;
+      case 'ArrowUp':
+        items[at <= 0 ? 0 : at - 1]?.focus();
+        break;
+      case 'Home':
+        items[0]?.focus();
+        break;
+      case 'End':
+        items[items.length - 1]?.focus();
+        break;
+    }
+    event.preventDefault();
+  }
+
+  /** A click or tap outside the conversation bar closes the list. */
+  @HostListener('document:pointerdown', ['$event'])
+  onConversationPointerDown(event: Event): void {
+    if (!this.listOpen()) return;
+    const target = event.target;
+    if (target instanceof Element && target.closest('.conv')) return;
+    this.closeList(false);
+  }
+
+  private conversationItems(): HTMLElement[] {
+    return Array.from(this.host.nativeElement.querySelectorAll<HTMLElement>('.conv-pop button:not([disabled])'));
+  }
+
+  /** Focus goes to the shown conversation's row when the list opens, else to its first button. */
+  private focusCurrentItem(): void {
+    const current = this.host.nativeElement.querySelector<HTMLElement>(`.conv-pop [aria-current="true"]`);
+    (current ?? this.conversationItems()[0])?.focus();
   }
 
   async stop(): Promise<void> {

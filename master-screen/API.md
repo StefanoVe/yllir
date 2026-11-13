@@ -11,7 +11,7 @@ Single source of truth for the HTTP API and the shared types. Server and client 
 - With `--exit-when-closed` (passed by the launcher) it exits 60 s after the last `/api/events` client disconnected, but only once at least one client has connected before; a client reconnecting inside the 60 s cancels the exit.
 - Exits cleanly (closing watcher, agent turn, SSE streams) on SIGINT/SIGTERM and when `POST /api/shutdown` is called. A lock file `.campaign/state/master-screen/server.json` (`{pid,port,url}`) is written at start and removed at exit; a stale lock (dead pid) is ignored.
 - Reads the campaign only through the framework: `node <framework>/scripts/engine.mjs <command> <campaign> ...` (JSON on stdout, last line `exit: <code>`) and the framework library modules loaded at run time by dynamic `import(<framework>/scripts/lib/<file>.mjs)` (for example `public-text.mjs`, `frontmatter.mjs`, `config.mjs`). Nothing from `<framework>/scripts` is copied into this project. All campaign writes go through `engine.mjs commit` (done by the agent, or by a sheet tool of the live table; never by an HTTP route, except undo).
-- Operational state lives in `<campaign>/.campaign/state/master-screen/` (chat.json). Never inside canon folders.
+- Operational state lives in `<campaign>/.campaign/state/master-screen/`: `chats/<id>.json` (one file per conversation) and `turns.json`. Never inside canon folders.
 
 ## Types (`shared/src/types.ts`)
 
@@ -72,8 +72,11 @@ export type TurnState = 'queued' | 'running' | 'done' | 'error' | 'cancelled';
 export type StepKind = 'read' | 'search' | 'write' | 'skill' | 'image' | 'check' | 'save' | 'agent' | 'music' | 'open' | 'other';
 export interface TurnStep { id: string; kind: StepKind; text: string; at: string; endedAt?: string; state: 'running' | 'done' | 'failed'; parentId?: string } // text: plain-language sentence, campaign language; parentId: the sub-agent tool use it runs under
 export interface ChatMessage { id: string; role: 'master' | 'agent'; text: string; at: string; turnId?: string; steps?: TurnStep[] } // agent message: steps of its turn, all with a final state; absent in files written before steps
-export interface Turn { id: string; messageId: string; state: TurnState; activity: string; startedAt: string; endedAt?: string; fromSha?: string; toSha?: string; error?: string; steps?: TurnStep[] } // steps: live list, newest last, at most 60
-export interface ChatResponse { messages: ChatMessage[]; turn: Turn | null }
+export interface Turn { id: string; messageId: string; state: TurnState; activity: string; startedAt: string; endedAt?: string; fromSha?: string; toSha?: string; error?: string; steps?: TurnStep[]; conversationId?: string } // steps: live list, newest last, at most 60; conversationId absent in data written before conversations
+/** One conversation of the master: its own agent session, so its own fresh context. */
+export interface Conversation { id: string; title: string; createdAt: string; updatedAt: string; messageCount: number } // title: '' until the first master message; the client shows a default name
+export interface ConversationsResponse { conversations: Conversation[]; currentId: string; turn: Turn | null } // newest updatedAt first; turn = the queued or running turn of the whole campaign, whatever its conversation
+export interface ChatResponse { conversationId: string; messages: ChatMessage[]; turn: Turn | null } // turn only when it belongs to this conversation
 
 export interface ChecksResponse {
   brokenLinks: { from: string; to: string; text?: string }[];
@@ -87,8 +90,9 @@ export type LiveEvent =
   | { event: 'hello'; data: { serverTime: string } }
   | { event: 'files'; data: { changed: string[]; removed: string[] } }  // canon files, debounced 150 ms
   | { event: 'changes'; data: Record<string, never> }                    // refetch /api/changes
-  | { event: 'message'; data: ChatMessage }
-  | { event: 'delta'; data: { messageId: string; text: string } }       // streamed agent text, appended
+  | { event: 'conversations'; data: Record<string, never> }              // refetch /api/chats
+  | { event: 'message'; data: ChatMessage & { conversationId: string } }
+  | { event: 'delta'; data: { messageId: string; text: string; conversationId: string } }  // streamed agent text, appended
   | { event: 'turn'; data: Turn }
   | { event: 'open'; data: { path: string } }                           // the agent asks the screen to open a document
   | { event: 'status'; data: StatusResponse };
@@ -109,8 +113,11 @@ All under `/api`, JSON, UTF-8. Errors: `{ "error": "<plain-language message>" }`
 | GET `/changes` | `?limit=30` | `ChangesResponse` |
 | GET `/changes/:id/diff` | | `DiffResponse` |
 | POST `/changes/undo` | `{ id?: string }` (default: newest group that is not undone and not an undo) | `UndoResponse` |
-| GET `/chat` | | `ChatResponse` |
-| POST `/chat/messages` | `{ text: string (1..8000), model?: 'sonnet'\|'opus'\|'haiku', effort?: 'low'\|'medium'\|'high'\|'max' }`; `model`/`effort` absent = SDK default; invalid value = 400 | 202 `{ messageId, turnId }`; queued when a turn is running |
+| GET `/chats` | | `ConversationsResponse`. Creates the first conversation when none exists |
+| POST `/chats` | | 201 `Conversation`; publishes SSE `conversations` |
+| DELETE `/chats/:id` | | `{ ok: true }`; 404 for an unknown id. Cancels the running turn of that conversation and drops its queued turns; the change groups already made stay in the canon. If it was the last conversation a fresh empty one is created. Publishes SSE `conversations` |
+| GET `/chat` | `?conversationId=` (absent = most recently updated conversation) | `ChatResponse`; 404 for an unknown id |
+| POST `/chat/messages` | `{ text: string (1..8000), model?: 'sonnet'\|'opus'\|'haiku', effort?: 'low'\|'medium'\|'high'\|'max', conversationId?: string (absent = most recently updated conversation) }`; `model`/`effort` absent = SDK default; invalid value = 400; unknown `conversationId` = 404 | 202 `{ messageId, turnId }`; queued when a turn is running |
 | POST `/chat/turns/:id/cancel` | | `{ ok: true }` |
 | GET `/checks` | | `ChecksResponse` (last result, or computed once) |
 | POST `/checks/run` | | `ChecksResponse` (recomputed with `engine.mjs index` then `query errors` and `query sketches`) |
@@ -118,6 +125,15 @@ All under `/api`, JSON, UTF-8. Errors: `{ "error": "<plain-language message>" }`
 | GET `/plot/sheets` | | `PlotSheetsResponse`: the plot sheets in navigator order (each session, then its scenes), `path`, `title`, `kind`, `session`; same 503/500 as `/plot` |
 | GET `/events` | `Last-Event-ID` header | SSE, 15 s heartbeat comment, ring buffer of 500 events for replay |
 | POST `/shutdown` | | `{ ok: true }`, then the process exits |
+
+## Conversations
+
+- The master can have many conversations. Each one is its own agent session, so it has its own fresh context; the `resume` id of its session is stored per conversation (`resumeId` in `chats/<id>.json`). At most 500 messages are kept per conversation.
+- The turn queue stays ONE per campaign: FIFO, across all conversations. The canon is shared, so turns must not overlap. A turn queued behind a turn of another conversation shows as `queued` (`Turn.state`), with its `conversationId`.
+- SSE `message`, `delta` and `turn` carry `conversationId`, so the screen can show them only in the conversation they belong to. SSE `conversations` means: refetch `GET /api/chats`.
+- The title of a conversation is taken from the first master message: whitespace collapsed, cut to 60 characters with "…" when cut. Until then it is `''`.
+- Deleting a conversation never undoes canon changes; they stay in "what changed".
+- The former single chat (`chat.json`) is converted once into one conversation when the store first loads; the old file is then kept as `chat.json.migrated`.
 
 ## Undo semantics
 

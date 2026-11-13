@@ -1,0 +1,27 @@
+@if (count() > 0) {
+  @if (compact()) {
+    <span class="badge-wrap" role="status" aria-live="polite" [attr.title]="tooltip()">
+      <span class="icon-wrap">
+        <lucide-angular [img]="icons.Users" [size]="20" aria-hidden="true" />
+        <span class="spinner" aria-hidden="true"></span>
+      </span>
+      <span class="badge" aria-hidden="true">{{ count() }}</span>
+      <span class="sr-only">{{ countLabel() }}. {{ tooltip() }}</span>
+    </span>
+  } @else {
+    <div class="helpers" role="status" aria-live="polite">
+      <div class="head">
+        <span class="icon-wrap">
+          <lucide-angular [img]="icons.Users" [size]="16" aria-hidden="true" />
+          <span class="spinner" aria-hidden="true"></span>
+        </span>
+        <span class="count">{{ countLabel() }}</span>
+      </div>
+      <ul class="list" role="list" [attr.aria-label]="listLabel()">
+        @for (step of running(); track step.id) {
+          <li class="item" [attr.title]="step.text">{{ step.text }}</li>
+        }
+      </ul>
+    </div>
+  }
+}

@@ -3,6 +3,8 @@ import type {
   ChangesResponse,
   ChatResponse,
   ChecksResponse,
+  Conversation,
+  ConversationsResponse,
   DiffResponse,
   DocResponse,
   DocsResponse,
@@ -67,15 +69,35 @@ export class ApiService {
     return this.request('POST', '/changes/undo', { body: id ? { id } : {} });
   }
 
-  chat(): Promise<ChatResponse> {
-    return this.request('GET', '/chat');
+  /** Lists the conversations, newest first, with the current one and the campaign's running or queued turn. */
+  conversations(): Promise<ConversationsResponse> {
+    return this.request('GET', '/chats');
+  }
+
+  createConversation(): Promise<Conversation> {
+    return this.request('POST', '/chats');
+  }
+
+  /** Deletes a conversation. The server cancels its running turn and drops its queued ones. */
+  deleteConversation(id: string): Promise<{ ok: true }> {
+    return this.request('DELETE', `/chats/${encodeURIComponent(id)}`);
+  }
+
+  /** The history of one conversation. Without an id the server answers with the most recently updated one. */
+  chat(conversationId?: string): Promise<ChatResponse> {
+    return this.request('GET', '/chat', { query: { conversationId } });
   }
 
   /** Sends a message. The model and thinking effort go along only when they are set. */
-  sendMessage(text: string, choice: Partial<ChatChoice> = {}): Promise<{ messageId: string; turnId: string }> {
-    const body: { text: string; model?: ChatModel; effort?: ChatEffort } = { text };
+  sendMessage(
+    text: string,
+    choice: Partial<ChatChoice> = {},
+    conversationId?: string,
+  ): Promise<{ messageId: string; turnId: string }> {
+    const body: { text: string; model?: ChatModel; effort?: ChatEffort; conversationId?: string } = { text };
     if (choice.model !== undefined) body.model = choice.model;
     if (choice.effort !== undefined) body.effort = choice.effort;
+    if (conversationId !== undefined) body.conversationId = conversationId;
     return this.request('POST', '/chat/messages', { body });
   }
 
@@ -106,7 +128,7 @@ export class ApiService {
 
   /** Rejects with an ApiFailure (`{ error, status, message? }`) that keeps the server's error text; never with a raw Error. */
   private async request<T>(
-    method: 'GET' | 'POST' | 'PUT',
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
     path: string,
     options: { query?: Query; body?: unknown } = {},
   ): Promise<T> {

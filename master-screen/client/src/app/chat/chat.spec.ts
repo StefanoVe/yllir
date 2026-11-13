@@ -4,10 +4,19 @@ import { provideRouter } from '@angular/router';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { Subject } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ChatMessage, ChatResponse, StatusResponse, Turn, TurnStep } from '@shared/types';
+import type {
+  ChatMessage,
+  ChatResponse,
+  Conversation,
+  ConversationsResponse,
+  StatusResponse,
+  Turn,
+  TurnStep,
+} from '@shared/types';
 import { ApiService } from '../core/api.service';
 import { LiveService } from '../core/live.service';
 import { StatusService } from '../core/status.service';
+import { PrefsService } from '../core/prefs.service';
 import { Chat } from './chat';
 
 class FakeLive {
@@ -53,6 +62,12 @@ function deferred<T>() {
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
+function conversation(id: string, title: string): Conversation {
+  return { id, title, createdAt: AT, updatedAt: AT, messageCount: 0 };
+}
+
+const AT = '2026-11-12T10:00:00.000Z';
+
 describe('Chat', () => {
   let fixture: ComponentFixture<Chat>;
   let live: FakeLive;
@@ -61,6 +76,9 @@ describe('Chat', () => {
     chat: ReturnType<typeof vi.fn>;
     sendMessage: ReturnType<typeof vi.fn>;
     cancelTurn: ReturnType<typeof vi.fn>;
+    conversations: ReturnType<typeof vi.fn>;
+    createConversation: ReturnType<typeof vi.fn>;
+    deleteConversation: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -68,9 +86,20 @@ describe('Chat', () => {
     live = new FakeLive();
     agent = signal<StatusResponse | null>(status(false, 'Install Claude Code to talk to the assistant.'));
     api = {
-      chat: vi.fn(async (): Promise<ChatResponse> => ({ messages: [], turn: null })),
+      conversations: vi.fn(async (): Promise<ConversationsResponse> => ({
+        conversations: [conversation('c2', 'La locanda'), conversation('c1', '')],
+        currentId: 'c1',
+        turn: null,
+      })),
+      chat: vi.fn(async (id?: string): Promise<ChatResponse> => ({
+        conversationId: id ?? 'c1',
+        messages: [],
+        turn: null,
+      })),
       sendMessage: vi.fn(async () => ({ messageId: 'm1', turnId: 't1' })),
       cancelTurn: vi.fn(async () => ({ ok: true as const })),
+      createConversation: vi.fn(async () => conversation('c3', '')),
+      deleteConversation: vi.fn(async () => ({ ok: true as const })),
     };
     TestBed.configureTestingModule({
       imports: [Chat],
@@ -133,7 +162,7 @@ describe('Chat', () => {
 
     el<HTMLButtonElement>('button[type="submit"]')?.click();
     await settle();
-    expect(api.sendMessage).toHaveBeenCalledWith('hello', { model: 'sonnet', effort: 'medium' });
+    expect(api.sendMessage).toHaveBeenCalledWith('hello', { model: 'sonnet', effort: 'medium' }, 'c1');
     expect(el('[data-message-id="m1"]')).toBeNull();
     expect(el<HTMLTextAreaElement>('textarea')?.value).toBe('');
 
@@ -223,7 +252,7 @@ describe('Chat', () => {
     type('deep one');
     el<HTMLButtonElement>('button[type="submit"]')?.click();
     await settle();
-    expect(api.sendMessage).toHaveBeenCalledWith('deep one', { model: 'haiku', effort: 'max' });
+    expect(api.sendMessage).toHaveBeenCalledWith('deep one', { model: 'haiku', effort: 'max' }, 'c1');
   });
 
   it('closes the menu on Escape and returns focus to its button', async () => {
@@ -321,6 +350,169 @@ describe('Chat', () => {
       const summary = el('details.steps-done summary');
       expect(summary?.textContent?.trim()).toBe('What I did (1 step)');
       expect(el('[data-message-id="a1"] .steps-done li')).not.toBeNull();
+    });
+
+    it('shows the helper assistants above the status line while they work, and hides them when the turn ends', async () => {
+      agent.set(status(true));
+      await settle();
+      live.emit('turn', runningTurn([
+        { id: 'h1', kind: 'agent', text: 'Writing the innkeeper sheet', at: STEP_AT, state: 'running' },
+      ]));
+      await settle();
+      expect(el('ms-helpers-indicator .count')?.textContent?.trim()).toBe('1 assistant working');
+      expect(el('ms-helpers-indicator .item')?.textContent?.trim()).toBe('Writing the innkeeper sheet');
+      live.emit('turn', { ...runningTurn([{ id: 'h1', kind: 'agent', text: 'Done', at: STEP_AT, state: 'done', endedAt: STEP_AT }]), state: 'done' });
+      await settle();
+      expect(el('ms-helpers-indicator .count')).toBeNull();
+    });
+  });
+
+  describe('conversations', () => {
+    function openList(): void {
+      el<HTMLButtonElement>('[data-conv-trigger]')?.click();
+    }
+
+    function rows(): HTMLElement[] {
+      return Array.from(fixture.nativeElement.querySelectorAll('.conv-row') as NodeListOf<HTMLElement>);
+    }
+
+    it('shows the shown conversation by its default name, and lists them newest first', async () => {
+      agent.set(status(true));
+      await settle();
+      expect(el('[data-conv-trigger] .conv-current')?.textContent?.trim()).toBe('New conversation');
+      openList();
+      await settle();
+      expect(el('[data-conv-trigger]')?.getAttribute('aria-expanded')).toBe('true');
+      expect(rows()).toHaveLength(2);
+      expect(rows()[0].textContent).toContain('La locanda');
+      expect(rows()[1].textContent).toContain('New conversation');
+      expect(rows()[1].querySelector('.conv-time')).not.toBeNull();
+      expect(rows()[1].classList.contains('current')).toBe(true);
+    });
+
+    it('closes the list on Escape and gives the focus back to its button', async () => {
+      await settle();
+      openList();
+      await settle();
+      const pop = el('.conv-pop');
+      pop?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      await settle();
+      expect(el('.conv-pop')).toBeNull();
+      expect(document.activeElement).toBe(el('[data-conv-trigger]'));
+    });
+
+    it('creates a conversation and shows it', async () => {
+      await settle();
+      el<HTMLButtonElement>('.conv-new')?.click();
+      await settle();
+      expect(api.createConversation).toHaveBeenCalledTimes(1);
+      expect(api.chat).toHaveBeenLastCalledWith('c3');
+      expect(el('[data-conv-trigger] .conv-current')?.textContent?.trim()).toBe('New conversation');
+    });
+
+    it('switches to a picked conversation and loads its history', async () => {
+      await settle();
+      openList();
+      await settle();
+      el<HTMLButtonElement>('[data-conv-pick="c2"]')?.click();
+      await settle();
+      expect(api.chat).toHaveBeenLastCalledWith('c2');
+      expect(el('[data-conv-trigger] .conv-current')?.textContent?.trim()).toBe('La locanda');
+      expect(el('.conv-pop')).toBeNull();
+    });
+
+    it('asks inline before deleting, and cancelling deletes nothing', async () => {
+      await settle();
+      openList();
+      await settle();
+      el<HTMLButtonElement>('[data-conv-del="c2"]')?.click();
+      await settle();
+      expect(el('.conv-confirm-text')?.textContent).toContain('Delete this conversation?');
+      expect(api.deleteConversation).not.toHaveBeenCalled();
+      el<HTMLButtonElement>('.conv-action:not(.danger)')?.click();
+      await settle();
+      expect(el('.conv-confirm')).toBeNull();
+      expect(api.deleteConversation).not.toHaveBeenCalled();
+    });
+
+    it('deletes after the confirmation and switches to the current conversation when the shown one is deleted', async () => {
+      await settle();
+      openList();
+      await settle();
+      api.conversations.mockResolvedValueOnce({
+        conversations: [conversation('c2', 'La locanda')],
+        currentId: 'c2',
+        turn: null,
+      } satisfies ConversationsResponse);
+      el<HTMLButtonElement>('[data-conv-del="c1"]')?.click();
+      await settle();
+      el<HTMLButtonElement>('.conv-action.danger')?.click();
+      await settle();
+      expect(api.deleteConversation).toHaveBeenCalledWith('c1');
+      expect(api.chat).toHaveBeenLastCalledWith('c2');
+      expect(el('[data-conv-trigger] .conv-current')?.textContent?.trim()).toBe('La locanda');
+    });
+
+    it('shows the queued notice when the shown conversation waits for another conversation\'s turn', async () => {
+      agent.set(status(true));
+      await settle();
+      live.emit('turn', { id: 't9', messageId: 'm9', state: 'running', activity: '', startedAt: AT, conversationId: 'c2' } satisfies Turn);
+      await settle();
+      expect(el('.notice.queued')).toBeNull();
+      live.emit('turn', { id: 't2', messageId: 'm2', state: 'queued', activity: '', startedAt: AT, conversationId: 'c1' } satisfies Turn);
+      await settle();
+      expect(el('.notice.queued')?.textContent).toContain('Another conversation is working');
+    });
+
+    it('does not show a message or a delta of another conversation', async () => {
+      agent.set(status(true));
+      await settle();
+      live.emit('message', { id: 'x1', role: 'master', text: 'elsewhere', at: AT, conversationId: 'c2' });
+      live.emit('message', { id: 'x2', role: 'master', text: 'here', at: AT, conversationId: 'c1' });
+      await settle();
+      expect(el('[data-message-id="x1"]')).toBeNull();
+      expect(el('[data-message-id="x2"]')?.textContent).toContain('here');
+    });
+
+    it('disables sending while another conversation is loading', async () => {
+      agent.set(status(true));
+      await settle();
+      type('hello');
+      expect(el<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
+      const pending = deferred<ChatResponse>();
+      api.chat.mockReturnValueOnce(pending.promise);
+      openList();
+      await settle();
+      el<HTMLButtonElement>('[data-conv-pick="c2"]')?.click();
+      await settle();
+      expect(el<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+      pending.resolve({ conversationId: 'c2', messages: [], turn: null });
+      await settle();
+      expect(el<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(false);
+    });
+  });
+  describe('saved conversation', () => {
+    it('shows the saved conversation once the campaign slug arrives after the first load', async () => {
+      localStorage.setItem('yllir:test:chat.conversation', 'c2');
+      await settle();
+      expect(el('[data-conv-trigger] .conv-current')?.textContent?.trim()).toBe('New conversation');
+      TestBed.inject(PrefsService).setCampaign('test');
+      await settle();
+      expect(api.chat).toHaveBeenLastCalledWith('c2');
+      expect(el('[data-conv-trigger] .conv-current')?.textContent?.trim()).toBe('La locanda');
+    });
+
+    it('keeps the conversation the master picked when the campaign slug arrives later', async () => {
+      localStorage.setItem('yllir:test:chat.conversation', 'c2');
+      await settle();
+      el<HTMLButtonElement>('[data-conv-trigger]')?.click();
+      await settle();
+      el<HTMLButtonElement>('[data-conv-pick="c1"]')?.click();
+      await settle();
+      TestBed.inject(PrefsService).setCampaign('test');
+      await settle();
+      expect(api.chat).not.toHaveBeenCalledWith('c2');
+      expect(el('[data-conv-trigger] .conv-current')?.textContent?.trim()).toBe('New conversation');
     });
   });
 });

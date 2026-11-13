@@ -4,10 +4,12 @@ import { liveBoardIt } from './parts/live-board.it';
 import { combatIt } from './parts/combat.it';
 import { chatRichIt } from './parts/chat-rich.it';
 import { chatStepsIt } from './parts/chat-steps.it';
+import { chatConversationsIt } from './parts/chat-conversations.it';
 import { musicUiIt } from './parts/music-ui.it';
 import { liveModelIt } from './parts/live-model.it';
 import { polishIt } from './parts/polish.it';
 import { settingsPageIt } from './parts/settings-page.it';
+import { helpersIt } from './parts/helpers.it';
 
 export const it: Record<TranslationKey, string> = {
   ...liveAgentIt,
@@ -15,6 +17,8 @@ export const it: Record<TranslationKey, string> = {
   ...combatIt,
   ...chatRichIt,
   ...chatStepsIt,
+  ...chatConversationsIt,
+  ...helpersIt,
   ...musicUiIt,
   ...liveModelIt,
   ...polishIt,

@@ -4,6 +4,8 @@ import {
   EMPTY_CHAT_STATE,
   addMessage,
   applyDelta,
+  concernsShown,
+  emptyStateFor,
   isActiveTurn,
   isFailedTurn,
   mergeFetched,
@@ -95,22 +97,22 @@ describe('turns', () => {
 describe('mergeFetched', () => {
   it('takes the server history and keeps a pending bubble the server does not list yet', () => {
     let state = applyDelta(EMPTY_CHAT_STATE, { messageId: 'a2', text: 'In corso' }, AT);
-    state = mergeFetched(state, { messages: [master('m1', 'hello')], turn: turn('running') });
+    state = mergeFetched(state, { conversationId: 'c1', messages: [master('m1', 'hello')], turn: turn('running') });
     expect(state.messages.map((m) => m.id)).toEqual(['m1', 'a2']);
     expect(state.turn?.state).toBe('running');
   });
 
   it('collapses a bubble that the server now lists', () => {
     let state = applyDelta(EMPTY_CHAT_STATE, { messageId: 'a1', text: 'partial' }, AT);
-    state = mergeFetched(state, { messages: [agent('a1', 'final text')], turn: null });
+    state = mergeFetched(state, { conversationId: 'c1', messages: [agent('a1', 'final text')], turn: null });
     expect(state.messages).toEqual([agent('a1', 'final text')]);
   });
 
   it('keeps an active turn from an event when the response has none', () => {
     const state = setTurn(EMPTY_CHAT_STATE, turn('running'));
-    expect(mergeFetched(state, { messages: [], turn: null }).turn?.state).toBe('running');
+    expect(mergeFetched(state, { conversationId: 'c1', messages: [], turn: null }).turn?.state).toBe('running');
     const done = setTurn(EMPTY_CHAT_STATE, turn('done'));
-    expect(mergeFetched(done, { messages: [], turn: null }).turn).toBeNull();
+    expect(mergeFetched(done, { conversationId: 'c1', messages: [], turn: null }).turn).toBeNull();
   });
 });
 
@@ -152,7 +154,59 @@ describe('steps', () => {
 
   it('keeps the steps of the active turn through a refetch', () => {
     const shown = setTurn(EMPTY_CHAT_STATE, turn('running', { steps: [step('s1'), step('s2')] }));
-    const state = mergeFetched(shown, { messages: [], turn: turn('running', { steps: [step('s2')] }) });
+    const state = mergeFetched(shown, { conversationId: 'c1', messages: [], turn: turn('running', { steps: [step('s2')] }) });
     expect(state.turn?.steps?.map((s) => s.id)).toEqual(['s1', 's2']);
+  });
+});
+
+describe('conversations', () => {
+  const shownC1: ChatState = emptyStateFor('c1');
+
+  it('shows nothing until a conversation is picked, then only that conversation', () => {
+    expect(EMPTY_CHAT_STATE.conversationId).toBeNull();
+    expect(concernsShown(EMPTY_CHAT_STATE, 'c1')).toBe(false);
+    expect(concernsShown(shownC1, 'c1')).toBe(true);
+    expect(concernsShown(shownC1, 'c2')).toBe(false);
+  });
+
+  it('treats an event without a conversation id as belonging to the shown one', () => {
+    expect(concernsShown(shownC1, undefined)).toBe(true);
+    expect(concernsShown(EMPTY_CHAT_STATE, undefined)).toBe(true);
+  });
+
+  it('ignores a message of another conversation and keeps the shown one', () => {
+    let state = addMessage(shownC1, { ...master('m1', 'mine'), conversationId: 'c1' });
+    state = addMessage(state, { ...master('m2', 'elsewhere'), conversationId: 'c2' });
+    expect(state.messages.map((m) => m.id)).toEqual(['m1']);
+  });
+
+  it('stores a message of the shown conversation without the routing field', () => {
+    const state = addMessage(shownC1, { ...agent('a1', 'hi'), conversationId: 'c1' });
+    expect(state.messages).toEqual([agent('a1', 'hi')]);
+    expect('conversationId' in state.messages[0]).toBe(false);
+  });
+
+  it('ignores a delta of another conversation', () => {
+    const start = shownC1;
+    expect(applyDelta(start, { messageId: 'a1', text: 'x', conversationId: 'c2' }, AT)).toBe(start);
+    expect(applyDelta(start, { messageId: 'a1', text: 'x', conversationId: 'c1' }, AT).messages).toHaveLength(1);
+  });
+
+  it('ignores a turn of another conversation and takes one of the shown conversation', () => {
+    const start = shownC1;
+    expect(setTurn(start, { ...turn('running'), conversationId: 'c2' }).turn).toBeNull();
+    expect(setTurn(start, { ...turn('running'), conversationId: 'c1' }).turn?.state).toBe('running');
+    expect(setTurn(start, turn('queued')).turn?.state).toBe('queued');
+  });
+
+  it('drops a fetched response that is for another conversation than the shown one', () => {
+    const state = shownC1;
+    const stale = mergeFetched(state, { conversationId: 'c2', messages: [master('m9', 'old')], turn: null });
+    expect(stale).toBe(state);
+  });
+
+  it('starts an empty state for a newly picked conversation', () => {
+    const state = emptyStateFor('c2');
+    expect(state).toEqual({ conversationId: 'c2', messages: [], turn: null });
   });
 });

@@ -3,10 +3,12 @@ import { liveBoardEn } from './parts/live-board.en';
 import { combatEn } from './parts/combat.en';
 import { chatRichEn } from './parts/chat-rich.en';
 import { chatStepsEn } from './parts/chat-steps.en';
+import { chatConversationsEn } from './parts/chat-conversations.en';
 import { musicUiEn } from './parts/music-ui.en';
 import { liveModelEn } from './parts/live-model.en';
 import { polishEn } from './parts/polish.en';
 import { settingsPageEn } from './parts/settings-page.en';
+import { helpersEn } from './parts/helpers.en';
 
 export const en = {
   ...liveAgentEn,
@@ -14,6 +16,8 @@ export const en = {
   ...combatEn,
   ...chatRichEn,
   ...chatStepsEn,
+  ...chatConversationsEn,
+  ...helpersEn,
   ...musicUiEn,
   ...liveModelEn,
   ...polishEn,

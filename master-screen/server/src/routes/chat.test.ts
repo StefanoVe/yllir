@@ -60,7 +60,11 @@ describe('chat routes without an agent', () => {
     const server = await serve(campaign, null);
     const res = await request(server.port, { path: '/api/chat' });
     assert.equal(res.status, 200);
-    assert.deepEqual(res.json, { messages: [], turn: null });
+    const body = res.json as { conversationId: unknown; messages: unknown; turn: unknown };
+    assert.equal(typeof body.conversationId, 'string');
+    assert.ok((body.conversationId as string).length > 0);
+    assert.deepEqual(body.messages, []);
+    assert.equal(body.turn, null);
   });
 });
 

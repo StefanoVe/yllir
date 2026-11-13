@@ -28,7 +28,7 @@ const WRITABLE_FOLDERS = [
 /** Single files the assistant may write: the API keys of the image services. */
 const WRITABLE_FILES = [path.join('.campaign', 'state', 'keys.json')];
 const WRITE_DENIED_MESSAGE =
-  'The assistant writes drafts and working files only; campaign documents are saved through the Yllir save step. Allowed folders: drafts, styles, image services, battle map layouts, and the keys file.';
+  'The assistant writes drafts and working files only; campaign documents are saved through the Yllir save step. Allowed folders: drafts, styles, image services, battle map layouts, and the keys file. The result of the batch review is recorded with the engine\'s review step, not written as a file.';
 /** In-process tools built by claude-provider; their handlers validate their own input. */
 export const MCP_TOOLS = new Set([
   'mcp__yllir__search_docs',

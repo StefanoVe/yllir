@@ -1,4 +1,56 @@
 <div class="chat">
+  <div class="conv-bar">
+    <div class="conv" (keydown)="onConversationKeydown($event)">
+      <button type="button" class="conv-trigger" data-conv-trigger [title]="t('chat.conversations.switch')"
+              [attr.aria-expanded]="listOpen()" [attr.aria-controls]="listOpen() ? 'chat-conv-list' : null"
+              (click)="toggleList()">
+        <span class="conv-current">{{ shownTitle() }}</span>
+        <lucide-angular [img]="icons.ChevronDown" [size]="14" aria-hidden="true" />
+      </button>
+
+      @if (listOpen()) {
+        <div class="conv-pop" id="chat-conv-list">
+          <ul class="conv-list" role="list" [attr.aria-label]="t('chat.conversations.list')">
+            @for (conversation of conversations(); track conversation.id) {
+              <li class="conv-row" [class.current]="conversation.id === shownId()">
+                @if (pendingDelete() === conversation.id) {
+                  <div class="conv-confirm">
+                    <p class="conv-confirm-text">{{ t('chat.conversations.confirmDelete') }}</p>
+                    <div class="conv-confirm-actions">
+                      <button type="button" class="conv-action danger" [disabled]="deleting() !== null"
+                              (click)="deleteConversation(conversation.id)">{{ t('chat.conversations.confirmAction') }}</button>
+                      <button type="button" class="conv-action" data-conv-cancel (click)="cancelDelete()">{{ t('chat.conversations.cancel') }}</button>
+                    </div>
+                  </div>
+                } @else {
+                  <button type="button" class="conv-pick" [attr.data-conv-pick]="conversation.id"
+                          [attr.aria-current]="conversation.id === shownId() ? 'true' : null" (click)="select(conversation.id)">
+                    <span class="conv-title">{{ titleOf(conversation) }}</span>
+                    <time class="conv-time" [attr.datetime]="conversation.updatedAt">{{ relativeOf(conversation) }}</time>
+                  </button>
+                  <button type="button" class="icon-btn conv-del" [attr.data-conv-del]="conversation.id"
+                          [disabled]="deleting() !== null" [title]="t('chat.conversations.delete')"
+                          [attr.aria-label]="t('chat.conversations.delete')" (click)="askDelete(conversation.id)">
+                    <lucide-angular [img]="icons.Trash2" [size]="16" aria-hidden="true" />
+                  </button>
+                }
+              </li>
+            }
+          </ul>
+        </div>
+      }
+    </div>
+
+    <button type="button" class="icon-btn conv-new" [disabled]="switching()" [title]="t('chat.conversations.create')"
+            [attr.aria-label]="t('chat.conversations.create')" (click)="createConversation()">
+      <lucide-angular [img]="icons.Plus" [size]="18" aria-hidden="true" />
+    </button>
+  </div>
+
+  @if (listError(); as error) {
+    <p class="error" role="alert">{{ error }}</p>
+  }
+
   @if (liveOpen()) {
     <div class="chat-tools">
       <a class="icon-btn live-link" routerLink="/live" [title]="t('chat.liveLink')" [attr.aria-label]="t('chat.liveLink')">
@@ -68,6 +120,8 @@
       </button>
     }
   </div>
+
+  <ms-helpers-indicator [turn]="activeTurn()" />
 
   <div class="status" aria-live="polite" [attr.aria-label]="t('chat.status')">
     @if (activeTurn()) {
@@ -171,6 +225,10 @@
       }
     </div>
   </form>
+
+  @if (queuedElsewhere()) {
+    <p class="notice queued" role="status">{{ t('chat.conversations.queued') }}</p>
+  }
 
   @if (sendError(); as error) {
     <p class="error" role="alert">{{ error }}</p>

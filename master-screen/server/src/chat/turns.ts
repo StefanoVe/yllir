@@ -43,6 +43,7 @@ type Outcome = { state: 'done' } | { state: 'cancelled' } | { state: 'error'; me
 
 interface Job {
   turn: Turn;
+  conversationId: string;
   prompt: string;
   choice: ChatChoice;
   agentMessageId: string;
@@ -95,10 +96,16 @@ export class TurnRunner {
     this.headSha = opts.headSha ?? gitHeadSha;
   }
 
-  /** The turn that is queued or running, as a snapshot, or null. */
+  /** The turn that is queued or running (of the whole campaign), as a snapshot, or null. */
   current(): Turn | null {
     const job = this.running ?? this.queue[0] ?? null;
     return job ? { ...job.turn, steps: copySteps(job.steps) } : null;
+  }
+
+  /** The queued or running turn, only when it belongs to this conversation; otherwise null. */
+  currentFor(conversationId: string): Turn | null {
+    const turn = this.current();
+    return turn && turn.conversationId === conversationId ? turn : null;
   }
 
   isClosed(): boolean {
@@ -106,11 +113,12 @@ export class TurnRunner {
   }
 
   /**
-   * Accepts a master message: persists it, publishes it and queues its turn.
+   * Accepts a master message in a conversation: persists it there, publishes it and queues its turn.
+   * The queue is one for the whole campaign (FIFO), so a turn runs only after the turns queued before it.
    * The choice of model and effort is passed to the provider for this turn only.
-   * Resolves null once the runner is closing.
+   * Resolves null once the runner is closing. The caller checks that the conversation exists.
    */
-  async submit(text: string, choice: ChatChoice = {}): Promise<Submitted | null> {
+  async submit(conversationId: string, text: string, choice: ChatChoice = {}): Promise<Submitted | null> {
     if (this.closed) return null;
     const at = nowIso();
     const messageId = randomUUID();
@@ -121,9 +129,11 @@ export class TurnRunner {
       state: 'queued',
       activity: TEXTS[this.opts.lang].queued,
       startedAt: at,
+      conversationId,
     };
     const job: Job = {
       turn,
+      conversationId,
       prompt: text,
       choice,
       agentMessageId: randomUUID(),
@@ -136,13 +146,48 @@ export class TurnRunner {
     };
     const message: ChatMessage = { id: messageId, role: 'master', text, at, turnId };
     // The store call is made now, so messages keep their order even when persisted in parallel.
-    await this.opts.store.addMessage(message);
+    await this.opts.store.addMessage(conversationId, message);
     this.known.add(turnId);
     this.queue.push(job);
-    this.opts.ctx.bus.publish('message', message);
+    this.opts.ctx.bus.publish('message', { ...message, conversationId });
     this.publishTurn(job);
     this.pump();
     return { messageId, turnId };
+  }
+
+  /**
+   * Cancels the running turn of one conversation (as cancel does) and drops its queued turns,
+   * each published as cancelled. Turns of other conversations are not touched.
+   */
+  cancelConversation(conversationId: string): void {
+    this.dropQueued(conversationId);
+    if (this.running && this.running.conversationId === conversationId) {
+      this.stop(this.running, 'cancel');
+    }
+  }
+
+  /**
+   * Resolves once no turn of this conversation is running or queued: it cancels them first, and
+   * keeps waiting while a turn of the conversation is still running (a turn may be submitted meanwhile).
+   */
+  async settleConversation(conversationId: string): Promise<void> {
+    for (;;) {
+      this.cancelConversation(conversationId);
+      const job = this.running;
+      if (!job || job.conversationId !== conversationId || job.done === null) return;
+      await job.done;
+    }
+  }
+
+  /** Removes the queued turns of a conversation, publishing each as cancelled. */
+  private dropQueued(conversationId: string): void {
+    for (const job of this.queue.filter((j) => j.conversationId === conversationId)) {
+      this.queue.splice(this.queue.indexOf(job), 1);
+      job.turn.state = 'cancelled';
+      job.turn.endedAt = nowIso();
+      job.turn.activity = '';
+      this.publishTurn(job);
+    }
   }
 
   /** Cancels a queued or running turn. Returns false when this process has never seen the turn. */
@@ -248,7 +293,7 @@ export class TurnRunner {
           prompt: job.prompt,
           cwd: ctx.campaignRoot,
           frameworkRoot: ctx.frameworkRoot,
-          resumeId: store.resumeId(),
+          resumeId: store.resumeId(job.conversationId),
           model: job.choice.model,
           effort: job.choice.effort,
           signal: controller.signal,
@@ -326,7 +371,7 @@ export class TurnRunner {
       case 'delta': {
         if (event.text === '') return false;
         job.text += event.text;
-        ctx.bus.publish('delta', { messageId: job.agentMessageId, text: event.text });
+        ctx.bus.publish('delta', { messageId: job.agentMessageId, text: event.text, conversationId: job.conversationId });
         return false;
       }
       case 'open': {
@@ -336,7 +381,9 @@ export class TurnRunner {
         return false;
       }
       case 'resume': {
-        await store.setResumeId(event.id).catch((err: unknown) => ctx.log(`could not save the session: ${String(err)}`));
+        await store
+          .setResumeId(job.conversationId, event.id)
+          .catch((err: unknown) => ctx.log(`could not save the session: ${String(err)}`));
         return false;
       }
       case 'done':
@@ -382,12 +429,16 @@ export class TurnRunner {
             ...(job.steps.length > 0 ? { steps: copySteps(job.steps) } : {}),
           };
     try {
-      if (agentMessage) await store.addMessage(agentMessage);
+      if (agentMessage) await store.addMessage(job.conversationId, agentMessage);
       await store.appendTurn({ messageId: turn.messageId, turnId: turn.id, fromSha: job.fromSha, toSha });
     } catch (err) {
       ctx.log(`chat state could not be saved: ${String(err)}`);
     }
-    if (agentMessage) ctx.bus.publish('message', agentMessage);
+    if (agentMessage) {
+      ctx.bus.publish('message', { ...agentMessage, conversationId: job.conversationId });
+      // The order and the message count of the conversations changed.
+      ctx.bus.publish('conversations', {});
+    }
     this.publishTurn(job);
     if (job.fromSha !== toSha) ctx.bus.publish('changes', {});
   }

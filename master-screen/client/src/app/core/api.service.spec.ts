@@ -54,3 +54,57 @@ describe('ApiService failures', () => {
     await expect(api.status()).rejects.toMatchObject({ status: 0, error: expect.any(String) });
   });
 });
+
+describe('ApiService conversations', () => {
+  let api: ApiService;
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    api = TestBed.inject(ApiService);
+    fetchMock = vi.fn(async () => jsonResponse(200, { ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  function lastCall(): { url: string; init: RequestInit } {
+    const [url, init] = fetchMock.mock.calls[fetchMock.mock.calls.length - 1] as [string, RequestInit];
+    return { url, init };
+  }
+
+  it('lists the conversations with GET /api/chats', async () => {
+    await api.conversations();
+    expect(lastCall()).toMatchObject({ url: '/api/chats', init: { method: 'GET' } });
+  });
+
+  it('creates a conversation with POST /api/chats', async () => {
+    await api.createConversation();
+    expect(lastCall()).toMatchObject({ url: '/api/chats', init: { method: 'POST' } });
+  });
+
+  it('deletes a conversation by its encoded id', async () => {
+    await api.deleteConversation('a/b c');
+    expect(lastCall()).toMatchObject({ url: '/api/chats/a%2Fb%20c', init: { method: 'DELETE' } });
+  });
+
+  it('loads the shown conversation by its id, encoded in the query', async () => {
+    await api.chat('c 1&x');
+    expect(lastCall().url).toBe('/api/chat?conversationId=c+1%26x');
+  });
+
+  it('loads the default conversation when no id is given', async () => {
+    await api.chat();
+    expect(lastCall().url).toBe('/api/chat');
+  });
+
+  it('sends the conversation id in the message body only when given', async () => {
+    await api.sendMessage('hello', { model: 'haiku' }, 'c2');
+    expect(JSON.parse(String(lastCall().init.body))).toEqual({ text: 'hello', model: 'haiku', conversationId: 'c2' });
+
+    await api.sendMessage('plain');
+    expect(JSON.parse(String(lastCall().init.body))).toEqual({ text: 'plain' });
+  });
+});

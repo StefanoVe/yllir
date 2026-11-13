@@ -3,7 +3,8 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router, type Route } from '@angular/router';
 import { EMPTY, type Observable } from 'rxjs';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ModuleId, ScreenSettings } from '@shared/types';
+import type { ModuleId, ScreenSettings, Turn, TurnStep } from '@shared/types';
+import { CampaignTurnService } from '../core/campaign-turn.service';
 import { LiveService } from '../core/live.service';
 import { DEFAULT_SCREEN_SETTINGS, SettingsService } from '../core/settings.service';
 import { StatusService } from '../core/status.service';
@@ -22,7 +23,7 @@ const ALL_MODULES: Record<ModuleId, boolean> = { music: true, print: true, encyc
 function create(
   modules: Record<ModuleId, boolean>,
   tweak?: (settings: ScreenSettings) => void,
-  options: { loaded?: boolean; routes?: Route[]; initialUrl?: string } = {},
+  options: { loaded?: boolean; routes?: Route[]; initialUrl?: string; turn?: WritableSignal<Turn | null> } = {},
 ): Harness {
   const initial = structuredClone(DEFAULT_SCREEN_SETTINGS);
   tweak?.(initial);
@@ -42,6 +43,7 @@ function create(
         useValue: { on: () => EMPTY as Observable<unknown>, resync$: EMPTY, connected: signal(true).asReadonly() },
       },
       { provide: SettingsService, useValue: { settings, loaded } as unknown as SettingsService },
+      { provide: CampaignTurnService, useValue: { turn: (options.turn ?? signal<Turn | null>(null)).asReadonly() } },
     ],
   });
   const fixture = TestBed.createComponent(Shell);
@@ -259,5 +261,58 @@ describe('Shell density, motion and start page', () => {
     const { fixture, router } = create(ALL_MODULES, undefined, { routes, initialUrl: '/' });
     await fixture.whenStable();
     expect(router.url).toBe('/');
+  });
+});
+
+describe('Shell helpers entry', () => {
+  const AT = '2026-11-13T10:00:00.000Z';
+  const helper = (id: string, text: string): TurnStep => ({ id, kind: 'agent', text, at: AT, state: 'running' });
+  const turnWith = (state: Turn['state'], steps: TurnStep[]): Turn => ({ id: 't1', messageId: 'm1', state, activity: '', startedAt: AT, steps });
+
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  function railEntry(fixture: ComponentFixture<Shell>): HTMLAnchorElement | null {
+    return fixture.nativeElement.querySelector('nav a.rail-item[href="/"][aria-label$="working"]') as HTMLAnchorElement | null;
+  }
+
+  async function atRoute(url: string, turn: Turn | null): Promise<ComponentFixture<Shell>> {
+    const routes: Route[] = [{ path: '', children: [] }, { path: 'plot', children: [] }];
+    const { fixture, router } = create(ALL_MODULES, undefined, { routes, initialUrl: url, turn: signal(turn) });
+    await router.navigateByUrl(url);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('shows the compact helpers entry under Home when helpers work off Home', async () => {
+    const fixture = await atRoute('/plot', turnWith('running', [helper('a', 'Writing the sheet'), helper('b', 'Checking the map')]));
+    const entry = railEntry(fixture);
+    expect(entry).not.toBeNull();
+    expect(entry?.getAttribute('aria-label')).toBe('2 assistants working');
+    expect(entry?.querySelector('.badge')?.textContent?.trim()).toBe('2');
+    const home = fixture.nativeElement.querySelector('nav a[href="/"]') as HTMLElement;
+    expect(home.nextElementSibling).toBe(entry);
+  });
+
+  it('uses the singular label for one helper', async () => {
+    const fixture = await atRoute('/plot', turnWith('running', [helper('a', 'Writing the sheet')]));
+    expect(railEntry(fixture)?.getAttribute('aria-label')).toBe('1 assistant working');
+  });
+
+  it('hides the helpers entry on Home, where the chat shows them', async () => {
+    const fixture = await atRoute('/', turnWith('running', [helper('a', 'Writing the sheet')]));
+    expect(railEntry(fixture)).toBeNull();
+  });
+
+  it('hides the helpers entry when the running turn has no helper', async () => {
+    const fixture = await atRoute('/plot', turnWith('running', []));
+    expect(railEntry(fixture)).toBeNull();
+  });
+
+  it('hides the helpers entry while the turn is only queued', async () => {
+    const fixture = await atRoute('/plot', turnWith('queued', [helper('a', 'Waiting')]));
+    expect(railEntry(fixture)).toBeNull();
   });
 });

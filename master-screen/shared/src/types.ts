@@ -62,8 +62,26 @@ export interface ChatMessage {
 }
 export interface Turn { id: string; messageId: string; state: TurnState; activity: string; startedAt: string; endedAt?: string; fromSha?: string; toSha?: string; error?: string;
   steps?: TurnStep[];         // live list of the steps of the turn, newest last, at most 60
+  conversationId?: string;    // the conversation the turn belongs to; absent in data written before conversations
 }
-export interface ChatResponse { messages: ChatMessage[]; turn: Turn | null }
+/** One conversation of the master: its own agent session, so its own fresh context. */
+export interface Conversation {
+  id: string;
+  title: string;              // '' until the first master message; the client shows a default name
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+}
+export interface ConversationsResponse {
+  conversations: Conversation[]; // newest updatedAt first
+  currentId: string;
+  turn: Turn | null;             // the queued or running turn of the whole campaign, whatever its conversation
+}
+export interface ChatResponse {
+  conversationId: string;
+  messages: ChatMessage[];
+  turn: Turn | null;             // only when the turn belongs to this conversation
+}
 
 // Model and thinking effort the master picks for one chat message; absent = the SDK / Claude Code default.
 export type ChatModel = 'sonnet' | 'opus' | 'haiku';
@@ -119,8 +137,9 @@ export type LiveEvent =
   | { event: 'hello'; data: { serverTime: string } }
   | { event: 'files'; data: { changed: string[]; removed: string[] } }  // canon files, debounced 150 ms
   | { event: 'changes'; data: Record<string, never> }                    // refetch /api/changes
-  | { event: 'message'; data: ChatMessage }
-  | { event: 'delta'; data: { messageId: string; text: string } }       // streamed agent text, appended
+  | { event: 'conversations'; data: Record<string, never> }              // refetch /api/chats
+  | { event: 'message'; data: ChatMessage & { conversationId: string } }
+  | { event: 'delta'; data: { messageId: string; text: string; conversationId: string } }  // streamed agent text, appended
   | { event: 'turn'; data: Turn }
   | { event: 'open'; data: { path: string } }                           // the agent asks the screen to open a document
   | { event: 'status'; data: StatusResponse }

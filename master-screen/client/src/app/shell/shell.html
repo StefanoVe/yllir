@@ -4,6 +4,11 @@
        [attr.aria-label]="i18n.t('nav.home')" [title]="i18n.t('nav.home')">
       <lucide-angular [img]="icons.MessageSquare" [size]="20" aria-hidden="true" />
     </a>
+    @if (showRailHelpers()) {
+      <a class="rail-item" routerLink="/" [attr.aria-label]="railHelpersLabel()">
+        <ms-helpers-indicator [turn]="campaignTurn()" compact />
+      </a>
+    }
     <a class="rail-item" routerLink="/live" routerLinkActive="active" ariaCurrentWhenActive="page"
        [attr.aria-label]="i18n.t('nav.liveTable')" [title]="i18n.t('nav.liveTable')">
       <lucide-angular [img]="icons.Dices" [size]="20" aria-hidden="true" />

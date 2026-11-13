@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { afterEach, describe, it } from 'node:test';
 import { createFakeProvider } from '../agent/fake-provider.js';
 import { createChatService } from './index.js';
-import { makeCampaign, waitFor, type TestCampaign } from './test-support.js';
+import { makeCampaign, messagesOf, submitTo, waitFor, type TestCampaign } from './test-support.js';
 
 const cleanups: Array<() => void> = [];
 afterEach(() => {
@@ -19,10 +19,10 @@ describe('stored agent message', () => {
       { type: 'done' },
     ]);
     const service = createChatService(campaign.ctx, provider);
-    const sub = await service.runner.submit('ciao');
+    const sub = await submitTo(service, 'ciao');
     assert.ok(sub);
-    await waitFor(() => service.store.messages().some((m) => m.role === 'agent'), 'agent message stored');
-    const agent = service.store.messages().filter((m) => m.role === 'agent');
+    await waitFor(() => messagesOf(service).some((m) => m.role === 'agent'), 'agent message stored');
+    const agent = messagesOf(service).filter((m) => m.role === 'agent');
     assert.deepEqual(agent.map((m) => m.text), ['The answer.']);
     await service.runner.close();
   });

@@ -40,6 +40,7 @@ Questo documento descrive il master screen: la parte del framework che il master
 - **Interfaccia (Deciso, 2026-11-12).** Moderna e semplice da usare, ma abbastanza funzionale. È coerente con le icone con tooltip decise sopra.
 - **Impostazioni del master screen (Deciso, 2026-11-13).** L'icona delle impostazioni sta nel gruppo in fondo alla barra laterale, insieme all'anteprima pubblica e al tema, e apre una pagina. Le impostazioni su come funziona il master screen si salvano nel file della campagna `.campaign/master-screen.yaml`, sotto git, e valgono su ogni browser; il file contiene solo ciò che il master ha cambiato, il resto prende i valori predefiniti, uguali al comportamento precedente. Tema, dimensione del testo, preferiti e recenti restano sul computer, separati per campagna.
 - **Stile dell'interfaccia (Deciso, 2026-11-13).** Monocromo secondo il tema, taccuino in flat design squadrato; i nodi della mappa della trama e della tela del cockpit sono pezzi di carta strappata, i popup dei documenti pagine di quaderno. Precisa la decisione «Interfaccia» del 2026-11-12. Regole complete in [Linee guida dell'interfaccia](Linee%20guida%20dell'interfaccia.md).
+- **Conversazioni nel master screen (Deciso, 2026-11-13).** Il master crea ed elimina conversazioni con l'agente e sceglie quale continuare da un elenco nella chat. Ogni conversazione parte con un contesto nuovo: la continuità viene dai documenti, dal pacchetto di contesto e dalla nota sul lavoro in corso. La parola mostrata è «conversazione», mai «sessione». La coda dei turni resta una per campagna, e l'indicatore degli assistenti al lavoro è visibile nella chat e nella barra di navigazione. Dettagli in [Gestione delle sessioni](Gestione%20delle%20sessioni.md#conversazioni-nel-master-screen).
 
 ### Strumenti della sessione live estratti (Deciso)
 
@@ -84,6 +85,11 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 - Annullamento in linguaggio naturale: «torna a com'era» riporta indietro l'ultimo gruppo di modifiche. La cronologia dei gruppi resta consultabile. Il versionamento sottostante non è visibile.
 - Una riga di stato dice cosa sta facendo l'agente, senza log tecnici, e si può fermare il lavoro in corso.
 - Gli esiti dei controlli automatici (audit di continuità, collegamenti) si mostrano come frasi semplici, per esempio «Ho controllato 3 collegamenti: 2 aggiunti, 1 da confermare».
+- **Conversazioni (Deciso, 2026-11-13).** Il master può creare una conversazione nuova ed eliminarne una. Più conversazioni esistono accanto e il master sceglie da un elenco nella pagina della chat quale continuare. Ogni conversazione è separata e parte con un contesto nuovo: la continuità viene dai documenti, dal pacchetto di contesto del motore e dalla nota sul lavoro in corso, non dalla storia della conversazione precedente. Il titolo viene dal primo messaggio del master; non si rinomina.
+- **Eliminare una conversazione (Deciso, 2026-11-13).** Rimuove solo la cronologia della chat. Le modifiche già fatte ai documenti restano, e il master viene avvisato di questo in parole semplici prima di confermare: lo schermo chiede sempre conferma.
+- **Una scrittura alla volta (Deciso, 2026-11-13).** La coda dei turni è una per campagna: due conversazioni non scrivono il canone nello stesso momento. Un messaggio inviato mentre un'altra conversazione lavora attende, e lo schermo lo dice.
+- **Indicatore degli assistenti (Deciso, 2026-11-13).** Mentre l'agente lavora, la chat mostra in modo compatto quanti assistenti sono attivi e una frase semplice per ciascuno su che cosa sta facendo, senza termini tecnici. Se il master è su un'altra pagina, lo stesso indicatore sta nella barra di navigazione, così sa che l'agente è ancora al lavoro. Non compare mai la parola «sub-agent».
+- Le conversazioni del tavolo e degli scontri non cambiano: quella del tavolo resta una per sessione live, quella di ogni scontro ha la sua (vedi «Sessione live e scontri»).
 
 ### Consultazione della campagna
 
@@ -122,7 +128,7 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 
 - **Una schermata principale.** La chat e il pannello delle modifiche occupano il centro. Gli altri pannelli si aprono a richiesta e si chiudono senza perdere lo stato.
 - **Icone con tooltip (Deciso).** Ogni icona ha un tooltip e un nome accessibile. Nessuna barra di testo sopra le icone. Se un'icona non basta, la soluzione è cambiarla, non aggiungere etichette.
-- **Linguaggio del master.** Nell'interfaccia si usano parole come documento, scena, scheda, sessione, annuncio, personaggio. Restano fuori parole come commit, indice, canone, frontmatter, blocco dei metadati, provider, token. I termini tecnici vivono nel glossario di `Principi.md`.
+- **Linguaggio del master.** Nell'interfaccia si usano parole come documento, scena, scheda, sessione, conversazione, annuncio, personaggio. «Sessione» indica sempre la giocata; la conversazione con l'agente si chiama «conversazione» (decisione del 2026-11-13). Restano fuori parole come commit, indice, canone, frontmatter, blocco dei metadati, provider, token, sub-agent. I termini tecnici vivono nel glossario di `Principi.md`.
 - **Nessuna modifica silenziosa.** Ogni cambiamento è visibile, collegato a una richiesta e annullabile.
 - **Nessun aggiornamento ottimistico.** Ciò che compare sullo schermo è ciò che è stato davvero scritto. Vale per la musica come per tutto il resto.
 - **Il master decide, l'agente propone.** Le scelte di trama, di regole e di contenuto restano al master; l'agente indica le opzioni.

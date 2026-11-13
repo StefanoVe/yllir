@@ -31,6 +31,7 @@ export interface ChatTexts {
   invalidChoice: string;
   unavailable: string;
   noSuchTurn: string;
+  noSuchConversation: string;
   // Precise steps (see activity.ts). Each sentence is plain language and carries no path or tool name.
   readingInstructions: string;
   readingDoc: (title: string) => string;
@@ -99,6 +100,7 @@ export const TEXTS: Record<Lang, ChatTexts> = {
     invalidChoice: 'Scegli un modello e un livello di ragionamento tra quelli proposti.',
     unavailable: 'L’assistente non è disponibile in questo momento.',
     noSuchTurn: 'Questa risposta non esiste.',
+    noSuchConversation: 'Questa conversazione non esiste.',
   },
   en: {
     readingInstructions: 'Re-reading my instructions…',
@@ -152,6 +154,7 @@ export const TEXTS: Record<Lang, ChatTexts> = {
     invalidChoice: 'Choose a model and a thinking level from the options offered.',
     unavailable: 'The assistant is not available right now.',
     noSuchTurn: 'This answer does not exist.',
+    noSuchConversation: 'This conversation does not exist.',
   },
 };
 

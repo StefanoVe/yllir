@@ -5,6 +5,9 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Music, MessageSquare, Printer, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
 import { filter, map, take } from 'rxjs';
 import { LiveService } from '../core/live.service';
+import { CampaignTurnService } from '../core/campaign-turn.service';
+import { HelpersIndicator } from '../chat/helpers-indicator';
+import { helpersCountKey, runningHelpers } from '../chat/helpers';
 import { SettingsService } from '../core/settings.service';
 import { MusicApiService } from '../music/music-api.service';
 import { MusicDock } from '../music/music-dock';
@@ -19,7 +22,7 @@ import { applyTextScale, readTextScale } from './text-scale';
 
 @Component({
   selector: 'ms-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock, HelpersIndicator],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })
@@ -38,6 +41,7 @@ export class Shell {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly settingsService = inject(SettingsService);
   private readonly document = inject(DOCUMENT);
+  private readonly campaignTurns = inject(CampaignTurnService);
 
   readonly icons = { MessageSquare, Dices, GitBranch, Library, Music, BookOpen, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
   /** The connection notice shows only after the stream has been down for a while, so load and blips do not flash it. */
@@ -71,6 +75,12 @@ export class Shell {
     { initialValue: this.router.url },
   );
   private readonly campaignName = computed(() => this.status.campaign()?.name ?? '');
+  /** The campaign's queued or running turn, for the helpers entry of the rail. */
+  readonly campaignTurn = this.campaignTurns.turn;
+  private readonly helperCount = computed(() => runningHelpers(this.campaignTurn()).length);
+  /** The rail entry for the helpers at work shows off Home only: the chat already shows them there. */
+  readonly showRailHelpers = computed(() => this.helperCount() > 0 && this.url().split(/[?#]/)[0] !== '/');
+  readonly railHelpersLabel = computed(() => this.i18n.t(helpersCountKey(this.helperCount()), { count: this.helperCount() }));
 
   constructor() {
     // Saved text size: applied once the campaign is known, and again whenever it changes.
