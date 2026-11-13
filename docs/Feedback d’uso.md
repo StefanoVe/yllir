@@ -36,6 +36,19 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/feedback.mjs" report . --include-transcripts
 
 Il primo mostra conteggi per skill, invocazioni concluse e incomplete senza i corpi delle trascrizioni. Il secondo legge le trascrizioni locali. L’esportazione mantiene per impostazione predefinita l’aggregato storico; `--include-details yes` aggiunge i soli metadati per skill descritti sopra. Entrambe le modalità escludono testi e percorsi sensibili.
 
+## Segnalazione di un problema
+
+**Proposta**, non ancora deciso. Riguarda il singolo problema del framework, non il registro d’uso sopra.
+
+- Quando l’assistente verifica un problema del framework stesso (un comando che fallisce anche rieseguito come scritto, un controllo che contraddice le sue istruzioni, un arresto anomalo), chiede al master una sola volta per problema se vuole inviare una segnalazione all’autore su GitHub, nel repository `StefanoVe/yllir`. Non chiede di nuovo per lo stesso problema nella stessa conversazione. Problemi del master, permessi negati e domande sul contenuto non rientrano.
+- Se il master dice sì, lo script `issue-report.mjs` prova in quest’ordine:
+  1. il programma a riga di comando di GitHub (`gh`), che crea direttamente la segnalazione;
+  2. il browser predefinito del master, su un modulo già compilato: il master deve solo premere il pulsante di invio;
+  3. se nessuno dei due funziona, restituisce il testo e un collegamento già compilato, da aprire a mano.
+- La segnalazione contiene solo dati tecnici (versione del framework, assistente, sistema operativo, versione di Node) e una descrizione tecnica del problema. Non contiene mai contenuti della campagna né note del master. Il percorso della campagna e la cartella utente vengono sostituiti da un segnaposto prima dell’invio, e vale quanto stabilito in [Sicurezza e privacy](Sicurezza%20e%20privacy.md).
+- Il testo completo viene salvato anche in `.campaign/state/issues/`, fuori dal controllo delle versioni, come le altre annotazioni locali.
+
 ## Questioni aperte
 
 - Se e come inviare il registro d’uso all’autore: un pacchetto di diagnosi con consenso e redazione (vedi [Sicurezza e privacy](Sicurezza%20e%20privacy.md), sezione 8). Oggi il registro resta solo locale e spento per default. **Non deciso.**
+- Se il testo pubblico della segnalazione debba essere mostrato al master prima dell’invio. **Non deciso.**

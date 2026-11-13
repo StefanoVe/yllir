@@ -71,10 +71,13 @@ Use only the words in the language column of the campaign: the Italian column fo
 | Ingest | «Portare nella campagna» | «Bring into the campaign» |
 | Image provider | «Servizio per le illustrazioni» | «Illustration service» |
 | API key | «Chiave del servizio» | «Service key» |
+| Issue / bug report | «Segnalazione» | «Report» |
 
 ## Never say
 
 Never write these words, in any language, in a message to the master or in a document meant for players: skill, script, git, commit, repository, YAML, frontmatter, metadata block, Markdown, sub-agent, model, Haiku, Claude, hook, MCP, template, prompt, JSON, plugin, draft, batch, state, state file, op, tracker, provenance field, codes of saved versions (for example a1b2c3d), text in backticks, and the names of terminal commands (for example `node`, `mkdir`, `git`, `cat`).
+
+Note: URLs given on purpose in the report step of the entry skill (the link to a sent or pre-filled report) are allowed; no other URL is.
 
 ## Changes to the canon
 

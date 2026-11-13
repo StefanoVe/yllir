@@ -2,7 +2,7 @@
 name: yllir
 description: Entry point of Yllir. Invoke it first for every message of the master in a Yllir campaign folder or in an empty folder. It recognises what the master wants and runs the right process.
 user-invocable: true
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node */skills/core/yllir/scripts/generate-instructions.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Read, Write, Edit, Agent, Skill
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-report.mjs" *), Bash(node */scripts/issue-report.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node */skills/core/yllir/scripts/generate-instructions.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Read, Write, Edit, Agent, Skill
 ---
 
 # Yllir entry point
@@ -70,6 +70,12 @@ A process gives its message for the master as its final text. Send that message 
 - When a command or check fails, say only the fixed sentence of the lexicon that matches, or the closest one. Never explain why.
 - Keep maintenance in the background: answer the concrete request first. Older versions and housekeeping are not part of the answer unless the master asks.
 - While a process runs, send the master at most one short message, at the start, saying what you are doing. Never say that it is almost finished.
+- **Report a problem.** Applies only to a problem of the framework itself that you have verified: a command that fails again when run exactly as written, a check that contradicts its own instructions, or a crash. Never for the master's mistakes, a refused permission, or a content question.
+  1. Ask ONE question, once per problem per conversation, after the fixed sentence of the lexicon for an operation that could not be completed: whether the master wants the assistant to send a report to the author of the assistant on GitHub, saying in plain words that the report contains no campaign content. Do nothing else about it this turn.
+  2. If the master says no: say it is fine, and never ask again for that problem.
+  3. If the master says yes: run `node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-report.mjs" create . --title "<title>" --summary "<summary>"`, adding `--steps`, `--expected` and `--actual` when useful. Write them in English, technical, about the framework only. They go to a PUBLIC page: never put names, places, text or master's notes of the campaign, nor the master's name, in any of them.
+  4. Read the JSON result's `status`: `created` → say the report was sent, and give `issue_url` as a link. `browser` → say a page has opened in the browser with the report already filled in, and the master only has to press the button to send it. `text` → say the report could not be opened automatically, give `prefilled_url` as a link to click, and say it is already filled in.
+  5. Never say «issue» or the name of the script. Say «segnalazione» or «report».
 
 ## Examples
 
@@ -80,3 +86,7 @@ Wrong: writing the campaign files in this skill, or running the engine's `commit
 Correct, go back (the master writes «annulla l'ultima cosa che hai fatto» in an Italian campaign): the three-line summary of the last saved versions, then one confirmation question in plain Italian, naming the version to go back to.
 
 Wrong, go back: «Ho eseguito il ripristino dell'ultimo salvataggio a1b2c3.» It uses technical words and asks no confirmation before acting.
+
+Correct, a verified framework crash (the master has just been told the operation could not be completed): after the fixed sentence, one question in plain Italian: «Vuoi che mandi una segnalazione all'autore dell'assistente su GitHub? Nella segnalazione non c'è nulla della tua campagna.»
+
+Wrong, a verified framework crash: «Ho aperto una issue su GitHub con lo script issue-report.mjs.» It names the script and the jargon, and acts before the master says yes.
