@@ -575,11 +575,11 @@ Solo per il master.
   test('collects every action paragraph under the action headings, with plain text', () => {
     const { actions } = statSummary(REAL, ITALIAN);
     assert.deepEqual(actions, [
-      { name: 'Pugno pesante', text: 'Il guardiano colpisce con il braccio di pietra.' },
-      { name: 'Sasso lanciato', text: 'Gittata 30 m, 1d6 danni.' },
-      { name: 'Scatto', text: 'Il guardiano si sposta di 3 m.' },
-      { name: 'Parata', text: 'Quando è colpito in mischia, riduce il danno di 2.' },
-      { name: 'Passo pesante', text: 'Il guardiano si sposta di 1,5 m.' },
+      { name: 'Pugno pesante', text: 'Il guardiano colpisce con il braccio di pietra.', group: 'actions', timing: 'own_turn' },
+      { name: 'Sasso lanciato', text: 'Gittata 30 m, 1d6 danni.', group: 'actions', timing: 'own_turn' },
+      { name: 'Scatto', text: 'Il guardiano si sposta di 3 m.', group: 'bonus_actions', timing: 'own_turn' },
+      { name: 'Parata', text: 'Quando è colpito in mischia, riduce il danno di 2.', group: 'reactions', timing: 'any_turn' },
+      { name: 'Passo pesante', text: 'Il guardiano si sposta di 1,5 m.', group: 'legendary_actions', timing: 'others_turns' },
     ]);
   });
 
@@ -601,7 +601,7 @@ Solo per il master.
 
   test('never returns anything from the master-only block, even an action heading inside it', () => {
     const summary = statSummary(REAL, MASTER_ONLY);
-    assert.deepEqual(summary.actions, [{ name: 'Colpo visibile', text: 'Un colpo di spada.' }]);
+    assert.deepEqual(summary.actions, [{ name: 'Colpo visibile', text: 'Un colpo di spada.', group: 'actions', timing: 'own_turn' }]);
     const text = JSON.stringify(summary);
     assert.equal(text.includes('Colpo segreto'), false);
     assert.equal(text.includes('Solo per il master'), false);
@@ -610,7 +610,7 @@ Solo per il master.
 
   test('an unclosed master block is removed to the end of the sheet', () => {
     const open = '## Azioni\n\n**Visibile.** Testo.\n\n<!-- master -->\n**Nascosto.** Non deve comparire.\n';
-    assert.deepEqual(statSummary(REAL, open).actions, [{ name: 'Visibile', text: 'Testo.' }]);
+    assert.deepEqual(statSummary(REAL, open).actions, [{ name: 'Visibile', text: 'Testo.', group: 'actions', timing: 'own_turn' }]);
   });
 
   test('a creature without statistics gives empty lists', () => {
@@ -628,5 +628,114 @@ Solo per il master.
     assert.deepEqual(statSummary(REAL, '| | |\n|||\n**\n## Azioni\n****'), empty);
     assert.deepEqual(statSummary(undefined, '| CA | 12 |'), { lines: [], actions: [] });
     assert.deepEqual(statSummary(null, null), empty);
+  });
+});
+
+// Shorthand: apply an op and return the whole result (state and notices).
+function step(state, op, adapter = REAL) {
+  const result = recordEvent(adapter, state, op, ctx);
+  assert.equal(result.ok, true, result.error?.message);
+  return result;
+}
+
+describe('notices of automatic changes', () => {
+  test('damage that brings an enemy to 0 returns a defeated notice, also saved on the event', () => {
+    const state = fighting([{ op: 'add', name: 'Goblin 1', side: 'enemy', hp: 3 }]);
+    const result = step(state, { op: 'damage', id: 'c-1', amount: 3 });
+    assert.deepEqual(result.notices, [{ kind: 'defeated', id: 'c-1', name: 'Goblin 1' }]);
+    assert.deepEqual(result.state.events.at(-1).notice, { kind: 'defeated', id: 'c-1', name: 'Goblin 1' });
+  });
+
+  test('damage that brings a PC to 0 returns an unconscious notice', () => {
+    const state = fighting([{ op: 'add', name: 'Ilde', side: 'pc', hp: 4 }]);
+    const result = step(state, { op: 'damage', id: 'c-1', amount: 4 });
+    assert.deepEqual(result.notices, [{ kind: 'unconscious', id: 'c-1', name: 'Ilde' }]);
+  });
+
+  test('a change with nothing automatic has no notices and its event has no notice field', () => {
+    const state = fighting([{ op: 'add', name: 'Goblin 1', side: 'enemy', hp: 7 }]);
+    const result = step(state, { op: 'damage', id: 'c-1', amount: 2 });
+    assert.deepEqual(result.notices, []);
+    assert.equal('notice' in result.state.events.at(-1), false);
+  });
+
+  test('a defeated enemy that takes more damage is not reported again', () => {
+    const state = fighting([{ op: 'add', name: 'Goblin 1', side: 'enemy', hp: 3 }, { op: 'damage', id: 'c-1', amount: 3 }]);
+    assert.deepEqual(step(state, { op: 'damage', id: 'c-1', amount: 1 }).notices, []);
+  });
+
+  test('adding a combatant at 0 hp reports it at once', () => {
+    const result = step(fighting(), { op: 'add', name: 'Cart', side: 'enemy', hp: 0 });
+    assert.deepEqual(result.notices, [{ kind: 'defeated', id: 'c-1', name: 'Cart' }]);
+  });
+
+  test('next at the end of a turn with an end_of_turn condition returns condition-ended and the turn', () => {
+    let state = fighting([
+      { op: 'add', name: 'A', side: 'enemy', initiative: 20, hp: 3 },
+      { op: 'add', name: 'B', side: 'enemy', initiative: 10, hp: 3 },
+    ]);
+    state = step(state, { op: 'next' }).state;
+    state = step(state, { op: 'condition-add', id: 'c-1', condition: 'frightened', duration: 'end_of_turn' }).state;
+    const result = step(state, { op: 'next' });
+    assert.deepEqual(result.notices, [
+      { kind: 'condition-ended', id: 'c-1', name: 'A', condition: 'frightened' },
+      { kind: 'turn', id: 'c-2', name: 'B', round: 1, newRound: false },
+    ]);
+    assert.deepEqual(result.state.events.at(-2).notice, { kind: 'condition-ended', id: 'c-1', name: 'A', condition: 'frightened' });
+    assert.deepEqual(result.state.events.at(-1).notice, { kind: 'turn', id: 'c-2', name: 'B', round: 1, newRound: false });
+  });
+
+  test('a rounds 1 condition ends with a notice when its turn ends', () => {
+    let state = fighting([{ op: 'add', name: 'A', side: 'enemy', initiative: 20, hp: 3 }]);
+    state = step(state, { op: 'next' }).state;
+    state = step(state, { op: 'condition-add', id: 'c-1', condition: 'poisoned', duration: 'rounds', rounds: 1 }).state;
+    const result = step(state, { op: 'next' });
+    assert.equal(result.notices[0].kind, 'condition-ended');
+    assert.equal(result.notices[0].condition, 'poisoned');
+  });
+
+  test('newRound is true when the order wraps to a new round, and false inside a round', () => {
+    let state = fighting([
+      { op: 'add', name: 'A', side: 'enemy', initiative: 20, hp: 3 },
+      { op: 'add', name: 'B', side: 'enemy', initiative: 10, hp: 3 },
+    ]);
+    const first = step(state, { op: 'next' });
+    assert.deepEqual(first.notices, [{ kind: 'turn', id: 'c-1', name: 'A', round: 1, newRound: true }]);
+    state = step(first.state, { op: 'next' }).state;
+    const wrapped = step(state, { op: 'next' });
+    assert.deepEqual(wrapped.notices, [{ kind: 'turn', id: 'c-1', name: 'A', round: 2, newRound: true }]);
+  });
+
+  test('start and end report no notices', () => {
+    const started = startEncounter(REAL, null, ctx);
+    assert.deepEqual(started.notices, []);
+    assert.deepEqual(endEncounter(REAL, started.state, ctx).notices, []);
+  });
+
+  test('a state with a notice on an event is still valid', () => {
+    const state = fighting([{ op: 'add', name: 'Goblin 1', side: 'enemy', hp: 3 }, { op: 'damage', id: 'c-1', amount: 3 }]);
+    assert.equal(state.events.at(-1).notice.kind, 'defeated');
+    assert.deepEqual(validateState(REAL, state), []);
+  });
+});
+
+describe('action groups from the adapter', () => {
+  const SHEET = '# Drago\n\n## Azioni\n\n**Colpo.** Testo.\n\n## Reazioni\n\n**Parata.** Testo.\n\n## Azioni leggendarie\n\n**Passo.** Testo.\n';
+
+  test('each action carries the group and timing of its heading', () => {
+    assert.deepEqual(statSummary(REAL, SHEET).actions, [
+      { name: 'Colpo', text: 'Testo.', group: 'actions', timing: 'own_turn' },
+      { name: 'Parata', text: 'Testo.', group: 'reactions', timing: 'any_turn' },
+      { name: 'Passo', text: 'Testo.', group: 'legendary_actions', timing: 'others_turns' },
+    ]);
+  });
+
+  test('without action_groups in the adapter, the fixed headings are actions of their own turn', () => {
+    const { action_groups: _unused, ...withoutGroups } = REAL;
+    assert.deepEqual(statSummary(withoutGroups, SHEET).actions, [
+      { name: 'Colpo', text: 'Testo.', group: 'actions', timing: 'own_turn' },
+      { name: 'Parata', text: 'Testo.', group: 'actions', timing: 'own_turn' },
+      { name: 'Passo', text: 'Testo.', group: 'actions', timing: 'own_turn' },
+    ]);
   });
 });

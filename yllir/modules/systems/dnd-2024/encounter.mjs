@@ -5,9 +5,20 @@
 // mutates its input.
 //
 // Results: initEncounter returns a CombatState. startEncounter, recordEvent,
-// advanceTurn and endEncounter return { ok: true, state } or
+// advanceTurn and endEncounter return { ok: true, state, notices } or
 // { ok: false, error: { code, message } }. validateState returns an array of
 // { code, message }, empty when the state is valid.
+//
+// Notices: `notices` lists the automatic changes the rules made in that step, empty
+// when there were none. The change the master asked for directly is not a notice.
+// Each notice is also saved on the history line it belongs to, as `notice`. A notice is:
+// - { kind: 'condition-ended', id, name, condition }: a condition was removed at the
+//   end of the turn of its bearer (`end_of_turn`, or `rounds` reaching 0);
+// - { kind: 'defeated', id, name }: a non-PC reached 0 hp (not when already defeated);
+// - { kind: 'unconscious', id, name }: a PC reached 0 hp and was given `unconscious`
+//   (not when it already had it);
+// - { kind: 'turn', id, name, round, newRound }: after `next`, who is up. `newRound` is
+//   true when the round changes, which includes the first round of the combat.
 //
 // Choices made here (each one is covered by encounter.test.mjs):
 // - a PC at 0 hp falls unconscious (the `unconscious` condition is added, the PC is
@@ -56,13 +67,25 @@ function copyState(state) {
   };
 }
 
-// Appends plain-language lines to the history and counts one revision. Mutates `next`,
-// which must be a fresh copy.
-function commit(next, texts, ctx) {
-  for (const text of texts) next.events.push({ at: at(ctx), text });
+// Appends history lines and counts one revision. Each entry is plain text or
+// { text, notice }; a notice is saved on its line, a line without one stays { at, text }.
+// Mutates `next`, which must be a fresh copy.
+function commit(next, entries, ctx) {
+  for (const entry of entries) {
+    const { text, notice = null } = typeof entry === 'string' ? { text: entry } : entry;
+    const event = { at: at(ctx), text };
+    if (notice) event.notice = notice;
+    next.events.push(event);
+  }
   next.events = next.events.slice(-MAX_EVENTS);
   next.revision += 1;
   return next;
+}
+
+// A successful step: the new state and the notices of its entries (see the header).
+function done(next, entries, ctx) {
+  const notices = entries.flatMap((entry) => (typeof entry === 'object' && entry.notice ? [entry.notice] : []));
+  return { ok: true, state: commit(next, entries, ctx), notices };
 }
 
 function find(state, id) {
@@ -98,16 +121,18 @@ function resort(next) {
   return next;
 }
 
-// A PC at 0 hp falls unconscious; any other side at 0 hp is defeated.
+// A PC at 0 hp falls unconscious; any other side at 0 hp is defeated. Returns the notice
+// of the change it made, or null when nothing changed.
 function settleZeroHp(c) {
-  if (c.hp !== 0) return;
+  if (c.hp !== 0) return null;
   if (c.side === 'pc') {
-    if (!c.conditions.some((cond) => cond.id === UNCONSCIOUS)) {
-      c.conditions.push({ id: UNCONSCIOUS, duration: 'until_removed' });
-    }
-  } else {
-    c.defeated = true;
+    if (c.conditions.some((cond) => cond.id === UNCONSCIOUS)) return null;
+    c.conditions.push({ id: UNCONSCIOUS, duration: 'until_removed' });
+    return { kind: 'unconscious', id: c.id, name: c.name };
   }
+  if (c.defeated) return null;
+  c.defeated = true;
+  return { kind: 'defeated', id: c.id, name: c.name };
 }
 
 function durationText(duration, rounds) {
@@ -129,7 +154,7 @@ export function initEncounter(adapter) {
 export function startEncounter(adapter, previous, ctx = {}) {
   const base = initEncounter(adapter);
   const next = { ...base, active: true, revision: previous?.revision ?? 0 };
-  return { ok: true, state: commit(next, ['Combat starts'], ctx) };
+  return done(next, ['Combat starts'], ctx);
 }
 
 /** Ends the running combat. The state is kept, for the log. */
@@ -139,7 +164,7 @@ export function endEncounter(adapter, state, ctx = {}) {
   const next = copyState(state);
   next.active = false;
   const text = next.round > 0 ? `Combat ends in round ${next.round}` : 'Combat ends';
-  return { ok: true, state: commit(next, [text], ctx) };
+  return done(next, [text], ctx);
 }
 
 function opAdd(state, op, ctx) {
@@ -170,11 +195,11 @@ function opAdd(state, op, ctx) {
   if (op.ac !== undefined) c.ac = op.ac;
   if (op.sheet !== undefined) c.sheet = op.sheet; // checked by the store, not here
   if (op.notes !== undefined) c.notes = op.notes;
-  settleZeroHp(c);
+  const notice = settleZeroHp(c);
   next.combatants.push(c);
   resort(next);
   const detail = initiative === null ? '' : `, initiative ${initiative}`;
-  return { ok: true, state: commit(next, [`${name} joins the fight (${SIDE_WORDS[op.side]}${detail})`], ctx) };
+  return done(next, [{ text: `${name} joins the fight (${SIDE_WORDS[op.side]}${detail})`, notice }], ctx);
 }
 
 function opRemove(state, op, ctx) {
@@ -183,7 +208,7 @@ function opRemove(state, op, ctx) {
   const next = copyState(state);
   next.combatants = next.combatants.filter((x) => x.id !== op.id);
   resort(next);
-  return { ok: true, state: commit(next, [`${c.name} leaves the fight`], ctx) };
+  return done(next, [`${c.name} leaves the fight`], ctx);
 }
 
 function opInitiative(state, op, ctx) {
@@ -193,7 +218,7 @@ function opInitiative(state, op, ctx) {
   const next = copyState(state);
   next.combatants.find((x) => x.id === op.id).initiative = op.value;
   resort(next);
-  return { ok: true, state: commit(next, [`${c.name} has initiative ${op.value}`], ctx) };
+  return done(next, [`${c.name} has initiative ${op.value}`], ctx);
 }
 
 // Temporary hit points absorb damage first, then hit points. Hit points never go below 0.
@@ -213,12 +238,12 @@ function opDamage(state, op, ctx) {
     rest -= absorbed;
   }
   target.hp = Math.max(0, before - rest);
-  settleZeroHp(target);
+  const notice = settleZeroHp(target);
   let text = `${c.name} takes ${op.amount} damage (${target.hp} left`;
   if (absorbed > 0) text += `, ${absorbed} absorbed by temporary hit points`;
   text += ')';
   if (target.hp === 0 && before > 0) text += target.side === 'pc' ? ' and falls unconscious' : ' and is defeated';
-  return { ok: true, state: commit(next, [text], ctx) };
+  return done(next, [{ text, notice }], ctx);
 }
 
 // Heal never goes above hpMax (when it is known). Reaching hp above 0 clears `defeated`
@@ -241,7 +266,7 @@ function opHeal(state, op, ctx) {
   let text = `${c.name} heals ${gained} (${target.hp} left)`;
   if (gained === 0 && target.hpMax !== undefined) text = `${c.name} is already at full hit points (${target.hp})`;
   if (before === 0 && target.hp > 0) text += target.side === 'pc' ? ' and is conscious again' : ' and is no longer defeated';
-  return { ok: true, state: commit(next, [text], ctx) };
+  return done(next, [text], ctx);
 }
 
 function opConditionAdd(adapter, state, op, ctx) {
@@ -270,7 +295,7 @@ function opConditionAdd(adapter, state, op, ctx) {
   if (index >= 0) target.conditions[index] = entry;
   else target.conditions.push(entry);
   const words = durationText(duration, op.rounds);
-  return { ok: true, state: commit(next, [`${c.name} gets ${op.condition} (${words})`], ctx) };
+  return done(next, [`${c.name} gets ${op.condition} (${words})`], ctx);
 }
 
 function opConditionRemove(state, op, ctx) {
@@ -282,7 +307,7 @@ function opConditionRemove(state, op, ctx) {
   const next = copyState(state);
   const target = next.combatants.find((x) => x.id === op.id);
   target.conditions = target.conditions.filter((cond) => cond.id !== op.condition);
-  return { ok: true, state: commit(next, [`${c.name} loses ${op.condition}`], ctx) };
+  return done(next, [`${c.name} loses ${op.condition}`], ctx);
 }
 
 // A resource is a counter the adapter names (spell slots, uses, legendary actions...).
@@ -305,7 +330,7 @@ function opResource(adapter, state, op, ctx) {
   const value = hasValue ? op.value : Math.max(0, current + op.delta);
   target.resources[op.resource] = value;
   const label = op.resource.replace(/_/g, ' ');
-  return { ok: true, state: commit(next, [`${c.name}: ${label}, ${value} left`], ctx) };
+  return done(next, [`${c.name}: ${label}, ${value} left`], ctx);
 }
 
 function opNote(state, op, ctx) {
@@ -317,10 +342,10 @@ function opNote(state, op, ctx) {
   const text = op.text.trim();
   if (text === '') {
     delete target.notes;
-    return { ok: true, state: commit(next, [`Note on ${c.name} cleared`], ctx) };
+    return done(next, [`Note on ${c.name} cleared`], ctx);
   }
   target.notes = op.text;
-  return { ok: true, state: commit(next, [`Note on ${c.name}: ${text}`], ctx) };
+  return done(next, [`Note on ${c.name}: ${text}`], ctx);
 }
 
 function opReveal(state, op, ctx) {
@@ -328,13 +353,13 @@ function opReveal(state, op, ctx) {
   if (!c) return unknownCombatant(op.id);
   const next = copyState(state);
   next.combatants.find((x) => x.id === op.id).hidden = false;
-  return { ok: true, state: commit(next, [`${c.name} is revealed`], ctx) };
+  return done(next, [`${c.name} is revealed`], ctx);
 }
 
 /**
  * Applies one master operation (CombatOp) to the state. `start`, `next` and `end` are
  * routed to their own functions, so every CombatOp is accepted here.
- * @returns {{ok: true, state: object} | {ok: false, error: {code: string, message: string}}}
+ * @returns {{ok: true, state: object, notices: object[]} | {ok: false, error: {code: string, message: string}}}
  */
 export function recordEvent(adapter, state, op, ctx = {}) {
   if (!isPlainObject(state) || !Array.isArray(state.order) || !Array.isArray(state.combatants)) {
@@ -380,22 +405,24 @@ export function advanceTurn(adapter, state, ctx = {}) {
     next.round = 1;
     next.turn = first;
     const who = find(next, next.order[first]);
-    return { ok: true, state: commit(next, [`Round 1: ${who.name} is up`], ctx) };
+    const notice = { kind: 'turn', id: who.id, name: who.name, round: 1, newRound: true };
+    return done(next, [{ text: `Round 1: ${who.name} is up`, notice }], ctx);
   }
 
-  const lines = [];
+  const entries = [];
   const bearer = find(next, next.order[state.turn]);
   if (bearer) {
     const kept = [];
     for (const cond of bearer.conditions) {
+      const ended = { kind: 'condition-ended', id: bearer.id, name: bearer.name, condition: cond.id };
       if (cond.duration === 'end_of_turn') {
-        lines.push(`${bearer.name} loses ${cond.id}`);
+        entries.push({ text: `${bearer.name} loses ${cond.id}`, notice: ended });
         continue;
       }
       if (cond.duration === 'rounds') {
         const left = (cond.rounds ?? 1) - 1;
         if (left <= 0) {
-          lines.push(`${bearer.name} loses ${cond.id}`);
+          entries.push({ text: `${bearer.name} loses ${cond.id}`, notice: ended });
         } else {
           kept.push({ ...cond, rounds: left });
         }
@@ -426,8 +453,10 @@ export function advanceTurn(adapter, state, ctx = {}) {
   next.turn = found;
   next.round = round;
   const who = find(next, next.order[found]);
-  lines.push(round !== state.round ? `Round ${round}: ${who.name} is up` : `${who.name} is up`);
-  return { ok: true, state: commit(next, lines, ctx) };
+  const newRound = round !== state.round;
+  const notice = { kind: 'turn', id: who.id, name: who.name, round, newRound };
+  entries.push({ text: newRound ? `Round ${round}: ${who.name} is up` : `${who.name} is up`, notice });
+  return done(next, entries, ctx);
 }
 
 /**
@@ -480,10 +509,13 @@ export function validateState(adapter, state) {
 // comes back.
 const MASTER_BLOCK = /<!--\s*master\s*-->[\s\S]*?<!--\s*\/master\s*-->/g;
 const MASTER_OPEN = /<!--\s*master\s*-->[\s\S]*$/;
-const ACTION_HEADINGS = new Set([
+// Action headings of the fixed set, used when the adapter declares no action_groups.
+// Every action under them is read as an action of its own turn.
+const FIXED_ACTION_HEADINGS = [
   'azioni', 'azioni bonus', 'reazioni', 'azioni leggendarie',
   'actions', 'bonus actions', 'reactions', 'legendary actions',
-]);
+];
+const FIXED_ACTION_GROUP = { group: 'actions', timing: 'own_turn' };
 // Labels the adapter does not list: initiative and challenge rating, in both languages.
 const EXTRA_STAT_LABELS = {
   initiative: ['iniziativa', 'bonus di iniziativa', 'initiative', 'initiative bonus'],
@@ -517,6 +549,22 @@ function labelMap(adapter) {
   return map;
 }
 
+// Maps each action heading (normalised) to its { group, timing }. The adapter's
+// action_groups decide which headings are actions; without them the fixed set is used.
+function actionHeadings(adapter) {
+  const map = new Map();
+  if (Array.isArray(adapter?.action_groups)) {
+    for (const group of adapter.action_groups) {
+      for (const heading of group.headings ?? []) {
+        map.set(normaliseLabel(heading), { group: group.id, timing: group.timing });
+      }
+    }
+  } else {
+    for (const heading of FIXED_ACTION_HEADINGS) map.set(heading, { ...FIXED_ACTION_GROUP });
+  }
+  return map;
+}
+
 // First table row for each known label: `| CA | 15 (armatura) |` gives ac.
 function statRows(lines, labels) {
   const found = new Map();
@@ -542,15 +590,15 @@ function actionFromParagraph(text) {
   return { name, text: plainText(match[3]) };
 }
 
-// Every action paragraph under an action heading, in document order.
-function actionEntries(lines) {
+// Every action paragraph under an action heading, in document order, with its group.
+function actionEntries(lines, headings) {
   const actions = [];
-  let inActions = false;
+  let current = null;
   let paragraph = [];
   const flush = () => {
-    if (inActions && paragraph.length > 0) {
+    if (current !== null && paragraph.length > 0) {
       const entry = actionFromParagraph(paragraph.join(' '));
-      if (entry) actions.push(entry);
+      if (entry) actions.push({ ...entry, group: current.group, timing: current.timing });
     }
     paragraph = [];
   };
@@ -558,14 +606,14 @@ function actionEntries(lines) {
     const heading = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(raw);
     if (heading) {
       flush();
-      inActions = ACTION_HEADINGS.has(normaliseLabel(heading[1]));
+      current = headings.get(normaliseLabel(heading[1])) ?? null;
       continue;
     }
     if (raw.trim() === '') {
       flush();
       continue;
     }
-    if (inActions) paragraph.push(raw.trim());
+    if (current !== null) paragraph.push(raw.trim());
   }
   flush();
   return actions;
@@ -574,12 +622,15 @@ function actionEntries(lines) {
 /**
  * Summary of a stat block for the tooltip. `lines` are the rows found in the statistics
  * tables, in a fixed order, with the label as the sheet writes it and the value as the
- * sheet writes it, in plain text. `actions` are the entries under the action headings.
+ * sheet writes it, in plain text. `actions` are the entries under the action headings:
+ * `group` is the id of the adapter's action group and `timing` says when it can be used
+ * (own_turn, any_turn or others_turns). Without action_groups in the adapter, every
+ * action has group `actions` and timing `own_turn`.
  * The master-only block is removed before anything is read. Never throws: unexpected
  * input gives empty lists.
  * @param {object} adapter the parsed adapter.yaml of the game system
  * @param {string} markdown the sheet, Markdown
- * @returns {{lines: {label: string, value: string}[], actions: {name: string, text: string}[]}}
+ * @returns {{lines: {label: string, value: string}[], actions: {name: string, text: string, group: string, timing: string}[]}}
  */
 export function statSummary(adapter, markdown) {
   try {
@@ -592,7 +643,7 @@ export function statSummary(adapter, markdown) {
       const row = rows.get(id);
       if (row) summary.push({ label: row.label, value: row.value });
     }
-    return { lines: summary, actions: actionEntries(lines) };
+    return { lines: summary, actions: actionEntries(lines, actionHeadings(adapter)) };
   } catch {
     return { lines: [], actions: [] };
   }

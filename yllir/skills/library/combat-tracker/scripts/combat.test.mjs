@@ -139,3 +139,24 @@ describe('a full scripted encounter through the CLI', () => {
     assert.equal(json.error.code, 'bad-sheet');
   });
 });
+
+describe('notices in the CLI output', () => {
+  let root;
+  before(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'combat-notice-'));
+    const run = spawnSync(process.execPath, [INIT, root, '--name', 'T', '--language', 'en', '--register', 'plain', '--world', 'W', '--seed', 'World seed.md', '--adapter', 'dnd-2024'], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stdout);
+    const dir = path.join(root, '.campaign', 'state', 'live', SESSION);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(root, '.campaign', 'state', 'live', 'active.json'), JSON.stringify({ sessionId: SESSION }));
+  });
+  after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('a damage to 0 shows a defeated notice in the output', () => {
+    assert.equal(cli(['start', root]).code, 0);
+    assert.equal(cli(['add', root, '--name', 'Goblin 1', '--side', 'enemy', '--hp', '3']).code, 0);
+    const { code, json } = cli(['damage', root, '--id', 'c-1', '--amount', '3']);
+    assert.equal(code, 0);
+    assert.deepEqual(json.notices, [{ kind: 'defeated', id: 'c-1', name: 'Goblin 1' }]);
+  });
+});

@@ -44,6 +44,8 @@ Superata: la regola precedente «l'adattatore non contiene codice, e un calcolo 
 | `resources` | tipi di risorsa per entità, con massimo e recupero | PF, PF temporanei, slot, usi limitati, ricariche |
 | `conditions` | etichette con durata | prono, incapacitato; durata «fino a fine turno», «fino a salvezza» |
 | `condition_durations` | durate ammesse per le condizioni | fine turno, fino a salvezza, fino a riposo, fino a rimozione, round |
+| `condition_labels`, `duration_labels` | etichette di condizioni e durate nelle lingue della campagna (facoltativi) | `prone`: «Prono» / «Prone» |
+| `action_groups` | gruppi delle azioni di una creatura, con i titoli di sezione che li riconoscono e quando si usano (`own_turn`, `any_turn`, `others_turns`) (facoltativo) | azioni e azioni bonus nel proprio turno, reazioni in ogni turno, azioni leggendarie nei turni altrui |
 | `difficulty` | scala e metodo per misurare un incontro | fasce più GS per incontro |
 | `progression` | come avanza la campagna e quali eventi la attivano | `milestone`: nessun punto esperienza |
 | `creature_sheet` | campi obbligatori e facoltativi della scheda, con etichette in italiano e in inglese | statistiche 2024, capacità, fasi, azioni leggendarie |

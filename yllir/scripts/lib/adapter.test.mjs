@@ -179,3 +179,58 @@ test('optional checks key must name an existing .mjs file in the adapter folder'
     }
   });
 });
+
+test('the D&D manifest validates with its condition and duration labels and action groups', () => {
+  withRoot((temp) => {
+    fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    write(temp, 'dnd-2024', source);
+    const loaded = loadAdapter(temp, 'dnd-2024');
+    assert.deepEqual(loaded.errors, []);
+    assert.deepEqual(loaded.adapter.condition_labels.unconscious, { it: 'Privo di sensi', en: 'Unconscious' });
+    assert.deepEqual(loaded.adapter.duration_labels.rounds, { it: 'per alcuni round', en: 'for some rounds' });
+    assert.deepEqual(loaded.adapter.action_groups.map((group) => [group.id, group.timing]), [
+      ['actions', 'own_turn'],
+      ['bonus_actions', 'own_turn'],
+      ['reactions', 'any_turn'],
+      ['legendary_actions', 'others_turns'],
+    ]);
+    assert.deepEqual(loaded.adapter.action_groups[2].headings, ['reazioni', 'reactions']);
+  });
+});
+
+test('a condition label for a condition the adapter does not have is refused', () => {
+  withRoot((temp) => {
+    write(temp, 'dnd-2024', `${source}`.replace('condition_labels:\n', 'condition_labels:\n  dazed:\n    it: Confuso\n    en: Dazed\n'));
+    const errors = loadAdapter(temp, 'dnd-2024').errors;
+    assert.ok(errors.some((e) => e.code === 'bad-value' && e.path === 'condition_labels.dazed'));
+  });
+});
+
+test('a duration label for a duration the adapter does not have is refused', () => {
+  withRoot((temp) => {
+    write(temp, 'dnd-2024', replace(source, 'duration_labels:\n', 'duration_labels:\n  forever:\n    it: sempre\n    en: forever\n'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'duration_labels.forever'));
+  });
+});
+
+test('a bad action group timing is refused', () => {
+  withRoot((temp) => {
+    write(temp, 'dnd-2024', replace(source, 'timing: own_turn\n    label:\n      it: Azioni\n', 'timing: sometimes\n    label:\n      it: Azioni\n'));
+    const errors = loadAdapter(temp, 'dnd-2024').errors;
+    assert.ok(errors.some((e) => e.code === 'bad-value' && e.path === 'action_groups[0].timing'));
+  });
+});
+
+test('action groups need unique ids, a label in both languages and nonempty headings', () => {
+  withRoot((temp) => {
+    write(temp, 'dnd-2024', replace(source, 'id: reactions\n    timing', 'id: actions\n    timing'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.path === 'action_groups[2].id'));
+
+    write(temp, 'dnd-2024', replace(source, '      en: Reactions\n    headings: [reazioni, reactions]', '    headings: [reazioni, reactions]'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.path === 'action_groups[2].label.en'));
+
+    write(temp, 'dnd-2024', replace(source, 'headings: [reazioni, reactions]', 'headings: []'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.path === 'action_groups[2].headings'));
+  });
+});

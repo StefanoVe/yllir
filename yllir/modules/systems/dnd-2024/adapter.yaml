@@ -57,6 +57,93 @@ conditions:
   - stunned
   - unconscious
 condition_durations: [end_of_turn, until_save, until_rest, until_removed, rounds]
+condition_labels:
+  blinded:
+    it: Accecato
+    en: Blinded
+  charmed:
+    it: Affascinato
+    en: Charmed
+  deafened:
+    it: Assordato
+    en: Deafened
+  exhaustion:
+    it: Indebolimento
+    en: Exhaustion
+  frightened:
+    it: Spaventato
+    en: Frightened
+  grappled:
+    it: Afferrato
+    en: Grappled
+  incapacitated:
+    it: Incapacitato
+    en: Incapacitated
+  invisible:
+    it: Invisibile
+    en: Invisible
+  paralyzed:
+    it: Paralizzato
+    en: Paralyzed
+  petrified:
+    it: Pietrificato
+    en: Petrified
+  poisoned:
+    it: Avvelenato
+    en: Poisoned
+  prone:
+    it: Prono
+    en: Prone
+  restrained:
+    it: Trattenuto
+    en: Restrained
+  stunned:
+    it: Stordito
+    en: Stunned
+  unconscious:
+    it: Privo di sensi
+    en: Unconscious
+duration_labels:
+  end_of_turn:
+    it: fino alla fine del suo turno
+    en: until the end of its turn
+  until_save:
+    it: fino a un tiro salvezza
+    en: until a save
+  until_rest:
+    it: fino a un riposo
+    en: until a rest
+  until_removed:
+    it: finché non viene rimossa
+    en: until removed
+  rounds:
+    it: per alcuni round
+    en: for some rounds
+action_groups:
+  - id: actions
+    timing: own_turn
+    label:
+      it: Azioni
+      en: Actions
+    headings: [azioni, actions]
+  - id: bonus_actions
+    timing: own_turn
+    label:
+      it: Azioni bonus
+      en: Bonus actions
+    headings: [azioni bonus, bonus actions]
+  - id: reactions
+    timing: any_turn
+    label:
+      it: Reazioni
+      en: Reactions
+    headings: [reazioni, reactions]
+  - id: legendary_actions
+    timing: others_turns
+    label:
+      it: Azioni leggendarie
+      en: Legendary actions
+    headings: [azioni leggendarie, legendary actions]
 creature_sheet:
   section: statistics
   required:

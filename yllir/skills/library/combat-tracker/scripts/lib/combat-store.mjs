@@ -132,7 +132,7 @@ export function getCombat(root) {
 /**
  * Applies one CombatOp to the combat of the active session and saves the result.
  * Nothing is saved when the rules refuse the operation or the result is invalid.
- * @returns {Promise<{ok: true, sessionId: string, combat: object} | {ok: false, error: object}>}
+ * @returns {Promise<{ok: true, sessionId: string, combat: object, notices: object[]} | {ok: false, error: object}>}
  */
 export async function applyOp(root, op, { now = new Date().toISOString() } = {}) {
   const base = path.resolve(root);
@@ -172,5 +172,5 @@ export async function applyOp(root, op, { now = new Date().toISOString() } = {})
   if (problems.length > 0) return fail('invalid-state', problems[0].message);
 
   writeAtomic(file, `${JSON.stringify(result.state, null, 2)}\n`);
-  return { ok: true, sessionId: session.sessionId, combat: result.state };
+  return { ok: true, sessionId: session.sessionId, combat: result.state, notices: result.notices ?? [] };
 }

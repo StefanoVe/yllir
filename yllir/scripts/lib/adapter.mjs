@@ -89,7 +89,7 @@ function validate(adapter, folderId, folder) {
   const errors = [];
   const error = (code, field, message) => errors.push({ code, path: field, message });
   if (!isMapping(adapter)) return [{ code: 'bad-type', path: '', message: 'adapter manifest must be a mapping' }];
-  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not'];
+  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'condition_labels', 'duration_labels', 'action_groups', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not'];
   for (const key of Object.keys(adapter)) if (!allowed.includes(key)) error('unknown-key', key, `"${key}" is not a setting of an adapter manifest`);
   if (typeof adapter.id !== 'string' || !SLUG_RE.test(adapter.id)) error('bad-value', 'id', 'id must be a lowercase slug');
   if (adapter.id !== folderId) error('id-mismatch', 'id', `id must match the adapter folder ${folderId}`);
@@ -146,6 +146,65 @@ function validate(adapter, folderId, folder) {
   }
   const checksProblem = checksFileProblem(adapter.checks, folder);
   if (checksProblem) error(checksProblem.code, 'checks', checksProblem.message);
+  // Optional labels for the combat tracker: every label names a condition or duration of
+  // this adapter and gives its Italian and English text.
+  const validLabel = (field, label) => {
+    if (!isMapping(label)) { error('bad-type', field, `${field} must be a mapping with it and en`); return; }
+    for (const language of ['it', 'en']) {
+      if (typeof label[language] !== 'string' || !label[language].trim()) error('bad-value', `${field}.${language}`, `${field}.${language} must be nonempty text`);
+    }
+    for (const language of Object.keys(label)) {
+      if (!['it', 'en'].includes(language)) error('unknown-key', `${field}.${language}`, `"${language}" is not a supported label language`);
+    }
+  };
+  if (adapter.condition_labels !== undefined) {
+    if (!isMapping(adapter.condition_labels)) {
+      error('bad-type', 'condition_labels', 'condition_labels must be a mapping');
+    } else {
+      const conditions = Array.isArray(adapter.conditions) ? adapter.conditions : [];
+      for (const [id, label] of Object.entries(adapter.condition_labels)) {
+        if (!conditions.includes(id)) error('bad-value', `condition_labels.${id}`, `${id} is not a condition of this adapter`);
+        validLabel(`condition_labels.${id}`, label);
+      }
+    }
+  }
+  if (adapter.duration_labels !== undefined) {
+    if (!isMapping(adapter.duration_labels)) {
+      error('bad-type', 'duration_labels', 'duration_labels must be a mapping');
+    } else {
+      const durations = Array.isArray(adapter.condition_durations) ? adapter.condition_durations : [];
+      for (const [id, label] of Object.entries(adapter.duration_labels)) {
+        if (!durations.includes(id)) error('bad-value', `duration_labels.${id}`, `${id} is not a condition duration of this adapter`);
+        validLabel(`duration_labels.${id}`, label);
+      }
+    }
+  }
+  if (adapter.action_groups !== undefined) {
+    if (!Array.isArray(adapter.action_groups)) {
+      error('bad-type', 'action_groups', 'action_groups must be a list');
+    } else {
+      const groupIds = new Set();
+      adapter.action_groups.forEach((group, index) => {
+        const at = `action_groups[${index}]`;
+        if (!isMapping(group)) { error('bad-type', at, `${at} must be a mapping`); return; }
+        for (const key of Object.keys(group)) {
+          if (!['id', 'timing', 'label', 'headings'].includes(key)) error('unknown-key', `${at}.${key}`, `"${key}" is not a setting of an action group`);
+        }
+        if (typeof group.id !== 'string' || !group.id.trim()) {
+          error('bad-value', `${at}.id`, `${at}.id must be nonempty text`);
+        } else if (groupIds.has(group.id)) {
+          error('bad-value', `${at}.id`, `action group ${group.id} is duplicated`);
+        }
+        if (typeof group.id === 'string') groupIds.add(group.id);
+        if (!['own_turn', 'any_turn', 'others_turns'].includes(group.timing)) error('bad-value', `${at}.timing`, `${at}.timing must be own_turn, any_turn or others_turns`);
+        validLabel(`${at}.label`, group.label);
+        const headings = group.headings;
+        if (!Array.isArray(headings) || headings.length === 0 || headings.some((heading) => typeof heading !== 'string' || !heading.trim())) {
+          error('bad-value', `${at}.headings`, `${at}.headings must be a nonempty list of nonempty text`);
+        }
+      });
+    }
+  }
   if (!isMapping(adapter.item_sheet) || !Array.isArray(adapter.item_sheet.printable_fields) || adapter.item_sheet.printable_fields.length === 0) error('bad-value', 'item_sheet.printable_fields', 'item_sheet.printable_fields must be a nonempty list');
   if (!Array.isArray(adapter.do_not) || adapter.do_not.length === 0) error('bad-value', 'do_not', 'do_not must be a nonempty list');
   return errors;

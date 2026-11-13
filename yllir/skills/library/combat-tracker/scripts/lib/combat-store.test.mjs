@@ -163,3 +163,27 @@ describe('combat store file location', () => {
     }
   });
 });
+
+describe('combat store notices', () => {
+  let root;
+  before(() => {
+    root = makeCampaign();
+    openLive(root);
+  });
+  after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('a damage that brings an enemy to 0 shows a defeated notice and saves it on the event', async () => {
+    assert.equal((await applyOp(root, { op: 'start' }, { now: NOW })).ok, true);
+    assert.equal((await applyOp(root, { op: 'add', name: 'Goblin 1', side: 'enemy', hp: 3 }, { now: NOW })).ok, true);
+    const result = await applyOp(root, { op: 'damage', id: 'c-1', amount: 3 }, { now: NOW });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.notices, [{ kind: 'defeated', id: 'c-1', name: 'Goblin 1' }]);
+    assert.deepEqual(getCombat(root).combat.events.at(-1).notice, { kind: 'defeated', id: 'c-1', name: 'Goblin 1' });
+  });
+
+  test('a change with nothing automatic returns an empty list of notices', async () => {
+    const result = await applyOp(root, { op: 'heal', id: 'c-1', amount: 1 }, { now: NOW });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.notices, []);
+  });
+});

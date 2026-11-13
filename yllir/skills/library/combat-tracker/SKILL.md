@@ -28,7 +28,7 @@ If it exits `1` with `already-active`, ask the master ONE question: "A fight is 
 **4. Translate each master message into ONE operation.** Use this map:
 - damage to someone: `damage <root> --id <id> --amount <n>`
 - healing: `heal <root> --id <id> --amount <n>`
-- a condition: `condition-add <root> --id <id> --condition <name> [--duration <name>] [--rounds <n>]`
+- a condition: `condition-add <root> --id <id> --condition <name> [--duration <name>] [--rounds <n>]`. The condition name must be one of the adapter's `conditions` ids; the master's words are matched through `condition_labels` (the label in the campaign language). The duration is one of `condition_durations`, matched through `duration_labels`; `--rounds <n>` only with `rounds`.
 - a condition that ends: `condition-remove <root> --id <id> --condition <name>`
 - a counter (spell slots, uses, legendary actions): `resource <root> --id <id> --resource <name> --value <n>` or `--delta <n>`
 - a note the master asks to keep: `note <root> --id <id> --text "<text>"`
@@ -39,7 +39,7 @@ If it exits `1` with `already-active`, ask the master ONE question: "A fight is 
 If one message holds more than one change, run one command per change, in the order the master said them, and read each result before the next. Ids are given by the tracker when a combatant is added: read them from the `combat` output (`combatants[].id`) or from the status table. Never invent an id.
 
 **5. Read the result and report.** After each change, read `exit:`.
-- On `0`: say nothing technical. Give the state only when the master asks, or at the end of a round.
+- On `0`: read `notices` in the output. For each notice, tell the master in one short plain sentence, in the campaign language, using the adapter's labels: a condition that ended (`condition-ended`), an enemy or ally that is defeated (`defeated`), a player character that falls unconscious (`unconscious`), and after `next` who is up and, when `newRound` is true, the new round (`turn`). Say nothing else technical. Give the state only when the master asks, or at the end of a round.
 - On `1` with `unknown-condition`: tell the master in plain words that the game does not know that condition, and ask ONE question naming the nearest known conditions from the adapter (for example "I do not know the condition 'scared': do you mean 'frightened'?"). Wait for the answer.
 - On `1` with another code: say in one plain sentence what could not be written, and ask ONE question about what to do. Never retry a change the master has not confirmed.
 - On `2`: fix the command and run it again. Do not tell the master.
