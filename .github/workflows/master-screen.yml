@@ -8,7 +8,7 @@ on:
     paths: ['master-screen/**', '.github/workflows/master-screen.yml']
   workflow_dispatch:
 
-# Two releases never race for the same tag or the same pin commit.
+# Two releases never race for the same tag.
 concurrency:
   group: master-screen-release
   cancel-in-progress: false
@@ -16,7 +16,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # contents: write is used only on push to main: the GitHub Release and the pin commit.
+    # contents: write is used only to create the GitHub Release on push to main.
     permissions:
       contents: write
     env:
@@ -24,9 +24,32 @@ jobs:
     steps:
       - name: Check out the repository
         uses: actions/checkout@v4
-        with:
-          # Full history: the version counts the commits that touched master-screen/.
-          fetch-depth: 0
+
+      - name: Check the pin matches master-screen/VERSION
+        run: |
+          set -euo pipefail
+          V=$(sh master-screen/scripts/version.sh)
+          EXPECTED_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/master-screen-v$V/yllir-master-screen-$V.tar.gz"
+          export V EXPECTED_URL
+          node -e '
+            const fs = require("node:fs");
+            const pin = JSON.parse(fs.readFileSync("yllir/master-screen.json", "utf8"));
+            const v = process.env.V;
+            const url = process.env.EXPECTED_URL;
+            const errors = [];
+            if (pin.version !== v) {
+              errors.push(`yllir/master-screen.json has version "${pin.version}" but master-screen/VERSION is "${v}".`);
+            }
+            if (pin.url !== url) {
+              errors.push(`yllir/master-screen.json has url "${pin.url}" but it must be "${url}".`);
+            }
+            if (errors.length > 0) {
+              for (const e of errors) console.error(`Pin mismatch: ${e}`);
+              console.error("Set both master-screen/VERSION and yllir/master-screen.json to the same version in the commit.");
+              process.exit(1);
+            }
+            console.log(`The pin matches master-screen/VERSION (${v}).`);
+          '
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
@@ -66,13 +89,13 @@ jobs:
           fi
           SHA=$(sed -n 's/^sha256=//p' "$RUNNER_TEMP/pack-1.txt")
           SIZE=$(sed -n 's/^size=//p' "$RUNNER_TEMP/pack-1.txt")
+          (cd "$RUNNER_TEMP/pack-1" && sha256sum "$NAME" > "$NAME.sha256")
           {
             echo "VERSION=$V"
             echo "TAG=master-screen-v$V"
             echo "ASSET=$NAME"
             echo "PKG=$RUNNER_TEMP/pack-1/$NAME"
-            echo "SHA=$SHA"
-            echo "SIZE=$SIZE"
+            echo "SUMFILE=$RUNNER_TEMP/pack-1/$NAME.sha256"
           } >> "$GITHUB_ENV"
           echo "Packed $NAME ($SIZE bytes, sha256 $SHA)"
 
@@ -81,72 +104,9 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            # Re-run: keep the published asset and pin its checksum, not this build's.
-            echo "Release $TAG already exists: not creating it again."
-            mkdir -p "$RUNNER_TEMP/existing"
-            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$ASSET" --dir "$RUNNER_TEMP/existing" --clobber
-            FILE="$RUNNER_TEMP/existing/$ASSET"
-          else
-            gh release create "$TAG" "$PKG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
-              --title "Master screen $VERSION" \
-              --notes "Master screen package $VERSION, built from commit $GITHUB_SHA. Downloaded by the Yllir launcher; see yllir/master-screen.json."
-            FILE="$PKG"
+            echo "::warning::Release $TAG already exists: bump master-screen/VERSION and the pin in the commit to publish a new one."
+            exit 0
           fi
-          SHA=$(sha256sum "$FILE" | awk '{print $1}')
-          SIZE=$(wc -c < "$FILE" | tr -d ' ')
-          echo "SHA=$SHA" >> "$GITHUB_ENV"
-          echo "SIZE=$SIZE" >> "$GITHUB_ENV"
-          echo "Pinned asset $ASSET: $SIZE bytes, sha256 $SHA"
-
-      - name: Write the pin file
-        id: pin
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        run: |
-          set -euo pipefail
-          URL="https://github.com/StefanoVe/yllir-development/releases/download/$TAG/$ASSET"
-          export URL
-          node -e '
-            const fs = require("node:fs");
-            const pin = {
-              version: process.env.VERSION,
-              sha256: process.env.SHA,
-              url: process.env.URL,
-              size: Number(process.env.SIZE),
-            };
-            fs.writeFileSync("yllir/master-screen.json", JSON.stringify(pin, null, 2) + "\n");
-          '
-          if [ -n "$(git status --porcelain -- yllir/master-screen.json)" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "The pin is unchanged: nothing to commit."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Bump the framework patch and commit the pin
-        if: steps.pin.outputs.changed == 'true'
-        run: |
-          set -euo pipefail
-          # Edits only the number, so the rest of plugin.json keeps its formatting.
-          node -e '
-            const fs = require("node:fs");
-            const f = "yllir/.claude-plugin/plugin.json";
-            const re = /("version"\s*:\s*")(\d+)\.(\d+)\.(\d+)(")/;
-            const src = fs.readFileSync(f, "utf8");
-            if (!re.test(src)) throw new Error("no version field in plugin.json");
-            fs.writeFileSync(f, src.replace(re, (_, a, major, minor, patch, z) => `${a}${major}.${minor}.${Number(patch) + 1}${z}`));
-          '
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add yllir/master-screen.json yllir/.claude-plugin/plugin.json
-          git commit -m "master-screen: release v$VERSION [skip ci]"
-          for attempt in 1 2 3; do
-            if git pull --rebase origin main && git push origin HEAD:main; then
-              echo "Pushed the pin commit."
-              exit 0
-            fi
-            git rebase --abort 2>/dev/null || true
-            echo "Push failed (attempt $attempt of 3), retrying."
-            sleep $((attempt * 5))
-          done
-          echo "Could not push the pin commit after 3 attempts." >&2
-          exit 1
+          gh release create "$TAG" "$PKG" "$SUMFILE" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Master screen $VERSION" \
+            --notes "Master screen package $VERSION, built from commit $GITHUB_SHA. The Yllir launcher downloads it as pinned in yllir/master-screen.json and checks it against the .sha256 asset."

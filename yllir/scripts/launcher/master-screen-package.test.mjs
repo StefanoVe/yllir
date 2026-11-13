@@ -1,6 +1,7 @@
 // Tests of master-screen-package.mjs. Downloads go to a local node:http server (with
 // YLLIR_ALLOW_HTTP_TEST=1 passed explicitly), packages are real gzip tars made with the
-// system tar, and the hostile archives are written header by header.
+// system tar, and the hostile archives are written header by header. Fake fetch functions
+// answer the package URL and its `.sha256` URL.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -16,6 +17,7 @@ import {
   downloadPackage,
   ensureMasterScreen,
   extractPackage,
+  fetchChecksum,
   installedDir,
   isInstalled,
   newestInstalled,
@@ -27,7 +29,9 @@ import { message } from './launch-lib.mjs';
 
 const TEST_ENV = { YLLIR_ALLOW_HTTP_TEST: '1' };
 const PIN_VERSION = '0.2.7';
-const PIN_URL = `https://github.com/StefanoVe/yllir-development/releases/download/master-screen-v${PIN_VERSION}/yllir-master-screen-${PIN_VERSION}.tar.gz`;
+const PACKAGE_NAME = `yllir-master-screen-${PIN_VERSION}.tar.gz`;
+const PIN_URL = `https://github.com/StefanoVe/yllir-development/releases/download/master-screen-v${PIN_VERSION}/${PACKAGE_NAME}`;
+const HASH = 'ab'.repeat(32);
 
 function tempDir(t, prefix = 'yllir-msp-') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
@@ -54,6 +58,20 @@ function realPackage(t, options) {
   });
   const buf = fs.readFileSync(tgz);
   return { file: tgz, buf, sha256: crypto.createHash('sha256').update(buf).digest('hex'), size: buf.length };
+}
+
+/** The sha256sum line the release publishes next to the package. */
+function checksumLine(hash, name = PACKAGE_NAME) {
+  return `${hash}  ${name}\n`;
+}
+
+/** A fake fetch that serves the package at its URL and `checksumText` at the `.sha256` URL. */
+function releaseFetch(pkg, checksumText, seen = []) {
+  return async (url) => {
+    seen.push(url);
+    if (url.endsWith('.sha256')) return new Response(checksumText, { status: 200 });
+    return new Response(pkg.buf, { status: 200 });
+  };
 }
 
 /** A 512-byte ustar header and the padded body, written by hand. */
@@ -115,9 +133,7 @@ function leftovers(home) {
 function writePin(root, overrides = {}) {
   const pin = {
     version: PIN_VERSION,
-    sha256: 'a'.repeat(64),
     url: PIN_URL,
-    size: 1234567,
     ...overrides,
   };
   for (const key of Object.keys(overrides)) if (overrides[key] === undefined) delete pin[key];
@@ -133,18 +149,22 @@ function installFake(home, version, { verified = true } = {}) {
   return dir;
 }
 
-test('readPin accepts a valid pin and ignores unknown keys', (t) => {
+test('readPin accepts {version, url} and ignores unknown keys', (t) => {
   const root = tempDir(t);
   writePin(root, { note: 'extra' });
-  assert.deepEqual(readPin(root), { version: PIN_VERSION, sha256: 'a'.repeat(64), url: PIN_URL, size: 1234567 });
+  assert.deepEqual(readPin(root), { version: PIN_VERSION, url: PIN_URL });
 });
 
-test('readPin lowercases the sha256 and accepts the size cap exactly', (t) => {
+test('readPin accepts an old pin that still has sha256 and size, and ignores them', (t) => {
   const root = tempDir(t);
-  writePin(root, { sha256: 'AB'.repeat(32), size: 100 * 1024 * 1024 });
-  const pin = readPin(root);
-  assert.equal(pin.sha256, 'ab'.repeat(32));
-  assert.equal(pin.size, 100 * 1024 * 1024);
+  writePin(root, { sha256: 'a'.repeat(64), size: 1234567 });
+  assert.deepEqual(readPin(root), { version: PIN_VERSION, url: PIN_URL });
+});
+
+test('readPin rejects a url whose version differs from the pin version', (t) => {
+  const root = tempDir(t);
+  writePin(root, { version: '0.2.6' });
+  assert.equal(readPin(root), null);
 });
 
 test('readPin returns null when the file is missing or not JSON', (t) => {
@@ -162,9 +182,8 @@ test('readPin refuses every bad field', (t) => {
     { version: '0.2' },
     { version: '0.2.7-beta' },
     { version: 27 },
-    { sha256: 'a'.repeat(63) },
-    { sha256: 'g'.repeat(64) },
-    { sha256: undefined },
+    { version: undefined },
+    { url: undefined },
     { url: 'http://github.com/StefanoVe/yllir-development/releases/download/master-screen-v0.2.7/yllir-master-screen-0.2.7.tar.gz' },
     { url: 'https://evil.example.com/StefanoVe/yllir-development/releases/download/master-screen-v0.2.7/yllir-master-screen-0.2.7.tar.gz' },
     { url: 'https://github.com.evil.example/StefanoVe/yllir-development/releases/download/master-screen-v0.2.7/yllir-master-screen-0.2.7.tar.gz' },
@@ -173,12 +192,6 @@ test('readPin refuses every bad field', (t) => {
     { url: `${PIN_URL}?download=1` },
     { url: PIN_URL.replace('.tar.gz', '.zip') },
     { url: 'https://github.com/../yllir-development/releases/download/master-screen-v0.2.7/yllir-master-screen-0.2.7.tar.gz' },
-    { size: 0 },
-    { size: -5 },
-    { size: 1.5 },
-    { size: '1234' },
-    { size: 100 * 1024 * 1024 + 1 },
-    { size: undefined },
   ];
   for (const overrides of bad) {
     writePin(root, overrides);
@@ -209,6 +222,64 @@ test('a version folder without the .verified marker is not installed', (t) => {
   assert.equal(newestInstalled(home), null);
 });
 
+test('fetchChecksum returns the lowercase hash of a good checksum file', async () => {
+  const fetchImpl = async () => new Response(checksumLine(HASH.toUpperCase()), { status: 200 });
+  assert.equal(await fetchChecksum({ url: PIN_URL, fetchImpl }), HASH);
+});
+
+test('fetchChecksum accepts the binary-mode star before the file name', async () => {
+  const fetchImpl = async () => new Response(`${HASH} *${PACKAGE_NAME}\n`, { status: 200 });
+  assert.equal(await fetchChecksum({ url: PIN_URL, fetchImpl }), HASH);
+});
+
+test('fetchChecksum requests the url with .sha256 appended', async () => {
+  const seen = [];
+  const fetchImpl = async (url) => {
+    seen.push(url);
+    return new Response(checksumLine(HASH), { status: 200 });
+  };
+  await fetchChecksum({ url: PIN_URL, fetchImpl });
+  assert.deepEqual(seen, [`${PIN_URL}.sha256`]);
+});
+
+test('fetchChecksum refuses a malformed checksum file as bad-package', async () => {
+  const bodies = [
+    checksumLine(HASH, 'other-file.tar.gz'),
+    `${'g'.repeat(64)}  ${PACKAGE_NAME}\n`,
+    `${'a'.repeat(63)}  ${PACKAGE_NAME}\n`,
+    '',
+  ];
+  for (const body of bodies) {
+    const fetchImpl = async () => new Response(body, { status: 200 });
+    await assert.rejects(
+      fetchChecksum({ url: PIN_URL, fetchImpl }),
+      (err) => err.code === 'bad-package',
+      JSON.stringify(body),
+    );
+  }
+});
+
+test('fetchChecksum fails with download-failed on HTTP 404', async () => {
+  const fetchImpl = async () => new Response('missing', { status: 404 });
+  await assert.rejects(fetchChecksum({ url: PIN_URL, fetchImpl }), (err) => err.code === 'download-failed');
+});
+
+test('fetchChecksum fails with download-failed on a host outside the allow-list, without a request', async () => {
+  let hits = 0;
+  const fetchImpl = async () => {
+    hits += 1;
+    return new Response(checksumLine(HASH), { status: 200 });
+  };
+  const url = PIN_URL.replace('github.com', 'evil.example.com');
+  await assert.rejects(fetchChecksum({ url, fetchImpl }), (err) => err.code === 'download-failed');
+  assert.equal(hits, 0);
+});
+
+test('fetchChecksum fails with download-failed when the body is larger than 4096 bytes', async () => {
+  const fetchImpl = async () => new Response(`${HASH}  ${PACKAGE_NAME}${' '.repeat(5000)}\n`, { status: 200 });
+  await assert.rejects(fetchChecksum({ url: PIN_URL, fetchImpl }), (err) => err.code === 'download-failed');
+});
+
 test('downloadPackage streams the bytes into a temp folder and checks the sha256', async (t) => {
   const pkg = realPackage(t);
   const { base } = await serve(t, (req, res) => {
@@ -219,7 +290,6 @@ test('downloadPackage streams the bytes into a temp folder and checks the sha256
   const result = await downloadPackage({
     url: `${base}/pkg.tar.gz`,
     sha256: pkg.sha256,
-    size: pkg.size,
     dest: home,
     env: TEST_ENV,
   });
@@ -234,21 +304,34 @@ test('a checksum mismatch deletes the temp file and installs nothing', async (t)
   const { base } = await serve(t, (req, res) => res.end(pkg.buf));
   const home = tempDir(t);
   await assert.rejects(
-    downloadPackage({ url: `${base}/pkg.tar.gz`, sha256: 'b'.repeat(64), size: pkg.size, dest: home, env: TEST_ENV }),
+    downloadPackage({ url: `${base}/pkg.tar.gz`, sha256: 'b'.repeat(64), dest: home, env: TEST_ENV }),
     (err) => err.code === 'bad-package',
   );
   assert.deepEqual(leftovers(home), []);
   assert.equal(newestInstalled(home), null);
 });
 
-test('a download larger than size plus 1 MB is aborted and removed', async (t) => {
+test('a download larger than the 100 MB maximum is aborted and removed', async (t) => {
+  const chunk = Buffer.alloc(1024 * 1024, 7);
   const { base } = await serve(t, (req, res) => {
+    res.on('error', () => {});
     res.writeHead(200);
-    res.end(Buffer.alloc(3 * 1024 * 1024, 7));
+    let sent = 0;
+    const pump = () => {
+      while (!res.destroyed && sent < 101) {
+        sent += 1;
+        if (!res.write(chunk)) {
+          res.once('drain', pump);
+          return;
+        }
+      }
+      if (!res.destroyed) res.end();
+    };
+    pump();
   });
   const home = tempDir(t);
   await assert.rejects(
-    downloadPackage({ url: `${base}/big.tar.gz`, sha256: 'c'.repeat(64), size: 1000, dest: home, env: TEST_ENV }),
+    downloadPackage({ url: `${base}/big.tar.gz`, sha256: 'c'.repeat(64), dest: home, env: TEST_ENV }),
     (err) => err.code === 'download-failed',
   );
   assert.deepEqual(leftovers(home), []);
@@ -263,7 +346,7 @@ test('a redirect to a host outside the allow-list is refused without a request',
   });
   const home = tempDir(t);
   await assert.rejects(
-    downloadPackage({ url: `${base}/start`, sha256: 'd'.repeat(64), size: 10, dest: home, env: TEST_ENV }),
+    downloadPackage({ url: `${base}/start`, sha256: 'd'.repeat(64), dest: home, env: TEST_ENV }),
     (err) => err.code === 'download-failed',
   );
   assert.equal(hits, 1);
@@ -285,7 +368,6 @@ test('a redirect to an allowed host is followed', async (t) => {
   const result = await downloadPackage({
     url: `${base}/start`,
     sha256: pkg.sha256,
-    size: pkg.size,
     dest: home,
     env: TEST_ENV,
   });
@@ -299,7 +381,7 @@ test('more than 3 redirects fail', async (t) => {
     res.end();
   });
   await assert.rejects(
-    downloadPackage({ url: `${base}/x`, sha256: 'e'.repeat(64), size: 10, dest: tempDir(t), env: TEST_ENV }),
+    downloadPackage({ url: `${base}/x`, sha256: 'e'.repeat(64), dest: tempDir(t), env: TEST_ENV }),
     (err) => err.code === 'download-failed',
   );
 });
@@ -311,7 +393,7 @@ test('a 404 answer fails with download-failed', async (t) => {
   });
   const home = tempDir(t);
   await assert.rejects(
-    downloadPackage({ url: `${base}/gone.tar.gz`, sha256: 'f'.repeat(64), size: 10, dest: home, env: TEST_ENV }),
+    downloadPackage({ url: `${base}/gone.tar.gz`, sha256: 'f'.repeat(64), dest: home, env: TEST_ENV }),
     (err) => err.code === 'download-failed',
   );
   assert.deepEqual(leftovers(home), []);
@@ -327,7 +409,6 @@ test('a stalled download fails after the idle timeout', async (t) => {
     downloadPackage({
       url: `${base}/slow.tar.gz`,
       sha256: 'a'.repeat(64),
-      size: 1000,
       dest: home,
       env: TEST_ENV,
       idleTimeoutMs: 200,
@@ -340,7 +421,7 @@ test('a stalled download fails after the idle timeout', async (t) => {
 test('plain http is refused without the test flag', async (t) => {
   const { base } = await serve(t, (req, res) => res.end('x'));
   await assert.rejects(
-    downloadPackage({ url: `${base}/p.tar.gz`, sha256: 'a'.repeat(64), size: 10, dest: tempDir(t), env: {} }),
+    downloadPackage({ url: `${base}/p.tar.gz`, sha256: 'a'.repeat(64), dest: tempDir(t), env: {} }),
     (err) => err.code === 'download-failed',
   );
 });
@@ -517,7 +598,7 @@ test('ensureMasterScreen prunes nothing when no version is usable', async (t) =>
 test('ensureMasterScreen prunes nothing when the download fails the checksum', async (t) => {
   const pkg = realPackage(t);
   const root = tempDir(t);
-  writePin(root, { sha256: '0'.repeat(64), size: pkg.size });
+  writePin(root);
   const home = tempDir(t);
   installFake(home, '0.1.0', { verified: false });
 
@@ -525,7 +606,7 @@ test('ensureMasterScreen prunes nothing when the download fails the checksum', a
     frameworkRoot: root,
     home,
     env: {},
-    fetchImpl: async () => new Response(pkg.buf, { status: 200 }),
+    fetchImpl: releaseFetch(pkg, checksumLine('0'.repeat(64))),
   });
 
   assert.deepEqual(res, { error: 'bad-package' });
@@ -617,28 +698,46 @@ test('ensureMasterScreen uses the pinned version when it is already installed', 
   });
 });
 
-test('ensureMasterScreen downloads the pin, installs it and prunes old versions', async (t) => {
+test('ensureMasterScreen downloads the pin, checks it against the .sha256 asset, installs it and prunes old versions', async (t) => {
   const pkg = realPackage(t);
   const root = tempDir(t);
-  writePin(root, { sha256: pkg.sha256, size: pkg.size });
+  writePin(root);
   const home = tempDir(t);
   installFake(home, '0.1.0');
   installFake(home, '0.2.5');
   installFake(home, '0.2.6');
   const said = [];
+  const seen = [];
   const res = await ensureMasterScreen({
     frameworkRoot: root,
     home,
     env: {},
     lang: 'en',
     say: (text) => said.push(text),
-    fetchImpl: async () => new Response(pkg.buf, { status: 200 }),
+    fetchImpl: releaseFetch(pkg, checksumLine(pkg.sha256), seen),
   });
   assert.equal(res.source, 'downloaded');
   assert.equal(res.version, PIN_VERSION);
   assert.ok(fs.existsSync(res.serverFile));
   assert.deepEqual(said, [message('M6', 'en')]);
   assert.deepEqual(masterScreenEntries(home), [PIN_VERSION]);
+  assert.ok(seen.includes(`${PIN_URL}.sha256`));
+});
+
+test('ensureMasterScreen refuses a package whose .sha256 asset names a different hash', async (t) => {
+  const pkg = realPackage(t);
+  const root = tempDir(t);
+  writePin(root);
+  const home = tempDir(t);
+  const res = await ensureMasterScreen({
+    frameworkRoot: root,
+    home,
+    env: {},
+    fetchImpl: releaseFetch(pkg, checksumLine('0'.repeat(64))),
+  });
+  assert.deepEqual(res, { error: 'bad-package' });
+  assert.equal(newestInstalled(home), null);
+  assert.deepEqual(leftovers(home), []);
 });
 
 test('ensureMasterScreen falls back to the newest installed version when offline', async (t) => {
@@ -683,16 +782,16 @@ test('ensureMasterScreen reports download-failed when offline and nothing is ins
   assert.deepEqual(leftovers(home), []);
 });
 
-test('ensureMasterScreen reports bad-package when the download does not match the pin', async (t) => {
+test('ensureMasterScreen reports bad-package when the download does not match the published checksum', async (t) => {
   const pkg = realPackage(t);
   const root = tempDir(t);
-  writePin(root, { sha256: '0'.repeat(64), size: pkg.size });
+  writePin(root);
   const home = tempDir(t);
   const res = await ensureMasterScreen({
     frameworkRoot: root,
     home,
     env: {},
-    fetchImpl: async () => new Response(pkg.buf, { status: 200 }),
+    fetchImpl: releaseFetch(pkg, checksumLine('0'.repeat(64))),
   });
   assert.deepEqual(res, { error: 'bad-package' });
   assert.equal(newestInstalled(home), null);

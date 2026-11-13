@@ -1,8 +1,8 @@
-// The master screen package: a gzip tar published as a GitHub Release asset and pinned
-// in yllir/master-screen.json. Downloads it, checks its sha256 against the pin, extracts
-// it after checking every archive entry, and installs it under
-// <home>/master-screen/<version>/. Used by launch.mjs through ensureMasterScreen.
-// Only the system tar runs, through execFile and never through a shell.
+// The master screen package: a gzip tar published as a GitHub Release asset. It is pinned by
+// version and URL in yllir/master-screen.json; its sha256 comes from the `.sha256` asset of the
+// same release (sha256sum format). Downloads it, checks the sha256, extracts it after checking
+// every archive entry, and installs it under <home>/master-screen/<version>/. Used by launch.mjs
+// through ensureMasterScreen. Only the system tar runs, through execFile and never through a shell.
 
 import { execFile } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -17,7 +17,7 @@ const VERSION_RE = /^\d+\.\d+\.\d+$/;
 const SHA256_RE = /^[0-9a-fA-F]{64}$/;
 const PIN_URL_RE = /^https:\/\/github\.com\/([A-Za-z0-9_][A-Za-z0-9_.-]*)\/([A-Za-z0-9_][A-Za-z0-9_.-]*)\/releases\/download\/master-screen-v(\d+\.\d+\.\d+)\/yllir-master-screen-(\d+\.\d+\.\d+)\.tar\.gz$/;
 const MAX_PACKAGE_SIZE = 100 * 1024 * 1024;
-const SIZE_SLACK = 1024 * 1024;
+const MAX_CHECKSUM_SIZE = 4096;
 const MAX_REDIRECTS = 3;
 const IDLE_TIMEOUT_MS = 60 * 1000;
 const STALE_TMP_MS = 60 * 60 * 1000;
@@ -48,9 +48,10 @@ export function defaultHome(env = process.env) {
 }
 
 /**
- * Reads and validates <frameworkRoot>/master-screen.json. Returns
- * { version, sha256 (lowercase), url, size } or null when the file is missing or invalid.
- * The URL must be the release asset of this same version on github.com; unknown keys are ignored.
+ * Reads and validates <frameworkRoot>/master-screen.json. Returns { version, url } or null when
+ * the file is missing or invalid. The URL must be the release asset of this same version on
+ * github.com. Only `version` and `url` are read: unknown keys, including the sha256 and size of
+ * older pins, are ignored.
  */
 export function readPin(frameworkRoot) {
   let raw;
@@ -60,14 +61,12 @@ export function readPin(frameworkRoot) {
     return null;
   }
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const { version, sha256, url, size } = raw;
+  const { version, url } = raw;
   if (typeof version !== 'string' || !VERSION_RE.test(version)) return null;
-  if (typeof sha256 !== 'string' || !SHA256_RE.test(sha256)) return null;
   if (typeof url !== 'string') return null;
   const match = PIN_URL_RE.exec(url);
   if (!match || match[3] !== version || match[4] !== version) return null;
-  if (!Number.isInteger(size) || size <= 0 || size > MAX_PACKAGE_SIZE) return null;
-  return { version, sha256: sha256.toLowerCase(), url, size };
+  return { version, url };
 }
 
 /** <home>/master-screen/<version> */
@@ -126,25 +125,38 @@ function checkHop(value, hosts, allowHttp) {
 }
 
 /**
+ * Fetches `url` with redirects handled by hand: every hop is checked against the allowed hosts,
+ * at most MAX_REDIRECTS redirects are followed, and the final response (any status) is returned.
+ * Shared by the package download and the checksum download.
+ */
+async function fetchAllowed(url, { fetchImpl, env, signal }) {
+  const allowHttp = env.YLLIR_ALLOW_HTTP_TEST === '1';
+  const hosts = allowHttp ? [...DOWNLOAD_HOSTS, ...TEST_HOSTS] : DOWNLOAD_HOSTS;
+  let target = checkHop(url, hosts, allowHttp);
+  for (let redirects = 0; ; redirects += 1) {
+    const res = await fetchImpl(target.href, { redirect: 'manual', signal });
+    if (!REDIRECT_STATUS.has(res.status)) return res;
+    const location = res.headers.get('location');
+    if (!location || redirects >= MAX_REDIRECTS) throw fail('download-failed', 'too many redirects');
+    target = checkHop(new URL(location, target), hosts, allowHttp);
+  }
+}
+
+/**
  * Streams the package into a new `<dest>/master-screen/.tmp-<random>/package.tar.gz` while
- * hashing it. Follows at most 3 redirects, each on an allowed host, with an idle timeout and
- * a size cap of `size` + 1 MB. On any failure the temp folder is deleted. Returns
- * { file, tmpDir }; the caller deletes tmpDir when done. `dest` is the YLLIR home folder.
- * A checksum mismatch fails with code bad-package, everything else with download-failed.
+ * hashing it. Redirects follow the fetchAllowed rules, with an idle timeout and a size cap of
+ * MAX_PACKAGE_SIZE. On any failure the temp folder is deleted. Returns { file, tmpDir }; the
+ * caller deletes tmpDir when done. `dest` is the YLLIR home folder. A checksum mismatch fails
+ * with code bad-package, everything else with download-failed.
  */
 export async function downloadPackage({
   url,
   sha256,
-  size,
   dest,
   fetchImpl = globalThis.fetch,
   env = process.env,
   idleTimeoutMs = IDLE_TIMEOUT_MS,
 }) {
-  const allowHttp = env.YLLIR_ALLOW_HTTP_TEST === '1';
-  const hosts = allowHttp ? [...DOWNLOAD_HOSTS, ...TEST_HOSTS] : DOWNLOAD_HOSTS;
-  let target = checkHop(url, hosts, allowHttp);
-
   const base = path.join(dest, 'master-screen');
   fs.mkdirSync(base, { recursive: true });
   const tmpDir = fs.mkdtempSync(path.join(base, '.tmp-'));
@@ -158,17 +170,9 @@ export async function downloadPackage({
 
   try {
     armIdle();
-    let res;
-    for (let redirects = 0; ; redirects += 1) {
-      res = await fetchImpl(target.href, { redirect: 'manual', signal: controller.signal });
-      if (!REDIRECT_STATUS.has(res.status)) break;
-      const location = res.headers.get('location');
-      if (!location || redirects >= MAX_REDIRECTS) throw fail('download-failed', 'too many redirects');
-      target = checkHop(new URL(location, target), hosts, allowHttp);
-    }
+    const res = await fetchAllowed(url, { fetchImpl, env, signal: controller.signal });
     if (res.status !== 200) throw fail('download-failed', `HTTP ${res.status}`);
 
-    const limit = size + SIZE_SLACK;
     const hash = crypto.createHash('sha256');
     let total = 0;
     const handle = await fs.promises.open(file, 'w');
@@ -177,9 +181,9 @@ export async function downloadPackage({
         for await (const chunk of res.body) {
           armIdle();
           total += chunk.length;
-          if (total > limit) {
+          if (total > MAX_PACKAGE_SIZE) {
             controller.abort();
-            throw fail('download-failed', 'the package is larger than the pin says');
+            throw fail('download-failed', 'the package is larger than the maximum size');
           }
           hash.update(chunk);
           await handle.write(chunk);
@@ -191,12 +195,73 @@ export async function downloadPackage({
     clearTimeout(timer);
 
     if (hash.digest('hex') !== sha256.toLowerCase()) {
-      throw fail('bad-package', 'the package checksum does not match the pin');
+      throw fail('bad-package', 'the package checksum does not match the published checksum');
     }
     return { file, tmpDir };
   } catch (err) {
     clearTimeout(timer);
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (err.code === 'bad-package' || err.code === 'download-failed') throw err;
+    throw fail('download-failed', err.message);
+  }
+}
+
+/** The file name of a package URL: its last path segment. */
+function packageName(url) {
+  return path.posix.basename(new URL(url).pathname);
+}
+
+/** Reads a response body as text, failing once it grows past `limit` bytes. */
+async function readSmallText(res, limit, onChunk) {
+  const parts = [];
+  let total = 0;
+  if (res.body) {
+    for await (const chunk of res.body) {
+      onChunk();
+      total += chunk.length;
+      if (total > limit) throw fail('download-failed', 'the checksum file is larger than expected');
+      parts.push(Buffer.from(chunk));
+    }
+  }
+  return Buffer.concat(parts).toString('utf8');
+}
+
+/** Reads one sha256sum line: `<64 hex><spaces>name` (an optional `*` before the name is allowed). */
+function parseChecksum(text, name) {
+  const malformed = () => fail('bad-package', 'the checksum file is malformed');
+  const first = text.trim().split(/\r?\n/)[0] ?? '';
+  const [hash = '', fileName = ''] = first.split(/\s+/);
+  if (!SHA256_RE.test(hash) || fileName.replace(/^\*/, '') !== name) throw malformed();
+  return hash.toLowerCase();
+}
+
+/**
+ * Downloads the `.sha256` asset next to the package (`url` + '.sha256') and returns its sha256
+ * in lowercase. The file must name the package by its last URL segment. Uses the same host and
+ * redirect rules as downloadPackage. Any failure is download-failed, except a malformed file,
+ * which is bad-package.
+ */
+export async function fetchChecksum({
+  url,
+  fetchImpl = globalThis.fetch,
+  env = process.env,
+  idleTimeoutMs = IDLE_TIMEOUT_MS,
+}) {
+  const controller = new AbortController();
+  let timer = null;
+  const armIdle = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), idleTimeoutMs);
+  };
+  try {
+    armIdle();
+    const res = await fetchAllowed(`${url}.sha256`, { fetchImpl, env, signal: controller.signal });
+    if (res.status !== 200) throw fail('download-failed', `HTTP ${res.status}`);
+    const text = await readSmallText(res, MAX_CHECKSUM_SIZE, armIdle);
+    clearTimeout(timer);
+    return parseChecksum(text, packageName(url));
+  } catch (err) {
+    clearTimeout(timer);
     if (err.code === 'bad-package' || err.code === 'download-failed') throw err;
     throw fail('download-failed', err.message);
   }
@@ -344,9 +409,10 @@ function installedResult(home, version, source) {
 /**
  * Finds the master screen server to start, in this order: env YLLIR_MASTER_SCREEN_DIR,
  * the legacy bundled `<frameworkRoot>/master-screen/server.mjs`, the pinned version when
- * installed, a download of the pinned version, and finally the newest installed verified
- * version (with a plain notice). Returns { serverFile, source, version? } or
- * { error: 'no-package' | 'download-failed' | 'bad-package' }. `say` receives M6 and M8.
+ * installed, a download of the pinned version (its checksum from the release's .sha256 asset),
+ * and finally the newest installed verified version (with a plain notice). Returns
+ * { serverFile, source, version? } or { error: 'no-package' | 'download-failed' | 'bad-package' }.
+ * `say` receives M6 and M8.
  */
 export async function ensureMasterScreen({
   frameworkRoot,
@@ -375,10 +441,10 @@ export async function ensureMasterScreen({
   if (pin) {
     say(message('M6', lang));
     try {
+      const sha256 = await fetchChecksum({ url: pin.url, fetchImpl, env });
       const { file, tmpDir } = await downloadPackage({
         url: pin.url,
-        sha256: pin.sha256,
-        size: pin.size,
+        sha256,
         dest: home,
         fetchImpl,
         env,
