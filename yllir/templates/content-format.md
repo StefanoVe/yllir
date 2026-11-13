@@ -217,6 +217,8 @@ Validated: the sections, their order, `location` as a list of place ids, the sta
 
 `## Statistiche` (English: `## Statistics`) holds up to three tables, each under its `###` heading, in this order. Values come from the game system's adapter; the framework checks the shape.
 
+An amount the master rolls at the table (damage, healing, temporary hit points, a number of creatures) is written as its dice only, never with a precomputed result: `Colpisce: 1d6 + 1 danni perforanti`, not `Colpisce: 4 (1d6 + 1) danni perforanti`. A value the sheet fixes keeps its number (hit points in the Characteristics table). The adapter checks it.
+
 | Heading (it / en) | Columns (it / en) |
 |---|---|
 | `### Caratteristiche` / `### Characteristics` | `Caratteristica`, `Valore` / `Characteristic`, `Value` |

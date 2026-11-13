@@ -88,7 +88,7 @@ async function arithmeticErrors(adapter, statistics, lang) {
   if (typeof checks.checkCreature !== 'function') return [error('checks-unavailable', 'adapter checks do not export checkCreature')];
   const rows = characteristicRows(statistics, CHARACTERISTICS[lang]);
   const fields = characteristicFields(adapter, rows, lang);
-  return checks.checkCreature(fields).map((entry) => error(entry.code, entry.message));
+  return checks.checkCreature(fields, statistics).map((entry) => error(entry.code, entry.message));
 }
 
 export async function validateSheet(adapter, kind, markdown, lang) {

@@ -1,6 +1,7 @@
 // Deterministic arithmetic checks for D&D 2024 creature sheets.
-// Receives the raw cell text of the Characteristics table, keyed by adapter field id.
-// Returns [{ code, field, message }]. No rule tables: only the formulas below.
+// Receives the cell text of the Characteristics table, keyed by adapter field id, and the raw
+// text of the Statistics section for the roll check. Returns [{ code, field, message }].
+// No rule tables: only the formulas below.
 
 const ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
 const CR_FRACTIONS = { '1/8': 0.125, '1/4': 0.25, '1/2': 0.5 };
@@ -83,7 +84,26 @@ function checkProficiency(text, cr, errors) {
   }
 }
 
-export function checkCreature(fields) {
+// A rolled amount is written as dice only: "1d6 + 1", never "4 (1d6 + 1)".
+// The hit points row of the Characteristics table keeps its fixed number.
+const PRECOMPUTED_RE = /\b\d+\s*\(\s*\d*d\d+(?:\s*[+−-]\s*\d+)*\s*\)/gi;
+const HP_ROW_RE = /^\s*\|\s*(?:PF|HP|Punti ferita|Hit points)\s*\|/i;
+
+function checkRolls(statistics, errors) {
+  for (const line of statistics.split('\n')) {
+    if (HP_ROW_RE.test(line)) continue;
+    for (const match of line.matchAll(PRECOMPUTED_RE)) {
+      const dice = match[0].replace(/^\d+\s*\(\s*/, '').replace(/\s*\)$/, '');
+      errors.push({
+        code: 'precomputed-roll',
+        field: 'statistics',
+        message: `statistics: "${match[0]}" is a precomputed result; write the dice only ("${dice}"), the master rolls them`,
+      });
+    }
+  }
+}
+
+export function checkCreature(fields, statistics = '') {
   const errors = [];
   for (const field of ABILITIES) {
     if (fields[field] !== undefined) checkAbility(field, String(fields[field]).trim(), errors);
@@ -98,6 +118,7 @@ export function checkCreature(fields) {
     if (cr === null) errors.push({ code: 'bad-value', field: 'cr', message: `cr: "${text}" is not a challenge rating` });
   }
   if (fields.proficiency_bonus !== undefined) checkProficiency(String(fields.proficiency_bonus).trim(), cr, errors);
+  checkRolls(String(statistics), errors);
   return errors;
 }
 

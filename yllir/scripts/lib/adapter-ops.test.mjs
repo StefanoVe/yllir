@@ -148,6 +148,13 @@ test('creature table with a wrong proficiency bonus fails with bad-proficiency',
   assert.deepEqual(result.errors.map((entry) => entry.code), ['bad-proficiency']);
 });
 
+test('creature attack with a precomputed roll fails with precomputed-roll', async () => {
+  const extra = '\n### Attacchi e capacità\n\n| Attacco | Dettagli |\n| --- | --- |\n| Lancia | Attacco in mischia: +3. Colpisce: 4 (1d6 + 1) danni perforanti. |\n';
+  const result = await validateSheet(adapter, 'creature', creature(completeStats, extra), 'it');
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some((entry) => entry.code === 'precomputed-roll'));
+});
+
 test('adapter checks are skipped for non-combat creatures', async () => {
   const text = '---\nid: synthetic-creature\ntemplate: creature\n---\n\n# Compagno\n\n## Statistiche\n\n### Caratteristiche\n\n| Caratteristica | Valore |\n| --- | --- |\n| FOR | 14 (+9) |';
   assert.deepEqual(await validateSheet(adapter, 'creature', text, 'it'), { ok: true, errors: [] });

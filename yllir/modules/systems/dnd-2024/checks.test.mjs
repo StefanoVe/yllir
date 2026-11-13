@@ -115,3 +115,24 @@ test('scene check: a DC outside 5..30 is rejected', () => {
   }
   assert.deepEqual(checkSceneCheck('Strength saving throw DC 30', 'en'), []);
 });
+
+test('precomputed roll in the statistics is reported; dice only is valid', () => {
+  const bad = checkCreature({}, '| Lancia | Attacco in mischia: +3. Colpisce: 4 (1d6 + 1) danni perforanti. |');
+  assert.equal(bad.length, 1);
+  assert.equal(bad[0].code, 'precomputed-roll');
+  assert.ok(bad[0].message.includes('"1d6 + 1"'), bad[0].message);
+  assert.deepEqual(checkCreature({}, '| Lancia | Attacco in mischia: +3. Colpisce: 1d6 + 1 danni perforanti. |'), []);
+});
+
+test('hit points row of the Characteristics table keeps its fixed number', () => {
+  assert.deepEqual(checkCreature({ hp: '11 (2d8 + 2)' }, '| PF | 11 (2d8 + 2) |\n| HP | 11 (2d8 + 2) |'), []);
+});
+
+test('two precomputed amounts on one line give two precomputed-roll errors', () => {
+  const errors = checkCreature({}, '| Lancia | Colpisce: 7 (1d8 + 3) danni taglienti più 3 (1d6) danni da fuoco. |');
+  assert.deepEqual(errors.map((entry) => entry.code), ['precomputed-roll', 'precomputed-roll']);
+});
+
+test('checkCreature without a statistics argument still passes', () => {
+  assert.deepEqual(checkCreature({ str: '14' }), []);
+});
