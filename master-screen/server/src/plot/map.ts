@@ -5,7 +5,7 @@
 // list (sessions of one arc, scenes of one session) when the two have no declared dependency
 // between them. Only paths, titles, ids and statuses leave here: never a document body.
 // Owner: plot engineer.
-import type { PlotEdge, PlotNode, PlotResponse } from '../../../shared/src/types.js';
+import type { PlotEdge, PlotNode, PlotResponse, PlotSheet, PlotSheetsResponse } from '../../../shared/src/types.js';
 
 /** The fields of plotMap(root).sessions[] that the map uses. */
 export interface PlotSceneInput {
@@ -101,4 +101,29 @@ export function toPlotResponse(result: PlotMapResult): PlotResponse {
   }
 
   return { nodes, edges };
+}
+
+/**
+ * The plot sheets in navigator order: each session, immediately followed by its own scenes in
+ * events order. Entries with an empty file are skipped. Only path, title, kind and the session
+ * node id leave here, never a body.
+ */
+export function toPlotSheets(result: PlotMapResult): PlotSheetsResponse {
+  const sheets: PlotSheet[] = [];
+  for (const session of result.sessions) {
+    if (session.file) {
+      sheets.push({ path: session.file, title: session.name, kind: 'session' });
+    }
+    for (const scene of session.events) {
+      if (scene.file) {
+        sheets.push({
+          path: scene.file,
+          title: scene.name,
+          kind: 'scene',
+          session: sessionNodeId(session.id),
+        });
+      }
+    }
+  }
+  return { sheets };
 }

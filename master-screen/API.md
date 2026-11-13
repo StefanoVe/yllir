@@ -114,6 +114,8 @@ All under `/api`, JSON, UTF-8. Errors: `{ "error": "<plain-language message>" }`
 | POST `/chat/turns/:id/cancel` | | `{ ok: true }` |
 | GET `/checks` | | `ChecksResponse` (last result, or computed once) |
 | POST `/checks/run` | | `ChecksResponse` (recomputed with `engine.mjs index` then `query errors` and `query sketches`) |
+| GET `/plot` | | `PlotResponse` (nodes and edges of the plot map, paths and statuses only, never a body); 503 when the framework has no plot module, 500 on a failed build |
+| GET `/plot/sheets` | | `PlotSheetsResponse`: the plot sheets in navigator order (each session, then its scenes), `path`, `title`, `kind`, `session`; same 503/500 as `/plot` |
 | GET `/events` | `Last-Event-ID` header | SSE, 15 s heartbeat comment, ring buffer of 500 events for replay |
 | POST `/shutdown` | | `{ ok: true }`, then the process exits |
 

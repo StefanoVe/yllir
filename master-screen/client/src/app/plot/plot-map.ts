@@ -9,10 +9,10 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { Router } from '@angular/router';
 import { LucideAngularModule, Maximize, ZoomIn, ZoomOut } from 'lucide-angular';
 import type { PlotNode, PlotResponse } from '@shared/types';
-import { docUrl } from '../core/doc-nav.service';
+import type { SourceRef } from '@shared/cockpit-types';
+import { DocumentModal } from '../cockpit/modals/document-modal';
 import { I18n } from '../i18n';
 import { PlotApi } from './plot-api';
 import { isPlotFailure } from './plot-http';
@@ -35,13 +35,12 @@ const TITLE_MAX = 28;
  */
 @Component({
   selector: 'ms-plot-map',
-  imports: [LucideAngularModule],
+  imports: [LucideAngularModule, DocumentModal],
   templateUrl: './plot-map.html',
   styleUrl: './plot-map.css',
 })
 export class PlotMapComponent {
   private readonly api = inject(PlotApi);
-  private readonly router = inject(Router);
   private readonly injector = inject(Injector);
   private readonly destroyRef = inject(DestroyRef);
   readonly s = inject(I18n);
@@ -54,6 +53,10 @@ export class PlotMapComponent {
   readonly error = signal<string | null>(null);
   readonly transform = signal<Transform>({ x: 0, y: 0, k: 1 });
   readonly hovered = signal<string | null>(null);
+  /** The sheet shown in the popup, or null when none is open. */
+  readonly sheet = signal<SourceRef | null>(null);
+  /** The plot sheets in navigator order, for the popup's previous and next buttons. */
+  readonly sheets = signal<SourceRef[]>([]);
 
   readonly layout = computed(() => {
     const data = this.data();
@@ -115,12 +118,23 @@ export class PlotMapComponent {
     this.loading.set(true);
     this.error.set(null);
     try {
-      this.data.set(await this.api.load());
+      const [plot, sheets] = await Promise.all([this.api.load(), this.loadSheets()]);
+      this.data.set(plot);
+      this.sheets.set(sheets);
       afterNextRender(() => this.fit(), { injector: this.injector });
     } catch (failure) {
       this.error.set(isPlotFailure(failure) ? failure.error : this.s.t('panels.errors.generic'));
     } finally {
       this.loading.set(false);
+    }
+  }
+
+  /** The sheets for the navigator. A failure here must not break the map: the list is just empty. */
+  private async loadSheets(): Promise<SourceRef[]> {
+    try {
+      return (await this.api.sheets()).sheets.map((sheet) => ({ path: sheet.path }));
+    } catch {
+      return [];
     }
   }
 
@@ -141,9 +155,10 @@ export class PlotMapComponent {
     this.hovered.set(id);
   }
 
+  /** A click opens the sheet in the popup, not in the reader. */
   open(node: PlotNode): void {
     if (this.suppressClick) return;
-    void this.router.navigateByUrl(docUrl(node.path));
+    this.sheet.set({ path: node.path });
   }
 
   onPointerDown(event: PointerEvent): void {

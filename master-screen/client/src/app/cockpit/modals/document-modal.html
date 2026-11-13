@@ -22,6 +22,31 @@
       <p>{{ d.path }}</p>
       }
     </div>
+    @if (navigator(); as nav) {
+    <button
+      class="icon-button"
+      [title]="i18n.t('liveAgent.previousSheet')"
+      [attr.aria-label]="i18n.t('liveAgent.previousSheet')"
+      [disabled]="!nav.prev"
+      (click)="step(-1)"
+    >
+      <ui-icon name="left" [size]="17" />
+    </button>
+    <span
+      class="sheet-position"
+      [title]="i18n.t('liveAgent.sheetPosition', { current: nav.index + 1, total: nav.total })"
+      >{{ nav.index + 1 }} / {{ nav.total }}</span
+    >
+    <button
+      class="icon-button"
+      [title]="i18n.t('liveAgent.nextSheet')"
+      [attr.aria-label]="i18n.t('liveAgent.nextSheet')"
+      [disabled]="!nav.next"
+      (click)="step(1)"
+    >
+      <ui-icon name="right" [size]="17" />
+    </button>
+    }
     <button
       class="icon-button"
       [title]="i18n.t('liveAgent.openInReader')"

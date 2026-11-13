@@ -92,3 +92,7 @@
     </ul>
   </section>
 }
+
+@if (sheet(); as source) {
+  <cockpit-document-modal [source]="source" [siblings]="sheets()" (close)="sheet.set(null)" />
+}

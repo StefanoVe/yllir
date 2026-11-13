@@ -1,8 +1,9 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { Router, provideRouter } from '@angular/router';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { PlotResponse } from '@shared/types';
+import type { DocResponse, PlotResponse } from '@shared/types';
+import { DocumentsService } from '../cockpit/support/documents.service';
 import { PlotApi } from './plot-api';
 import { PlotMapComponent } from './plot-map';
 
@@ -22,16 +23,35 @@ const data: PlotResponse = {
   ],
 };
 
+const sheets = {
+  sheets: [
+    { path: 'sessions/1/main.md', title: 'The harbour', kind: 'session' },
+    { path: 'sessions/1/arrival.md', title: 'The arrival', kind: 'scene', session: 's1' },
+  ],
+};
+
 describe('PlotMapComponent', () => {
-  let api: { load: ReturnType<typeof vi.fn> };
+  let api: { load: ReturnType<typeof vi.fn>; sheets: ReturnType<typeof vi.fn> };
+  let documents: { detail: ReturnType<typeof vi.fn> };
   let fixture: ComponentFixture<PlotMapComponent>;
   let el: HTMLElement;
 
   beforeEach(() => {
-    api = { load: vi.fn(async () => data) };
+    api = {
+      load: vi.fn(async () => data),
+      sheets: vi.fn(async () => sheets),
+    };
+    documents = {
+      detail: vi.fn(async (path: string) => ({ path, title: path, blocks: [], masterOnly: false }) as unknown as DocResponse),
+    };
     TestBed.configureTestingModule({
       imports: [PlotMapComponent],
-      providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: PlotApi, useValue: api }],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        { provide: PlotApi, useValue: api },
+        { provide: DocumentsService, useValue: documents },
+      ],
     });
   });
 
@@ -73,6 +93,45 @@ describe('PlotMapComponent', () => {
     expect(items).toHaveLength(3);
     expect(items.find((text) => text.startsWith('The arrival'))).toContain('Needs: The harbour');
     expect(items.find((text) => text.startsWith('The harbour'))).toContain('Needs nothing');
+  });
+
+  it('opens a clicked node in the popup instead of navigating to the reader', async () => {
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigateByUrl');
+    create();
+    fixture.detectChanges();
+    await flush();
+    fixture.detectChanges();
+    const node = el.querySelector<SVGGElement>('g.node[data-path="sessions/1/main.md"]');
+    node?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    fixture.detectChanges();
+    await flush();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.sheet()).toEqual({ path: 'sessions/1/main.md' });
+    expect(navigate).not.toHaveBeenCalled();
+    expect(el.querySelector('cockpit-document-modal')).not.toBeNull();
+  });
+
+  it('gives the popup the ordered sheets so it can walk to the next one', async () => {
+    create();
+    fixture.detectChanges();
+    await flush();
+    fixture.detectChanges();
+    el.querySelector<SVGGElement>('g.node[data-path="sessions/1/main.md"]')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    fixture.detectChanges();
+    await flush();
+    fixture.detectChanges();
+    expect(el.querySelector('.sheet-position')?.textContent?.trim()).toBe('1 / 2');
+  });
+
+  it('keeps the map when the sheets list fails', async () => {
+    api.sheets.mockRejectedValueOnce(new Error('offline'));
+    create();
+    fixture.detectChanges();
+    await flush();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('g.node')).toHaveLength(3);
+    expect(el.querySelector('p[role="alert"]')).toBeNull();
   });
 
   it('shows an empty state when there are no sessions', async () => {

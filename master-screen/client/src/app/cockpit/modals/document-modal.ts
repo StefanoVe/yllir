@@ -3,6 +3,7 @@ import {
   ElementRef,
   HostListener,
   OnInit,
+  computed,
   ViewEncapsulation,
   effect,
   inject,
@@ -37,6 +38,8 @@ import { I18n } from "../../i18n";
 })
 export class DocumentModal implements OnInit {
   source = input.required<SourceRef>();
+  /** Ordered sheets for the previous and next buttons. Empty = no navigator. */
+  siblings = input<SourceRef[]>([]);
   close = output<void>();
   readonly i18n = inject(I18n);
   private documents = inject(DocumentsService);
@@ -50,6 +53,19 @@ export class DocumentModal implements OnInit {
   error = signal("");
   /** Visited documents inside the modal; the last one is shown. */
   history = signal<SourceRef[]>([]);
+  /** Position of the shown document in `siblings`; null when there is no navigator. */
+  readonly navigator = computed(() => {
+    const list = this.siblings();
+    const path = (this.history().at(-1) ?? this.source()).path;
+    const index = list.findIndex((item) => item.path === path);
+    if (list.length === 0 || index < 0) return null;
+    return {
+      index,
+      total: list.length,
+      prev: index > 0 ? list[index - 1]! : null,
+      next: index < list.length - 1 ? list[index + 1]! : null,
+    };
+  });
 
   constructor() {
     // Follow the source, not the component's lifetime: the modal is reused when the
@@ -126,6 +142,15 @@ export class DocumentModal implements OnInit {
     this.load({ path: target.path, anchor: target.fragment || undefined }, true);
   }
 
+  /** Loads the previous (-1) or next (+1) sheet, replacing the shown one. False when there is none. */
+  step(delta: -1 | 1): boolean {
+    const nav = this.navigator();
+    const target = delta < 0 ? nav?.prev : nav?.next;
+    if (!target) return false;
+    this.load(target, false);
+    return true;
+  }
+
   openInReader() {
     const current = this.history().at(-1) || this.source();
     this.dismiss();
@@ -143,5 +168,20 @@ export class DocumentModal implements OnInit {
   @HostListener("document:keydown.escape") escape() {
     if (this.overlay.top() !== null) return;
     this.dismiss();
+  }
+
+  /** Left and right arrows walk the sheets, under the same rule as Esc and never while typing. */
+  @HostListener("document:keydown", ["$event"]) arrows(event: KeyboardEvent) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    if (this.overlay.top() !== null) return;
+    const target = event.target as HTMLElement | null;
+    if (
+      target &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable)
+    )
+      return;
+    if (this.step(event.key === "ArrowLeft" ? -1 : 1)) event.preventDefault();
   }
 }

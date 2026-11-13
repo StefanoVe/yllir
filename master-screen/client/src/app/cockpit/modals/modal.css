@@ -62,6 +62,20 @@
   background: var(--color-surface-2);
   color: var(--color-text);
 }
+.cockpit-modal .icon-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+  background: none;
+  color: var(--color-text-muted);
+}
+.cockpit-modal .sheet-position {
+  flex: none;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .cockpit-modal .modal-body {
   flex: 1;
   min-height: 0;

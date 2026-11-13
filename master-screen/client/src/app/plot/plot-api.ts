@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import type { PlotResponse } from '@shared/types';
+import type { PlotResponse, PlotSheetsResponse } from '@shared/types';
 import { PlotHttp } from './plot-http';
 
 /** GET /api/plot. A separate service so the map can be tested with a fake. */
@@ -9,5 +9,10 @@ export class PlotApi {
 
   load(): Promise<PlotResponse> {
     return this.http.request<PlotResponse>('GET', '/plot');
+  }
+
+  /** GET /api/plot/sheets: the plot sheets in navigator order. */
+  sheets(): Promise<PlotSheetsResponse> {
+    return this.http.request<PlotSheetsResponse>('GET', '/plot/sheets');
   }
 }

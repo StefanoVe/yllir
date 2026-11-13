@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 import { fileURLToPath } from 'node:url';
-import type { PlotResponse } from '../../../shared/src/types.js';
+import type { PlotResponse, PlotSheetsResponse } from '../../../shared/src/types.js';
 import { makeCampaign, makeFramework, get, startApp, type Harness } from '../live/test-support.js';
-import { toPlotResponse, type PlotMapResult } from '../plot/map.js';
+import { toPlotResponse, toPlotSheets, type PlotMapResult } from '../plot/map.js';
 
 const REAL_FRAMEWORK = fileURLToPath(new URL('../../../../yllir', import.meta.url));
 
@@ -150,12 +150,103 @@ describe('plot mapping', () => {
   });
 });
 
+describe('GET /api/plot/sheets on a real plot-map fixture', () => {
+  it('lists each session followed by its own scenes, in the framework order of the plot', async () => {
+    const root = makeCampaign(FIXTURE);
+    const h = await startApp(root, REAL_FRAMEWORK);
+    harnesses.push(h);
+    const res = await get(h, '/plot/sheets');
+    assert.equal(res.status, 200, res.text);
+    const body = res.json as PlotSheetsResponse;
+    assert.deepEqual(
+      body.sheets.map((sheet) => `${sheet.kind}:${sheet.title}`),
+      [
+        'session:Altra',
+        'session:Sessione 1',
+        'scene:Mercato',
+        'scene:Porto',
+        'scene:Faro',
+        'session:Sessione 2',
+        'session:Sessione 3',
+      ],
+    );
+    const faro = body.sheets.find((sheet) => sheet.title === 'Faro');
+    assert.deepEqual(faro, {
+      path: 'Trama/Sessione 1/Eventi/Faro.md',
+      title: 'Faro',
+      kind: 'scene',
+      session: 'session:s-01',
+    });
+  });
+
+  it('never carries the body text of a document', async () => {
+    const root = makeCampaign(FIXTURE);
+    const h = await startApp(root, REAL_FRAMEWORK);
+    harnesses.push(h);
+    const res = await get(h, '/plot/sheets');
+    assert.equal(res.status, 200);
+    assert.equal(res.text.includes('SEGRETO'), false);
+  });
+});
+
+describe('toPlotSheets', () => {
+  it('orders sessions with their scenes, keeps paths and skips entries without a file', () => {
+    const out = toPlotSheets({
+      sessions: [
+        {
+          id: 'x',
+          file: 'T/x/x.md',
+          name: 'X',
+          arc: 'A',
+          depends_on: [],
+          played: true,
+          ready: false,
+          events: [
+            { id: 'e1', file: 'T/x/e1.md', name: 'E1', depends_on: [] },
+            { id: 'e2', file: '', name: 'E2', depends_on: [] },
+            { id: 'e3', file: 'T/x/e3.md', name: 'E3', depends_on: [] },
+          ],
+        },
+        {
+          id: 'y',
+          file: '',
+          name: 'Y',
+          arc: 'A',
+          depends_on: [],
+          played: false,
+          ready: true,
+          events: [{ id: 'e4', file: 'T/y/e4.md', name: 'E4', depends_on: [] }],
+        },
+      ],
+    });
+    assert.deepEqual(out, {
+      sheets: [
+        { path: 'T/x/x.md', title: 'X', kind: 'session' },
+        { path: 'T/x/e1.md', title: 'E1', kind: 'scene', session: 'session:x' },
+        { path: 'T/x/e3.md', title: 'E3', kind: 'scene', session: 'session:x' },
+        { path: 'T/y/e4.md', title: 'E4', kind: 'scene', session: 'session:y' },
+      ],
+    });
+  });
+});
+
 describe('GET /api/plot without the plot module', () => {
   it('answers 503 with the plain message', async () => {
     const root = makeCampaign({ 'campaign.yaml': CAMPAIGN_YAML });
     const h = await startApp(root, makeFramework({ libs: false }));
     harnesses.push(h);
     const res = await get(h, '/plot');
+    assert.equal(res.status, 503);
+    assert.deepEqual(res.json, { error: 'This version of Yllir does not support the plot map yet.' });
+  });
+});
+
+describe('GET /api/plot/sheets without the plot module', () => {
+  it('answers 503 with the same plain message as /api/plot', async () => {
+    const root = makeCampaign({ 'campaign.yaml': CAMPAIGN_YAML });
+    const h = await startApp(root, makeFramework({ libs: false }));
+    harnesses.push(h);
+    const res = await get(h, '/plot/sheets');
     assert.equal(res.status, 503);
     assert.deepEqual(res.json, { error: 'This version of Yllir does not support the plot map yet.' });
   });
