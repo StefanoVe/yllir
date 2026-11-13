@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { after, describe, it } from 'node:test';
+import { after, before, describe, it } from 'node:test';
 import type { MusicResponse } from '../../../shared/src/types.js';
 import { get, send, startApp, type Harness } from '../live/test-support.js';
 import { musicAvailable } from '../music/availability.js';
-import { MUSIC_OFF_YAML, MUSIC_ON_YAML, musicCampaign, oldFramework, REAL_FRAMEWORK, silentCampaign } from '../music/test-support.js';
+import { resetMusicToolsCache } from '../music/mpv.js';
+import { fakeMpvBinary, MUSIC_OFF_YAML, MUSIC_ON_YAML, musicCampaign, oldFramework, REAL_FRAMEWORK, silentCampaign } from '../music/test-support.js';
 
 const harnesses: Harness[] = [];
 after(async () => {
@@ -11,6 +12,26 @@ after(async () => {
     await h.server.close();
     await h.ctx.closeAll();
   }
+});
+
+let savedMpvPath: string | undefined;
+let savedYtdlpPath: string | undefined;
+
+// The tests must not depend on mpv and yt-dlp being installed (CI has neither).
+before(() => {
+  savedMpvPath = process.env.MPV_PATH;
+  savedYtdlpPath = process.env.YTDLP_PATH;
+  process.env.MPV_PATH = fakeMpvBinary();
+  process.env.YTDLP_PATH = process.execPath;
+  resetMusicToolsCache();
+});
+
+after(() => {
+  if (savedMpvPath === undefined) delete process.env.MPV_PATH;
+  else process.env.MPV_PATH = savedMpvPath;
+  if (savedYtdlpPath === undefined) delete process.env.YTDLP_PATH;
+  else process.env.YTDLP_PATH = savedYtdlpPath;
+  resetMusicToolsCache();
 });
 
 async function start(yaml: string, framework: string = REAL_FRAMEWORK, campaign?: string): Promise<Harness> {
