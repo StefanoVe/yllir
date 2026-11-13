@@ -34,6 +34,21 @@ Parla poco e guarda negli occhi chi le parla.
 
 Può cucire un mantello per il gruppo in cambio di pelli di capra.
 
+## Statistiche
+
+### Caratteristiche
+
+| Caratteristica | Valore |
+| --- | --- |
+| CA | 10 |
+| PF | 6 |
+
+### Attacchi e capacità
+
+| Attacco o capacità | Dettagli |
+| --- | --- |
+| Ago da sarta | Attacco in mischia: +1, portata 1,5 m. Colpisce: 1d4 danni perforanti. |
+
 <!-- master -->
 ## Master
 
@@ -306,4 +321,55 @@ test('change-draft merge writes the drafts with exit 0, the same subject exits 1
   assert.equal(same.status, 1, same.stdout);
   assert.equal(same.json.errors[0].code, 'same-subject');
   assertUsage(cli(['change-draft', dir, '--op', 'rename', '--subject', 'teodo-marr', '--title', 'X', '--other', 'oria-valdes']));
+});
+
+test('review records the answer for the checked drafts (exit 0), a wrong hash exits 1 with review-stale and writes nothing', (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const check = cli(['check', dir, '--files', MIRA_PATH]);
+  assert.equal(check.status, 0, check.stdout);
+  const reviewFile = path.join(dir, '.campaign/state/engine/review.json');
+
+  const stale = cli(['review', dir, '--outcome', 'APPLY', '--drafts-hash', 'wrong']);
+  assert.equal(stale.status, 1, stale.stdout);
+  assert.equal(stale.json.ok, false);
+  assert.equal(stale.json.errors[0].code, 'review-stale');
+  assert.equal(fs.existsSync(reviewFile), false);
+
+  const recorded = cli(['review', dir, '--outcome', 'APPLY', '--drafts-hash', check.json.draftsHash]);
+  assert.equal(recorded.status, 0, recorded.stdout);
+  assert.deepEqual(recorded.json, { ok: true, outcome: 'APPLY', draftsHash: check.json.draftsHash });
+  assert.deepEqual(JSON.parse(fs.readFileSync(reviewFile, 'utf8')), { outcome: 'APPLY', draftsHash: check.json.draftsHash });
+
+  const saved = cli(['commit', dir, '--files', MIRA_PATH, '--message', 'Add Mira Sanna']);
+  assert.equal(saved.status, 0, saved.stdout);
+  assert.equal(saved.json.ok, true);
+});
+
+test('review without a check exits 1 with check-missing; a bad outcome or a missing --drafts-hash-less call is a usage error', (t) => {
+  const dir = makeCampaign(t);
+  const noCheck = cli(['review', dir, '--outcome', 'APPLY', '--drafts-hash', 'any']);
+  assert.equal(noCheck.status, 1, noCheck.stdout);
+  assert.equal(noCheck.json.errors[0].code, 'check-missing');
+  assert.equal(fs.existsSync(path.join(dir, '.campaign/state/engine/review.json')), false);
+
+  assertUsage(cli(['review', dir, '--outcome', 'REJECT', '--drafts-hash', 'any']));
+  assertUsage(cli(['review', dir, '--drafts-hash', 'any']));
+  assertUsage(cli(['review', dir, '--outcome', 'APPLY', '--files', MIRA_PATH]));
+});
+
+test('review FIX is recorded (exit 0), and commit still refuses with review-missing (exit 1)', (t) => {
+  const dir = makeCampaign(t);
+  const before = git(dir, ['rev-list', '--count', 'HEAD']);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const check = cli(['check', dir, '--files', MIRA_PATH]);
+
+  const fix = cli(['review', dir, '--outcome', 'FIX', '--drafts-hash', check.json.draftsHash]);
+  assert.equal(fix.status, 0, fix.stdout);
+  assert.equal(fix.json.outcome, 'FIX');
+
+  const refused = cli(['commit', dir, '--files', MIRA_PATH, '--message', 'Add Mira Sanna']);
+  assert.equal(refused.status, 1);
+  assert.equal(refused.json.errors[0].code, 'review-missing');
+  assert.equal(git(dir, ['rev-list', '--count', 'HEAD']), before);
 });

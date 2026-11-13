@@ -6,6 +6,7 @@
 //   context <root> [--subjects "a,b"] [--place id] [--session id] [--out .campaign/state/<file>]
 //   check   <root> [--files "a,b"] [--deletes "c"] [--sources "d"]
 //   commit  <root> [--files "a,b"] [--deletes "c"] [--sources "d"] --message "<text>" [--note "<text>"]
+//   review  <root> --outcome APPLY|FIX --drafts-hash <hash>   (records the batch reviewer's answer for the last check)
 //   query   <root> <name> [args...]
 //   index   <root>
 //   change-plan <root> --subject <id>   (read-only census of the references to one subject)
@@ -16,7 +17,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { checkBatch, commitBatch } from './lib/engine/commit.mjs';
+import { checkBatch, commitBatch, recordReview } from './lib/engine/commit.mjs';
 import { buildContext } from './lib/engine/context.mjs';
 import { changePlan } from './lib/engine/change-plan.mjs';
 import { changeDraft } from './lib/engine/change-draft.mjs';
@@ -30,6 +31,7 @@ const USAGE = [
   '  context <root> [--subjects "a,b"] [--place id] [--session id] [--out .campaign/state/<file>]',
   '  check   <root> [--files "a,b"] [--deletes "c"] [--sources "d"]',
   '  commit  <root> [--files "a,b"] [--deletes "c"] [--sources "d"] --message "<text>" [--note "<text>"]',
+  '  review  <root> --outcome APPLY|FIX --drafts-hash <hash>',
   '  query   <root> <name> [args...]',
   '  index   <root>',
   '  change-plan <root> --subject <id>',
@@ -40,6 +42,7 @@ const COMMANDS = {
   context: ['subjects', 'place', 'session', 'out'],
   check: ['files', 'deletes', 'sources'],
   commit: ['files', 'deletes', 'sources', 'message', 'note'],
+  review: ['outcome', 'drafts-hash'],
   query: null, // positional: <name> [args...], no options
   index: [],
   'change-plan': ['subject'],
@@ -136,6 +139,16 @@ async function run(parsed) {
         sources: listOption(options, 'sources'),
         message: options.message,
         note: options.note ?? '',
+      });
+      return { code: result.ok ? 0 : 1, value: result };
+    }
+    case 'review': {
+      if (options.outcome !== 'APPLY' && options.outcome !== 'FIX') {
+        usageError('--outcome must be APPLY or FIX');
+      }
+      const result = recordReview(root, {
+        outcome: options.outcome,
+        draftsHash: options['drafts-hash']?.trim(),
       });
       return { code: result.ok ? 0 : 1, value: result };
     }

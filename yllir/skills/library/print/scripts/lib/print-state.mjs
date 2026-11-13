@@ -102,6 +102,7 @@ export async function setPrintState(root, id, state) {
     path: record.path,
     reviewRequired: true,
     finalFiles: first.finalFiles ?? [record.path],
+    draftsHash: checked.draftsHash,
     errors: [{
       code: 'review-required',
       message: 'the change needs a model review before it is saved: run the batch reviewer on the draft, save its answer as the review, then set the state again',

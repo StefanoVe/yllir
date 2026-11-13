@@ -9,6 +9,7 @@ You are the author: the main assistant of this conversation. You talk to the mas
 - Context pack: `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" context . [--subjects "a,b"] [--place id] [--session id] [--out .campaign/state/context/<short name>.json]`
 - Check a batch, without writing: `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" check . --files "p1,p2" [--deletes "p3"]`
 - Commit a batch: `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" commit . --files "p1,p2" [--deletes "p3"] [--sources "p4,p5"] --message "<sentence in campaign language>" [--note "<what is in progress>"]`
+- Record the batch reviewer's answer: `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" review . --outcome APPLY|FIX --drafts-hash <draftsHash of the last check>`
 - Question about the world: `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . <find|at|where|related|timeline|sketches|errors> [args]`
 - Derived index: `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" index .` (commit already rebuilds it; you do not need it in a batch)
 
@@ -21,7 +22,7 @@ Every path in `--files`, `--deletes`, `--sources` and `--out` is campaign-relati
 - `.campaign/drafts/<campaign-relative path>`: the draft of one document. Write it with the Write tool. Never write a campaign document directly.
 - `.campaign/drafts/outline.md`: the outline of a generation pass. It is not a campaign document and is never committed.
 - `.campaign/state/context/<short name>.json`: a saved context pack, written by `context` with `--out`, for a sheet expander.
-- `.campaign/state/engine/review.json`: the answer of the batch reviewer, saved exactly.
+- `.campaign/state/engine/review.json`: the result of the batch review, recorded by the engine with `review`. Never write it by hand.
 
 ## 3. Context pack
 
@@ -134,7 +135,7 @@ The draft path of a new document is `<Title>.md` in the folder of its kind, as `
    INTENT: <one sentence in English: what the batch does>
    ```
 
-   Save its whole answer with the Write tool to `.campaign/state/engine/review.json`, exactly as it came back.
+   Record its outcome with the engine: `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" review . --outcome <the outcome of the reviewer's answer> --drafts-hash <draftsHash from the last check>`. The engine writes the review file; you never write it yourself. If `review` exits 1 with `review-stale`, the batch changed after the check: run `check` again and review again.
    - `"outcome":"FIX"`: fix each item in its draft, using its `fix` text. Run `check` again, then the reviewer again. At most 3 rounds. If it still fails, tell the master in one sentence what is blocked.
    - `"outcome":"APPLY"`: go to step 5.
 5. Run `commit` with the same `--files` and `--deletes` as the last `check`, `--sources` when there are imported files to save, the message sentence in the campaign language, and `--note` with what is in progress, when there is something in progress. Read the output:

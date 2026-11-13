@@ -219,6 +219,39 @@ export async function commitBatch(root, options = {}) {
   }
 }
 
+/**
+ * Records the model review of the batch that was checked last. The review is bound to the
+ * drafts hash that check printed: it is refused when check.json did not pass or was written
+ * for other drafts. Writes review.json as { outcome, draftsHash }; commitBatch saves only
+ * an APPLY review. Nothing is written on a refusal.
+ * @param {string} root campaign folder
+ * @param {{ outcome: string, draftsHash?: string }} options outcome: APPLY or FIX (the reviewer's answer)
+ * @returns {{ ok: true, outcome: string, draftsHash: string } | { ok: false, errors: object[] }}
+ */
+export function recordReview(root, { outcome, draftsHash }) {
+  const dir = path.resolve(root);
+  const refuse = (code, message) => ({ ok: false, errors: [{ file: '', code, message }] });
+  if (outcome !== 'APPLY' && outcome !== 'FIX') {
+    return refuse('bad-outcome', 'the outcome of the review must be APPLY or FIX');
+  }
+  if (typeof draftsHash !== 'string' || draftsHash === '') {
+    return refuse('no-drafts-hash', 'the drafts hash printed by the last check is required');
+  }
+  const check = readJson(path.join(dir, CHECK_FILE));
+  if (check === null) {
+    return refuse('check-missing', 'the batch was not checked: check it first, then review it');
+  }
+  if (check.ok !== true) {
+    return refuse('check-failed', 'the last check did not pass: fix the batch and check it again before the review');
+  }
+  if (check.draftsHash !== draftsHash) {
+    return refuse('review-stale', 'the batch changed since the last check, check it again and review it');
+  }
+  fs.mkdirSync(path.join(dir, ENGINE_DIR), { recursive: true });
+  fs.writeFileSync(path.join(dir, REVIEW_FILE), `${JSON.stringify({ outcome, draftsHash }, null, 2)}\n`);
+  return { ok: true, outcome, draftsHash };
+}
+
 // ---------------------------------------------------------------------------
 // Evaluation: preflight, copy, transform, validate
 // ---------------------------------------------------------------------------
@@ -770,13 +803,18 @@ function writeCheck(dir, record) {
   fs.writeFileSync(path.join(dir, CHECK_FILE), `${JSON.stringify(record, null, 2)}\n`);
 }
 
-/** True when review.json says APPLY, check.json passed for these drafts, and the review is not older than the check. */
+/**
+ * True when review.json says APPLY, check.json passed for these drafts, and the review is not older than the check.
+ * A review that carries a draftsHash (written by `engine review`) must name these drafts too; one without it
+ * (older flows, the master screen's live-table review) is accepted on the outcome and the check alone.
+ */
 function reviewApproved(dir, draftsHash) {
   const reviewPath = path.join(dir, REVIEW_FILE);
   const checkPath = path.join(dir, CHECK_FILE);
   const review = readJson(reviewPath);
   const check = readJson(checkPath);
   if (!review || review.outcome !== 'APPLY') return false;
+  if (review.draftsHash !== undefined && review.draftsHash !== draftsHash) return false;
   if (!check || check.draftsHash !== draftsHash || check.ok !== true) return false;
   return fs.statSync(reviewPath).mtimeMs >= fs.statSync(checkPath).mtimeMs;
 }

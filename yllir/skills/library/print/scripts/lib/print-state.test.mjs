@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { rewritePrintState, setPrintState } from './print-state.mjs';
+import { rewritePrintState, setPrintState, runEngine } from './print-state.mjs';
 import { objectSheet, makeCampaign, removeCampaign, readText } from './fixtures.mjs';
 
 const SHEET = '<!-- yllir\nid: x\ntemplate: item\nlocation: [p]\n-->\n# X\n';
@@ -88,6 +88,32 @@ test('setPrintState: review first, then the write cycle saves the change as one 
     assert.equal(same.unchanged, true);
     const commitsSame = execFileSync('git', ['rev-list', '--count', 'HEAD'], { cwd: root }).toString().trim();
     assert.equal(commitsSame, commitsAfter, 'an unchanged state saves nothing');
+  } finally {
+    removeCampaign(root);
+  }
+});
+
+test('setPrintState: review-required carries the drafts hash of check, and engine review with it lets the same call save', async () => {
+  const root = makeCampaign({
+    sheets: { 'Oggetti/Lanterna.md': objectSheet({ id: 'lanterna', title: 'Lanterna', shortText: 'Breve.' }) },
+  });
+  try {
+    const first = await setPrintState(root, 'lanterna', 'printed');
+    assert.equal(first.errors[0].code, 'review-required');
+    const check = JSON.parse(readText(root, '.campaign/state/engine/check.json'));
+    assert.equal(typeof first.draftsHash, 'string');
+    assert.notEqual(first.draftsHash, '');
+    assert.equal(first.draftsHash, check.draftsHash, 'the hash is the one of the last check');
+
+    // The reviewer's outcome is recorded by the engine, never by writing the review file.
+    const review = await runEngine(['review', root, '--outcome', 'APPLY', '--drafts-hash', first.draftsHash]);
+    assert.equal(review.ok, true, JSON.stringify(review));
+    assert.equal(review.draftsHash, first.draftsHash);
+
+    const second = await setPrintState(root, 'lanterna', 'printed');
+    assert.equal(second.ok, true, JSON.stringify(second));
+    assert.equal(second.state, 'printed');
+    assert.match(readText(root, 'Oggetti/Lanterna.md'), /^print: printed$/m);
   } finally {
     removeCampaign(root);
   }

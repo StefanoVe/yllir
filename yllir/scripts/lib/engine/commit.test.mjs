@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildWorldIndex } from '../world-graph.mjs';
-import { DRAFT_DIR, checkBatch, commitBatch } from './commit.mjs';
+import { DRAFT_DIR, checkBatch, commitBatch, recordReview } from './commit.mjs';
 import { ensureRepo } from '../versions.mjs';
 import { toCommentMetadata } from '../frontmatter.mjs';
 
@@ -998,4 +998,101 @@ test('an invalid retired-ids file blocks the batch with retired-ids-invalid and 
   assert.equal(result.ok, false);
   assert.equal(head(dir), commitBefore);
   assert.equal(fs.existsSync(path.join(dir, MIRA_PATH)), false);
+});
+
+test('engine review records APPLY for the checked drafts hash, and commit then succeeds', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const check = await checkBatch(dir, { files: [MIRA_PATH] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  const recorded = recordReview(dir, { outcome: 'APPLY', draftsHash: check.draftsHash });
+  assert.deepEqual(recorded, { ok: true, outcome: 'APPLY', draftsHash: check.draftsHash });
+  const review = JSON.parse(readAt(dir, '.campaign/state/engine/review.json'));
+  assert.deepEqual(review, { outcome: 'APPLY', draftsHash: check.draftsHash });
+
+  const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Add Mira Sanna' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(fs.existsSync(path.join(dir, '.campaign/state/engine/review.json')), false);
+});
+
+test('engine review with a hash other than the checked one is review-stale and writes nothing', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const check = await checkBatch(dir, { files: [MIRA_PATH] });
+  const commitBefore = head(dir);
+
+  const refused = recordReview(dir, { outcome: 'APPLY', draftsHash: 'not-the-hash' });
+  assert.equal(refused.ok, false);
+  assert.deepEqual(refused.errors.map((e) => e.code), ['review-stale']);
+  assert.equal(fs.existsSync(path.join(dir, '.campaign/state/engine/review.json')), false);
+
+  const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Add Mira Sanna' });
+  assert.deepEqual(result.errors.map((e) => e.code), ['review-missing']);
+  assert.equal(head(dir), commitBefore);
+  assert.ok(check.draftsHash);
+});
+
+test('engine review without a check.json is refused and writes nothing', (t) => {
+  const dir = makeCampaign(t);
+  const refused = recordReview(dir, { outcome: 'APPLY', draftsHash: 'any' });
+  assert.equal(refused.ok, false);
+  assert.deepEqual(refused.errors.map((e) => e.code), ['check-missing']);
+  assert.equal(fs.existsSync(path.join(dir, '.campaign/state/engine/review.json')), false);
+});
+
+test('engine review of a check that did not pass is refused', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const broken = await checkBatch(dir, { files: ['Personaggi/Assente.md'] });
+  assert.equal(broken.ok, false);
+  const refused = recordReview(dir, { outcome: 'APPLY', draftsHash: broken.draftsHash });
+  assert.deepEqual(refused.errors.map((e) => e.code), ['check-failed']);
+  assert.equal(fs.existsSync(path.join(dir, '.campaign/state/engine/review.json')), false);
+});
+
+test('a FIX review is recorded, but commit still fails with review-missing', async (t) => {
+  const dir = makeCampaign(t);
+  const commitBefore = head(dir);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const check = await checkBatch(dir, { files: [MIRA_PATH] });
+
+  const recorded = recordReview(dir, { outcome: 'FIX', draftsHash: check.draftsHash });
+  assert.equal(recorded.ok, true, JSON.stringify(recorded));
+  assert.equal(JSON.parse(readAt(dir, '.campaign/state/engine/review.json')).outcome, 'FIX');
+
+  const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Add Mira Sanna' });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.errors.map((e) => e.code), ['review-missing']);
+  assert.equal(head(dir), commitBefore);
+});
+
+test('an APPLY review recorded before the drafts changed is refused by commit', async (t) => {
+  const dir = makeCampaign(t);
+  const commitBefore = head(dir);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const first = await checkBatch(dir, { files: [MIRA_PATH] });
+  recordReview(dir, { outcome: 'APPLY', draftsHash: first.draftsHash });
+
+  writeDraft(dir, MIRA_PATH, MIRA.replace('Sarta del borgo.', 'Sarta del borgo, con due figlie.'));
+  const second = await checkBatch(dir, { files: [MIRA_PATH] });
+  assert.equal(second.ok, true, JSON.stringify(second.errors));
+  assert.notEqual(second.draftsHash, first.draftsHash);
+
+  const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Add Mira Sanna' });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.errors.map((e) => e.code), ['review-missing']);
+  assert.equal(head(dir), commitBefore);
+});
+
+test('an old-format review.json without draftsHash still approves the commit', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  await checkBatch(dir, { files: [MIRA_PATH] });
+  const full = path.join(dir, '.campaign/state/engine/review.json');
+  fs.mkdirSync(path.dirname(full), { recursive: true });
+  fs.writeFileSync(full, `${JSON.stringify({ outcome: 'APPLY' })}\n`);
+
+  const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Add Mira Sanna' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
 });
