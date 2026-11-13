@@ -134,6 +134,11 @@ export interface UpdateStatus {
   blockedReason: 'turn-running' | 'live-open' | 'offline' | null;
 }
 
+/** The campaign alignment after a framework update, run by the assistant in a dedicated conversation. */
+export type AlignState = 'none' | 'needed' | 'running' | 'waiting-answer' | 'done' | 'failed';
+/** conversationId: the alignment conversation when there is one for the current run, else null. */
+export type AlignStatus = { state: AlignState; conversationId: string | null };
+
 export interface ChecksResponse {
   // checkedLinks (optional, added later): total number of links that were checked
 

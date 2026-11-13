@@ -15,5 +15,13 @@ export const updateIt = {
   'update.retry': 'Riprova',
   'update.offline': 'Nessuna connessione. Yllir continua a funzionare come prima.',
   'update.reopen': 'La pagina si riapre da sola; se non succede, chiudi questa finestra e apri di nuovo Yllir.',
+  'update.align.title': 'Sto allineando la tua campagna',
+  'update.align.working': 'Aspetta, sto lavorando',
+  'update.align.answer': 'Rispondi alla domanda',
+  'update.align.placeholder': 'La tua risposta',
+  'update.align.done': 'La tua campagna ora funziona con la versione aggiornata di Yllir.',
+  'update.align.failed': "Non è stato possibile completare l'aggiornamento. Non è stato cambiato nulla di ciò che hai scritto.",
+  'update.align.close': 'Chiudi',
+  'update.align.dialog': 'Aggiornamento della campagna',
   'shell.updateNotice': "Impostazioni, c'è un aggiornamento pronto",
 };

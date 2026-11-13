@@ -386,3 +386,23 @@ The screen knows whether a newer Yllir is published, shows the news, and can app
 The published source is read with unauthenticated GET requests and a generic User-Agent only, with an 8 s timeout: the plugin manifest (`yllir/.claude-plugin/plugin.json` on the main branch) and the news folder `yllir/news`, from which `X.Y.Z.md` or `X.Y.Z.<campaign language>.md` is taken for each version after the installed one, oldest first, capped at 8000 characters. A failure of the news alone keeps the update available without news. The check runs at most once an hour; the first status request after start starts the first check in the background.
 
 Apply runs one at a time: `claude plugin update yllir@yllir --json` (no shell, 3 minutes at most), then `claude plugin list --json` to find the plugin's install folder. Then the server starts a detached helper that waits for this process to exit (30 s at most) and starts that folder's `scripts/launcher/launch.mjs` for the campaign, and the server shuts down. Any failure ends in `failed`, with nothing else changed and the old server running. `failed` is cleared by POST `/update/check`, after which the update can be applied again.
+
+## Alignment (campaign alignment after a framework update)
+
+After the assistant is updated, the campaign is aligned: the framework's `update-campaign.mjs` runs (deterministic), then the assistant does the guided sheet format follow-up of the pending migrations. The screen runs this in one dedicated chat conversation with the model `sonnet` and one fixed English prompt (`server/src/update/align-text.ts`). Code: `server/src/update/align.ts` (state), `align-check.ts` (the framework check), routes in `server/src/routes/update.ts`.
+
+| Method and path | Request | Response |
+|---|---|---|
+| GET `/update/align` | | `AlignStatus` |
+| POST `/update/align/start` | | 202 `AlignStatus` (`state` `running`); 409 `{ error }` when the state is not `needed` or `failed`, or a run is active; 503 `{ error }` when the agent is not available |
+
+`AlignStatus` (`shared/src/types.ts`): `{ state: 'none' | 'needed' | 'running' | 'waiting-answer' | 'done' | 'failed', conversationId: string | null }`.
+
+- The check is the framework's `update-campaign.mjs <campaign> --dry-run` (no shell, writes nothing). It says `needed` when the result is `would-update`, or `failed` with first error `interrupted-update`, or `pending_migrations` is not empty. The answer is cached for 30 s, and never asked while a run is active.
+- `none`: nothing to do. `needed`: the campaign must be aligned. `failed` (still needed): the last run ended with an error or was cancelled; start is allowed again as a retry.
+- `running`: a turn of the alignment conversation is queued or running (also when the master answers in it, through the existing `POST /api/chat/messages`).
+- When the turns end: nothing needed any more gives `done`; still needed after a normal end gives `waiting-answer` (the assistant asked a question); an error or a cancel gives `failed`.
+- `conversationId` is set for `running`, `waiting-answer`, `done` and `failed`. The alignment conversation is an ordinary conversation: it stays listed in `GET /api/chats`, with the English prompt as its first master message, so its title is the English first line of that prompt.
+- While the state is `running` or `waiting-answer`, POST `/update/apply` answers 409 `{ error }` (the sentence of `alignBusy`).
+- The state is kept in memory: after a restart it is recomputed from the framework check (a run that was waiting is then `needed` again). No SSE event is sent for it: the screen follows the `turn` events of the conversation, or asks again.
+

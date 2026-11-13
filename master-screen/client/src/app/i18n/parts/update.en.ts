@@ -15,5 +15,13 @@ export const updateEn = {
   'update.retry': 'Try again',
   'update.offline': 'No connection. Yllir keeps working as it is.',
   'update.reopen': 'The page will reopen by itself; if it does not, close this window and open Yllir again.',
+  'update.align.title': 'Updating your campaign',
+  'update.align.working': 'Wait, I am working',
+  'update.align.answer': 'Answer the question',
+  'update.align.placeholder': 'Your answer',
+  'update.align.done': 'Your campaign now works with the updated Yllir.',
+  'update.align.failed': 'The update could not be completed. Nothing was changed that you wrote.',
+  'update.align.close': 'Close',
+  'update.align.dialog': 'Campaign update',
   'shell.updateNotice': 'Settings, an update is ready',
 };

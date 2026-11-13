@@ -36,6 +36,8 @@ export function registerChatRoutes(app: Router, ctx: Ctx, options: ChatRouteOpti
   const provider = 'provider' in options ? options.provider ?? null : createProvider(ctx);
   const service = createChatService(ctx, provider ?? unavailableProvider(t.unavailable));
   const { store, runner } = service;
+  // Shared with the other routes of the campaign (the update routes run the alignment through it).
+  ctx.chat = service;
 
   app.get('/chats', (_req, res) => {
     res.json({ conversations: store.conversations(), currentId: store.currentId(), turn: runner.current() });

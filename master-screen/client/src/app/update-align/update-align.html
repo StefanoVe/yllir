@@ -1,0 +1,64 @@
+@if (visible()) {
+  <div class="align-scrim">
+    <section #panel class="align-panel" role="dialog" aria-modal="true" tabindex="-1"
+             aria-labelledby="align-title" [attr.aria-describedby]="hint() ? 'align-hint' : null"
+             [attr.aria-label]="t('update.align.dialog')">
+      <header class="align-head">
+        <h2 id="align-title">{{ t('update.align.title') }}</h2>
+      </header>
+
+      <div class="align-log" role="log" [attr.aria-label]="t('chat.log')">
+        @for (message of agentMessages(); track message.id) {
+          <article class="msg agent">
+            <div class="text md" [msChatRich]="message.text" [innerHTML]="render(message.text)"></div>
+          </article>
+        }
+
+        @if (activeTurn(); as turn) {
+          <p class="activity" role="status">
+            <span class="dots" aria-hidden="true"><span></span><span></span><span></span></span>
+            <span>{{ activityLine() }}</span>
+          </p>
+          <ms-helpers-indicator [turn]="turn" />
+          @if (stepRows().length > 0) {
+            <ul class="steps" role="list" [attr.aria-label]="t('chat.steps.list')">
+              @for (item of stepRows(); track item.step.id) {
+                <li class="step" [class.child]="item.depth > 0">
+                  <span class="step-text">{{ item.step.text }}</span>
+                  @if (item.step.state === 'running') {
+                    <span class="sr-only">{{ t('chat.steps.running') }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          }
+        }
+
+        @if (finished()) {
+          <p class="final" role="status">{{ finalText() }}</p>
+        }
+      </div>
+
+      <form class="composer" (submit)="$event.preventDefault(); send()">
+        <textarea rows="2" class="input" [value]="draft()" [disabled]="!canType()"
+                  [placeholder]="t('update.align.placeholder')" [attr.aria-label]="t('update.align.placeholder')"
+                  [attr.aria-describedby]="hint() ? 'align-hint' : null"
+                  (input)="draft.set($any($event.target).value)" (keydown)="onComposerKeydown($event)"></textarea>
+        @if (sendError(); as error) {
+          <p class="error" role="alert">{{ error }}</p>
+        }
+        <div class="composer-bar">
+          <p id="align-hint" class="hint" role="status" [hidden]="hint() === ''">{{ hint() }}</p>
+          @if (finished()) {
+            <button type="button" class="btn primary" (click)="close()">{{ t('update.align.close') }}</button>
+          } @else {
+            <button type="submit" class="btn primary icon-only" [disabled]="!canSend()"
+                    [title]="t('chat.send')" [attr.aria-label]="t('chat.send')">
+              <lucide-angular [img]="icons.Send" [size]="16" aria-hidden="true" />
+            </button>
+          }
+        </div>
+      </form>
+    </section>
+  </div>
+}

@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import type {
+  AlignStatus,
   ChangesResponse,
   ChatResponse,
   ChecksResponse,
@@ -145,6 +146,16 @@ export class ApiService {
   /** Starts the update. Rejects with 409 and a plain sentence when it cannot start yet. */
   applyUpdate(): Promise<{ ok: true }> {
     return this.request('POST', '/update/apply');
+  }
+
+  /** The campaign alignment after an update: what state it is in and which conversation shows it. */
+  alignStatus(): Promise<AlignStatus> {
+    return this.request('GET', '/update/align');
+  }
+
+  /** Starts the alignment. Rejects with 409 when the state is not 'needed'. */
+  startAlign(): Promise<AlignStatus> {
+    return this.request('POST', '/update/align/start');
   }
 
   /** Rejects with an ApiFailure (`{ error, status, message? }`) that keeps the server's error text; never with a raw Error. */

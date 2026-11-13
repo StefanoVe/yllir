@@ -13,6 +13,7 @@ import { PrefsService } from '../core/prefs.service';
 import { StatusService } from '../core/status.service';
 import { UpdateService } from '../core/update';
 import { ThemeService } from '../core/theme.service';
+import { UpdateAlign } from '../update-align/update-align';
 import { ViewModeService } from '../core/view-mode.service';
 import { I18n, type TranslationKey } from '../i18n';
 import { Palette, PaletteController } from '../search/palette';
@@ -20,7 +21,7 @@ import { applyTextScale, readTextScale } from './text-scale';
 
 @Component({
   selector: 'ms-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock, UpdateAlign],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })
