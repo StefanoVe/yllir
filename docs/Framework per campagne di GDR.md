@@ -33,6 +33,7 @@ Questo file è l’indice: raccoglie le decisioni dell’autore, che sono vincol
 | [Installazione e requisiti](Installazione%20e%20requisiti.md) | Requisiti minimi e per modulo, installazione guidata, controlli all’avvio, disinstallazione |
 | [Gestione delle sessioni](Gestione%20delle%20sessioni.md) | Cambio automatico di argomento, handoff fra sessioni, finestre di contesto gestite senza il master |
 | [Master screen](Master%20screen.md) | La GUI locale futura e le funzioni che vi confluiscono |
+| [Linee guida dell'interfaccia](Linee%20guida%20dell'interfaccia.md) | Stile del master screen: monocromo, taccuino flat, nodi di carta strappata, popup come pagine di quaderno; restyling |
 
 ## Decisioni dell’autore
 

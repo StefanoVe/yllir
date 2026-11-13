@@ -38,6 +38,7 @@ Questo documento descrive il master screen: la parte del framework che il master
 - **Vista per i giocatori (Deciso, 2026-11-12).** Per ora non c'è. L'anteprima «vista giocatori» (nasconde il blocco riservato) resta solo un controllo del master.
 - **Enciclopedia pubblica (Deciso, 2026-11-12): opzione A.** È una sezione del master screen che genera il sito statico e lo mostra in anteprima. Il sito è il bersaglio dei QR della stampa, quindi gli indirizzi si legano a un identificativo stabile e non al nome del file. **Solo in locale per ora** (decisione dell'autore, 2026-11-12): il sito si genera in `.campaign/cache/encyclopedia/` e non viene pubblicato; nessuna credenziale e nessun dominio. La pubblicazione su un host resta da decidere.
 - **Interfaccia (Deciso, 2026-11-12).** Moderna e semplice da usare, ma abbastanza funzionale. È coerente con le icone con tooltip decise sopra.
+- **Stile dell'interfaccia (Deciso, 2026-11-13).** Monocromo secondo il tema, taccuino in flat design squadrato; i nodi della mappa della trama e della tela del cockpit sono pezzi di carta strappata, i popup dei documenti pagine di quaderno. Precisa la decisione «Interfaccia» del 2026-11-12. Regole complete in [Linee guida dell'interfaccia](Linee%20guida%20dell'interfaccia.md).
 
 ### Strumenti della sessione live estratti (Deciso)
 
@@ -125,6 +126,7 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 - **Il master decide, l'agente propone.** Le scelte di trama, di regole e di contenuto restano al master; l'agente indica le opzioni.
 - **Funziona senza rete** per tutto ciò che non è esplicitamente online (musica da piattaforme di streaming, ricerche di immagini remote).
 - **Preferenze locali.** Preferiti, recenti, tema e dimensione del testo si salvano sul computer e restano separati per campagna.
+- **Stile visivo.** Segue le [Linee guida dell'interfaccia](Linee%20guida%20dell'interfaccia.md).
 
 ## Architettura proposta
 
