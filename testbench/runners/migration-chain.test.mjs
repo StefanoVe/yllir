@@ -24,8 +24,17 @@ process.env.GIT_CONFIG_NOSYSTEM = '1';
 const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'morvalle-legacy', 'campaign');
 const INSTALLED = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'yllir', '.claude-plugin', 'plugin.json'), 'utf8')).version;
 const OLD = '0.0.1';
-const PENDING = ['category-first-geography-v1', 'item-descriptions-v1', 'statistics-tables-v1'];
-const ORDER = ['session-layout-v1', 'category-first-geography-v1', 'item-descriptions-v1', 'statistics-tables-v1', 'world-graph-v1', 'metadata-comment-v1'];
+// A campaign from 0.0.1 has every guided migration whose condition holds: the older ones by version
+// (item-knowledge-v1, economy-v1), the content ones by detect (scene-checks-v1, combat-statistics-v1).
+// shortcut-v1 and encounters-v1 (no fight events in the fixture) leave nothing pending.
+const PENDING = [
+  'category-first-geography-v1', 'item-descriptions-v1', 'item-knowledge-v1', 'statistics-tables-v1',
+  'scene-checks-v1', 'combat-statistics-v1', 'economy-v1',
+];
+const ORDER = [
+  'session-layout-v1', 'category-first-geography-v1', 'item-descriptions-v1', 'item-knowledge-v1', 'statistics-tables-v1',
+  'world-graph-v1', 'metadata-comment-v1', 'scene-checks-v1', 'combat-statistics-v1', 'shortcut-v1', 'economy-v1', 'encounters-v1',
+];
 
 const tempDirs = [];
 after(() => {
@@ -89,7 +98,7 @@ test('the legacy campaign reaches the current format in one update; the guided p
   // The session check now names the guided parts that are left, in order.
   const check = sessionCheck(dir);
   assert.deepEqual(check.post_update, PENDING);
-  assert.match(formatCheck(check), /^post-update needed: category-first-geography-v1, item-descriptions-v1, statistics-tables-v1$/m);
+  assert.match(formatCheck(check), new RegExp(`^post-update needed: ${PENDING.join(', ')}$`, 'm'));
 });
 
 test('a second update of the same campaign changes nothing and saves no version', async () => {

@@ -1,0 +1,7 @@
+id: encounters-v1
+after: [metadata-comment-v1, economy-v1]
+introduced_in: 0.61.0
+needed: detect
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs

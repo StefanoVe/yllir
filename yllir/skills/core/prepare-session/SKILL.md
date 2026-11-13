@@ -42,7 +42,7 @@ Read the main file and the scene files of LAST_PLAYED with the Read tool, so tha
 
 Output: the context pack, read.
 
-**Step 3 — Plan the scenes.** Before any file, write in your reasoning one line per scene: its id (`<session-slug>-<nn>-<scene-slug>`), what happens, where, who is in it, which items matter, and which scenes it depends on. Decide all dependencies now, in this one pass:
+**Step 3 — Plan the scenes.** Before any file, write in your reasoning one line per scene: its id (`<session-slug>-<nn>-<scene-slug>`), what happens, where, who is in it, which items matter, whether it is a fight and with which enemies and counts, and which scenes it depends on. Decide all dependencies now, in this one pass:
 - the first scenes have `depends_on: []`;
 - a choice or a fork makes several scenes depend on the same earlier scene (these are the branches);
 - a scene that several branches lead to depends on all of them (a rejoin);
@@ -56,6 +56,7 @@ Output: the scene plan.
 **Step 4 — Characters, places and items.** For each name the scenes use:
 1. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . find "<name>"`. An existing subject is reused as it is: its identity does not change. You may link to it, never redefine it. If `find` gives several matches for one name, ask ONE question.
 2. A missing subject is created in the same batch:
+   - an enemy of a fight (an id of the `enemies` of a scene, Step 5) that has no sheet yet: a full sheet, with `template: enemy` or `creature` and its statistics (a sketch is not enough: the balance needs the statistics). The sheet is written in this batch, with the same `id` as the one in `enemies`;
    - a full sheet when a scene needs details of it (how it looks, how it speaks, what it wants, what it knows);
    - a sketch otherwise: `sketch: true`, a title, one sentence, its kind, its provenance, its relations and its location.
 3. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . sketches`. A sketch the session uses is expanded into a full sheet in the same batch, with the same `id`.
@@ -80,7 +81,16 @@ Output: the list of new and expanded subjects, and the list of invented facts.
 
 **Step 5 — Write the batch.** Write every file of the session as drafts, then run the write cycle once for the whole batch:
 - the session's main file, `<PLOT FOLDER>/<Session folder>/<Session folder>.md`, as a STUB: metadata block with only `id`, `depends_on` (the session prerequisites from Step 3) and `provenance: generated`, and no body. Do not draft its body or its scene list: the engine derives them at the commit. The stub is still needed, because the plot map ignores every scene file whose session has no main file (it reports `event-session-mismatch`), and the engine rebuilds the stub's metadata block and body from the scene files.
-- one file per scene: `<PLOT FOLDER>/<Session folder>/Eventi/<Scene>.md`. Metadata block: `id`, `session` (the id of the session), `depends_on` (from Step 3, a list of scene ids; `[]` for the first scenes), `location` when the scene has one, `characters` and `items` when they matter, `appearances` (the block form of Step 4) only where the scene explicitly places a subject in a place, and `provenance: generated`. Body: the scene in the campaign language, with links to the subjects it names.
+- one file per scene: `<PLOT FOLDER>/<Session folder>/Eventi/<Scene>.md`. Metadata block: `id`, `session` (the id of the session), `depends_on` (from Step 3, a list of scene ids; `[]` for the first scenes), `location` when the scene has one, `characters` and `items` when they matter, `appearances` (the block form of Step 4) only where the scene explicitly places a subject in a place, `enemies` (see Fights below) only where the scene is a fight, and `provenance: generated`. Body: the scene in the campaign language, with links to the subjects it names.
+  - Fights. A scene that is a fight has an `enemies` key in its metadata block: a block list, one entry for each kind of enemy, each entry with exactly two keys, `id` (an existing creature sheet, or one written in this batch under Step 4) and `count` (a positive integer). Each `id` appears once in the list. A scene with no fight has no `enemies` key. Example for a fight with three guards and one leader:
+    ```yaml
+    enemies:
+      - id: guardiano-di-sale
+        count: 3
+      - id: capo-dei-predoni
+        count: 1
+    ```
+    Every enemy of the list must have a sheet, written in this batch when it does not exist yet (Step 4). The scene text tells the fight as usual; the list holds the numbers only.
   - Checks. When a scene has an attempt whose result is uncertain, write it as a check, in exactly this form (in the campaign language: Italian `Prova`, `Successo`, `Fallimento`; English `Check`, `Success`, `Failure`):
 
     ```markdown
@@ -117,6 +127,8 @@ If the write cycle asks the master a question, ask that question instead, and st
 ## Examples
 
 Correct: the master writes «prepara la sessione del faro». The target is «Il faro spento 2», its prerequisite «Il faro spento 1» is played, and the scenes are three: an arrival at the port, a conversation with the keeper, a choice to climb or to wait. The two last scenes depend on the first. The message names the three scenes in one line each, and says that the keeper's family name and the port's tavern are invented.
+
+Correct: the scene «Scontro al ponte» is a fight, id `faro-spento-2-02-scontro-al-ponte`, after the arrival scene. Its metadata has `enemies` with `guardiano-di-sale` (count 3) and `capo-dei-predoni` (count 1). Neither creature has a sheet yet, so both full creature sheets are written in the same batch. The arrival scene, a conversation, has no `enemies` key.
 
 Wrong: writing the scenes with the dependencies of the file list (each scene after the previous one). The order of the list is not a dependency; only `depends_on` is.
 

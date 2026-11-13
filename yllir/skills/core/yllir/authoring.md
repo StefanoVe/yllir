@@ -174,3 +174,15 @@ Every document says where it comes from: `master`, `played` or `generated`.
 - Never say: draft, batch, check, commit, review, sub-agent, script, git, file, folder, JSON, template, provenance field, command.
 - Say what was created or changed, and what was invented. Ask at most one question.
 - A failure: say the fixed sentence of the lexicon that matches it, and nothing more.
+
+## 12. Prices, wages and rewards
+
+- Before you write any price, wage or reward, read `economy` in the `context` output. When it is a path, read that document with the Read tool and use its currencies (`## Valute`), its categories (`## Prezzi base`) and its place factors (`## Variazioni per luogo`). Write every amount as `<number> <currency>`, for example `2 scudi`, in a currency of that document, with `.` as decimal separator.
+- When `economy` is `null`, ask the master the economy question before you write the first price, wage or reward: which currency or currencies the world uses, how they are worth one another, and what one reference food costs in it. The reference food is `economy.reference_item` of `${CLAUDE_PLUGIN_ROOT}/modules/systems/<system.adapter>/adapter.yaml` in the campaign language (`it` or `en`). When `system.adapter` is `none` or the adapter has no `economy` key, the reference food is «un pasto semplice» (English «a simple meal»). Ask it at most once per conversation.
+  - With an answer, create the economy document in the same batch, in the shape of `write-document`, Step 5, «Economy document».
+  - If the master says «later» (or «più tardi»), write the price in words with no number, and go on.
+- Engine check codes for prices:
+  - `economy-price`: a sheet's price is outside the range of its category. Fix the price so that it is in the range. Name the item in the sheet's `## Deroghe` (English `## Exceptions`), with the reason, only when the master wants an exception.
+  - `economy-currency`: a price or a reward names no currency of the economy document. Change the currency name to one of `## Valute`.
+  - The economy document's own codes (`economy-table`, `economy-range`, `economy-currency`, `economy-place`): fix that document.
+- An event with a fight declares `enemies` in its metadata block, as `content-format.md` section 2.2 says. The engine codes `enemies-*` and `pc-*` mean the draft is wrong: fix it, then check again.

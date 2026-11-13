@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { loadAdapter, pluginRootFromHere } from './adapter.mjs';
-import { cardFields, loadRollFix, progressionEvent, validateSheet } from './adapter-ops.mjs';
+import { cardFields, loadRateEncounter, loadRollFix, loadStatSummary, progressionEvent, validateSheet } from './adapter-ops.mjs';
 
 const adapter = loadAdapter(pluginRootFromHere(), 'dnd-2024').adapter;
 const completeStats = 'CA 12 · PF 20 · Velocità 9 · FOR 10 · DES 11 · COS 12 · INT 13 · SAG 14 · CAR 15';
@@ -163,4 +163,16 @@ test('adapter checks are skipped for non-combat creatures', async () => {
 test('loadRollFix gives the fixRolls of the dnd-2024 checks, and null without a checks file', async () => {
   assert.equal(typeof (await loadRollFix(adapter)), 'function');
   assert.equal(await loadRollFix({ id: 'no-checks' }), null);
+});
+
+test('loadRateEncounter gives the rateEncounter of dnd-2024, and null without difficulty.ops', async () => {
+  assert.equal(typeof (await loadRateEncounter(adapter)), 'function');
+  assert.equal(await loadRateEncounter({ id: 'no-ops', difficulty: { method: 'band-and-cr' } }), null);
+  assert.equal(await loadRateEncounter(null), null);
+});
+
+test('loadStatSummary gives the statSummary of dnd-2024, and null without encounter_ops', async () => {
+  assert.equal(typeof (await loadStatSummary(adapter)), 'function');
+  assert.equal(await loadStatSummary({ id: 'no-ops', checksPath: adapter.checksPath }), null);
+  assert.equal(await loadStatSummary(null), null);
 });

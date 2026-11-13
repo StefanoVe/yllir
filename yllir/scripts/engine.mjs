@@ -22,6 +22,7 @@ import { buildContext } from './lib/engine/context.mjs';
 import { changePlan } from './lib/engine/change-plan.mjs';
 import { changeDraft } from './lib/engine/change-draft.mjs';
 import { runQuery } from './lib/engine/query.mjs';
+import { runEncounters } from './lib/engine/encounters.mjs';
 import { buildSubjectIndex } from './lib/subjects.mjs';
 import { buildWorldIndex, writeWorldIndex } from './lib/world-graph.mjs';
 import { exitWith } from './lib/cli-exit.mjs';
@@ -153,7 +154,9 @@ async function run(parsed) {
       return { code: result.ok ? 0 : 1, value: result };
     }
     case 'query': {
-      const result = runQuery(root, parsed.name, parsed.args);
+      const result = parsed.name === 'encounters'
+        ? await runEncounters(root, parsed.args)
+        : runQuery(root, parsed.name, parsed.args);
       return { code: result.error ? 1 : 0, value: result };
     }
     case 'index': {

@@ -31,7 +31,12 @@ Skip any question the master's message already answers. Ask the rest in ONE numb
 Ask in ONE free-text message, numbered, only what is still missing:
 1. The name of the campaign. If still missing after the answer, use the world name, or «Campagna» (Italian) / «Campaign» (English).
 2. The premise: two or three sentences on the world and the story. If still missing, the premise is «La descrizione sarà scritta più avanti.» (Italian) / «The description will be written later.» (English).
-3. The full path of the shared folder, only if question 4 was yes and no path is known. A relative path is joined to the parent of the campaign folder.
+3. The full path of the shared folder, only if round 1 question 4 was yes and no path is known. A relative path is joined to the parent of the campaign folder.
+4. **Economy**, only if the master's messages have not answered it already. Ask it with the exact wording of the campaign language:
+   - Italian: «Con quali valute si paga nel mondo, e quanto vale una rispetto alle altre (per esempio «una corona vale dieci scudi»)? E quanto costa in quelle valute «{cibo}»? Puoi anche rispondere «più tardi»: ne riparliamo quando servirà un prezzo.»
+   - English: «Which currencies are used in the world, and how much is one worth compared to the others (for example «one crown is worth ten silver»)? And how much does «{food}» cost in them? You can also answer «later»: we will come back to it when a price is needed.»
+   - `{cibo}` / `{food}` is the reference food. Read `${CLAUDE_PLUGIN_ROOT}/modules/systems/<adapter id>/adapter.yaml` (the adapter of the game matched in round 1; with no game matched, skip the read), key `economy.reference_item`, label `it` for an Italian campaign and `en` for any other language. With no adapter, or no such key, the food is «un pasto semplice» (Italian) / «a simple meal» (English).
+   - Default when the master says nothing about it, or answers «later» (or «più tardi»): later. Nothing about the economy is written. The answer counts as an economy answer only when it names at least one currency and a price; a currency with no price, or a price with no currency, counts as later.
 
 World name: the proper name in the premise if there is one (for example «Varn»), otherwise the campaign name. Its folder is the word «World» in the campaign language (`Mondo` in Italian, `World` in English, otherwise the translation); its slug is the lowercase ASCII form (`mondo`).
 
@@ -39,7 +44,7 @@ The seed file name is `Seme del mondo.md` in Italian, `World seed.md` in English
 
 ## Step 4 — Summary and one confirmation
 
-Show in plain words, in the campaign language: the name, the language, the tone, the game (matched: the game rules of that game are applied; named but not matched: they are not available yet, and the campaign works anyway; none: nothing), the shared material (its folder name only), the defaults used, and the first two documents: the world seed (the premise, the tone and the game in one place, which will grow as the world does) and the description of the world in the world folder.
+Show in plain words, in the campaign language: the name, the language, the tone, the game (matched: the game rules of that game are applied; named but not matched: they are not available yet, and the campaign works anyway; none: nothing), the shared material (its folder name only), the defaults used, the economy (the currencies and the food price, or, when later, «la definiremo quando servirà un prezzo» / «we will set it when a price is first needed»), and the first two documents: the world seed (the premise, the tone and the game in one place, which will grow as the world does) and the description of the world in the world folder. The economy document is listed only when the master gave an economy answer.
 
 Ask for one confirmation. If the master's message already confirms, go on without asking.
 
@@ -57,9 +62,9 @@ Then run `node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" . --id <slug> --
 
 If the master named a shared folder, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" . --id <slug of the folder name> --folder "<folder name>" --type external --source "<absolute path>"`. If it fails, tell the master in one sentence that the shared material could not be connected, and go on: do not stop.
 
-## Step 6 — Draft the two documents
+## Step 6 — Draft the documents
 
-Write both drafts with the Write tool, under `.campaign/drafts/`, at the campaign-relative path.
+Write each draft with the Write tool, under `.campaign/drafts/`, at the campaign-relative path. The first two are always drafted; the economy document only under its own rule below.
 
 **Seed**, at `.campaign/drafts/<Seed file name>` (campaign root, not in a folder). The whole seed is master-only, so ALL its content goes inside the master block. Structure, with `id` `seme-del-mondo` (Italian) or `world-seed` (English):
 
@@ -108,12 +113,71 @@ Use only the master's words in the premise: change word order, grammar and punct
 - Correct: master says «Varn is a city of bridges where the river sings» → `_Varn is a city of bridges, and the river sings._`
 - Wrong: `_Varn rises over a dark sea, its bridges full of merchants._` (sea and merchants are new).
 
+**Economy document**, only when the master gave an economy answer (currencies and a price). Otherwise nothing is written here.
+- Path: `.campaign/drafts/<free folder>/<Economy file name>`. The `<free folder>` is `Storia` (Italian) or `History` (English); the file name is `Economia.md` (Italian) or `Economy.md` (English).
+- A new campaign has no `free` category: Step 5 creates only the places category. In the same batch, add it to `campaign.yaml`, as `build-world` Step 5 does for factions. Read `campaign.yaml` with the Read tool, add this entry to the end of its `structure` list, and write the whole file to `.campaign/drafts/campaign.yaml`, keeping every other line exactly as it is. Italian campaign:
+
+  ```yaml
+    - id: storia
+      folder: Storia
+      type: free
+  ```
+
+  English campaign: `id: history`, `folder: History`. If `campaign.yaml` already has a `free` category, do not add the entry: use its folder.
+- Metadata block: `id: economia`, `provenance: master`. Title: `# Economia` (English `# Economy`). Then the sections of this order, each table with a header row and a separator row:
+  - `## Valute` (English `## Currencies`): columns `Valuta`, `Equivalenza`, `Nota` (`Currency`, `Equivalence`, `Note`). The first currency the master names is the unit of account: its row says `unità di conto` (English `unit of account`). Every other currency has a row that says how many of the unit one piece of it is worth, written as `<number> <unit currency form>`, with `.` as decimal separator. The master's words «una corona vale dieci scudi» make the crown the unit, and the scudo row says `0.1 corone`. The `Nota` cell is empty unless the master gave a note.
+  - `## Prezzi base` (English `## Base prices`): columns `Categoria`, `Minimo`, `Massimo`, `Unità` (`Category`, `Minimum`, `Maximum`, `Unit`). One row, for the reference food (the same label as in Step 3), with `Minimo` and `Massimo` both equal to the stated amount as a plain number (`2`, `0.5`, never `2 scudi`), unless the master gave a range. The currency goes only in `Unità`: the unit-of-account currency of the `Valute` table (the first currency named, for example `corona`), never a time or a measure: the day is already in the category name.
+  - `## Salari` (English `## Wages`): header and separator rows only.
+  - `## Variazioni per luogo` (English `## Variations by place`): header and separator rows only.
+  - Master block, last: `<!-- master -->`, `## Master`, `### Indicazioni per il master` (English `### Indicazioni per il master` as well), one line saying the prices come from the first interview, then `<!-- /master -->`.
+- Full example for an Italian campaign where the master said «Usiamo corone e scudi: una corona vale dieci scudi. Una razione costa due scudi.»:
+
+```markdown
+<!-- yllir
+id: economia
+provenance: master
+-->
+
+# Economia
+
+## Valute
+
+| Valuta | Equivalenza | Nota |
+| --- | --- | --- |
+| corona / corone | unità di conto | |
+| scudo / scudi | 0.1 corone | |
+
+## Prezzi base
+
+| Categoria | Minimo | Massimo | Unità |
+| --- | --- | --- | --- |
+| Razione (un giorno) | 2 | 2 | corona |
+
+## Salari
+
+| Mestiere | Paga | Periodo |
+| --- | --- | --- |
+
+## Variazioni per luogo
+
+| Luogo | Fattore | Motivo |
+| --- | --- | --- |
+
+<!-- master -->
+## Master
+
+### Indicazioni per il master
+
+I prezzi vengono dalla prima intervista: una corona vale dieci scudi, e una razione costa due scudi.
+<!-- /master -->
+```
+
 ## Step 7 — Save the first version
 
-Follow the write cycle in `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/authoring.md`, with ONE batch containing both files:
-- files: `<Seed file name>,<Folder>/<World name>.md`
-- intent: «First documents of a new campaign: the world seed and the world description, from the master's words only.»
-- Both documents are saved as written in Step 6, with no further generation.
+Follow the write cycle in `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/authoring.md`, with ONE batch containing the drafts of this step:
+- files: `<Seed file name>,<Folder>/<World name>.md`, and, when the economy document was drafted, `<free folder>/<Economy file name>` and `campaign.yaml` (the draft with the `free` entry) as further entries of the same list.
+- intent: «First documents of a new campaign: the world seed, the world description and, when the master gave them, the currencies and prices, from the master's words only.»
+- Every draft is saved as written in Step 6, with no further generation.
 
 If the write cycle reports errors that the author cannot fix in two rounds, tell the master in one sentence what is blocked, and stop.
 

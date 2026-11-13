@@ -5,9 +5,13 @@
 import { buildWorldIndex } from '../world-graph.mjs';
 import { foldForm } from '../fold.mjs';
 import { compareStrings } from '../subjects.mjs';
+import { priceReport } from '../economy/economy.mjs';
+import { unreachableNodes, forgottenCharacters } from '../plot/doctor.mjs';
 
+// `encounters [sessionId]` is asynchronous (adapter loaders): it is run by
+// runEncounters in encounters.mjs, which the engine calls for that name.
 const USAGE =
-  'usage: find <text> | at <placeId> | where <id> | related <id> | timeline [from] [to] | sketches | errors';
+  'usage: find <text> | at <placeId> | where <id> | related <id> | timeline [from] [to] | sketches | errors | prices | unreachable | forgotten | encounters [sessionId]';
 
 // name -> allowed argument counts
 const QUERIES = {
@@ -18,6 +22,24 @@ const QUERIES = {
   timeline: { min: 0, max: 2 },
   sketches: { min: 0, max: 0 },
   errors: { min: 0, max: 0 },
+  prices: { min: 0, max: 0 },
+  unreachable: { min: 0, max: 0 },
+  forgotten: { min: 0, max: 0 },
+};
+
+// Queries that read the campaign files directly, without the world index.
+// Each returns an object with `results` and any extra fields to show next to it.
+const ROOT_HANDLERS = {
+  prices(root) {
+    const report = priceReport(root);
+    return { results: report.results, economy: report.economy };
+  },
+  unreachable(root) {
+    return { results: unreachableNodes(root) };
+  },
+  forgotten(root) {
+    return { results: forgottenCharacters(root) };
+  },
 };
 
 const NUMBER_RE = /^-?\d+(\.\d+)?$/;
@@ -32,6 +54,9 @@ class QueryError extends Error {}
  */
 export function runQuery(root, name, args = []) {
   const argList = [...args];
+  if (name === 'encounters') {
+    return { query: name, args: argList, error: 'encounters is run by runEncounters (encounters.mjs), not runQuery' };
+  }
   if (!Object.hasOwn(QUERIES, name)) {
     return { query: name, args: argList, error: `unknown query "${name}". ${USAGE}` };
   }
@@ -41,6 +66,9 @@ export function runQuery(root, name, args = []) {
   }
 
   try {
+    if (Object.hasOwn(ROOT_HANDLERS, name)) {
+      return { query: name, args: argList, ...ROOT_HANDLERS[name](root) };
+    }
     const index = buildWorldIndex(root);
     const results = HANDLERS[name](index, ...argList);
     return { query: name, args: argList, results };

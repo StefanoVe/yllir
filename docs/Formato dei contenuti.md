@@ -203,6 +203,7 @@ Trama/
 - `location` è facoltativo e indica il luogo principale della scena o dell'evento.
 - `characters` (**Proposta**, 2026-11-09) è facoltativo nei file evento di trama: elenca gli `id` dei personaggi che l'evento nomina e fa agire o parlare, ciascuno con la sua scheda (vedi 2.6). Un evento che non nomina personaggi dichiara `[]` oppure non scrive il campo. Ogni `id` deve essere una scheda di personaggio (`npc`, `vendor`, `enemy` o `creature`).
 - `appearances` (**Deciso**, 2026-11-10) è facoltativo nei file evento: elenca solo le presenze geografiche esplicitamente stabilite dal testo della scena, nella forma `- subject: ID` / `location: [PLACE_IDS]`. Non si inferisce la presenza da `characters`, `items`, link, nomi o menzioni. Ogni soggetto e luogo deve avere una scheda.
+- `enemies` (**Deciso (2026-11-14)**) è facoltativo nei file evento e dichiara uno scontro. È una lista di voci, ciascuna con due chiavi: `id`, che deve essere una scheda di nemico, creatura, PNG o venditore (`template` `enemy`, `creature`, `npc` o `vendor`), e `count`, un numero intero positivo. Lo stesso `id` compare una sola volta. Un evento senza scontro non scrive il campo. Il bilanciamento degli incontri legge questo campo (vedi [Skill di libreria](Skill%20di%20libreria.md#l15-bilanciamento-degli-incontri)).
 
 ```yaml
 <!-- yllir
@@ -235,6 +236,23 @@ characters: [ilde-varno, bruno-tesi]
 appearances:
   - subject: ilde-varno
     location: [porto-di-selce]
+-->
+```
+
+Un evento con uno scontro dichiara i nemici in `enemies` (esempio fittizio):
+
+```yaml
+<!-- yllir
+id: il-faro-spento-02-ponte
+session: il-faro-spento-02
+depends_on: [il-faro-spento-02-arrivo]
+location: [porto-di-selce]
+characters: [ilde-varno]
+enemies:
+  - id: guardiano-di-sale
+    count: 3
+  - id: capo-dei-predoni
+    count: 1
 -->
 ```
 
@@ -490,7 +508,9 @@ Per una campagna in inglese, le intestazioni delle colonne sono `Characteristic`
 **Modello:** il modello del PNG (4.2), con `template: vendor` e in più le sezioni che seguono. Un venditore non ha un modello separato: la sezione `## Assortimento` e il valore `template: vendor` lo rendono tale.
 **Obbligatorie aggiuntive:** `## Assortimento`, tabella con colonne `Oggetto`, `Prezzo`, `Nota`.
 **Facoltative aggiuntive, in ordine:** `## Trattare`, con il modo di contrattare, in prosa pubblica; `## Deroghe`, obbligatoria se un prezzo esce dagli intervalli.
-**Regole dei prezzi:** ogni prezzo è espresso nell'unità del documento di economia (vedi 4.9) e cade nell'intervallo del suo oggetto o nella variazione del luogo. Una deroga è sempre dichiarata con il motivo nella sezione `## Deroghe`.
+**Regole dei prezzi:** ogni prezzo è espresso in una valuta del documento di economia (vedi 4.9) e cade nell'intervallo del suo oggetto, moltiplicato per il fattore del luogo del venditore. Una deroga è sempre dichiarata con il motivo nella sezione `## Deroghe`.
+
+**Forma del prezzo (Deciso (2026-11-14)):** `<numero> <valuta>`, con una delle forme della valuta (`2 scudi`, `0.5 scudo l'uno`); più importi si uniscono con `e` (`1 corona e 5 scudi`); il testo fra parentesi non si conta. Una cella senza cifre non è un prezzo numerico e non si controlla.
 
 ```markdown
 ## Assortimento
@@ -555,7 +575,7 @@ Non contiene segreti.
 
 **Categoria:** `Oggetti/`: un annuncio è un oggetto (la carta appesa alla bacheca) con `template: notice`. Nessuna categoria in più (YAGNI).
 **Metadati:** `id`; `template: notice`; `location`, con il solo luogo della bacheca; `print` se l'annuncio ha una carta.
-**Obbligatorie, in ordine:** titolo; `## Testo`, il testo dell'annuncio come è affisso; `## Premio`, con la ricompensa in unità del documento di economia, oppure «Nessun premio».
+**Obbligatorie, in ordine:** titolo; `## Testo`, il testo dell'annuncio come è affisso; `## Premio`, con la ricompensa nella forma dei prezzi (vedi 4.4), oppure «Nessun premio».
 **Facoltative, in ordine:** immagine di carta sotto il titolo; `## Indizi`, ciò che il lettore può ricavare dall'annuncio.
 **Blocco riservato:** `### Indicazioni per il master`, con il committente vero, le condizioni nascoste e l'esito reale.
 
@@ -610,16 +630,19 @@ Il patto è stato rotto da tre generazioni, ma nessuno lo ha ancora detto ad alt
 ### 4.8 Personaggio giocante
 
 **Categoria:** file `Giocatori/<Nome>.md`, tipo `master-only`. È una scheda per personaggio, non una cartella. Gli originali (PDF, foto, testo) stanno in `Fonti/`.
-**Metadati:** `id`.
-**Obbligatorie, in ordine:** titolo; `## Scheda`, con i dati trascritti del personaggio nei campi dell'adattatore; `## Integrazione con la trama`, con ganci, segreti innestabili e rimandi alle sessioni.
+**Metadati:** `id`; `level`, facoltativo: livello del personaggio (intero positivo), usato dal bilanciamento degli incontri. Classe e altre meccaniche restano in `## Scheda`.
+**Obbligatorie, in ordine:** titolo; `## Scheda`, con i dati trascritti del personaggio nei campi dell'adattatore; `## Integrazione con la trama`, con i ganci nella forma che segue e i rimandi alle sessioni.
 **Facoltative, in ordine:** `## Background`, come lo scrive il giocatore; `## Domande aperte`, da porre al giocatore; `## Originali`, con i link ai file in `Fonti/`.
 **Blocco riservato:** non si usa. L'intero file è riservato, e nessuna scheda pubblica linka questa categoria.
+
+**Forma di un gancio (Deciso (2026-11-14)).** Ogni gancio è una sottosezione `### <nome breve>` con quattro voci elenco, in quest'ordine: `- Gancio:`, `- Innesco:`, `- Posta:` e `- Stato: pronto` oppure `- Stato: da proporre`. Dopo le quattro voci un gancio può avere altre voci elenco, per esempio `- Sessioni: [...]`. Il controllo verifica che le quattro voci siano presenti e non vuote, e che lo stato sia uno dei due valori.
 
 Un'integrazione che propone canone resta una proposta finché il master non la conferma. Il personaggio giocante non definisce l'identità di altri soggetti: quella sta nelle loro schede.
 
 ```markdown
 <!-- yllir
 id: pietro-sala
+level: 3
 -->
 
 # Pietro Sala
@@ -630,8 +653,19 @@ Mestiere: pilota di chiatte. Forza di volontà alta, forza fisica media.
 
 ## Integrazione con la trama
 
+### Il padre al faro
+
 - Gancio: il padre di Pietro lavorava al faro, e conosce il custode.
-- Segreto innestabile: un debito con il Patto del faro.
+- Innesco: Pietro passa dal faro durante la prima sessione.
+- Posta: la verità sul padre cambia il destino di Pietro.
+- Stato: pronto
+
+### Debito con il Patto
+
+- Gancio: un debito con il Patto del faro.
+- Innesco: il Patto chiede il pagamento al porto.
+- Posta: Pietro perde la chiatta o il nome.
+- Stato: da proporre
 
 ## Domande aperte
 
@@ -640,13 +674,22 @@ Mestiere: pilota di chiatte. Forza di volontà alta, forza fisica media.
 
 ### 4.9 Documento di economia
 
-**File:** `Storia/Economia.md`, unico nella campagna, con percorso fisso. Nasce la prima volta che serve un prezzo, un salario o una ricompensa, non all'intervista di creazione.
+**File:** `Storia/Economia.md`, unico nella campagna, con percorso fisso. **Deciso (2026-11-14):** nasce quando il master risponde alla domanda sull'economia, all'intervista iniziale o nella migrazione `economy-v1`. Se risponde «più tardi», la domanda torna la prima volta che un documento ha bisogno di un prezzo, un salario o una ricompensa.
 **Metadati:** `id: economia`.
 **Obbligatorie, in ordine:** titolo; `## Valute`, tabella con colonne `Valuta`, `Equivalenza`, `Nota`; `## Prezzi base`, tabella con colonne `Categoria`, `Minimo`, `Massimo`, `Unità`; `## Salari`, tabella con colonne `Mestiere`, `Paga`, `Periodo`; `## Variazioni per luogo`, tabella con colonne `Luogo`, `Fattore`, `Motivo`, dove `Luogo` è un `id`.
 **Facoltative, in ordine:** `## Deroghe in vigore`, con luogo, periodo e motivo di ogni deroga; `## Da definire`.
 **Blocco riservato:** `### Indicazioni per il master`, con le cause che tengono i prezzi a quei livelli.
 
 I numeri usano il punto come separatore decimale, così il controllo dei prezzi è sicuro.
+
+**Forme delle valute (Deciso (2026-11-14)):**
+
+- Più valute sono ammesse. Una riga per valuta. La cella della valuta può elencare più forme separate da ` / ` (`scudo / scudi`); la prima è il nome.
+- La colonna `Equivalenza` dice `unità di conto` in una sola riga: è l'unità di riferimento del mondo. Ogni altra riga dice `<numero> <valuta>`: una unità di questa valuta vale quel numero di unità della valuta indicata. Sono ammesse catene (una valuta che vale un'altra valuta non di conto): il controllo le riporta all'unità di conto. Non sono ammessi cicli.
+- `Minimo` e `Massimo` sono numeri semplici, nella valuta indicata dalla colonna `Unità`.
+- `Fattore` è un numero positivo; moltiplica l'intervallo dei venditori del luogo.
+- Le tabelle vuote, con solo intestazione e separatore, sono valide.
+- Il cibo di riferimento della domanda iniziale è una riga di `Prezzi base`, con `Minimo` e `Massimo` uguali al prezzo dato dal master: `Razione (un giorno)` con l'adattatore D&D 2024, `Pasto semplice` senza adattatore.
 
 ```markdown
 <!-- yllir
@@ -660,6 +703,7 @@ id: economia
 | Valuta | Equivalenza | Nota |
 | --- | --- | --- |
 | scudo | unità di conto | moneta del porto |
+| corona / corone | 10 scudi | una corona vale dieci scudi |
 
 ## Prezzi base
 
@@ -808,11 +852,11 @@ Nei documenti di `Trama/` il controllo sui blocchi con tre backtick non si appli
 | Nemico | blocco statistiche conforme allo schema dell'adattatore; `location` presente (anche `[]`); titoli riservati solo nel blocco | se la lore e le regole sono scritte nel registro giusto |
 | Venditore | colonne della tabella; prezzi nell'unità e negli intervalli, o deroga con motivo; oggetti linkati esistenti | se un prezzo è coerente con il tipo di merce |
 | Oggetto | `print` solo con carta; immagine di carta e sorgente `.psd` presenti; `## Effetti` presente; carta marcata da rigenerare se il titolo cambia | se la descrizione è ciò che il personaggio può sapere |
-| Annuncio | `## Premio` presente o dichiarato assente; premio negli intervalli di economia; `location` esistente | se il testo sembra un avviso credibile nel luogo |
+| Annuncio | `## Premio` presente o dichiarato assente; premio scritto `<numero> <valuta>` con una valuta del documento di economia (nessun intervallo: i premi non hanno categoria. Scelta di implementazione (0.61.0), da confermare dall'autore); `location` esistente | se il testo sembra un avviso credibile nel luogo |
 | Concetto di storia | sezioni obbligatorie; nessuna sezione di tipo personaggio | coerenza con il canone e con le altre voci di `Storia/` |
-| Personaggio giocante | sezioni obbligatorie; nessun link pubblico verso `Giocatori/` | se l'integrazione propone canone che va confermato |
-| Economia | tabelle con colonne fisse; `Minimo` ≤ `Massimo`; `Luogo` esistenti; valuta usata dalle schede esiste nel documento | se il sistema di prezzi regge la campagna |
-| Sessione | `id` unico; `depends_on` esistenti e senza cicli; file principale coerente con la cartella `Eventi/`; ogni evento con `session` corretta; prove con titolo nel formato dell'adattatore; ogni `id` in `characters` esiste ed è una scheda di personaggio | l'ordine narrativo, la coerenza delle scene e la fedeltà della mappa agli eventi; ogni personaggio nominato che agisce o parla è in `characters`; il testo non definisce né cambia l'identità di un personaggio |
+| Personaggio giocante | sezioni obbligatorie e ordine; ogni aggancio con le quattro voci e uno stato valido; `level`, se presente, intero positivo; nessun blocco riservato; nessun link pubblico verso `Giocatori/` | se l'integrazione propone canone che va confermato |
+| Economia | tabelle con colonne fisse; `Minimo` ≤ `Massimo`, numeri semplici; una sola riga `unità di conto`; equivalenze `<numero> <valuta>` senza cicli; `Luogo` esistenti e `Fattore` positivo; `Unità` dei prezzi base valuta nota; valuta usata dalle schede esiste nel documento | se il sistema di prezzi regge la campagna |
+| Sessione | `id` unico; `depends_on` esistenti e senza cicli; file principale coerente con la cartella `Eventi/`; ogni evento con `session` corretta; prove con titolo nel formato dell'adattatore; ogni `id` in `characters` esiste ed è una scheda di personaggio; `enemies`, se presente, ha `id` di schede di creatura esistenti, `count` intero positivo e ogni `id` una sola volta | l'ordine narrativo, la coerenza delle scene e la fedeltà della mappa agli eventi; ogni personaggio nominato che agisce o parla è in `characters`; il testo non definisce né cambia l'identità di un personaggio |
 | Cronaca | nome del file uguale alla data nel `id` | fedeltà al registro di sessione |
 
 ## 6. Scelte chiarite
@@ -831,7 +875,7 @@ Nei documenti di `Trama/` il controllo sui blocchi con tre backtick non si appli
 - **Diramazioni.** [Principi](Principi.md), punto 15, copre solo i prerequisiti. La mappa della trama potrebbe aver bisogno di dichiarare anche le uscite (scelte e diramazioni). Non è deciso se servono altri campi o se la mappa le ricava dal testo, che sarebbe una seconda fonte di verità.
 - **Modello del venditore.** Il venditore è un PNG con una sezione in più e un valore di `template`, non un tipo separato. Va confermato, perché un modello separato sarebbe più leggibile per i tavoli con molti negozi.
 - **Formato del registro `mixed`.** La configurazione ammette `mixed`, ma non è definito quando un testo sia misto né come lo verifica il validatore. Va definito o tolto.
-- **Economia e unità.** Non è deciso se le unità di conto vadano sempre nei metadati o solo nella tabella, né quanto possa essere largo l'intervallo di un prezzo.
+- **Economia e unità.** **In parte risposta (Deciso (2026-11-14)):** le unità di conto stanno nella tabella `Valute` (la riga `unità di conto`), non nei metadati. Resta aperto quanto possa essere largo l'intervallo di un prezzo.
 - **Sotto-luoghi.** L'elenco dei sotto-luoghi è derivato dalle cartelle. Non è deciso dove vada scritto per il master (in una vista derivata o non va scritto del tutto).
 - **Criterio di ramo (Proposta, 2026-11-09).** Il criterio per riconoscere una biforcazione o un rientro (2.9) è giudicato dall'agente e non è deterministico. Va verificato sui casi reali e, se serve, reso più esplicito nelle regole di 2.9.
 - **Campo `characters` (Proposta, 2026-11-09).** Non è deciso se dichiarare i personaggi di un evento con il campo `characters` sia il modo giusto, o se vadano ricavati dai link nel testo. Il campo e il testo sarebbero due fonti di verità da tenere allineate: il rischio va verificato su casi reali. La lista dei nomi con la maiuscola non elencati in `characters` è un'euristica informativa, non un controllo deterministico completo.

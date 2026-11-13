@@ -6,8 +6,8 @@
 //   - dashes form (read only, for older campaigns): YAML frontmatter between
 //     two `---` lines.
 // The lines in between are the same YAML-like content in both forms: `key: value`
-// scalars, flow lists `[a, b]`, plus block YAML for the structured `appearances`
-// and `relations` fields. Other keys retain string semantics.
+// scalars, flow lists `[a, b]`, plus block YAML for the structured `appearances`,
+// `relations` and `enemies` fields. Other keys retain string semantics.
 
 import { parseYamlLite } from './yaml-lite.mjs';
 
@@ -16,7 +16,7 @@ export const METADATA_CLOSE = '-->';
 
 const DASHES = '---';
 const KEY_LINE = /^([a-z][a-z0-9_]*):(?: (.*)|)$/;
-const BLOCK_KEYS = ['appearances', 'relations'];
+const BLOCK_KEYS = ['appearances', 'relations', 'enemies'];
 
 function stripCr(raw) {
   return raw.endsWith('\r') ? raw.slice(0, -1) : raw;

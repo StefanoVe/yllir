@@ -131,7 +131,21 @@ The engine regenerates the main file from the event files at every commit. It ho
 ### 2.2 Event files
 
 - The file name is the event's name. There is no `#` title; the text starts at once.
-- Metadata block: `id`, `session` (the id of its session), `depends_on` (required; `[]` when none), and optionally `location`, `characters`, `items`, `appearances`.
+- Metadata block: `id`, `session` (the id of its session), `depends_on` (required; `[]` when none), and optionally `location`, `characters`, `items`, `appearances`, `enemies`.
+- `enemies`: only on an event with a fight. A block list, each entry with exactly the keys `id` and `count`:
+
+  ```yaml
+  enemies:
+    - id: guardiano-di-sale
+      count: 3
+    - id: capo-dei-predoni
+      count: 1
+  ```
+
+  - `id`: an existing subject whose sheet has the template `enemy`, `creature`, `npc` or `vendor`.
+  - `count`: a positive integer.
+  - The same `id` appears only once in the list.
+  - An event with no fight has no `enemies` key.
 - `characters`: the characters the event names and makes act or speak; each must have a sheet. `items`: relevant items used in the event, when they have value, effects, secrets or a plot role; each id must have an item sheet.
 - `appearances`: a list of `subject` and `location` pairs (`subject: <id>`, `location: [<place ids>]`), only for presences the text states. Presence is never inferred from `characters`, `items`, names or mentions.
 - `##` is a minor action inside the event.
@@ -232,7 +246,8 @@ For `npc`, `vendor` and `enemy` the table `### Attacchi e capacità` (English: `
 - The character sheet (4.2) with `template: vendor` and the sections below.
 - Required in addition: `## Assortimento` (English: `## Stock`), whose first table has the columns `Oggetto`, `Prezzo`, `Nota` (English: `Item`, `Price`, `Note`), in this order.
 - Optional, in order after the stock: `## Trattare` (English: `## Haggling`); `## Deroghe` (English: `## Exceptions`), required when a price leaves the economy ranges, with the reason.
-- Prices use the unit of the economy document (4.11).
+- Prices are written as `<number> <currency>`, in a currency of the economy document (4.11), for example `2 scudi`.
+- A price outside the range of its category (4.11, with the factor of the vendor's place) needs the item named in `## Deroghe` (English `## Exceptions`), with the reason, as one line `- <item name>: <reason>`.
 
 Validated: the stock columns and order, and the required sections.
 
@@ -267,7 +282,7 @@ Validated: exactly one public level-1 title; `In breve`, `Descrizione`, `Effetti
 ### 4.7 Notice (`template: notice`)
 
 - Category: `Oggetti/`: a notice is an item, the sheet of the paper pinned to a board. Metadata block: `id`, `kind: item`, `template: notice`, `provenance`, `location` (the board's place only).
-- Required, in order: the title; `## Testo` (English: `## Text`), the text as posted; `## Premio` (English: `## Reward`), in economy units, or `Nessun premio` (English: `No reward`).
+- Required, in order: the title; `## Testo` (English: `## Text`), the text as posted; `## Premio` (English: `## Reward`), written as `<number> <currency>` in a currency of the economy document (4.11), for example `10 scudi`, or `Nessun premio` (English: `No reward`).
 - Optional: `## Indizi` (English: `## Clues`) after the title's image.
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), with the real client and hidden conditions.
 
@@ -297,9 +312,61 @@ Validated by the world graph: `when` is a number, `participants` and `location` 
 
 ### 4.11 Economy document
 
-- File `Storia/Economia.md`, one per campaign. Metadata block: `id: economia`.
+- File `Storia/Economia.md` (English `History/Economy.md`), one per campaign; find it by `id: economia`. Metadata block: `id: economia`, `provenance`.
 - Required, in order: the title; `## Valute` (English: `## Currencies`): `Valuta`, `Equivalenza`, `Nota`; `## Prezzi base` (English: `## Base prices`): `Categoria`, `Minimo`, `Massimo`, `Unità`; `## Salari` (English: `## Wages`): `Mestiere`, `Paga`, `Periodo`; `## Variazioni per luogo` (English: `## Variations by place`): `Luogo` (an id), `Fattore`, `Motivo`.
-- Optional: `## Deroghe in vigore` (English: `## Exceptions in force`); `## Da definire`. Numbers use a dot as decimal separator.
+- Optional: `## Deroghe in vigore` (English: `## Exceptions in force`); `## Da definire` (English: `## To define`). Then the master block: `### Indicazioni per il master` (English: `### Master notes`), with one line that says where the prices come from.
+- A table may hold only its header and separator rows (no data rows): that is valid.
+- Numbers use a dot as decimal separator.
+- **Currency (`Valuta`).** One currency per row. The cell lists its written forms separated by ` / `; the first form is the name, for example `scudo / scudi`.
+- **Equivalence (`Equivalenza`).** Exactly one row says `unità di conto` (English `unit of account`): that currency is the reference unit. Every other row says `<number> <currency form>`, meaning one unit of this currency is worth that many of the named one: `10 scudi` on the row `corona / corone`. Chains are allowed and are resolved to the reference unit.
+- **`Minimo` and `Massimo` (`Prezzi base`).** Plain numbers, never `<number> <currency>`, with `.` as decimal separator (`1`, `0.5`). Their currency is the one named in the `Unità` cell of the same row.
+- **Price text (`Paga`, and every price or reward in other documents).** `<number> <currency>`, for example `2 scudi` or `0.5 scudo l'uno`. A sum joins its pairs with `e` (English `and`): `1 corona e 5 scudi`. Text in parentheses is ignored.
+- **`Unità` (`Prezzi base`).** The name of a currency of `## Valute`.
+- **Place factor (`Fattore`).** A positive number. It multiplies the price range of the vendors whose place is that `Luogo`, or whose nearest place above it has a row (4.4).
+
+Example with two currencies:
+
+```markdown
+<!-- yllir
+id: economia
+provenance: master
+-->
+
+# Economia
+
+## Valute
+
+| Valuta | Equivalenza | Nota |
+| --- | --- | --- |
+| scudo / scudi | unità di conto | moneta del regno |
+| corona / corone | 10 scudi | moneta del nord |
+
+## Prezzi base
+
+| Categoria | Minimo | Massimo | Unità |
+| --- | --- | --- | --- |
+| Corda | 1 | 3 | scudo |
+
+## Salari
+
+| Mestiere | Paga | Periodo |
+| --- | --- | --- |
+| Guardia | 2 scudi | giorno |
+
+## Variazioni per luogo
+
+| Luogo | Fattore | Motivo |
+| --- | --- | --- |
+| costa-di-selce | 1.5 | porto, merci importate |
+
+<!-- master -->
+## Master
+
+### Indicazioni per il master
+
+I prezzi vengono dal regno; le corone sono monete del nord.
+<!-- /master -->
+```
 
 ### 4.12 Sketch (`sketch: true`)
 
@@ -310,7 +377,28 @@ Validated by the world graph: `when` is a number, `participants` and `location` 
 
 ### 4.13 Player character (`master-only`)
 
-- Category: `Giocatori/`, one file per character; the whole file is master-only. Metadata block: `id`. Required: the title, `## Scheda` (English: `## Sheet`), `## Integrazione con la trama` (English: `## Plot integration`). Optional: `## Background`, `## Domande aperte` (English: `## Open questions`), `## Originali` (English: `## Originals`). No master block: the whole file is private.
+- Category: `Giocatori/` (English `Players/`), one file per character; the whole file is master-only. Metadata block: `id`, `kind: character`, no `template`, and optionally `level: <positive integer>`: the character level, as the player's sheet states it, used by encounter balancing. Class and every other mechanic stay in `## Scheda`.
+- Required: the title, `## Scheda` (English: `## Sheet`), `## Integrazione con la trama` (English: `## Plot integration`). Optional, in this order: `## Background`, `## Domande aperte` (English: `## Open questions`), `## Originali` (English: `## Originals`). No other `##` heading. No master block: the whole file is private.
+- `## Integrazione con la trama` holds the hooks. Each hook is one `###` heading with a short name, followed by exactly these four list items, in this order, with the labels of the language of the campaign:
+
+  ```markdown
+  ### Il registro del faro
+  - Gancio: il registro del faro è sparito la notte del naufragio.
+  - Innesco: il gruppo entra nel faro.
+  - Posta: Ilde scopre che il padre ha firmato il registro.
+  - Stato: da proporre
+  ```
+
+  | Item (it / en) | Meaning |
+  | --- | --- |
+  | `- Gancio:` / `- Hook:` | the link to the story, with non-empty text |
+  | `- Innesco:` / `- Trigger:` | what makes the hook start, with non-empty text |
+  | `- Posta:` / `- Stakes:` | what is at risk, with non-empty text |
+  | `- Stato: pronto` or `- Stato: da proporre` / `- Status: ready` or `- Status: to propose` | the only two allowed values |
+
+  A hook may add more list items after the four (for example `- Sessioni: [...]`).
+- A hook that would add a fact to the canon is `da proporre` / `to propose` until the master says yes; then it becomes `pronto` / `ready`.
+- The file never links to the master block of another document. No public document links to a player character file.
 
 ## 5. Seed of the world
 

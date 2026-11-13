@@ -290,3 +290,127 @@ test('the same campaign gives identical results on repeated calls', (t) => {
     assert.deepEqual(runQuery(root, args[0], args[1]), runQuery(root, args[0], args[1]));
   }
 });
+
+const ECONOMY = page(
+  ['id: economia', 'provenance: master'],
+  [
+    '# Economia',
+    '',
+    '## Valute',
+    '',
+    '| Valuta | Equivalenza | Nota |',
+    '| --- | --- | --- |',
+    '| scudo / scudi | unità di conto | moneta comune |',
+    '',
+    '## Prezzi base',
+    '',
+    '| Categoria | Minimo | Massimo | Unità |',
+    '| --- | --- | --- | --- |',
+    '| Corda | 1 | 3 | scudi |',
+    '',
+    '## Salari',
+    '',
+    '| Mestiere | Paga | Periodo |',
+    '| --- | --- | --- |',
+    '',
+    '## Variazioni per luogo',
+    '',
+    '| Luogo | Fattore | Motivo |',
+    '| --- | --- | --- |',
+    '',
+  ].join('\n'),
+);
+
+const BOTTEGA = page(
+  ['id: bottega-sale', 'template: vendor', 'kind: character', 'provenance: master', 'location: [borgo-cenere]'],
+  [
+    '# Bottega del Sale',
+    '',
+    '## Assortimento',
+    '',
+    '| Oggetto | Prezzo | Nota |',
+    '| --- | --- | --- |',
+    '| Corda di canapa | 10 scudi | dieci braccia |',
+    '| Corda di crine | 2 scudi | leggera |',
+    '| Sale grosso | 5 scudi | sacco |',
+    '',
+  ].join('\n'),
+);
+
+test('prices lists the out-of-range and unmatched rows, next to the economy state', (t) => {
+  const root = makeCampaign(t, { 'Storia/Economia.md': ECONOMY, 'Personaggi/Bottega.md': BOTTEGA });
+  const result = runQuery(root, 'prices');
+  assert.equal(result.error, undefined);
+  assert.equal(result.economy, 'present');
+  assert.deepEqual(result.results, [
+    {
+      file: 'Personaggi/Bottega.md',
+      id: 'bottega-sale',
+      item: 'Corda di canapa',
+      price: 10,
+      status: 'out-of-range',
+      range: [1, 3],
+      unit: 'scudo',
+    },
+    {
+      file: 'Personaggi/Bottega.md',
+      id: 'bottega-sale',
+      item: 'Sale grosso',
+      price: 5,
+      status: 'unmatched',
+      range: null,
+      unit: 'scudo',
+    },
+  ]);
+});
+
+test('prices without an economy document gives economy missing and no results', (t) => {
+  const result = runQuery(makeCampaign(t, { 'Personaggi/Bottega.md': BOTTEGA }), 'prices');
+  assert.deepEqual(result, { query: 'prices', args: [], economy: 'missing', results: [] });
+});
+
+test('prices takes no arguments', (t) => {
+  assert.equal(typeof runQuery(makeCampaign(t), 'prices', ['x']).error, 'string');
+});
+
+test('unreachable lists a plot node whose dependency does not exist', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/Sessione 1/Eventi/Perduto.md': page(
+      ['id: sessione-1-perduto', 'session: sessione-1', 'provenance: played', 'depends_on: [evento-mai-esistito]'],
+      '# Perduto\n\nUn evento che non può accadere.\n',
+    ),
+  });
+  const result = runQuery(root, 'unreachable');
+  assert.equal(result.error, undefined);
+  assert.deepEqual(result.results, [
+    {
+      id: 'sessione-1-perduto',
+      file: 'Trama/Sessione 1/Eventi/Perduto.md',
+      kind: 'event',
+      reason: 'missing-dependency',
+      via: ['evento-mai-esistito'],
+    },
+  ]);
+});
+
+test('unreachable of a campaign with a reachable plot is empty', (t) => {
+  assert.deepEqual(runQuery(makeCampaign(t), 'unreachable').results, []);
+});
+
+test('forgotten lists a character that no plot or chronicle document mentions', (t) => {
+  const result = runQuery(makeCampaign(t), 'forgotten');
+  assert.equal(result.error, undefined);
+  const ids = result.results.map((entry) => entry.id);
+  assert.equal(ids.includes('oria-schizzo'), true, JSON.stringify(result.results));
+  assert.equal(ids.includes('lino-valdes'), false);
+  const schizzo = result.results.find((entry) => entry.id === 'oria-schizzo');
+  assert.equal(schizzo.sketch, true);
+  assert.equal(schizzo.file, 'Personaggi/schizzo.md');
+});
+
+test('usage names the three new queries and encounters', (t) => {
+  const result = runQuery(makeCampaign(t), 'nosuch');
+  for (const name of ['prices', 'unreachable', 'forgotten', 'encounters']) {
+    assert.equal(result.error.includes(name), true, `usage must name ${name}`);
+  }
+});

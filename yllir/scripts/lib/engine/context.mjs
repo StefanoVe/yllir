@@ -10,6 +10,7 @@ import { parseFrontmatter } from '../frontmatter.mjs';
 import { parseYamlLite } from '../yaml-lite.mjs';
 import { analyzeMarkdown } from '../zones.mjs';
 import { compareStrings } from '../subjects.mjs';
+import { findEconomyDocument } from '../economy/economy.mjs';
 
 const SUMMARY_LIMIT = 300;
 const MASTER_MARK = '<!-- master -->';
@@ -135,6 +136,7 @@ export function buildContext(root, { subjects = [], place = null, session = null
     truncated,
     errors,
     session: sessionOut,
+    economy: findEconomyDocument(root),
   };
 }
 

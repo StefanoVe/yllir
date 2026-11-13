@@ -48,7 +48,27 @@ export function loadAdapter(pluginRoot, id) {
   if (isMapping(parsed.data) && checksFileProblem(parsed.data.checks, folder) === null && parsed.data.checks !== undefined) {
     parsed.data.checksPath = path.join(folder, parsed.data.checks);
   }
+  if (isMapping(parsed.data) && isMapping(parsed.data.difficulty)) {
+    const { difficulty } = parsed.data;
+    if (moduleFileProblem(difficulty.ops, folder) === null && difficulty.ops !== undefined) {
+      parsed.data.difficultyOpsPath = path.join(folder, difficulty.ops);
+    }
+    difficulty.budget_per_character = keyedRows(difficulty.budget_per_character, (row) => [String(row[0]), { low: row[1], moderate: row[2], high: row[3] }]);
+    difficulty.cr_xp = keyedRows(difficulty.cr_xp, (row) => [row[0], row[1]]);
+  }
   return result(parsed.data, errors);
+}
+
+// Rows that passed validation become an object keyed by their first cell; invalid rows are skipped (already reported).
+function keyedRows(rows, toEntry) {
+  if (!Array.isArray(rows)) return rows;
+  const out = {};
+  for (const row of rows) {
+    if (!Array.isArray(row) || row.length === 0) continue;
+    const [key, value] = toEntry(row);
+    if (!Object.hasOwn(out, key)) out[key] = value;
+  }
+  return out;
 }
 
 function manifests(pluginRoot) {
@@ -85,11 +105,88 @@ function checksFileProblem(name, folder) {
   return { code: 'missing-file', message: `checks file ${name} is not in the adapter folder` };
 }
 
+// Returns null when a module file name (difficulty.ops) is absent or valid, otherwise the problem.
+function moduleFileProblem(name, folder) {
+  if (name === undefined) return null;
+  if (typeof name !== 'string' || !name.endsWith('.mjs') || name.length <= '.mjs'.length || /[/\\]/.test(name) || name.includes('..')) {
+    return { code: 'bad-value', message: 'ops must be a file name ending in .mjs, without folders' };
+  }
+  try {
+    if (fs.statSync(path.join(folder, name)).isFile()) return null;
+  } catch { /* reported below */ }
+  return { code: 'missing-file', message: `ops file ${name} is not in the adapter folder` };
+}
+
+const BUDGET_KEYS = ['low', 'moderate', 'high'];
+
+// difficulty.budget_per_character: rows [level 1-20, low, moderate, high]; difficulty.cr_xp: rows [cr text, xp].
+function validateDifficulty(difficulty, folder, error) {
+  if (!isMapping(difficulty)) { error('bad-type', 'difficulty', 'difficulty must be a mapping'); return; }
+  for (const key of Object.keys(difficulty)) {
+    if (!['method', 'bands', 'ops', 'budget_per_character', 'cr_xp'].includes(key)) error('unknown-key', `difficulty.${key}`, `"${key}" is not a setting of difficulty`);
+  }
+  const opsProblem = moduleFileProblem(difficulty.ops, folder);
+  if (opsProblem) error(opsProblem.code, 'difficulty.ops', opsProblem.message);
+  if (difficulty.budget_per_character !== undefined) {
+    const at = 'difficulty.budget_per_character';
+    if (!Array.isArray(difficulty.budget_per_character)) {
+      error('bad-type', at, `${at} must be a list of [level, low, moderate, high]`);
+    } else {
+      const levels = new Set();
+      difficulty.budget_per_character.forEach((row, index) => {
+        const where = `${at}[${index}]`;
+        if (!Array.isArray(row) || row.length !== 4) { error('bad-value', where, `${where} must be [level, low, moderate, high]`); return; }
+        const [level, ...values] = row;
+        if (!Number.isInteger(level) || level < 1 || level > 20) error('bad-value', where, `${where} level must be a whole number from 1 to 20`);
+        else if (levels.has(level)) error('bad-value', where, `level ${level} is listed twice`);
+        levels.add(level);
+        values.forEach((value, offset) => {
+          if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) error('bad-value', where, `${where} ${BUDGET_KEYS[offset]} must be a number of zero or more`);
+        });
+      });
+    }
+  }
+  if (difficulty.cr_xp !== undefined) {
+    const at = 'difficulty.cr_xp';
+    if (!Array.isArray(difficulty.cr_xp)) {
+      error('bad-type', at, `${at} must be a list of [challenge rating, xp]`);
+    } else {
+      const ratings = new Set();
+      difficulty.cr_xp.forEach((row, index) => {
+        const where = `${at}[${index}]`;
+        if (!Array.isArray(row) || row.length !== 2) { error('bad-value', where, `${where} must be [challenge rating, xp]`); return; }
+        const [rating, xp] = row;
+        if (typeof rating !== 'string' || rating.trim() === '') error('bad-value', where, `${where} challenge rating must be nonempty text`);
+        else if (ratings.has(rating)) error('bad-value', where, `challenge rating ${rating} is listed twice`);
+        if (typeof rating === 'string') ratings.add(rating);
+        if (typeof xp !== 'number' || !Number.isFinite(xp) || xp <= 0) error('bad-value', where, `${where} xp must be a positive number`);
+      });
+    }
+  }
+}
+
+// economy.reference_item: a mapping of language to nonempty text, with it and en required.
+function validateEconomy(economy, error) {
+  if (!isMapping(economy)) { error('bad-type', 'economy', 'economy must be a mapping'); return; }
+  for (const key of Object.keys(economy)) {
+    if (key !== 'reference_item') error('unknown-key', `economy.${key}`, `"${key}" is not a setting of economy`);
+  }
+  if (economy.reference_item === undefined) return;
+  const item = economy.reference_item;
+  if (!isMapping(item)) { error('bad-type', 'economy.reference_item', 'economy.reference_item must be a mapping'); return; }
+  for (const language of ['it', 'en']) {
+    if (item[language] === undefined) error('bad-value', `economy.reference_item.${language}`, `economy.reference_item.${language} is required`);
+  }
+  for (const [language, text] of Object.entries(item)) {
+    if (typeof text !== 'string' || !text.trim()) error('bad-value', `economy.reference_item.${language}`, `economy.reference_item.${language} must be nonempty text`);
+  }
+}
+
 function validate(adapter, folderId, folder) {
   const errors = [];
   const error = (code, field, message) => errors.push({ code, path: field, message });
   if (!isMapping(adapter)) return [{ code: 'bad-type', path: '', message: 'adapter manifest must be a mapping' }];
-  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'condition_labels', 'duration_labels', 'action_table', 'action_groups', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not'];
+  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'economy', 'resources', 'conditions', 'condition_durations', 'condition_labels', 'duration_labels', 'action_table', 'action_groups', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not'];
   for (const key of Object.keys(adapter)) if (!allowed.includes(key)) error('unknown-key', key, `"${key}" is not a setting of an adapter manifest`);
   if (typeof adapter.id !== 'string' || !SLUG_RE.test(adapter.id)) error('bad-value', 'id', 'id must be a lowercase slug');
   if (adapter.id !== folderId) error('id-mismatch', 'id', `id must match the adapter folder ${folderId}`);
@@ -146,6 +243,8 @@ function validate(adapter, folderId, folder) {
   }
   const checksProblem = checksFileProblem(adapter.checks, folder);
   if (checksProblem) error(checksProblem.code, 'checks', checksProblem.message);
+  if (adapter.difficulty !== undefined) validateDifficulty(adapter.difficulty, folder, error);
+  if (adapter.economy !== undefined) validateEconomy(adapter.economy, error);
   // Optional labels for the combat tracker: every label names a condition or duration of
   // this adapter and gives its Italian and English text.
   const validLabel = (field, label) => {

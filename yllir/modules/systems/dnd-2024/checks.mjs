@@ -20,7 +20,7 @@ function inRange(value, min, max) {
 }
 
 // Returns the numeric CR, or null when the text is not a valid CR.
-function parseCr(text) {
+export function parseCr(text) {
   if (text === '0') return 0;
   if (Object.hasOwn(CR_FRACTIONS, text)) return CR_FRACTIONS[text];
   if (/^\d+$/.test(text)) {

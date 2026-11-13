@@ -90,6 +90,24 @@ Use these words when you propose or report a change of the shape of the canon.
 | Retcon (correction of an established fact) | «Correggere un fatto già stabilito» | «Correct a fact already established» |
 | Census (plan of references) | «Che cosa cambia» | «What changes» |
 
+## How hard a fight is
+
+Use these words when you tell the master how hard a fight is. Never give numbers.
+
+| Internal term (never say it) | Italian word the master sees | English word the master sees |
+|---|---|---|
+| Band trivial or low | «Facile» | «Easy» |
+| Band moderate | «Impegnativo» | «Challenging» |
+| Band high or beyond | «Molto duro» | «Very hard» |
+
+## Fixed sentence for encounter balancing
+
+Use this sentence as it is when the game system gives no rule to measure fights. It is not a failure, and nothing was changed.
+
+| Italian | English |
+|---|---|
+| Questo gioco non ha regole per misurare la difficoltà degli scontri, quindi non posso ribilanciarli. | This game has no rules to measure how hard a fight is, so I cannot rebalance them. |
+
 ## Where a document comes from
 
 Use these words when you tell the master where something comes from. They are not internal terms.

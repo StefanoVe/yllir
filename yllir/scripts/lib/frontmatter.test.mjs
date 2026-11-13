@@ -38,6 +38,8 @@ const DASHES_FIXTURES = [
   '---\r\nid: a\r\ntags: [x, y]\r\n---\r\nBody\r\n',
   '---\nid: a\n---',
   '---\n---\nx',
+  '---\nid: scontro\nenemies:\n  - id: guardiano-di-sale\n    count: 3\n  - id: capo-dei-predoni\n    count: 1\n---\nBody\n',
+  '---\nid: scontro\nenemies: []\n---\n',
 ];
 
 test('no frontmatter returns the whole text as body', () => {
@@ -84,6 +86,54 @@ test('relations accepts a block list of mappings', () => {
   });
   assert.deepEqual(result.errors, []);
   assert.equal(result.bodyStartLine, 9);
+});
+
+test('enemies accepts a block list of mappings', () => {
+  const text = [
+    '<!-- yllir',
+    'id: scontro-al-ponte',
+    'session: sessione-03',
+    'characters: [ilde-varno]',
+    'enemies:',
+    '  - id: guardiano-di-sale',
+    '    count: 3',
+    '  - id: capo-dei-predoni',
+    '    count: 1',
+    '-->',
+    'Body',
+  ].join('\n');
+  const result = parseFrontmatter(text);
+  assert.deepEqual(result.data, {
+    id: 'scontro-al-ponte',
+    session: 'sessione-03',
+    characters: ['ilde-varno'],
+    enemies: [
+      { id: 'guardiano-di-sale', count: 3 },
+      { id: 'capo-dei-predoni', count: 1 },
+    ],
+  });
+  assert.deepEqual(result.errors, []);
+  assert.equal(result.body, 'Body');
+});
+
+test('enemies flow form accepts the empty list', () => {
+  const result = parseFrontmatter('<!-- yllir\nid: evento\nenemies: []\n-->\nBody');
+  assert.deepEqual(result.data, { id: 'evento', enemies: [] });
+  assert.deepEqual(result.errors, []);
+});
+
+test('enemies block syntax reports malformed YAML with its source line', () => {
+  const result = parseFrontmatter('---\nid: a\nenemies:\n  - id: b\n    count: [x,, y]\n---\n');
+  assert.deepEqual(result.errors, [{ line: 5, message: 'empty list item' }]);
+});
+
+test('enemies block survives the comment-form conversion', () => {
+  const dashes = '---\nid: scontro\nenemies:\n  - id: guardiano-di-sale\n    count: 3\n---\nBody\n';
+  const fromDashes = parseFrontmatter(dashes);
+  const fromComment = parseFrontmatter(toComment(dashes));
+  assert.deepEqual(fromComment.data.enemies, [{ id: 'guardiano-di-sale', count: 3 }]);
+  assert.deepEqual(fromComment.data, fromDashes.data);
+  assert.deepEqual(fromComment.errors, []);
 });
 
 test('appearances and relations blocks work in the same frontmatter', () => {

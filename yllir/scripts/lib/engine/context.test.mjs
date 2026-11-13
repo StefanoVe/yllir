@@ -314,9 +314,18 @@ test('the same campaign and arguments give identical packs, whatever the order o
   assert.deepEqual(first, reordered);
 });
 
+test('the pack names the economy document, or null when the campaign has none', (t) => {
+  assert.equal(buildContext(makeCampaign(t)).economy, null);
+  const root = makeCampaign(t, {
+    'Storia/Economia.md': page(['id: economia', 'provenance: master'], '# Economia\n\nValute e prezzi.\n'),
+  });
+  assert.equal(buildContext(root).economy, 'Storia/Economia.md');
+});
+
 test('an empty request gives an empty pack with the campaign-level fields', (t) => {
   const pack = buildContext(makeCampaign(t));
   assert.deepEqual(Object.keys(pack).sort(), [
+    'economy',
     'errors',
     'focus',
     'neighbours',

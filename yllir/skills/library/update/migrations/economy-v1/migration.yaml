@@ -1,0 +1,8 @@
+id: economy-v1
+after: [metadata-comment-v1, shortcut-v1]
+introduced_in: 0.61.0
+needed:
+  from_version_below: 0.61.0
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs

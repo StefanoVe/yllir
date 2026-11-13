@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { parseFrontmatter } from './frontmatter.mjs';
 import { publicBody } from './public-text.mjs';
@@ -185,4 +186,42 @@ export async function loadRollFix(adapter) {
     return null;
   }
   return typeof checks.fixRolls === 'function' ? checks.fixRolls : null;
+}
+
+/**
+ * The adapter's rateEncounter (from its difficulty.mjs), or null when the adapter declares no difficulty.ops,
+ * the file cannot be imported, or it does not export the function.
+ * @param {object|null} adapter loaded adapter (its difficultyOpsPath is set by loadAdapter)
+ * @returns {Promise<Function|null>}
+ */
+export async function loadRateEncounter(adapter) {
+  if (!adapter || typeof adapter.difficultyOpsPath !== 'string') return null;
+  let ops;
+  try {
+    ops = await import(pathToFileURL(adapter.difficultyOpsPath).href);
+  } catch {
+    return null;
+  }
+  return typeof ops.rateEncounter === 'function' ? ops.rateEncounter : null;
+}
+
+/**
+ * The adapter's statSummary (from the encounter_ops module of adapter.yaml), or null when the adapter
+ * declares no encounter_ops, the file cannot be imported, or it does not export the function.
+ * The module sits next to adapter.yaml, so its folder is taken from a module path that loadAdapter
+ * already resolved (checksPath or difficultyOpsPath).
+ * @param {object|null} adapter loaded adapter
+ * @returns {Promise<Function|null>}
+ */
+export async function loadStatSummary(adapter) {
+  if (!adapter || typeof adapter.encounter_ops !== 'string') return null;
+  const known = adapter.checksPath ?? adapter.difficultyOpsPath;
+  if (typeof known !== 'string') return null;
+  let ops;
+  try {
+    ops = await import(pathToFileURL(path.join(path.dirname(known), adapter.encounter_ops)).href);
+  } catch {
+    return null;
+  }
+  return typeof ops.statSummary === 'function' ? ops.statSummary : null;
 }

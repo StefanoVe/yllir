@@ -1096,3 +1096,119 @@ test('an old-format review.json without draftsHash still approves the commit', a
   const result = await commitBatch(dir, { files: [MIRA_PATH], message: 'Add Mira Sanna' });
   assert.equal(result.ok, true, JSON.stringify(result.errors));
 });
+
+const ECONOMY_PATH = 'Storia/Economia.md';
+const ECONOMY = `---
+id: economia
+provenance: master
+---
+# Economia
+
+## Valute
+
+| Valuta | Equivalenza | Nota |
+| --- | --- | --- |
+| moneta / monete | unità di conto | moneta comune |
+
+## Prezzi base
+
+| Categoria | Minimo | Massimo | Unità |
+| --- | --- | --- | --- |
+| Martello | 5 | 8 | monete |
+
+## Salari
+
+| Mestiere | Paga | Periodo |
+| --- | --- | --- |
+
+## Variazioni per luogo
+
+| Luogo | Fattore | Motivo |
+| --- | --- | --- |
+`;
+
+const FOSCO_PATH = 'Personaggi/Fosco il Ramaio.md';
+const FOSCO = readAt(FIXTURE, FOSCO_PATH);
+// The hammer costs 20 monete: above the range 5 to 8.
+const FOSCO_OUT_OF_RANGE = FOSCO.replace('| Martello da fabbro | 6 monete |', '| Martello da fabbro | 20 monete |');
+const PC_PATH = 'Giocatori/Ilde Varno.md';
+const PC_WITHOUT_SCHEDA = `---
+id: ilde-varno
+level: 3
+provenance: master
+---
+# Ilde Varno
+
+## Integrazione con la trama
+
+### Gancio
+
+- Gancio: un debito con il ramaio.
+- Innesco: il ramaio chiede il pagamento.
+- Posta: la bottega.
+- Stato: pronto
+`;
+const EVENT_PATH = 'Trama/Sessione 1/Eventi/Scontro vuoto.md';
+const EVENT_UNKNOWN_ENEMY = `---
+id: scontro-vuoto
+session: sessione-1
+provenance: played
+enemies:
+  - id: mostro-inesistente
+    count: 1
+---
+# Scontro vuoto
+
+Un mostro che non esiste.
+`;
+
+/** The fixture with the economy document committed, as the campaign would have it. */
+function makeCampaignWithEconomy(t) {
+  const dir = makeCampaign(t);
+  fs.mkdirSync(path.dirname(path.join(dir, ECONOMY_PATH)), { recursive: true });
+  fs.writeFileSync(path.join(dir, ECONOMY_PATH), ECONOMY);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'economy']);
+  return dir;
+}
+
+test('a vendor price out of its range blocks the batch with an economy-price error', async (t) => {
+  const dir = makeCampaignWithEconomy(t);
+  writeDraft(dir, FOSCO_PATH, FOSCO_OUT_OF_RANGE);
+  const check = await checkBatch(dir, { files: [FOSCO_PATH] });
+  assert.equal(check.ok, false);
+  const error = check.errors.find((item) => item.code === 'economy-price');
+  assert.ok(error, JSON.stringify(check.errors));
+  assert.equal(path.posix.basename(error.file), 'Fosco il Ramaio.md');
+});
+
+test('the same vendor price is accepted when the item is named in the exceptions section', async (t) => {
+  const dir = makeCampaignWithEconomy(t);
+  const excepted = `${FOSCO_OUT_OF_RANGE.replace('<!-- master -->', '## Deroghe\n\nMartello da fabbro: prezzo di guerra, il ramaio lo alza per chi arriva tardi.\n\n<!-- master -->')}`;
+  writeDraft(dir, FOSCO_PATH, excepted);
+  const check = await checkBatch(dir, { files: [FOSCO_PATH] });
+  assert.equal(check.errors.some((item) => item.code === 'economy-price'), false, JSON.stringify(check.errors));
+});
+
+test('a player sheet without the Scheda section is refused with pc-sections', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, PC_PATH, PC_WITHOUT_SCHEDA);
+  const check = await checkBatch(dir, { files: [PC_PATH] });
+  assert.equal(check.ok, false);
+  assert.ok(check.errors.some((item) => item.code === 'pc-sections' && item.file === PC_PATH), JSON.stringify(check.errors));
+});
+
+test('an event naming an enemy that is not a subject is refused with enemies-unknown', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, EVENT_PATH, EVENT_UNKNOWN_ENEMY);
+  const check = await checkBatch(dir, { files: [EVENT_PATH] });
+  assert.equal(check.ok, false);
+  assert.ok(check.errors.some((item) => item.code === 'enemies-unknown' && item.file === EVENT_PATH), JSON.stringify(check.errors));
+});
+
+test('without an economy document a priced vendor adds no economy error', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, FOSCO_PATH, FOSCO_OUT_OF_RANGE);
+  const check = await checkBatch(dir, { files: [FOSCO_PATH] });
+  assert.equal(check.errors.some((item) => item.code.startsWith('economy')), false, JSON.stringify(check.errors));
+});

@@ -129,6 +129,7 @@ test('optional battle_grid is validated and battleGrid gives the square size', (
     const block = 'battle_grid:\n  square: 5\n  unit: ft\n';
     fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
     fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/difficulty.mjs'), 'export {};\n');
     write(temp, 'dnd-2024', replace(plain, 'encounters: turn-based\n', `encounters: turn-based\n${block}`));
     let loaded = loadAdapter(temp, 'dnd-2024');
     assert.deepEqual(loaded.errors, []);
@@ -167,6 +168,7 @@ test('optional checks key must name an existing .mjs file in the adapter folder'
     assert.ok(loaded.errors.some((e) => e.code === 'missing-file' && e.path === 'checks'));
 
     fs.writeFileSync(path.join(dir, 'checks.mjs'), 'export function checkCreature() { return []; }\n');
+    fs.writeFileSync(path.join(dir, 'difficulty.mjs'), 'export {};\n');
     loaded = loadAdapter(temp, 'dnd-2024');
     assert.deepEqual(loaded.errors, []);
     assert.equal(loaded.adapter.checksPath, path.join(dir, 'checks.mjs'));
@@ -184,6 +186,7 @@ test('the D&D manifest validates with its condition and duration labels and acti
   withRoot((temp) => {
     fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
     fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/difficulty.mjs'), 'export {};\n');
     write(temp, 'dnd-2024', source);
     const loaded = loadAdapter(temp, 'dnd-2024');
     assert.deepEqual(loaded.errors, []);
@@ -239,6 +242,7 @@ test('the D&D manifest declares the action table and the markers of each action 
   withRoot((temp) => {
     fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
     fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/difficulty.mjs'), 'export {};\n');
     write(temp, 'dnd-2024', source);
     const loaded = loadAdapter(temp, 'dnd-2024');
     assert.deepEqual(loaded.errors, []);
@@ -269,5 +273,68 @@ test('a non-string marker is refused', () => {
 
     write(temp, 'dnd-2024', replace(source, 'markers: [reazione, reaction]', 'markers: reazione'));
     assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'action_groups[2].markers'));
+  });
+});
+
+test('the D&D manifest loads the difficulty tables as maps and the reference food', () => {
+  withRoot((temp) => {
+    fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/difficulty.mjs'), 'export {};\n');
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    write(temp, 'dnd-2024', source);
+    const loaded = loadAdapter(temp, 'dnd-2024');
+    assert.deepEqual(loaded.errors, []);
+    assert.equal(loaded.adapter.difficultyOpsPath, path.join(temp, 'modules/systems/dnd-2024/difficulty.mjs'));
+    assert.deepEqual(loaded.adapter.difficulty.budget_per_character['3'], { low: 150, moderate: 225, high: 400 });
+    assert.equal(Object.keys(loaded.adapter.difficulty.budget_per_character).length, 20);
+    assert.equal(loaded.adapter.difficulty.cr_xp['1/8'], 25);
+    assert.equal(loaded.adapter.difficulty.cr_xp['0'], 10);
+    assert.equal(Object.keys(loaded.adapter.difficulty.cr_xp).length, 34);
+    assert.deepEqual(loaded.adapter.economy, { reference_item: { it: 'Razione (un giorno)', en: 'Rations (one day)' } });
+  });
+});
+
+test('difficulty.ops must be a .mjs file that exists in the adapter folder', () => {
+  withRoot((temp) => {
+    write(temp, 'dnd-2024', source);
+    let loaded = loadAdapter(temp, 'dnd-2024');
+    assert.ok(loaded.errors.some((e) => e.code === 'missing-file' && e.path === 'difficulty.ops'));
+    assert.equal(loaded.adapter.difficultyOpsPath, undefined);
+
+    write(temp, 'dnd-2024', replace(source, 'ops: difficulty.mjs', 'ops: ../difficulty.mjs'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'difficulty.ops'));
+  });
+});
+
+test('difficulty tables reject bad levels, bad numbers and bad ratings', () => {
+  withRoot((temp) => {
+    fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/difficulty.mjs'), 'export {};\n');
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    const cases = [
+      ['- [21, 50, 75, 100]', '- [1, 50, 75, 100]', 'difficulty.budget_per_character[0]'],
+      ['- [2, "100", 150, 200]', '- [2, 100, 150, 200]', 'difficulty.budget_per_character[1]'],
+      ['- ["1/8", -25]', '- ["1/8", 25]', 'difficulty.cr_xp[1]'],
+      ['- [1, 25]', '- ["1/8", 25]', 'difficulty.cr_xp[1]'],
+    ];
+    for (const [bad, good, at] of cases) {
+      const text = replace(source, good, bad);
+      write(temp, 'dnd-2024', text);
+      const errors = loadAdapter(temp, 'dnd-2024').errors;
+      assert.ok(errors.some((e) => e.code === 'bad-value' && e.path === at), `${bad} -> ${at}`);
+    }
+  });
+});
+
+test('economy accepts only reference_item with it and en text', () => {
+  withRoot((temp) => {
+    fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/difficulty.mjs'), 'export {};\n');
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    write(temp, 'dnd-2024', replace(source, '    en: Rations (one day)', ''));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'economy.reference_item.en'));
+
+    write(temp, 'dnd-2024', replace(source, 'economy:\n', 'economy:\n  prices: []\n'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'unknown-key' && e.path === 'economy.prices'));
   });
 });

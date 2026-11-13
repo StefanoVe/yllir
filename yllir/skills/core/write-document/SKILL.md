@@ -38,6 +38,8 @@ Choose the `kind`, the `template` and the category folder:
 | Item | `item` | `item`, or `notice` for a notice board announcement | `objects` |
 | Faction | `faction` | `faction` | the folder of the top-level category `fazioni` (`factions` in English), `Fazioni/` or `Factions/` at the root |
 | Historical event | `event` | `event` | the folder of the `free` category itself (`Storia` in Italian), directly |
+| Player character | `character` | none (a player character has no template) | the `master-only` category `Giocatori/` (English `Players/`) |
+| Economy document | none | none | fixed path `Storia/Economia.md` (English `History/Economy.md`), `id: economia` |
 | Sketch | as the subject | as the subject | as the subject |
 
 A faction whose category (`fazioni` / `factions`) is not yet in `campaign.yaml` also needs that entry, of type `subjects` and folder `Fazioni` or `Factions` at the root, in the same batch (as `build-world` Step 5 shows).
@@ -67,6 +69,27 @@ Use this step for a character (`npc`, `vendor`), a creature that fights (`enemy`
 - Keep the `id`, the `kind` and the `template`.
 
 **Expand a sketch.** Read the sketch with the Read tool. Write the full document in its template, to the same path: keep the `id`, `kind`, `relations` and `location`; remove the line `sketch: true`; keep the `provenance`. The sentence the sketch has becomes the first sentence of its first required section; fill the other required sections. Do not change the sketch's relations: they were decided when it was outlined.
+
+**Player character.** The file is `Giocatori/<Title>.md` (English `Players/<Title>.md`), with metadata `id`, `kind: character`, no `template`. Sections and the hook format are in `content-format.md`, section 4.13. Then:
+1. Originals first. If the player gave files (PDF, photo, text), they must already be in the campaign through the import process: the entry skill routes them to `yllir:import`. This process never copies originals. If they are not yet imported, do not write the sheet: tell the master in one sentence that the files go through import first, and stop.
+2. Read the `context` output of Step 2 (the seed, the nearby subjects, the timeline, the open threads). Use them as candidates for the hooks.
+3. Classify each claim of the player's background, one claim at a time:
+   - **anchorable**: it matches a subject of the canon. Write that subject's name as plain text in a hook; the engine adds the link. Example: the background says «suo padre era il guardiano del faro», and the canon has the place `Faro di Selce`, which is the lighthouse: anchorable.
+   - **compatible**: it adds a fact the canon does not contradict. Write it in a hook with `- Stato: da proporre`. Example: «ha giurato fedeltà a un contrabbandiere», and the canon does not mention any such smuggler.
+   - **silence**: the canon says nothing and the claim does not matter for the plot. Keep it in `## Background` only. Example: «ama pescare all'alba».
+   - **conflict**: it contradicts the canon. Never change the canon, and never change the claim. Write one line in `## Domande aperte` (English `## Open questions`) that names both sides, and tell the master in the final message. Example: the background says the father is alive, the canon says he died in the fire of the tower.
+4. A hook that would add a fact to the canon stays `- Stato: da proporre` (English `- Status: to propose`) until the master says yes. With the yes, change it to `- Stato: pronto` (English `- Status: ready`), and write the canon fact in its own sheet in the same batch. That batch goes through the batch reviewer as section 7 of `authoring.md` says.
+5. Write `level: <n>` in the metadata block only when the player's sheet states the level. Never invent it.
+6. Never rewrite the mechanics of the player's sheet: transcribe them as given (the adapter's `do_not` list says so). They go in `## Scheda`.
+
+**Economy document.** Create or change it when the master asks for prices, currencies, wages or place factors, or when `authoring.md` section 12 asks for it.
+- Path: a new one is `.campaign/drafts/Storia/Economia.md` (English `History/Economy.md`). An existing one is at the path that the `economy` field of `context` gives. Find it by `id: economia`.
+- Metadata: `id: economia` and `provenance`.
+- Shape: exactly as `content-format.md` section 4.11. The title, then `## Valute` (English `## Currencies`), `## Prezzi base` (English `## Base prices`), `## Salari` (English `## Wages`) and `## Variazioni per luogo` (English `## Variations by place`), in this order, then the master block with `### Indicazioni per il master` (English `### Master notes`) and one line that says where the prices come from. A table may keep only its header and separator rows.
+- The currency rules are those of 4.11: one currency per row; exactly one `unità di conto` (English `unit of account`) row, the first currency named unless the master says otherwise; the other equivalences as the master gave them.
+- A reference food from the answer to the economy question: one `Prezzi base` row with `Minimo` = `Massimo` = the stated number (a plain number, for example `1`, not `1 scudo`), with the currency in `Unità`, unless the master gave a range. Empty `## Salari` and `## Variazioni per luogo` tables are valid.
+- When a change is made to an existing economy document, change only what the master asked, as Step 5 "Change" says.
+- After the economy document is committed, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . prices` and read `results`. Before you change any sheet, show the master the sheets out of range (file, item, price, range), and ask one question: update them? Change them only on a yes, as a change of their own batch.
 
 **Do not put a secret in the public part.** A secret goes only in the master block. An invention is never presented as a quote of a source (a letter, a book, a sign).
 

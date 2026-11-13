@@ -345,6 +345,24 @@ Scelte di implementazione prese in questa fase, da confermare:
 - **Migrazione del mondo.** Il suo `needed` è `detect`: serve finché il piano trova lavoro, anche in una campagna 0.30.x che ha ancora l’`AGENTS.md` generato (rimosso dalla versione 0.31.0). Una campagna già aggiornata con lavoro del mondo ancora da fare viene completata con un aggiornamento pieno.
 - **Statistiche.** La fase deterministica legge soltanto. Le bozze si scrivono nella parte guidata (`post-update.mjs --prepare`), come prima.
 
+## Migrazione economy-v1 (Deciso, 2026-11-14)
+
+Migrazione post-aggiornamento, decisione 1 del 2026-11-14. Fa la domanda sull'economia alle campagne che non hanno ancora il documento di economia (`Storia/Economia.md`):
+
+- chiede quali valute usa il mondo, quanto vale ciascuna rispetto all'unità di conto, e quanto costa il cibo di riferimento nella sua valuta: `Razione (un giorno)` con l'adattatore D&D 2024, `Pasto semplice` senza adattatore;
+- il master può rispondere «più tardi»: il rinvio si registra nello stato della migrazione, che risulta completata e non viene riprovata; la domanda torna dal processo di scrittura quando un documento ha bisogno di un prezzo, un salario o una ricompensa;
+- con la risposta crea il documento di economia (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md#49-documento-di-economia)) e non tocca nessun altro file;
+- è reversibile con git, come ogni migrazione.
+
+## Migrazione encounters-v1 (Deciso, 2026-11-14)
+
+Migrazione post-aggiornamento, decisione 4 del 2026-11-14. Dichiara il campo `enemies` (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md#21-metadati)) negli eventi di trama che hanno uno scontro:
+
+- l'agente individua gli eventi con uno scontro che non hanno ancora `enemies`; il controllo deterministico verifica il risultato (`id` di una scheda di creatura, `count` intero positivo, nessun `id` ripetuto);
+- chiede il numero di nemici quando il testo non lo dice, e l'`id` quando non è chiaro quale scheda usare;
+- non cambia la prosa dell'evento e non scrive un `id` che non corrisponde a una scheda di creatura: lo decide il master;
+- è reversibile con git, come ogni migrazione.
+
 ## Questioni aperte
 
 - Dove si trova, sul computer del master, la cartella del plugin pubblicato (la sorgente delle novità): per ora il controllo la legge dalla variabile `YLLIR_PUBLISHED_SOURCE`, e senza di essa tace. Va verificato come il marketplace la rende disponibile.

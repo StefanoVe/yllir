@@ -29,6 +29,9 @@ import { checkLinks } from '../links/check-links.mjs';
 import { checkSheets } from '../sheets/sheet-check.mjs';
 import { checkItemSheets } from '../items/item-manager.mjs';
 import { planRetiredIds, writeRetiredIds } from './retired-ids.mjs';
+import { checkSheetPrices, checkEconomyDocument, findEconomyDocument } from '../economy/economy.mjs';
+import { checkPlayerSheets } from '../sheets/pc-check.mjs';
+import { checkEnemies } from '../plot/enemies-check.mjs';
 
 export const DRAFT_DIR = '.campaign/drafts';
 
@@ -464,6 +467,13 @@ async function validate(dir, { files, checkFiles, planFiles }) {
   if (files.length > 0) {
     run('sheets', () => checkSheets(dir, { files }).errors);
     run('items', () => checkItemSheets(dir, { files }).errors);
+    run('economy', () => checkSheetPrices(dir, { files }).errors);
+    const economyFile = findEconomyDocument(dir);
+    if (economyFile !== null && files.includes(economyFile)) {
+      run('economy', () => checkEconomyDocument(dir, economyFile).errors, economyFile);
+    }
+    run('pc-sheet', () => checkPlayerSheets(dir, { files }).errors);
+    run('enemies', () => checkEnemies(dir, { files }).errors);
   }
   run('config', () => validateConfig(dir).errors.map((e) => ({ ...e, message: e.path ? `${e.path}: ${e.message}` : e.message })), 'campaign.yaml');
   run('plot', () => plotMap(dir).errors);
