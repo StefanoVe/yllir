@@ -155,3 +155,17 @@ describe('serializeSettings and the real yaml-lite', () => {
     assert.deepEqual(sanitizeStored(parsed.data).settings, DEFAULT_SETTINGS);
   });
 });
+
+describe('start page', () => {
+  it('defaults to the plot', () => {
+    assert.equal(DEFAULT_SETTINGS.ui.startPage, 'plot');
+  });
+
+  it('maps a saved start_page: home (no longer offered) to the default plot', () => {
+    const parsed = parseYamlLite('ui:\n  start_page: home\n');
+    assert.deepEqual(parsed.errors, []);
+    const { settings, explicit } = sanitizeStored(parsed.data);
+    assert.equal(settings.ui.startPage, 'plot');
+    assert.ok(!explicit.includes('ui.startPage'));
+  });
+});

@@ -23,7 +23,7 @@ export const DEFAULT_SETTINGS: ScreenSettings = {
   ui: {
     density: 'comfortable',
     motion: 'system',
-    startPage: 'home',
+    startPage: 'plot',
     rail: { plot: true, docs: true, music: true, encyclopedia: true, print: true },
   },
 };
@@ -59,7 +59,7 @@ export const LEAVES: readonly Leaf[] = [
   { path: 'music.dock', file: 'music.dock', kind: { type: 'enum', values: ['always', 'playing'] } },
   { path: 'ui.density', file: 'ui.density', kind: { type: 'enum', values: ['comfortable', 'compact'] } },
   { path: 'ui.motion', file: 'ui.motion', kind: { type: 'enum', values: ['system', 'reduced'] } },
-  { path: 'ui.startPage', file: 'ui.start_page', kind: { type: 'enum', values: ['home', 'live', 'plot', 'docs'] } },
+  { path: 'ui.startPage', file: 'ui.start_page', kind: { type: 'enum', values: ['live', 'plot', 'docs'] } },
   { path: 'ui.rail.plot', file: 'ui.rail.plot', kind: BOOL },
   { path: 'ui.rail.docs', file: 'ui.rail.docs', kind: BOOL },
   { path: 'ui.rail.music', file: 'ui.rail.music', kind: BOOL },
@@ -129,7 +129,7 @@ export const settingsPatchSchema: z.ZodType<ScreenSettingsPatch> = z
       .object({
         density: z.enum(['comfortable', 'compact']).optional(),
         motion: z.enum(['system', 'reduced']).optional(),
-        startPage: z.enum(['home', 'live', 'plot', 'docs']).optional(),
+        startPage: z.enum(['live', 'plot', 'docs']).optional(),
         rail: z
           .object({
             plot: bool.optional(),

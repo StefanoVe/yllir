@@ -2,12 +2,9 @@ import { Component, DOCUMENT, DestroyRef, ElementRef, HostListener, computed, ef
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Music, MessageSquare, Printer, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
-import { filter, map, take } from 'rxjs';
+import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Music, Printer, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
+import { filter, map } from 'rxjs';
 import { LiveService } from '../core/live.service';
-import { CampaignTurnService } from '../core/campaign-turn.service';
-import { HelpersIndicator } from '../chat/helpers-indicator';
-import { helpersCountKey, runningHelpers } from '../chat/helpers';
 import { SettingsService } from '../core/settings.service';
 import { MusicApiService } from '../music/music-api.service';
 import { MusicDock } from '../music/music-dock';
@@ -22,7 +19,7 @@ import { applyTextScale, readTextScale } from './text-scale';
 
 @Component({
   selector: 'ms-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock, HelpersIndicator],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })
@@ -41,9 +38,8 @@ export class Shell {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly settingsService = inject(SettingsService);
   private readonly document = inject(DOCUMENT);
-  private readonly campaignTurns = inject(CampaignTurnService);
 
-  readonly icons = { MessageSquare, Dices, GitBranch, Library, Music, BookOpen, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
+  readonly icons = { Dices, GitBranch, Library, Music, BookOpen, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
   /** The connection notice shows only after the stream has been down for a while, so load and blips do not flash it. */
   readonly showOffline = signal(false);
   private offlineTimer: ReturnType<typeof setTimeout> | undefined;
@@ -53,7 +49,6 @@ export class Shell {
   readonly printEnabled = computed(() => this.status.modules()?.print === true);
   /** Rail entries the master can hide in the settings: shown only when the module is on AND the rail flag is on. */
   private readonly railSettings = computed(() => this.settingsService.settings().ui.rail);
-  readonly showPlot = computed(() => this.railSettings().plot);
   readonly showDocs = computed(() => this.railSettings().docs);
   readonly showMusic = computed(() => this.musicEnabled() && this.railSettings().music);
   readonly showEncyclopedia = computed(() => this.encyclopediaEnabled() && this.railSettings().encyclopedia);
@@ -64,9 +59,6 @@ export class Shell {
     return this.settingsService.settings().music.dock === 'playing' ? playing : this.musicEnabled() || playing;
   });
 
-  /** The URL the first navigation ended on (null until it ends). */
-  private readonly firstUrl = signal<string | null>(null);
-
   private readonly url = toSignal(
     this.router.events.pipe(
       filter((event): event is NavigationEnd => event instanceof NavigationEnd),
@@ -75,12 +67,6 @@ export class Shell {
     { initialValue: this.router.url },
   );
   private readonly campaignName = computed(() => this.status.campaign()?.name ?? '');
-  /** The campaign's queued or running turn, for the helpers entry of the rail. */
-  readonly campaignTurn = this.campaignTurns.turn;
-  private readonly helperCount = computed(() => runningHelpers(this.campaignTurn()).length);
-  /** The rail entry for the helpers at work shows off Home only: the chat already shows them there. */
-  readonly showRailHelpers = computed(() => this.helperCount() > 0 && this.url().split(/[?#]/)[0] !== '/');
-  readonly railHelpersLabel = computed(() => this.i18n.t(helpersCountKey(this.helperCount()), { count: this.helperCount() }));
 
   constructor() {
     // Saved text size: applied once the campaign is known, and again whenever it changes.
@@ -97,27 +83,6 @@ export class Shell {
       const ui = this.settingsService.settings().ui;
       this.document.documentElement.dataset['density'] = ui.density;
       this.document.documentElement.dataset['motion'] = ui.motion;
-    });
-    // The start page opens once per app load: after both the settings are loaded and the first navigation
-    // has ended, and only when that navigation landed on Home (a deep link is never redirected).
-    // Later returns to Home are never redirected.
-    this.router.events
-      .pipe(
-        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
-        take(1),
-      )
-      .subscribe((event) => this.firstUrl.set(event.urlAfterRedirects));
-    let startPageChecked = false;
-    effect(() => {
-      const first = this.firstUrl();
-      if (startPageChecked || first === null || !this.settingsService.loaded()) return;
-      startPageChecked = true;
-      untracked(() => {
-        const page = this.settingsService.settings().ui.startPage;
-        if (page !== 'home' && first === '/') {
-          void this.router.navigate([`/${page}`], { replaceUrl: true });
-        }
-      });
     });
     // Show the connection notice only after 4 seconds offline; hide it at once when connected.
     effect(() => {

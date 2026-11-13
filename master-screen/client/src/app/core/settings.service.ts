@@ -20,7 +20,7 @@ export const DEFAULT_SCREEN_SETTINGS: ScreenSettings = {
   ui: {
     density: 'comfortable',
     motion: 'system',
-    startPage: 'home',
+    startPage: 'plot',
     rail: { plot: true, docs: true, music: true, encyclopedia: true, print: true },
   },
 };

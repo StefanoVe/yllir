@@ -103,7 +103,7 @@ export interface ScreenSettings {
   ui: {
     density: 'comfortable' | 'compact';
     motion: 'system' | 'reduced';
-    startPage: 'home' | 'live' | 'plot' | 'docs';
+    startPage: 'live' | 'plot' | 'docs';
     rail: { plot: boolean; docs: boolean; music: boolean; encyclopedia: boolean; print: boolean };
   };
 }

@@ -71,7 +71,6 @@ const MOTION_OPTIONS: Option<ScreenSettings['ui']['motion']>[] = [
   { value: 'reduced', label: 'settingsPage.motion.reduced' },
 ];
 const START_OPTIONS: Option<ScreenSettings['ui']['startPage']>[] = [
-  { value: 'home', label: 'nav.home' },
   { value: 'live', label: 'nav.liveTable' },
   { value: 'plot', label: 'nav.plot' },
   { value: 'docs', label: 'nav.documents' },
@@ -88,7 +87,6 @@ const PANEL_OPTIONS: { key: PanelKey; label: TranslationKey }[] = [
 ];
 /** Sidebar items. Items with a module are offered only when that module is on. */
 const RAIL_OPTIONS: { key: RailKey; label: TranslationKey; module: ModuleId | null }[] = [
-  { key: 'plot', label: 'nav.plot', module: null },
   { key: 'docs', label: 'nav.documents', module: null },
   { key: 'music', label: 'nav.music', module: 'music' },
   { key: 'encyclopedia', label: 'nav.encyclopedia', module: 'encyclopedia' },
