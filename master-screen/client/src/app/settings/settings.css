@@ -612,3 +612,68 @@ summary {
     display: none;
   }
 }
+
+/* Update */
+.update-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.update-title {
+  font-weight: 500;
+}
+
+.update-news {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.update-news p {
+  margin: 0 0 var(--space-1);
+}
+
+.update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+/* Square buttons: a filled primary, and a secondary with only a border. */
+.update-btn {
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-text);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.update-btn.primary {
+  background: var(--color-text);
+  color: var(--color-surface);
+}
+
+.update-btn:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+
+.update-btn.primary:hover:not(:disabled) {
+  background: var(--color-text-muted);
+}
+
+.update-btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.update-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -369,3 +369,20 @@ Saved in the campaign file `.campaign/master-screen.yaml` (snake_case keys, writ
 | PUT `/settings` | `ScreenSettingsPatch` (any subset, two levels deep, unknown keys rejected) | `SettingsResponse`; publishes SSE `settings` with the merged settings |
 
 Errors: 400 `{ error: 'Invalid settings' }` for a body that does not validate; 409 when the campaign folder is not a git repository (nothing is written, `canSave` is false); 500 `{ error: 'Settings could not be saved.' }` when the write or commit fails. A missing or unreadable settings file gives the defaults, never an error.
+
+## Update (framework update from the screen)
+
+The screen knows whether a newer Yllir is published, shows the news, and can apply the update and restart itself. The code is in `server/src/update/` (`service.ts` holds the state; `source.ts` the published source; `notice.ts` the notice memory; `restart.ts` the helper that starts the new launcher). The notice memory is the file `.campaign/state/update-notice.yaml`, the same one the framework's update check writes.
+
+| Method and path | Request | Response |
+|---|---|---|
+| GET `/update` | | `UpdateStatus` |
+| POST `/update/check` | | `UpdateStatus`, after a fresh check |
+| POST `/update/snooze` | | `UpdateStatus`; writes the notice memory with a one-day snooze when an update is available, else nothing |
+| POST `/update/apply` | | 202 `{ ok: true }`, then the update runs in the background; 409 `{ error }` when refused |
+
+`UpdateStatus` (`shared/src/types.ts`) never carries a version number. `state` is `idle` (up to date, or nothing checked yet), `available`, `offline` (the source could not be read; silent), `updating`, `restarting` or `failed`. `snoozed` is true while the snooze runs past today. `canApply` is true only when `state` is `available` and nothing blocks it; `blockedReason` is `turn-running` (the assistant is answering), `live-open` (a live session is open) or `offline`.
+
+The published source is read with unauthenticated GET requests and a generic User-Agent only, with an 8 s timeout: the plugin manifest (`yllir/.claude-plugin/plugin.json` on the main branch) and the news folder `yllir/news`, from which `X.Y.Z.md` or `X.Y.Z.<campaign language>.md` is taken for each version after the installed one, oldest first, capped at 8000 characters. A failure of the news alone keeps the update available without news. The check runs at most once an hour; the first status request after start starts the first check in the background.
+
+Apply runs one at a time: `claude plugin update yllir@yllir --json` (no shell, 3 minutes at most), then `claude plugin list --json` to find the plugin's install folder. Then the server starts a detached helper that waits for this process to exit (30 s at most) and starts that folder's `scripts/launcher/launch.mjs` for the campaign, and the server shuts down. Any failure ends in `failed`, with nothing else changed and the old server running. `failed` is cleared by POST `/update/check`, after which the update can be applied again.

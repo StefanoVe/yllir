@@ -123,6 +123,17 @@ export interface SettingsResponse {
   explicit: string[];
 }
 
+/** The framework update as the screen shows it. Never carries a version number. */
+export interface UpdateStatus {
+  state: 'idle' | 'available' | 'offline' | 'updating' | 'restarting' | 'failed';
+  /** Plain-language news of the newer versions, in the campaign language; null when there are none. */
+  news: string | null;
+  /** True while the notice memory has a snooze that runs past today. */
+  snoozed: boolean;
+  canApply: boolean;
+  blockedReason: 'turn-running' | 'live-open' | 'offline' | null;
+}
+
 export interface ChecksResponse {
   // checkedLinks (optional, added later): total number of links that were checked
 

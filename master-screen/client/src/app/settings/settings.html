@@ -323,6 +323,88 @@
       </div>
     </section>
 
+    <!-- Update -->
+    <section class="card" id="s-update" aria-labelledby="h-update">
+      <div class="card-head">
+        <h2 id="h-update">{{ t('update.section') }}</h2>
+        <button type="button" class="icon-btn" [disabled]="updates.checking() || updateBusy()"
+                [attr.aria-label]="t('settings.checkAgain')" [title]="t('settings.checkAgain')" (click)="checkUpdate()">
+          <lucide-angular [img]="updates.checking() ? icons.LoaderCircle : icons.RefreshCw" [size]="18" aria-hidden="true"
+                          [class.spin]="updates.checking()" />
+        </button>
+      </div>
+
+      @if (updates.actionError(); as message) {
+        <p class="error" role="alert">{{ message }}</p>
+      }
+
+      @if (updates.status(); as update) {
+        @switch (update.state) {
+          @case ('idle') {
+            <p class="update-line">{{ t('update.upToDate') }}</p>
+          }
+          @case ('available') {
+            <p class="update-line update-title">{{ t('update.available') }}</p>
+            @if (news().length > 0) {
+              <p class="sub-label">{{ t('update.news') }}</p>
+              <div class="update-news">
+                @for (block of news(); track $index) {
+                  @if (block.list) {
+                    <ul class="plain">
+                      @for (line of block.lines; track $index) {
+                        <li>{{ line }}</li>
+                      }
+                    </ul>
+                  } @else {
+                    <p>{{ block.lines[0] }}</p>
+                  }
+                }
+              </div>
+            }
+            <div class="update-actions">
+              <button type="button" class="update-btn primary" [disabled]="!update.canApply" (click)="applyUpdate()">{{ t('update.now') }}</button>
+              <button type="button" class="update-btn" [disabled]="update.snoozed" (click)="snoozeUpdate()">{{ t('update.later') }}</button>
+            </div>
+            @if (!update.canApply && update.blockedReason) {
+              <p class="muted">{{ blockedText(update.blockedReason) }}</p>
+            }
+          }
+          @case ('offline') {
+            <p class="update-line">
+              <lucide-angular [img]="icons.WifiOff" [size]="16" aria-hidden="true" />
+              <span>{{ t('update.offline') }}</span>
+            </p>
+          }
+          @case ('updating') {
+            <p class="update-line">
+              <lucide-angular [img]="icons.LoaderCircle" [size]="16" aria-hidden="true" class="spin" />
+              <span role="status">{{ t('update.updating') }}</span>
+            </p>
+          }
+          @case ('restarting') {
+            <p class="update-line">
+              <lucide-angular [img]="icons.LoaderCircle" [size]="16" aria-hidden="true" class="spin" />
+              <span role="status">{{ t('update.restarting') }}</span>
+            </p>
+            @if (updates.reopenNotice()) {
+              <p class="muted">{{ t('update.reopen') }}</p>
+            }
+          }
+          @case ('failed') {
+            <p class="error" role="alert">
+              <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
+              <span>{{ t('update.failed') }}</span>
+            </p>
+            <div class="update-actions">
+              <button type="button" class="update-btn primary" (click)="retryUpdate()">{{ t('update.retry') }}</button>
+            </div>
+          }
+        }
+      } @else {
+        <div class="row-skel" aria-hidden="true"></div>
+      }
+    </section>
+
     <!-- Checks -->
     <section class="card" id="s-checks" aria-labelledby="h-checks">
       <div class="card-head">

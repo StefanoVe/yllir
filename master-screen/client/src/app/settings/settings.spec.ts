@@ -7,9 +7,19 @@ import { PrefsService } from '../core/prefs.service';
 import { DEFAULT_SCREEN_SETTINGS, SettingsService } from '../core/settings.service';
 import { StatusService } from '../core/status.service';
 import { ThemeService } from '../core/theme.service';
-import { Settings, checkSummary } from './settings';
+import type { UpdateStatus } from '@shared/types';
+import { UpdateService } from '../core/update';
+import { Settings, checkSummary, parseNews } from './settings';
 
 const EMPTY_CHECKS: ChecksResponse = { brokenLinks: [], sketches: [], exclusions: [], checkedAt: '2026-11-13T10:30:00Z' };
+const UPDATE_IDLE: UpdateStatus = { state: 'idle', news: null, snoozed: false, canApply: true, blockedReason: null };
+const UPDATE_AVAILABLE: UpdateStatus = {
+  state: 'available',
+  news: 'Better search.\nThe search finds more.\n\n- New cards\n- Fixed the map',
+  snoozed: false,
+  canApply: true,
+  blockedReason: null,
+};
 
 function withSettings(change: (s: ScreenSettings) => void): ScreenSettings {
   const copy = structuredClone(DEFAULT_SCREEN_SETTINGS);
@@ -34,6 +44,16 @@ describe('Settings page', () => {
   };
   let modules: ReturnType<typeof signal<Record<ModuleId, boolean> | null>>;
   let api: { checks: ReturnType<typeof vi.fn>; runChecks: ReturnType<typeof vi.fn> };
+  let updateFake: {
+    status: ReturnType<typeof signal<UpdateStatus | null>>;
+    checking: ReturnType<typeof signal<boolean>>;
+    actionError: ReturnType<typeof signal<string | null>>;
+    reopenNotice: ReturnType<typeof signal<boolean>>;
+    check: ReturnType<typeof vi.fn>;
+    apply: ReturnType<typeof vi.fn>;
+    snooze: ReturnType<typeof vi.fn>;
+    retry: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     settingsFake = {
@@ -54,10 +74,21 @@ describe('Settings page', () => {
       checks: vi.fn(async () => EMPTY_CHECKS),
       runChecks: vi.fn(async () => EMPTY_CHECKS),
     };
+    updateFake = {
+      status: signal<UpdateStatus | null>(UPDATE_IDLE),
+      checking: signal(false),
+      actionError: signal<string | null>(null),
+      reopenNotice: signal(false),
+      check: vi.fn(),
+      apply: vi.fn(),
+      snooze: vi.fn(),
+      retry: vi.fn(),
+    };
     TestBed.configureTestingModule({
       imports: [Settings],
       providers: [
         { provide: SettingsService, useValue: settingsFake },
+        { provide: UpdateService, useValue: updateFake },
         { provide: StatusService, useValue: { modules, status: signal(null), campaign: signal({ name: 'Demo' }) } },
         { provide: ApiService, useValue: api },
         { provide: PrefsService, useValue: { slug: signal<string | null>('demo'), get: () => null, set: vi.fn(), remove: vi.fn() } },
@@ -85,18 +116,18 @@ describe('Settings page', () => {
     return found;
   }
 
-  it('renders the six sections when music is on, and hides Music when it is off', async () => {
+  it('renders the seven sections when music is on, and hides Music when it is off', async () => {
     const root = await render();
     const ids = [...root.querySelectorAll('section.card')].map((el) => el.id);
-    expect(ids).toEqual(['s-table', 's-combat', 's-music', 's-appearance', 's-checks', 's-about']);
-    expect(root.querySelectorAll('nav.toc a').length).toBe(6);
+    expect(ids).toEqual(['s-table', 's-combat', 's-music', 's-appearance', 's-update', 's-checks', 's-about']);
+    expect(root.querySelectorAll('nav.toc a').length).toBe(7);
 
     modules.set({ music: false, print: false, encyclopedia: false });
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
     expect(root.querySelector('#s-music')).toBeNull();
-    expect(root.querySelectorAll('nav.toc a').length).toBe(5);
+    expect(root.querySelectorAll('nav.toc a').length).toBe(6);
   });
 
   it('clicking the autoHide switch saves autoHide false', async () => {
@@ -181,5 +212,97 @@ describe('Settings page', () => {
     expect(busy[0].text).toBe('settings.brokenFound.one:{"count":1}');
     expect(busy[1].text).toBe('settings.sketchesFound.other:{"count":2}');
     expect(busy[2].text).toBe('settings.exclusionsFound.one:{"count":1}');
+  });
+  describe('Update section', () => {
+    const section = (root: HTMLElement) => q(root, '#s-update');
+    const buttons = (root: HTMLElement) => [...section(root).querySelectorAll<HTMLButtonElement>('button')];
+
+    it('says everything is up to date, with a check button', async () => {
+      const root = await render();
+      expect(section(root).textContent).toContain('Everything is up to date');
+      expect(buttons(root).some((button) => button.textContent?.includes('Update now'))).toBe(false);
+      q<HTMLButtonElement>(root, '#s-update button.icon-btn').click();
+      expect(updateFake.check).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the news as paragraphs and a list, with Update now and Later', async () => {
+      updateFake.status.set(UPDATE_AVAILABLE);
+      const root = await render();
+      const text = section(root).textContent ?? '';
+      expect(text).toContain('An update for Yllir is ready.');
+      expect(section(root).querySelector('.update-news p')?.textContent).toBe('Better search. The search finds more.');
+      expect([...section(root).querySelectorAll('.update-news li')].map((li) => li.textContent)).toEqual(['New cards', 'Fixed the map']);
+      expect(text).not.toMatch(/version|plugin|server|package|\d+\.\d+/i);
+
+      const now = buttons(root).find((button) => button.textContent?.includes('Update now'));
+      now?.click();
+      expect(updateFake.apply).toHaveBeenCalledTimes(1);
+      buttons(root).find((button) => button.textContent?.includes('Later'))?.click();
+      expect(updateFake.snooze).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables Update now with the reason when the update cannot start yet', async () => {
+      updateFake.status.set({ ...UPDATE_AVAILABLE, canApply: false, blockedReason: 'turn-running' });
+      const root = await render();
+      const now = buttons(root).find((button) => button.textContent?.includes('Update now'));
+      expect(now?.disabled).toBe(true);
+      expect(section(root).textContent).toContain('The assistant is still working: wait for it to finish');
+    });
+
+    it('shows the live table reason when a live table is open', async () => {
+      updateFake.status.set({ ...UPDATE_AVAILABLE, canApply: false, blockedReason: 'live-open' });
+      const root = await render();
+      expect(section(root).textContent).toContain('A live table is open: close it first');
+    });
+
+    it('shows the running update in plain words, with no buttons to press', async () => {
+      updateFake.status.set({ ...UPDATE_AVAILABLE, state: 'updating' });
+      const root = await render();
+      expect(section(root).textContent).toContain('Updating, it takes a few seconds');
+      expect(buttons(root).every((button) => button.textContent?.includes('Update now') === false)).toBe(true);
+    });
+
+    it('shows the reopen notice while restarting only when the updates service raises it', async () => {
+      updateFake.status.set({ ...UPDATE_AVAILABLE, state: 'restarting' });
+      const root = await render();
+      expect(section(root).textContent).toContain('Almost done, reopening');
+      expect(section(root).textContent).not.toContain('close this window');
+
+      updateFake.reopenNotice.set(true);
+      fixture.detectChanges();
+      expect(section(root).textContent).toContain('close this window and open Yllir again');
+    });
+
+    it('a failed update says nothing has changed, and retry applies again', async () => {
+      updateFake.status.set({ ...UPDATE_AVAILABLE, state: 'failed' });
+      const root = await render();
+      expect(section(root).textContent).toContain('The update did not work. Nothing has changed.');
+      buttons(root).find((button) => button.textContent?.includes('Try again'))?.click();
+      expect(updateFake.retry).toHaveBeenCalledTimes(1);
+      expect(updateFake.apply).not.toHaveBeenCalled();
+    });
+
+    it('offline says Yllir keeps working as it is', async () => {
+      updateFake.status.set({ ...UPDATE_IDLE, state: 'offline' });
+      const root = await render();
+      expect(section(root).textContent).toContain('No connection. Yllir keeps working as it is.');
+    });
+
+    it('shows the refusal sentence of a 409 as an alert', async () => {
+      updateFake.status.set({ ...UPDATE_AVAILABLE, canApply: false, blockedReason: 'live-open' });
+      updateFake.actionError.set('A live table is open: close it first');
+      const root = await render();
+      expect(section(root).querySelector('[role="alert"]')?.textContent).toContain('A live table is open: close it first');
+    });
+  });
+
+  it('parseNews keeps paragraphs and list items apart, and joins wrapped lines', () => {
+    expect(parseNews('One line\nstill one.\n\nSecond paragraph.\n- first\n- second\n\n- again')).toEqual([
+      { list: false, lines: ['One line still one.'] },
+      { list: false, lines: ['Second paragraph.'] },
+      { list: true, lines: ['first', 'second'] },
+      { list: true, lines: ['again'] },
+    ]);
+    expect(parseNews('  ')).toEqual([]);
   });
 });

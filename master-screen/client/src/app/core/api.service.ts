@@ -13,6 +13,7 @@ import type {
   SettingsResponse,
   StatusResponse,
   UndoResponse,
+  UpdateStatus,
 } from '@shared/types';
 import { I18n } from '../i18n';
 import type { ChatChoice, ChatEffort, ChatModel } from '../chat/chat-choice';
@@ -124,6 +125,26 @@ export class ApiService {
 
   shutdown(): Promise<{ ok: true }> {
     return this.request('POST', '/shutdown');
+  }
+
+  /** The framework update notice and its state (see the Update section of API.md). */
+  updateStatus(): Promise<UpdateStatus> {
+    return this.request('GET', '/update');
+  }
+
+  /** A fresh check of the framework update. Also clears a failed update so it can be started again. */
+  checkUpdate(): Promise<UpdateStatus> {
+    return this.request('POST', '/update/check');
+  }
+
+  /** "Later": hides the notice until the next update is found. */
+  snoozeUpdate(): Promise<UpdateStatus> {
+    return this.request('POST', '/update/snooze');
+  }
+
+  /** Starts the update. Rejects with 409 and a plain sentence when it cannot start yet. */
+  applyUpdate(): Promise<{ ok: true }> {
+    return this.request('POST', '/update/apply');
   }
 
   /** Rejects with an ApiFailure (`{ error, status, message? }`) that keeps the server's error text; never with a raw Error. */

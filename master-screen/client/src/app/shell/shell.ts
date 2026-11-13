@@ -11,6 +11,7 @@ import { MusicDock } from '../music/music-dock';
 import { MusicPlayerService } from '../music/music-player.service';
 import { PrefsService } from '../core/prefs.service';
 import { StatusService } from '../core/status.service';
+import { UpdateService } from '../core/update';
 import { ThemeService } from '../core/theme.service';
 import { ViewModeService } from '../core/view-mode.service';
 import { I18n, type TranslationKey } from '../i18n';
@@ -37,7 +38,12 @@ export class Shell {
   private readonly musicApi = inject(MusicApiService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly settingsService = inject(SettingsService);
+  private readonly updates = inject(UpdateService);
   private readonly document = inject(DOCUMENT);
+
+  /** A small dot on the settings entry while an update is ready and the master has not said "later". */
+  readonly showUpdateNotice = this.updates.showNotice;
+  readonly settingsLabel = computed(() => this.i18n.t(this.showUpdateNotice() ? 'shell.updateNotice' : 'nav.settings'));
 
   readonly icons = { Dices, GitBranch, Library, Music, BookOpen, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
   /** The connection notice shows only after the stream has been down for a while, so load and blips do not flash it. */

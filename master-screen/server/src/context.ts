@@ -1,7 +1,27 @@
 // Shared context of the server: campaign and framework folders, port, event bus and
 // shutdown hooks. Created once per process by index.ts. Owner: server skeleton.
 import path from 'node:path';
+import type { Turn } from '../../shared/src/types.js';
 import { Bus } from './bus.js';
+
+/** The bus also remembers which chat turns are queued or running, from their `turn` events. */
+class TurnTrackingBus extends Bus {
+  private readonly open = new Set<string>();
+
+  override publish(...args: Parameters<Bus['publish']>): number {
+    const [event, data] = args;
+    if (event === 'turn') {
+      const turn = data as unknown as Turn;
+      if (turn.state === 'queued' || turn.state === 'running') this.open.add(turn.id);
+      else this.open.delete(turn.id);
+    }
+    return super.publish(...args);
+  }
+
+  hasOpenTurn(): boolean {
+    return this.open.size > 0;
+  }
+}
 
 export interface AgentStatus {
   available: boolean;
@@ -17,6 +37,8 @@ export interface Ctx {
   state: { dir: string };
   /** Whether the agent can run; the reason is plain language in the campaign language. */
   agentStatus(): AgentStatus;
+  /** Whether a chat turn is queued or running (the turn runner publishes every change on the bus). */
+  chatTurnOpen(): boolean;
   /** Asks the process to shut down gracefully (used by POST /api/shutdown). */
   requestShutdown(): void;
   /** Registers a cleanup that runs once at shutdown, last registered first. */
@@ -37,14 +59,16 @@ export interface CreateCtxOptions {
 export function createCtx(opts: CreateCtxOptions): Ctx {
   const log = opts.log ?? ((msg: string) => process.stderr.write(`${msg}\n`));
   const closers: Array<() => void | Promise<void>> = [];
+  const bus = new TurnTrackingBus();
   return {
     campaignRoot: opts.campaignRoot,
     frameworkRoot: opts.frameworkRoot,
     port: opts.port,
-    bus: new Bus(),
+    bus,
     log,
     state: { dir: path.join(opts.campaignRoot, '.campaign', 'state', 'master-screen') },
     agentStatus: opts.agentStatus ?? (() => ({ available: false, reason: 'Not configured' })),
+    chatTurnOpen: () => bus.hasOpenTurn(),
     requestShutdown: opts.requestShutdown ?? (() => {}),
     onClose(fn) {
       closers.push(fn);

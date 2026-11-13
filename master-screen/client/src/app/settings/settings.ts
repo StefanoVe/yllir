@@ -10,9 +10,10 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Check, LoaderCircle, LucideAngularModule, Monitor, Moon, RefreshCw, Sun, TriangleAlert } from 'lucide-angular';
-import type { ChecksResponse, ModuleId, ScreenModel, ScreenSettings, ScreenSettingsPatch } from '@shared/types';
+import { Check, LoaderCircle, LucideAngularModule, Monitor, Moon, RefreshCw, Sun, TriangleAlert, WifiOff } from 'lucide-angular';
+import type { ChecksResponse, ModuleId, ScreenModel, ScreenSettings, ScreenSettingsPatch, UpdateStatus } from '@shared/types';
 import { ApiService, isApiFailure } from '../core/api.service';
+import { BLOCKED_REASON_KEYS, UpdateService } from '../core/update';
 import { PrefsService } from '../core/prefs.service';
 import { SettingsService } from '../core/settings.service';
 import { StatusService } from '../core/status.service';
@@ -93,6 +94,41 @@ const RAIL_OPTIONS: { key: RailKey; label: TranslationKey; module: ModuleId | nu
   { key: 'print', label: 'nav.print', module: 'print' },
 ];
 
+/** One block of the update news: a paragraph (one line of text) or a list. */
+export interface NewsBlock {
+  list: boolean;
+  lines: string[];
+}
+
+/**
+ * Splits the update news (Markdown-light: paragraphs separated by blank lines, `- ` or `* ` list items)
+ * into plain blocks. Nothing is rendered as HTML.
+ */
+export function parseNews(news: string): NewsBlock[] {
+  const blocks: NewsBlock[] = [];
+  // True while the last block can still take more lines (a blank line closes it).
+  let open = false;
+  for (const raw of news.split('\n')) {
+    const line = raw.trim();
+    if (line === '') {
+      open = false;
+      continue;
+    }
+    const last = blocks[blocks.length - 1];
+    const item = /^[-*]\s+(.*)$/.exec(line);
+    if (item) {
+      if (open && last?.list) last.lines.push(item[1]);
+      else blocks.push({ list: true, lines: [item[1]] });
+    } else if (open && last && !last.list) {
+      last.lines[0] += ` ${line}`;
+    } else {
+      blocks.push({ list: false, lines: [line] });
+    }
+    open = true;
+  }
+  return blocks;
+}
+
 export interface CheckLine {
   text: string;
   broken: boolean;
@@ -135,9 +171,10 @@ export class Settings {
   private readonly status = inject(StatusService);
   private readonly host = inject(ElementRef) as ElementRef<HTMLElement>;
   readonly settingsService = inject(SettingsService);
+  readonly updates = inject(UpdateService);
   readonly i18n = inject(I18n);
 
-  readonly icons = { Check, LoaderCircle, Monitor, Moon, RefreshCw, Sun, TriangleAlert };
+  readonly icons = { Check, LoaderCircle, Monitor, Moon, RefreshCw, Sun, TriangleAlert, WifiOff };
   readonly themeOptions = THEME_OPTIONS;
   readonly modelOptions = MODEL_OPTIONS;
   readonly densityOptions = DENSITY_OPTIONS;
@@ -201,6 +238,7 @@ export class Settings {
     { id: 's-combat', label: 'combat.settings.heading' },
     ...(this.musicOn() ? [{ id: 's-music', label: 'nav.music' as TranslationKey }] : []),
     { id: 's-appearance', label: 'settings.appearance' },
+    { id: 's-update', label: 'update.section' },
     { id: 's-checks', label: 'settings.checks' },
     { id: 's-about', label: 'settings.about' },
   ]);
@@ -280,6 +318,39 @@ export class Settings {
   /** Plain sentence for one broken link. */
   linkLine(from: string, to: string): string {
     return this.t('settings.linkLine', { from, to });
+  }
+
+  // Update section.
+
+  /** The news of the pending update, as plain blocks. */
+  readonly news = computed<NewsBlock[]>(() => {
+    const text = this.updates.status()?.news;
+    return text ? parseNews(text) : [];
+  });
+  /** True while the update runs: the actions wait. */
+  readonly updateBusy = computed(() => {
+    const state = this.updates.status()?.state;
+    return state === 'updating' || state === 'restarting';
+  });
+
+  checkUpdate(): void {
+    void this.updates.check();
+  }
+
+  applyUpdate(): void {
+    void this.updates.apply();
+  }
+
+  retryUpdate(): void {
+    void this.updates.retry();
+  }
+
+  snoozeUpdate(): void {
+    void this.updates.snooze();
+  }
+
+  blockedText(reason: NonNullable<UpdateStatus['blockedReason']>): string {
+    return this.t(BLOCKED_REASON_KEYS[reason]);
   }
 
   readonly scaleLabel = computed(() => this.t('settings.textSizeValue', { percent: this.textScale() }));

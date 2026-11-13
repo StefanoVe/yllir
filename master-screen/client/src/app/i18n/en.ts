@@ -9,6 +9,7 @@ import { liveModelEn } from './parts/live-model.en';
 import { polishEn } from './parts/polish.en';
 import { settingsPageEn } from './parts/settings-page.en';
 import { helpersEn } from './parts/helpers.en';
+import { updateEn } from './parts/update.en';
 
 export const en = {
   ...liveAgentEn,
@@ -22,6 +23,7 @@ export const en = {
   ...liveModelEn,
   ...polishEn,
   ...settingsPageEn,
+  ...updateEn,
   'nav.home': 'Home',
   'nav.search': 'Search',
   'nav.liveTable': 'Live table',

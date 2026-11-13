@@ -17,6 +17,7 @@ import { registerStatusRoutes } from './routes/status.js';
 import { createSiteRouter, registerEncyclopediaRoutes } from './routes/encyclopedia.js';
 import { registerPrintRoutes } from './routes/print.js';
 import { registerSettingsRoutes } from './routes/settings.js';
+import { registerUpdateRoutes } from './routes/update.js';
 import { encyclopediaEnabledAtStartup } from './encyclopedia/config.js';
 import { securityMiddleware } from './security.js';
 import { createCampaignCockpit } from './cockpit/wiring.js';
@@ -77,6 +78,7 @@ export function createApp(ctx: Ctx): express.Express {
   registerEncyclopediaRoutes(api, ctx);
   registerPrintRoutes(api, ctx);
   registerSettingsRoutes(api, ctx);
+  registerUpdateRoutes(api, ctx);
   app.use('/api', api);
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'There is no such action.' });

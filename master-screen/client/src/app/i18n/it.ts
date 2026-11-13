@@ -10,6 +10,7 @@ import { liveModelIt } from './parts/live-model.it';
 import { polishIt } from './parts/polish.it';
 import { settingsPageIt } from './parts/settings-page.it';
 import { helpersIt } from './parts/helpers.it';
+import { updateIt } from './parts/update.it';
 
 export const it: Record<TranslationKey, string> = {
   ...liveAgentIt,
@@ -23,6 +24,7 @@ export const it: Record<TranslationKey, string> = {
   ...liveModelIt,
   ...polishIt,
   ...settingsPageIt,
+  ...updateIt,
   'nav.home': 'Home',
   'nav.search': 'Cerca',
   'nav.liveTable': 'Tavolo',

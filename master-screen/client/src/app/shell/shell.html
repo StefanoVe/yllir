@@ -48,8 +48,11 @@
       <lucide-angular [img]="icons.SunMoon" [size]="20" aria-hidden="true" />
     </button>
     <a class="rail-item" routerLink="/settings" routerLinkActive="active" ariaCurrentWhenActive="page"
-       [attr.aria-label]="i18n.t('nav.settings')" [title]="i18n.t('nav.settings')">
+       [attr.aria-label]="settingsLabel()" [title]="settingsLabel()">
       <lucide-angular [img]="icons.Settings" [size]="20" aria-hidden="true" />
+      @if (showUpdateNotice()) {
+        <span class="rail-dot" aria-hidden="true"></span>
+      }
     </a>
   </nav>
 
