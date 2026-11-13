@@ -558,23 +558,24 @@ Solo per il master.
   test('reads the Italian sheet: labels as written, ability rows, initiative and CR', () => {
     const summary = statSummary(REAL, ITALIAN);
     assert.deepEqual(summary.lines, [
-      { label: 'CA', value: '15 (armatura di pietra)' },
-      { label: 'PF', value: '52' },
-      { label: 'Velocità', value: '9 m' },
-      { label: 'Iniziativa', value: '+1' },
-      { label: 'FOR', value: '18 (+4)' },
-      { label: 'DES', value: '8 (-1)' },
-      { label: 'COS', value: '16 (+3)' },
-      { label: 'INT', value: '3 (-4)' },
-      { label: 'SAG', value: '10 (+0)' },
-      { label: 'CAR', value: '5 (-3)' },
-      { label: 'GS', value: '2' },
+      { id: 'ac', label: 'CA', value: '15 (armatura di pietra)' },
+      { id: 'hp', label: 'PF', value: '52' },
+      { id: 'speed', label: 'Velocità', value: '9 m' },
+      { id: 'initiative', label: 'Iniziativa', value: '+1' },
+      { id: 'str', label: 'FOR', value: '18 (+4)' },
+      { id: 'dex', label: 'DES', value: '8 (-1)' },
+      { id: 'con', label: 'COS', value: '16 (+3)' },
+      { id: 'int', label: 'INT', value: '3 (-4)' },
+      { id: 'wis', label: 'SAG', value: '10 (+0)' },
+      { id: 'cha', label: 'CAR', value: '5 (-3)' },
+      { id: 'cr', label: 'GS', value: '2' },
     ]);
   });
 
   test('collects every action paragraph under the action headings, with plain text', () => {
     const { actions } = statSummary(REAL, ITALIAN);
     assert.deepEqual(actions, [
+      { name: 'Pugno', text: '+6, 1d8 + 4', group: 'actions', timing: 'own_turn' },
       { name: 'Pugno pesante', text: 'Il guardiano colpisce con il braccio di pietra.', group: 'actions', timing: 'own_turn' },
       { name: 'Sasso lanciato', text: 'Gittata 30 m, 1d6 danni.', group: 'actions', timing: 'own_turn' },
       { name: 'Scatto', text: 'Il guardiano si sposta di 3 m.', group: 'bonus_actions', timing: 'own_turn' },
@@ -586,13 +587,13 @@ Solo per il master.
   test('reads the English sheet with the English headings and labels', () => {
     const summary = statSummary(REAL, ENGLISH);
     assert.deepEqual(summary.lines.slice(0, 4), [
-      { label: 'AC', value: '15' },
-      { label: 'HP', value: '52' },
-      { label: 'Speed', value: '9 m' },
-      { label: 'Initiative', value: '+1' },
+      { id: 'ac', label: 'AC', value: '15' },
+      { id: 'hp', label: 'HP', value: '52' },
+      { id: 'speed', label: 'Speed', value: '9 m' },
+      { id: 'initiative', label: 'Initiative', value: '+1' },
     ]);
-    assert.deepEqual(summary.lines.find((line) => line.label === 'STR'), { label: 'STR', value: '18 (+4)' });
-    assert.deepEqual(summary.lines.find((line) => line.label === 'CR'), { label: 'CR', value: '2' });
+    assert.deepEqual(summary.lines.find((line) => line.label === 'STR'), { id: 'str', label: 'STR', value: '18 (+4)' });
+    assert.deepEqual(summary.lines.find((line) => line.label === 'CR'), { id: 'cr', label: 'CR', value: '2' });
     assert.deepEqual(summary.actions.map((action) => action.name), [
       'Heavy fist', 'Dash', 'Parry', 'Heavy step',
     ]);
@@ -737,5 +738,80 @@ describe('action groups from the adapter', () => {
       { name: 'Parata', text: 'Testo.', group: 'actions', timing: 'own_turn' },
       { name: 'Passo', text: 'Testo.', group: 'actions', timing: 'own_turn' },
     ]);
+  });
+});
+
+describe('statSummary: action tables', () => {
+  const TABLE_SHEET = `# Guardiano sintetico
+
+## Statistiche
+
+### Caratteristiche
+
+| Caratteristica | Valore |
+|---|---|
+| CA | 13 |
+| PF | 9 (2d8) |
+
+### Attacchi e capacità
+
+| Attacco o capacità | Dettagli |
+|---|---|
+| Lancia | Attacco in mischia o a distanza: +3, portata 5 ft. o gittata 20/60 ft. Colpisce: 4 (1d6 + 1) danni perforanti. |
+| Parata | Reazione: +2 CA contro un attacco in mischia che lo colpirebbe. |
+| Colpo di coda | Azione leggendaria: il guardiano colpisce con la coda. |
+`;
+
+  test('the table under Attacchi e capacità gives one action per row, with group and timing', () => {
+    assert.deepEqual(statSummary(REAL, TABLE_SHEET).actions, [
+      { name: 'Lancia', text: 'Attacco in mischia o a distanza: +3, portata 5 ft. o gittata 20/60 ft. Colpisce: 4 (1d6 + 1) danni perforanti.', group: 'actions', timing: 'own_turn' },
+      { name: 'Parata', text: 'Reazione: +2 CA contro un attacco in mischia che lo colpirebbe.', group: 'reactions', timing: 'any_turn' },
+      { name: 'Colpo di coda', text: 'Azione leggendaria: il guardiano colpisce con la coda.', group: 'legendary_actions', timing: 'others_turns' },
+    ]);
+  });
+
+  test('a row whose details start with Azione bonus goes to bonus_actions and keeps the marker in its text', () => {
+    const sheet = '### Attacchi e capacità\n\n| Attacco o capacità | Dettagli |\n|---|---|\n| Scatto | Azione bonus: il guardiano si sposta di 3 m. |\n';
+    assert.deepEqual(statSummary(REAL, sheet).actions, [
+      { name: 'Scatto', text: 'Azione bonus: il guardiano si sposta di 3 m.', group: 'bonus_actions', timing: 'own_turn' },
+    ]);
+  });
+
+  test('a marker in parentheses in the name gives the group', () => {
+    const sheet = '### Attacchi e capacità\n\n| Attacco o capacità | Dettagli |\n|---|---|\n| Morso (reazione) | Quando un nemico entra in mischia, morde. |\n';
+    assert.deepEqual(statSummary(REAL, sheet).actions, [
+      { name: 'Morso (reazione)', text: 'Quando un nemico entra in mischia, morde.', group: 'reactions', timing: 'any_turn' },
+    ]);
+  });
+
+  test('the English heading and columns work the same way', () => {
+    const sheet = '## Statistics\n\n### Attacks and abilities\n\n| Attack or ability | Details |\n| --- | --- |\n| Bite | Reaction: +2 AC against a melee attack. |\n';
+    assert.deepEqual(statSummary(REAL, sheet).actions, [
+      { name: 'Bite', text: 'Reaction: +2 AC against a melee attack.', group: 'reactions', timing: 'any_turn' },
+    ]);
+  });
+
+  test('table rows and paragraph actions come in document order', () => {
+    const sheet = '## Azioni\n\n**Colpo.** Testo.\n\n### Attacchi e capacità\n\n| Attacco o capacità | Dettagli |\n|---|---|\n| Morso | Testo del morso. |\n\n## Reazioni\n\n**Parata.** Testo.\n';
+    assert.deepEqual(statSummary(REAL, sheet).actions.map((action) => action.name), ['Colpo', 'Morso', 'Parata']);
+  });
+
+  test('a row inside the master-only block is not returned', () => {
+    const sheet = '### Attacchi e capacità\n\n| Attacco o capacità | Dettagli |\n|---|---|\n| Colpo visibile | Un colpo. |\n\n<!-- master -->\n### Attacchi e capacità\n\n| Attacco o capacità | Dettagli |\n|---|---|\n| Colpo segreto | Non deve comparire. |\n<!-- /master -->\n';
+    const summary = statSummary(REAL, sheet);
+    assert.deepEqual(summary.actions.map((action) => action.name), ['Colpo visibile']);
+    assert.equal(JSON.stringify(summary).includes('Colpo segreto'), false);
+  });
+
+  test('the stat lines carry the adapter field id: CA gives ac and PF gives hp', () => {
+    assert.deepEqual(statSummary(REAL, TABLE_SHEET).lines, [
+      { id: 'ac', label: 'CA', value: '13' },
+      { id: 'hp', label: 'PF', value: '9 (2d8)' },
+    ]);
+  });
+
+  test('without action_table in the adapter, the tables give no actions', () => {
+    const { action_table: _unused, ...withoutTable } = REAL;
+    assert.deepEqual(statSummary(withoutTable, TABLE_SHEET).actions, []);
   });
 });

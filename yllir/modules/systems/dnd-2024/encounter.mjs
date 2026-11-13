@@ -504,9 +504,10 @@ export function validateState(adapter, state) {
 }
 
 // Public summary of a stat block, for the tooltip of a combatant. Reads the sheet's
-// statistics tables (ability rows, armour class, hit points, speed) and every entry
-// under the action headings. The master-only block is removed first, so it never
-// comes back.
+// statistics tables (ability rows, armour class, hit points, speed), the rows of the
+// action tables (adapter.action_table, the "attacks and abilities" tables) and every
+// paragraph under the action headings. The master-only block is removed first, so it
+// never comes back.
 const MASTER_BLOCK = /<!--\s*master\s*-->[\s\S]*?<!--\s*\/master\s*-->/g;
 const MASTER_OPEN = /<!--\s*master\s*-->[\s\S]*$/;
 // Action headings of the fixed set, used when the adapter declares no action_groups.
@@ -535,6 +536,7 @@ function plainText(text) {
 }
 
 const normaliseLabel = (text) => plainText(text).replace(/:$/, '').toLowerCase();
+const normaliseMarker = (text) => text.replace(/\s+/g, ' ').trim().toLowerCase();
 
 // Maps every label the sheet may use (Italian or English) to the adapter field id.
 function labelMap(adapter) {
@@ -549,29 +551,43 @@ function labelMap(adapter) {
   return map;
 }
 
-// Maps each action heading (normalised) to its { group, timing }. The adapter's
-// action_groups decide which headings are actions; without them the fixed set is used.
-function actionHeadings(adapter) {
-  const map = new Map();
+// The action rules of the adapter, read once per call:
+// - headings: each action heading (normalised) to its { group, timing };
+// - groups: each action group with its timing and its markers (normalised);
+// - tables: the table headings (normalised) whose rows are actions;
+// - fallback: the group of a row no marker matches, the first group with timing own_turn.
+// Without action_groups in the adapter, the fixed headings are actions of their own turn.
+function actionRules(adapter) {
+  const headings = new Map();
+  const groups = [];
   if (Array.isArray(adapter?.action_groups)) {
     for (const group of adapter.action_groups) {
-      for (const heading of group.headings ?? []) {
-        map.set(normaliseLabel(heading), { group: group.id, timing: group.timing });
-      }
+      const markers = Array.isArray(group?.markers)
+        ? group.markers.filter((m) => typeof m === 'string' && m.trim() !== '').map(normaliseMarker)
+        : [];
+      const entry = { group: group.id, timing: group.timing, markers };
+      groups.push(entry);
+      for (const heading of group.headings ?? []) headings.set(normaliseLabel(heading), { group: group.id, timing: group.timing });
     }
   } else {
-    for (const heading of FIXED_ACTION_HEADINGS) map.set(heading, { ...FIXED_ACTION_GROUP });
+    for (const heading of FIXED_ACTION_HEADINGS) headings.set(heading, { ...FIXED_ACTION_GROUP });
   }
-  return map;
+  const tables = new Set(
+    (Array.isArray(adapter?.action_table) ? adapter.action_table : [])
+      .filter((heading) => typeof heading === 'string' && heading.trim() !== '')
+      .map(normaliseLabel),
+  );
+  const own = groups.find((group) => group.timing === 'own_turn') ?? groups[0];
+  const fallback = own ? { group: own.group, timing: own.timing } : { ...FIXED_ACTION_GROUP };
+  return { headings, groups, tables, fallback };
 }
 
 // First table row for each known label: `| CA | 15 (armatura) |` gives ac.
 function statRows(lines, labels) {
   const found = new Map();
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith('|')) continue;
-    const cells = trimmed.replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
+    if (!isTableRow(line)) continue;
+    const cells = splitRow(line);
     if (cells.length < 2) continue;
     const id = labels.get(normaliseLabel(cells[0]));
     const value = plainText(cells[1]);
@@ -580,6 +596,10 @@ function statRows(lines, labels) {
   }
   return found;
 }
+
+const isTableRow = (line) => line.trim().startsWith('|');
+const splitRow = (line) => line.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map((cell) => cell.trim());
+const isSeparatorRow = (cells) => cells.every((cell) => /^:?-+:?$/.test(cell));
 
 // A paragraph starting with a bold name: `***Name.*** text`, `**Name.** text`, or a list item of that form.
 function actionFromParagraph(text) {
@@ -590,47 +610,113 @@ function actionFromParagraph(text) {
   return { name, text: plainText(match[3]) };
 }
 
-// Every action paragraph under an action heading, in document order, with its group.
-function actionEntries(lines, headings) {
+// True when `marker` is the whole of `lead` or its first words, at a word boundary.
+function leadsWith(lead, marker) {
+  if (!lead.startsWith(marker)) return false;
+  return lead.length === marker.length || !/[\p{L}\p{N}]/u.test(lead[marker.length]);
+}
+
+// The group of one table row. Its details (the text before the first `:` or `.`) start
+// with a marker: the longest such marker wins, so `Azione bonus` beats `Azione`. Without
+// one, a marker in parentheses in the name counts. Otherwise the row takes the fallback.
+function rowGroup(rules, name, details) {
+  const lead = normaliseMarker(details.split(/[:.]/)[0]);
+  let best = null;
+  for (const group of rules.groups) {
+    for (const marker of group.markers) {
+      if (leadsWith(lead, marker) && (best === null || marker.length > best.marker.length)) best = { marker, group };
+    }
+  }
+  if (best) return { group: best.group.group, timing: best.group.timing };
+  for (const match of name.matchAll(/\(([^()]*)\)/g)) {
+    const wanted = normaliseMarker(match[1]);
+    const found = rules.groups.find((group) => group.markers.includes(wanted));
+    if (found) return { group: found.group, timing: found.timing };
+  }
+  return { ...rules.fallback };
+}
+
+// One row of an action table: the first cell is the name, the second the details.
+function tableAction(rules, cells) {
+  const name = plainText(cells[0] ?? '');
+  if (name === '') return null;
+  const text = plainText(cells[1] ?? '');
+  return { name, text, ...rowGroup(rules, name, text) };
+}
+
+// Every action in the sheet, with the line where it starts (`at`): the paragraphs under
+// the action headings and the rows of the action tables. Table rows: the first row of a
+// table is its header and the separator row after it is skipped.
+function actionEntries(lines, rules) {
   const actions = [];
-  let current = null;
+  let current = null; // { group, timing } of the action heading, or null
+  let tableSection = false; // the heading is one of adapter.action_table
+  let phase = null; // null before the header row, then 'separator', then 'rows'
   let paragraph = [];
+  let paragraphAt = 0;
   const flush = () => {
     if (current !== null && paragraph.length > 0) {
       const entry = actionFromParagraph(paragraph.join(' '));
-      if (entry) actions.push({ ...entry, group: current.group, timing: current.timing });
+      if (entry) actions.push({ ...entry, group: current.group, timing: current.timing, at: paragraphAt });
     }
     paragraph = [];
   };
-  for (const raw of lines) {
+  lines.forEach((raw, at) => {
     const heading = /^#{1,6}\s+(.*?)\s*#*\s*$/.exec(raw);
     if (heading) {
       flush();
-      current = headings.get(normaliseLabel(heading[1])) ?? null;
-      continue;
+      const key = normaliseLabel(heading[1]);
+      current = rules.headings.get(key) ?? null;
+      tableSection = rules.tables.has(key);
+      phase = null;
+      return;
     }
     if (raw.trim() === '') {
       flush();
-      continue;
+      phase = null;
+      return;
     }
-    if (current !== null) paragraph.push(raw.trim());
-  }
+    if (tableSection && isTableRow(raw)) {
+      const cells = splitRow(raw);
+      if (phase === null) {
+        phase = 'separator'; // the header row
+        return;
+      }
+      phase = 'rows';
+      if (isSeparatorRow(cells)) return;
+      const entry = tableAction(rules, cells);
+      if (entry) actions.push({ ...entry, at });
+      return;
+    }
+    phase = null;
+    if (current !== null) {
+      if (paragraph.length === 0) paragraphAt = at;
+      paragraph.push(raw.trim());
+    }
+  });
   flush();
   return actions;
 }
 
 /**
  * Summary of a stat block for the tooltip. `lines` are the rows found in the statistics
- * tables, in a fixed order, with the label as the sheet writes it and the value as the
- * sheet writes it, in plain text. `actions` are the entries under the action headings:
- * `group` is the id of the adapter's action group and `timing` says when it can be used
- * (own_turn, any_turn or others_turns). Without action_groups in the adapter, every
- * action has group `actions` and timing `own_turn`.
- * The master-only block is removed before anything is read. Never throws: unexpected
- * input gives empty lists.
+ * tables, in a fixed order: `id` is the adapter field id (or `initiative` and `cr`),
+ * `label` is the label as the sheet writes it and `value` the value as the sheet writes
+ * it, in plain text. `actions` are, in document order, the paragraphs under the action
+ * headings and the rows of the tables under the headings of adapter.action_table (the
+ * first cell is the name, the second the details; the header and separator rows are
+ * skipped). Each action has `group`, the id of the adapter's action group, and `timing`
+ * (own_turn, any_turn or others_turns):
+ * - a row whose details start with one of the markers of a group (text before the first
+ *   `:` or `.`; the longest marker wins) takes that group, and the marker stays in `text`;
+ * - otherwise a marker in parentheses in the name gives the group;
+ * - otherwise the first group with timing own_turn.
+ * Without action_groups in the adapter, every action has group `actions` and timing
+ * `own_turn`. The master-only block is removed before anything is read. Never throws:
+ * unexpected input gives empty lists.
  * @param {object} adapter the parsed adapter.yaml of the game system
  * @param {string} markdown the sheet, Markdown
- * @returns {{lines: {label: string, value: string}[], actions: {name: string, text: string, group: string, timing: string}[]}}
+ * @returns {{lines: {id: string, label: string, value: string}[], actions: {name: string, text: string, group: string, timing: string}[]}}
  */
 export function statSummary(adapter, markdown) {
   try {
@@ -641,9 +727,12 @@ export function statSummary(adapter, markdown) {
     const summary = [];
     for (const id of STAT_ORDER) {
       const row = rows.get(id);
-      if (row) summary.push({ label: row.label, value: row.value });
+      if (row) summary.push({ id, label: row.label, value: row.value });
     }
-    return { lines: summary, actions: actionEntries(lines, actionHeadings(adapter)) };
+    const actions = actionEntries(lines, actionRules(adapter))
+      .sort((a, b) => a.at - b.at)
+      .map(({ name, text, group, timing }) => ({ name, text, group, timing }));
+    return { lines: summary, actions };
   } catch {
     return { lines: [], actions: [] };
   }

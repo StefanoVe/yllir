@@ -119,6 +119,7 @@ duration_labels:
   rounds:
     it: per alcuni round
     en: for some rounds
+action_table: [attacchi e capacità, attacks and abilities]
 action_groups:
   - id: actions
     timing: own_turn
@@ -126,24 +127,28 @@ action_groups:
       it: Azioni
       en: Actions
     headings: [azioni, actions]
+    markers: [azione, action]
   - id: bonus_actions
     timing: own_turn
     label:
       it: Azioni bonus
       en: Bonus actions
     headings: [azioni bonus, bonus actions]
+    markers: [azione bonus, bonus action]
   - id: reactions
     timing: any_turn
     label:
       it: Reazioni
       en: Reactions
     headings: [reazioni, reactions]
+    markers: [reazione, reaction]
   - id: legendary_actions
     timing: others_turns
     label:
       it: Azioni leggendarie
       en: Legendary actions
     headings: [azioni leggendarie, legendary actions]
+    markers: [azione leggendaria, legendary action]
 creature_sheet:
   section: statistics
   required:

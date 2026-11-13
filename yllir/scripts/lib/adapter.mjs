@@ -89,7 +89,7 @@ function validate(adapter, folderId, folder) {
   const errors = [];
   const error = (code, field, message) => errors.push({ code, path: field, message });
   if (!isMapping(adapter)) return [{ code: 'bad-type', path: '', message: 'adapter manifest must be a mapping' }];
-  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'condition_labels', 'duration_labels', 'action_groups', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not'];
+  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'resources', 'conditions', 'condition_durations', 'condition_labels', 'duration_labels', 'action_table', 'action_groups', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not'];
   for (const key of Object.keys(adapter)) if (!allowed.includes(key)) error('unknown-key', key, `"${key}" is not a setting of an adapter manifest`);
   if (typeof adapter.id !== 'string' || !SLUG_RE.test(adapter.id)) error('bad-value', 'id', 'id must be a lowercase slug');
   if (adapter.id !== folderId) error('id-mismatch', 'id', `id must match the adapter folder ${folderId}`);
@@ -179,6 +179,15 @@ function validate(adapter, folderId, folder) {
       }
     }
   }
+  // Headings of the tables whose rows are actions (attacks and abilities): a nonempty list of text.
+  const isTextList = (value) => Array.isArray(value) && value.every((item) => typeof item === 'string' && item.trim() !== '');
+  if (adapter.action_table !== undefined) {
+    if (!Array.isArray(adapter.action_table)) {
+      error('bad-type', 'action_table', 'action_table must be a list');
+    } else if (adapter.action_table.length === 0 || !isTextList(adapter.action_table)) {
+      error('bad-value', 'action_table', 'action_table must be a nonempty list of nonempty text');
+    }
+  }
   if (adapter.action_groups !== undefined) {
     if (!Array.isArray(adapter.action_groups)) {
       error('bad-type', 'action_groups', 'action_groups must be a list');
@@ -188,7 +197,7 @@ function validate(adapter, folderId, folder) {
         const at = `action_groups[${index}]`;
         if (!isMapping(group)) { error('bad-type', at, `${at} must be a mapping`); return; }
         for (const key of Object.keys(group)) {
-          if (!['id', 'timing', 'label', 'headings'].includes(key)) error('unknown-key', `${at}.${key}`, `"${key}" is not a setting of an action group`);
+          if (!['id', 'timing', 'label', 'headings', 'markers'].includes(key)) error('unknown-key', `${at}.${key}`, `"${key}" is not a setting of an action group`);
         }
         if (typeof group.id !== 'string' || !group.id.trim()) {
           error('bad-value', `${at}.id`, `${at}.id must be nonempty text`);
@@ -201,6 +210,10 @@ function validate(adapter, folderId, folder) {
         const headings = group.headings;
         if (!Array.isArray(headings) || headings.length === 0 || headings.some((heading) => typeof heading !== 'string' || !heading.trim())) {
           error('bad-value', `${at}.headings`, `${at}.headings must be a nonempty list of nonempty text`);
+        }
+        // Optional words that put a row of an action table in this group (see statSummary).
+        if (group.markers !== undefined && !isTextList(group.markers)) {
+          error('bad-value', `${at}.markers`, `${at}.markers must be a list of nonempty text`);
         }
       });
     }

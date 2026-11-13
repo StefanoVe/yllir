@@ -234,3 +234,40 @@ test('action groups need unique ids, a label in both languages and nonempty head
     assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.path === 'action_groups[2].headings'));
   });
 });
+
+test('the D&D manifest declares the action table and the markers of each action group', () => {
+  withRoot((temp) => {
+    fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    write(temp, 'dnd-2024', source);
+    const loaded = loadAdapter(temp, 'dnd-2024');
+    assert.deepEqual(loaded.errors, []);
+    assert.deepEqual(loaded.adapter.action_table, ['attacchi e capacità', 'attacks and abilities']);
+    assert.deepEqual(loaded.adapter.action_groups.map((group) => group.markers), [
+      ['azione', 'action'],
+      ['azione bonus', 'bonus action'],
+      ['reazione', 'reaction'],
+      ['azione leggendaria', 'legendary action'],
+    ]);
+  });
+});
+
+test('action_table must be a nonempty list of nonempty text', () => {
+  withRoot((temp) => {
+    write(temp, 'dnd-2024', replace(source, 'action_table: [attacchi e capacità, attacks and abilities]', 'action_table: []'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'action_table'));
+
+    write(temp, 'dnd-2024', replace(source, 'action_table: [attacchi e capacità, attacks and abilities]', 'action_table: attacks'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-type' && e.path === 'action_table'));
+  });
+});
+
+test('a non-string marker is refused', () => {
+  withRoot((temp) => {
+    write(temp, 'dnd-2024', replace(source, 'markers: [reazione, reaction]', 'markers: [reazione, 3]'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'action_groups[2].markers'));
+
+    write(temp, 'dnd-2024', replace(source, 'markers: [reazione, reaction]', 'markers: reazione'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'action_groups[2].markers'));
+  });
+});
