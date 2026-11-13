@@ -141,4 +141,10 @@ export const liveAgentEn = {
   'liveAgent.viewer.openPdf': 'Open PDF in a new tab',
   'liveAgent.viewer.closePdf': 'Close PDF',
   'liveAgent.viewer.pdfReady': 'The PDF is ready to open.',
+  'liveAgent.masterOnlyBadge': 'Master only',
+  'liveAgent.backShort': 'Back',
+  'liveAgent.onThisPage': 'On this page',
+  'liveAgent.mentionedIn': 'Mentioned in',
+  'liveAgent.hintSheet': 'change sheet',
+  'liveAgent.hintClose': 'close',
 } as const;

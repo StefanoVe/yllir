@@ -149,4 +149,10 @@ export const liveAgentIt = {
   'liveAgent.viewer.openPdf': 'Apri PDF in nuova scheda',
   'liveAgent.viewer.closePdf': 'Chiudi PDF',
   'liveAgent.viewer.pdfReady': 'Il documento PDF è pronto per l’apertura.',
+  'liveAgent.masterOnlyBadge': 'Solo master',
+  'liveAgent.backShort': 'Indietro',
+  'liveAgent.onThisPage': 'In questa pagina',
+  'liveAgent.mentionedIn': 'Citato in',
+  'liveAgent.hintSheet': 'cambia scheda',
+  'liveAgent.hintClose': 'chiudi',
 } as const;

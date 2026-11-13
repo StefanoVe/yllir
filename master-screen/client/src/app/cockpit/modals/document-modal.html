@@ -6,75 +6,166 @@
   [attr.aria-label]="doc()?.title || i18n.t('liveAgent.document')"
 >
   <header class="modal-head">
-    @if (history().length > 1) {
-    <button
-      class="icon-button"
-      [title]="i18n.t('liveAgent.back')"
-      [attr.aria-label]="i18n.t('liveAgent.backToPrevious')"
-      (click)="back()"
-    >
-      <ui-icon name="left" [size]="17" />
-    </button>
-    }
-    <div class="modal-title">
-      <h2>{{ doc()?.title || i18n.t("liveAgent.loading") }}</h2>
-      @if (doc(); as d) {
-      <p>{{ d.path }}</p>
+    <div class="modal-title head-title" [attr.title]="doc()?.path ?? null">
+      @if (category(); as cat) {
+      <p class="eyebrow">{{ cat }}</p>
+      }
+      <div class="title-row">
+        <h2>{{ doc()?.title || i18n.t("liveAgent.loading") }}</h2>
+        @if (doc()?.masterOnly) {
+        <span class="master-pill">{{ i18n.t("liveAgent.masterOnlyBadge") }}</span>
+        }
+      </div>
+    </div>
+    <div class="head-actions">
+      @if (history().length > 1) {
+      <button
+        type="button"
+        class="back-button"
+        [title]="i18n.t('liveAgent.back')"
+        [attr.aria-label]="i18n.t('liveAgent.backToPrevious')"
+        (click)="back()"
+      >
+        <ui-icon name="left" [size]="16" />
+        <span>{{ i18n.t("liveAgent.backShort") }}</span>
+      </button>
+      }
+      @if (navigator(); as nav) {
+      <div class="segmented">
+        <button
+          type="button"
+          class="icon-button"
+          [title]="i18n.t('liveAgent.previousSheet')"
+          [attr.aria-label]="i18n.t('liveAgent.previousSheet')"
+          [disabled]="!nav.prev"
+          (click)="step(-1)"
+        >
+          <ui-icon name="left" [size]="17" />
+        </button>
+        <span
+          class="sheet-position"
+          [title]="i18n.t('liveAgent.sheetPosition', { current: nav.index + 1, total: nav.total })"
+          >{{ nav.index + 1 }} / {{ nav.total }}</span
+        >
+        <button
+          type="button"
+          class="icon-button"
+          [title]="i18n.t('liveAgent.nextSheet')"
+          [attr.aria-label]="i18n.t('liveAgent.nextSheet')"
+          [disabled]="!nav.next"
+          (click)="step(1)"
+        >
+          <ui-icon name="right" [size]="17" />
+        </button>
+      </div>
+      }
+      <span class="head-divider" aria-hidden="true"></span>
+      <button
+        type="button"
+        class="icon-button"
+        [title]="i18n.t('liveAgent.openInReader')"
+        [attr.aria-label]="i18n.t('liveAgent.openInReaderAria')"
+        (click)="openInReader()"
+      >
+        <ui-icon name="external" [size]="17" />
+      </button>
+      <button
+        #closeButton
+        type="button"
+        class="icon-button close-button"
+        [title]="i18n.t('liveAgent.closeEsc')"
+        [attr.aria-label]="i18n.t('liveAgent.close')"
+        (click)="dismiss()"
+      >
+        <ui-icon name="x" [size]="18" />
+      </button>
+    </div>
+    <span
+      class="reading-progress"
+      role="presentation"
+      aria-hidden="true"
+      [style.transform]="'scaleX(' + progress() + ')'"
+    ></span>
+  </header>
+  <div
+    #body
+    class="modal-body document-content"
+    [attr.aria-busy]="loading() ? 'true' : null"
+    (click)="click($event)"
+    (scroll)="onScroll()"
+  >
+    <div class="doc-layout" [class.has-outline]="showOutline()">
+      <div class="doc-main">
+        @if (error()) {
+        <div class="doc-error">
+          <ui-icon name="file" [size]="28" />
+          <p class="modal-error">{{ error() }}</p>
+          <p class="error-path">{{ failedPath() }}</p>
+        </div>
+        } @else if (doc(); as d) {
+        @if (d.masterOnly) {
+        <p class="master-banner">{{ i18n.t("liveAgent.masterOnlyDoc") }}</p>
+        }
+        <article [class.item-document]="d.path.startsWith('Items/')">
+          <ms-doc-body [blocks]="d.blocks" />
+        </article>
+        @if (backlinks().length > 0) {
+        <section class="backlinks">
+          <h3 class="backlinks-title">{{ i18n.t("liveAgent.mentionedIn") }}</h3>
+          <div class="backlink-list">
+            @for (link of backlinks(); track link.path) {
+            <button
+              type="button"
+              class="backlink-chip"
+              [title]="link.path"
+              (click)="openBacklink(link.path)"
+            >
+              {{ link.title }}
+            </button>
+            }
+          </div>
+        </section>
+        }
+        } @else {
+        <div class="doc-skeleton" aria-hidden="true">
+          <span class="skeleton-bar skeleton-title"></span>
+          <span class="skeleton-bar skel-1"></span>
+          <span class="skeleton-bar skel-2"></span>
+          <span class="skeleton-bar skel-3"></span>
+          <span class="skeleton-bar skel-4"></span>
+          <span class="skeleton-bar skel-5"></span>
+          <span class="skeleton-bar skel-6"></span>
+        </div>
+        }
+      </div>
+      @if (showOutline()) {
+      <nav class="doc-outline" [attr.aria-label]="i18n.t('liveAgent.onThisPage')">
+        <p class="outline-title">{{ i18n.t("liveAgent.onThisPage") }}</p>
+        <ul>
+          @for (heading of outline(); track heading.id) {
+          <li>
+            <button
+              type="button"
+              class="outline-link"
+              [class.level-3]="heading.level === 3"
+              [class.active]="activeHeading() === heading.id"
+              [attr.aria-current]="activeHeading() === heading.id ? 'location' : null"
+              (click)="goTo(heading.id)"
+            >
+              {{ heading.text }}
+            </button>
+          </li>
+          }
+        </ul>
+      </nav>
       }
     </div>
-    @if (navigator(); as nav) {
-    <button
-      class="icon-button"
-      [title]="i18n.t('liveAgent.previousSheet')"
-      [attr.aria-label]="i18n.t('liveAgent.previousSheet')"
-      [disabled]="!nav.prev"
-      (click)="step(-1)"
-    >
-      <ui-icon name="left" [size]="17" />
-    </button>
-    <span
-      class="sheet-position"
-      [title]="i18n.t('liveAgent.sheetPosition', { current: nav.index + 1, total: nav.total })"
-      >{{ nav.index + 1 }} / {{ nav.total }}</span
-    >
-    <button
-      class="icon-button"
-      [title]="i18n.t('liveAgent.nextSheet')"
-      [attr.aria-label]="i18n.t('liveAgent.nextSheet')"
-      [disabled]="!nav.next"
-      (click)="step(1)"
-    >
-      <ui-icon name="right" [size]="17" />
-    </button>
-    }
-    <button
-      class="icon-button"
-      [title]="i18n.t('liveAgent.openInReader')"
-      [attr.aria-label]="i18n.t('liveAgent.openInReaderAria')"
-      (click)="openInReader()"
-    >
-      <ui-icon name="external" [size]="17" />
-    </button>
-    <button
-      #closeButton
-      class="icon-button"
-      [title]="i18n.t('liveAgent.closeEsc')"
-      [attr.aria-label]="i18n.t('liveAgent.close')"
-      (click)="dismiss()"
-    >
-      <ui-icon name="x" [size]="18" />
-    </button>
-  </header>
-  <div #body class="modal-body document-content" (click)="click($event)">
-    @if (error()) {
-    <p class="modal-error">{{ error() }}</p>
-    } @else if (doc(); as d) {
-    @if (d.masterOnly) {
-    <p class="notice">{{ i18n.t("liveAgent.masterOnlyDoc") }}</p>
-    }
-    <article [class.item-document]="d.path.startsWith('Items/')">
-      <ms-doc-body [blocks]="d.blocks" />
-    </article>
-    }
   </div>
+  @if (navigator()) {
+  <footer class="modal-hint" aria-hidden="true">
+    <span><kbd>←</kbd><kbd>→</kbd> {{ i18n.t("liveAgent.hintSheet") }}</span>
+    <span class="hint-sep">·</span>
+    <span><kbd>Esc</kbd> {{ i18n.t("liveAgent.hintClose") }}</span>
+  </footer>
+  }
 </section>

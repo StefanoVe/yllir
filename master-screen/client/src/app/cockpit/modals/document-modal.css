@@ -1,0 +1,487 @@
+/* Document reader popup (DocumentModal). Every selector is scoped to .document-modal, and the
+   shared look stays in modal.css, which is loaded first. Colors and spacing come from the tokens in styles.css only. */
+
+/* Override the shared size for the reader only: a fixed height, so the popup does not jump while loading. */
+.document-modal {
+  width: min(1120px, calc(100vw - 48px));
+  height: min(90vh, 1000px);
+  max-height: none;
+  border-radius: var(--radius-lg);
+}
+
+/* Opening animation. The scrim is the sibling before the dialog, so it is matched from the dialog's side. */
+@media (prefers-reduced-motion: no-preference) {
+  .document-modal {
+    animation: document-modal-in 160ms ease-out both;
+  }
+  .cockpit-scrim:has(+ .document-modal) {
+    animation: document-scrim-in 160ms ease-out both;
+  }
+}
+@keyframes document-modal-in {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes document-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Focus ring for every button of the popup. */
+.document-modal button:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* Header: stays put, because only the body scrolls. */
+.document-modal .modal-head {
+  position: relative;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 12px 16px 12px 24px;
+}
+.document-modal .head-title {
+  flex: 1;
+  min-width: 0;
+}
+.document-modal .eyebrow {
+  margin: 0 0 2px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.document-modal .title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.document-modal .modal-title h2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: normal;
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+.document-modal .master-pill {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+/* Header actions: one row that never wraps or shrinks; groups are separated by the gap. */
+.document-modal .head-actions {
+  display: flex;
+  align-items: center;
+  flex: none;
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+.document-modal .head-actions ui-icon {
+  display: flex;
+  flex: none;
+}
+
+/* One button system: 36px square (44px on narrow screens), borderless, radius 10px. */
+.document-modal .back-button,
+.document-modal .icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  box-sizing: border-box;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition-property: background-color, color;
+  transition-duration: 120ms;
+  transition-timing-function: ease-out;
+}
+.document-modal .icon-button:disabled {
+  background: transparent;
+}
+.document-modal .back-button:not(:disabled):active,
+.document-modal .icon-button:not(:disabled):active {
+  background: color-mix(in srgb, var(--color-surface-2) 92%, var(--color-text) 8%);
+}
+@media (hover: hover) {
+  .document-modal .icon-button:not(:disabled):hover {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .document-modal .back-button,
+  .document-modal .icon-button {
+    transition-property: background-color, color, transform;
+  }
+  .document-modal .back-button:not(:disabled):active,
+  .document-modal .icon-button:not(:disabled):active {
+    transform: scale(0.96);
+  }
+}
+
+/* Back: the same button with its label, on a filled surface. */
+.document-modal .back-button {
+  width: auto;
+  gap: 6px;
+  padding: 0 14px 0 10px;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+.document-modal .back-button:not(:disabled):active {
+  background: color-mix(in srgb, var(--color-surface-2) 92%, var(--color-text) 8%);
+}
+@media (hover: hover) {
+  .document-modal .back-button:hover {
+    background: color-mix(in srgb, var(--color-surface-2) 92%, var(--color-text) 8%);
+  }
+}
+
+/* Sheet navigator: a borderless track with the prev, position and next controls inside. */
+.document-modal .segmented {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 0;
+  height: 36px;
+  padding: 2px;
+  border-radius: 10px;
+  background: var(--color-surface-2);
+}
+.document-modal .segmented .icon-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+.document-modal .segmented .icon-button:not(:disabled):active {
+  background: color-mix(in srgb, var(--color-surface) 92%, var(--color-text) 8%);
+}
+@media (hover: hover) {
+  .document-modal .segmented .icon-button:not(:disabled):hover {
+    background: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-1);
+  }
+}
+.document-modal .sheet-position {
+  min-width: 48px;
+  padding: 0 4px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+}
+
+/* The divider is not drawn: the gap between groups does that job. */
+.document-modal .head-divider {
+  display: none;
+}
+
+/* Close: the same button, with the danger tint on hover and press. */
+.document-modal .close-button:not(:disabled):active {
+  background: color-mix(in srgb, var(--color-danger) 20%, transparent);
+  color: var(--color-danger);
+}
+@media (hover: hover) {
+  .document-modal .close-button:not(:disabled):hover {
+    background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+    color: var(--color-danger);
+  }
+}
+.document-modal .reading-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: var(--color-accent);
+  transform-origin: left center;
+  transform: scaleX(0);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .document-modal .reading-progress {
+    transition: transform 80ms linear;
+  }
+}
+
+/* Body: one scroll container with the document column and, when wide, the outline rail. */
+.document-modal .modal-body {
+  padding: 0;
+}
+.document-modal .doc-layout {
+  display: block;
+}
+.document-modal .doc-main {
+  box-sizing: content-box;
+  max-width: 72ch;
+  margin: 0 auto;
+  padding: 28px 40px 8px;
+}
+.document-modal .master-banner {
+  margin: 0 0 var(--space-2);
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+.document-modal .doc-outline {
+  display: none;
+}
+@media (min-width: 1000px) {
+  .document-modal .doc-layout.has-outline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 220px;
+  }
+  .document-modal .doc-layout.has-outline .doc-outline {
+    display: block;
+    position: sticky;
+    top: 0;
+    align-self: start;
+    width: 220px;
+    max-height: calc(90vh - 120px);
+    box-sizing: border-box;
+    overflow-y: auto;
+    padding: 28px 16px 24px 0;
+  }
+}
+.document-modal .outline-title {
+  margin: 0 0 8px;
+  padding-left: 12px;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.document-modal .doc-outline ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.document-modal .outline-link {
+  display: block;
+  width: 100%;
+  padding: 5px 10px 5px 12px;
+  border: 0;
+  border-left: 2px solid transparent;
+  border-radius: 0 6px 6px 0;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+  text-align: left;
+  cursor: pointer;
+}
+.document-modal .outline-link:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+.document-modal .outline-link.level-3 {
+  padding-left: 24px;
+}
+.document-modal .outline-link.active {
+  border-left-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+
+/* Backlinks footer. */
+.document-modal .backlinks {
+  margin-top: var(--space-4);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+.document-modal .backlinks-title {
+  margin: 0 0 var(--space-1);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+.document-modal .backlink-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.document-modal .backlink-chip {
+  max-width: 100%;
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-align: left;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.document-modal .backlink-chip:hover {
+  background: var(--color-surface-2);
+  border-color: var(--color-accent);
+}
+
+/* Loading skeleton: shimmer only when motion is allowed. */
+.document-modal .doc-skeleton {
+  display: grid;
+  gap: 12px;
+  padding-top: 8px;
+}
+.document-modal .skeleton-bar {
+  display: block;
+  height: 12px;
+  border-radius: 6px;
+  background: var(--color-surface-2);
+}
+.document-modal .skeleton-title {
+  width: 60%;
+  height: 22px;
+  margin-bottom: 8px;
+}
+.document-modal .skel-1 { width: 96%; }
+.document-modal .skel-2 { width: 88%; }
+.document-modal .skel-3 { width: 100%; }
+.document-modal .skel-4 { width: 72%; }
+.document-modal .skel-5 { width: 92%; }
+.document-modal .skel-6 { width: 54%; }
+@media (prefers-reduced-motion: no-preference) {
+  .document-modal .skeleton-bar {
+    background: linear-gradient(90deg, var(--color-surface-2) 25%, var(--color-border) 50%, var(--color-surface-2) 75%) 0 0 / 200% 100%;
+    animation: document-shimmer 1.4s ease-in-out infinite;
+  }
+}
+@keyframes document-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+/* Error state. */
+.document-modal .doc-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+.document-modal .doc-error .modal-error {
+  margin: 0;
+}
+.document-modal .error-path {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+/* Footer hint: desktop only, with the navigator. */
+.document-modal .modal-hint {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  gap: 8px;
+  padding: 6px 16px;
+  border-top: 1px solid var(--color-border);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+.document-modal .modal-hint kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-right: 2px;
+  padding: 0 4px;
+  border: 1px solid var(--color-border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+}
+@media (min-width: 760px) {
+  .document-modal .modal-hint {
+    display: flex;
+  }
+}
+
+/* Narrow screens: full screen, larger hit areas, smaller gutters. */
+@media (max-width: 759px) {
+  .document-modal {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+  .document-modal .modal-head {
+    padding: 12px 12px 12px 16px;
+  }
+  .document-modal .doc-main {
+    padding: 28px 16px 8px;
+  }
+  .document-modal .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+  .document-modal .back-button {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+  }
+  .document-modal .back-button span {
+    display: none;
+  }
+  .document-modal .segmented {
+    height: 48px;
+  }
+  .document-modal .segmented .icon-button {
+    width: 44px;
+    height: 44px;
+  }
+}
