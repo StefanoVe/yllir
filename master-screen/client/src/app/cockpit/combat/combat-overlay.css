@@ -11,7 +11,8 @@
  * - Between 900 and 1199 px the turn column is 300 px (the brief fixes 360 px from 1200 px).
  * - The turn panel's "Out of turn" block is a <details> that is open on wide screens only.
  * - The newest-notice list opens as a popover under the header, not as a row of its own.
- * - The initiative step (before the fight starts) is not restyled in this pass.
+ * - The initiative step (before the fight starts) has its own stylesheet (initiative-step.css)
+ *   and the overlay shows no chat until a combat is active.
  * - Row actions keep their full text as visually hidden text (so screen readers and the text
  *   check still see it), with the same text in a title tooltip.
  */

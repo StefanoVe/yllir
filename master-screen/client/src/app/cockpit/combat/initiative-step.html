@@ -1,73 +1,135 @@
 <form class="step" (submit)="$event.preventDefault(); start()">
-  <p class="hint muted">{{ i18n.t("combat.initiative.hint") }}</p>
+  <section class="card participants" aria-labelledby="combat-participants">
+    <h3 id="combat-participants">{{ i18n.t("combat.setup.participants") }}</h3>
 
-  <section aria-labelledby="combat-pcs">
-    <h3 id="combat-pcs">{{ i18n.t("combat.initiative.players") }}</h3>
-    @if (pcRows().length === 0) {
-    <p class="muted">{{ i18n.t("combat.initiative.noPlayers") }}</p>
-    }
-    <ul class="rows">
-      @for (row of pcRows(); track row.key) {
-      <li>
-        <span class="name">{{ row.name }}</span>
-        <input
-          type="number"
-          step="1"
-          inputmode="numeric"
-          class="initiative"
-          [value]="row.initiative"
-          [attr.aria-label]="i18n.t('combat.initiative.of', { name: row.name })"
-          (input)="setInitiative(row.key, initiativeValue($event))"
-        />
-      </li>
-      }
-    </ul>
-  </section>
-
-  <section aria-labelledby="combat-creatures">
-    <h3 id="combat-creatures">{{ i18n.t("combat.initiative.creatures") }}</h3>
-    <ul class="rows">
-      @for (row of creatureRows(); track row.key) {
-      <li [class.unticked]="!row.checked">
-        <label class="name">
+    <section aria-labelledby="combat-pcs">
+      <h4 id="combat-pcs" class="group">{{ i18n.t("combat.initiative.players") }}</h4>
+      <ul class="rows">
+        @for (row of pcRows(); track row.key) {
+        <li class="row" [class.off]="!row.checked">
+          <label class="who">
+            <input
+              type="checkbox"
+              class="tick"
+              [checked]="row.checked"
+              (change)="togglePc(row.key, checkedValue($event))"
+            />
+            <span class="box" aria-hidden="true"></span>
+            <span class="avatar" data-side="pc" aria-hidden="true">{{ initials(row.name) }}</span>
+            <span class="name">{{ row.name }}</span>
+          </label>
           <input
-            type="checkbox"
-            [checked]="row.checked"
-            (change)="toggle(row.cardId, checkedValue($event))"
+            type="number"
+            step="1"
+            inputmode="numeric"
+            class="initiative"
+            placeholder="{{ i18n.t('combat.setup.initiativeShort') }}"
+            [attr.title]="i18n.t('combat.initiative.hint')"
+            [attr.aria-label]="i18n.t('combat.initiative.of', { name: row.name })"
+            [value]="row.initiative"
+            [disabled]="!row.checked"
+            (input)="setInitiative(row.key, inputValue($event))"
           />
-          <span>{{ row.name }}</span>
-        </label>
+        </li>
+        }
+      </ul>
+      <div class="add-pc">
+        <input
+          type="text"
+          class="text"
+          [value]="newPcName()"
+          [placeholder]="i18n.t('combat.setup.addPcName')"
+          [attr.aria-label]="i18n.t('combat.setup.addPcName')"
+          (input)="newPcName.set(inputValue($event))"
+          (keydown.enter)="$event.preventDefault(); addPc()"
+        />
         <button
           type="button"
-          class="side"
-          [class.ally]="row.side === 'ally'"
-          [disabled]="!row.checked"
-          [attr.aria-label]="i18n.t('combat.side.change', { name: row.name })"
-          [title]="i18n.t('combat.side.change', { name: row.name })"
-          (click)="toggleSide(row.cardId)"
-        >{{ sideLabel(row.side) }}</button>
-        <input
-          type="number"
-          step="1"
-          inputmode="numeric"
-          class="initiative"
-          [value]="row.initiative"
-          [disabled]="!row.checked"
-          [attr.aria-label]="i18n.t('combat.initiative.of', { name: row.name })"
-          (input)="setInitiative(row.key, initiativeValue($event))"
-        />
-      </li>
+          class="ghost"
+          [disabled]="!newPcName().trim()"
+          (click)="addPc()"
+        >{{ i18n.t("combat.setup.addPc") }}</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="combat-creatures">
+      <h4 id="combat-creatures" class="group">{{ i18n.t("combat.initiative.creatures") }}</h4>
+      @if (creatureRows().length === 0) {
+      <p class="muted">{{ i18n.t("combat.setup.noCreatures") }}</p>
       }
-    </ul>
+      <ul class="rows">
+        @for (row of creatureRows(); track row.key) {
+        <li class="row" [class.off]="!row.checked">
+          <label class="who">
+            <input
+              type="checkbox"
+              class="tick"
+              [checked]="row.checked"
+              (change)="toggle(row.cardId, checkedValue($event))"
+            />
+            <span class="box" aria-hidden="true"></span>
+            <span class="avatar" [attr.data-side]="row.side" aria-hidden="true">{{ initials(row.name) }}</span>
+            <span class="name">{{ row.name }}</span>
+          </label>
+          <div class="segment">
+            <button
+              type="button"
+              class="side"
+              data-side="ally"
+              [attr.aria-pressed]="row.side === 'ally'"
+              [disabled]="!row.checked"
+              (click)="setSide(row.cardId, 'ally')"
+            >{{ i18n.t("combat.side.ally") }}</button>
+            <button
+              type="button"
+              class="side"
+              data-side="enemy"
+              [attr.aria-pressed]="row.side === 'enemy'"
+              [disabled]="!row.checked"
+              (click)="setSide(row.cardId, 'enemy')"
+            >{{ i18n.t("combat.side.enemy") }}</button>
+          </div>
+          <input
+            type="number"
+            step="1"
+            inputmode="numeric"
+            class="initiative"
+            placeholder="{{ i18n.t('combat.setup.initiativeShort') }}"
+            [attr.title]="i18n.t('combat.initiative.hint')"
+            [attr.aria-label]="i18n.t('combat.initiative.of', { name: row.name })"
+            [value]="row.initiative"
+            [disabled]="!row.checked"
+            (input)="setInitiative(row.key, inputValue($event))"
+          />
+        </li>
+        }
+      </ul>
+    </section>
   </section>
 
-  @if (error()) {
-  <p class="alert" role="alert">{{ error() }}</p>
-  }
+  <section class="card order" aria-labelledby="combat-order">
+    <h3 id="combat-order">{{ i18n.t("combat.setup.order") }}</h3>
+    @if (order().length) {
+    <ol class="tiles" [attr.aria-label]="i18n.t('combat.list')">
+      @for (item of order(); track item.key) {
+      <li class="tile" [attr.data-side]="item.kind">
+        <span class="tile-avatar" aria-hidden="true">{{ initials(item.name) }}</span>
+        <span class="tile-name">{{ item.name }}</span>
+        <span class="tile-init" [class.none]="item.initiative === null">{{ item.initiative ?? "—" }}</span>
+      </li>
+      }
+    </ol>
+    } @else {
+    <p class="muted">{{ i18n.t("combat.setup.orderEmpty") }}</p>
+    }
 
-  <div class="actions">
-    <button type="submit" class="primary" [disabled]="!canStart()">
-      {{ busy() ? i18n.t("combat.initiative.starting") : i18n.t("combat.initiative.start") }}
-    </button>
-  </div>
+    <div class="footer">
+      @if (error()) {
+      <p class="alert" role="alert">{{ error() }}</p>
+      }
+      <button type="submit" class="primary" [disabled]="!canStart()">
+        {{ busy() ? i18n.t("combat.initiative.starting") : i18n.t("combat.setup.start", { n: payload().participants.length }) }}
+      </button>
+    </div>
+  </section>
 </form>

@@ -85,8 +85,8 @@
   </section>
   } }
 
-  <div class="stage" [class.chat-open]="chatOpen()">
-    <main class="body" [class.with-chat]="chatOpen()">
+  <div class="stage" [class.chat-open]="!!combat() && chatOpen()">
+    <main class="body" [class.with-chat]="!!combat() && chatOpen()">
       @if (error()) {
       <p class="alert" role="alert">{{ error() }}</p>
       }
@@ -108,6 +108,7 @@
       }
     </main>
 
+    @if (combat()) {
     <aside class="chat-panel" [class.collapsed]="!chatOpen()" [attr.aria-label]="i18n.t('combat.chat.title')">
       <button
         type="button"
@@ -121,15 +122,10 @@
         <ui-icon [name]="chatOpen() ? 'right' : 'left'" [size]="14" />
       </button>
       @if (chatOpen()) {
-      <cockpit-chat
-        class="chat"
-        [openSource]="openSource"
-        [placeholder]="combat() ? '' : i18n.t('combat.chat.waiting')"
-        [alwaysCompose]="!!combat()"
-        [showHead]="false"
-      />
+      <cockpit-chat class="chat" [openSource]="openSource" [alwaysCompose]="true" [showHead]="false" />
       }
     </aside>
+    }
   </div>
 </div>
 }

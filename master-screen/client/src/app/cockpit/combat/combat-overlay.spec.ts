@@ -179,7 +179,7 @@ describe('Combat overlay', () => {
 
     // Player characters come from the battle API, without any ticking.
     expect([...root.querySelectorAll('.name')].map((el) => el.textContent?.trim()).slice(0, 2)).toEqual(['Mira', 'Tor']);
-    const creatureBoxes = root.querySelectorAll<HTMLInputElement>('input[type="checkbox"]');
+    const creatureBoxes = root.querySelectorAll<HTMLInputElement>('section[aria-labelledby="combat-creatures"] input[type="checkbox"]');
     expect([...creatureBoxes].map((box) => box.checked)).toEqual([true, false, false]);
 
     setNumber(root.querySelector<HTMLInputElement>('input[aria-label="Initiative of Mira"]')!, '14');
@@ -187,7 +187,7 @@ describe('Combat overlay', () => {
     creatureBoxes[1]!.click(); // Ogre
     creatureBoxes[2]!.click(); // Brann
     await settle(fixture);
-    root.querySelectorAll<HTMLButtonElement>('button.side')[2]!.click(); // Brann becomes an ally
+    root.querySelectorAll<HTMLButtonElement>('button.side[data-side="ally"]')[2]!.click(); // Brann becomes an ally
     await settle(fixture);
     setNumber(root.querySelector<HTMLInputElement>('input[aria-label="Initiative of Ogre"]')!, '');
 
@@ -399,6 +399,32 @@ describe('Combat overlay', () => {
     ] }));
     await settle(fixture);
     expect(root.querySelector('.sr-only')?.textContent?.trim()).toBe("Round 3: Ogre's turn");
+  });
+
+  it('shows no chat panel and no chat toggle while no combat is active', async () => {
+    installServer({ battle: null });
+    TestBed.inject(CockpitService).session.set(session([card('c-ogre', 'enemy', 'Ogre', 'Enemies/Ogre.md')]));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('cockpit-initiative-step')).not.toBeNull();
+    expect(root.querySelector('.chat-panel')).toBeNull();
+    expect(root.querySelector('.chat-toggle')).toBeNull();
+    expect(root.querySelector('cockpit-chat')).toBeNull();
+  });
+
+  it('shows the chat panel once a combat is active', async () => {
+    installServer({ battle: null });
+    TestBed.inject(CockpitService).session.set(session([], COMBAT));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('.chat-panel')).not.toBeNull();
+    expect(root.querySelector('.chat-toggle')).not.toBeNull();
   });
 
   it('renders the turn panel while a combat is active', async () => {

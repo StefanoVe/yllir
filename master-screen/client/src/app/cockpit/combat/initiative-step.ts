@@ -9,6 +9,9 @@ import {
   type PlayerRow,
   type Side,
   buildCombatStart,
+  byInitiative,
+  initials,
+  parseInitiative,
 } from "./combat-model";
 
 interface CreatureState {
@@ -16,10 +19,23 @@ interface CreatureState {
   side: Side;
 }
 
+/** A player character typed in this step, not listed by the battle API. */
+interface AdHocPc {
+  key: string;
+  name: string;
+}
+
+/** One line of the order preview: a ticked participant and its initiative. */
+export interface OrderItem {
+  key: string;
+  name: string;
+  kind: "pc" | Side;
+  initiative: number | null;
+}
+
 /**
- * Step 1 of the combat: the initiative of every player character and of the creatures.
- * Confirm sends one `combat.start` action; the overlay switches to the battle view when the
- * combat becomes active.
+ * Step 1 of the combat: who takes part and in what order. Confirm sends one `combat.start`
+ * action; the overlay switches to the battle view when the combat becomes active.
  */
 @Component({
   selector: "cockpit-initiative-step",
@@ -35,18 +51,31 @@ export class InitiativeStep {
   /** The card the master clicked, always listed first and ticked. */
   clicked = input<FightCard | null>(null);
   readonly initiatives = signal<Record<string, string>>({});
+  /** Player characters the master unticked. Every other player character is ticked. */
+  readonly unticked = signal<Record<string, true>>({});
   readonly creatureState = signal<Record<string, CreatureState>>({});
+  readonly adHocPcs = signal<AdHocPc[]>([]);
+  readonly newPcName = signal("");
   readonly busy = signal(false);
   readonly error = signal("");
+  readonly initials = initials;
+  private adHocCount = 0;
 
-  readonly pcRows = computed(() =>
-    this.players().map((p) => ({
+  readonly pcRows = computed(() => {
+    const listed = this.players().map((p) => ({
       key: `pc:${p.ref}`,
       name: p.name,
       path: p.ref,
-      initiative: this.initiatives()[`pc:${p.ref}`] ?? "",
-    })),
-  );
+    }));
+    const typed = this.adHocPcs().map((p) => ({ key: p.key, name: p.name, path: "" }));
+    const off = this.unticked();
+    const all = this.initiatives();
+    return [...listed, ...typed].map((row) => ({
+      ...row,
+      checked: !off[row.key],
+      initiative: all[row.key] ?? "",
+    }));
+  });
 
   readonly creatureRows = computed(() => {
     const clicked = this.clicked();
@@ -75,13 +104,32 @@ export class InitiativeStep {
   });
 
   readonly payload = computed<Extract<CockpitAction, { type: "combat.start" }>>(() => {
-    const pcs: PlayerRow[] = this.pcRows().map(({ name, path, initiative }) => ({
-      name,
-      path,
-      initiative,
-    }));
+    const pcs: PlayerRow[] = this.pcRows()
+      .filter((row) => row.checked)
+      .map(({ name, path, initiative }) => ({ name, path, initiative }));
     const creatures: CreatureRow[] = this.creatureRows();
     return buildCombatStart(this.title(), pcs, creatures);
+  });
+
+  /** Ticked participants in initiative order, missing initiative last. */
+  readonly order = computed<OrderItem[]>(() => {
+    const pcs: OrderItem[] = this.pcRows()
+      .filter((row) => row.checked)
+      .map((row) => ({
+        key: row.key,
+        name: row.name,
+        kind: "pc",
+        initiative: parseInitiative(row.initiative),
+      }));
+    const creatures: OrderItem[] = this.creatureRows()
+      .filter((row) => row.checked)
+      .map((row) => ({
+        key: row.key,
+        name: row.name,
+        kind: row.side,
+        initiative: parseInitiative(row.initiative),
+      }));
+    return byInitiative([...pcs, ...creatures]);
   });
 
   readonly canStart = computed(
@@ -92,6 +140,15 @@ export class InitiativeStep {
     this.initiatives.update((all) => ({ ...all, [key]: raw }));
   }
 
+  togglePc(key: string, checked: boolean): void {
+    this.unticked.update((all) => {
+      const next = { ...all };
+      if (checked) delete next[key];
+      else next[key] = true;
+      return next;
+    });
+  }
+
   toggle(cardId: string, checked: boolean): void {
     this.creatureState.update((all) => ({
       ...all,
@@ -99,22 +156,24 @@ export class InitiativeStep {
     }));
   }
 
-  toggleSide(cardId: string): void {
-    this.creatureState.update((all) => {
-      const current = all[cardId];
-      const side: Side = current?.side === "ally" ? "enemy" : "ally";
-      return {
-        ...all,
-        [cardId]: { checked: current?.checked ?? this.clicked()?.cardId === cardId, side },
-      };
-    });
+  setSide(cardId: string, side: Side): void {
+    this.creatureState.update((all) => ({
+      ...all,
+      [cardId]: { checked: all[cardId]?.checked ?? this.clicked()?.cardId === cardId, side },
+    }));
   }
 
-  sideLabel(side: Side): string {
-    return side === "ally" ? this.i18n.t("combat.side.ally") : this.i18n.t("combat.side.enemy");
+  /** Adds a player character typed by the master. Empty names are ignored. */
+  addPc(): void {
+    const name = this.newPcName().trim();
+    if (!name) return;
+    this.adHocCount += 1;
+    const key = `pc:adhoc:${this.adHocCount}`;
+    this.adHocPcs.update((list) => [...list, { key, name }]);
+    this.newPcName.set("");
   }
 
-  initiativeValue(event: Event): string {
+  inputValue(event: Event): string {
     return (event.target as HTMLInputElement).value;
   }
 
