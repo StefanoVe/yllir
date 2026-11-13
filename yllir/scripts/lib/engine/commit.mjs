@@ -22,6 +22,7 @@ import { validateSheet, loadSceneValueCheck } from '../adapter-ops.mjs';
 import { plotMap } from '../plot/plot-map.mjs';
 import { checkScene } from '../plot/scene-checks.mjs';
 import { writeSessionMaps } from '../plot/session-map.mjs';
+import { isGenerated } from '../mentions.mjs';
 import { planLinks } from '../links/link-plan.mjs';
 import { autoOutcomes } from '../links/auto-outcomes.mjs';
 import { applyLinks } from '../links/apply-links.mjs';
@@ -960,11 +961,11 @@ function folderPaths(structure, predicate) {
     .map((category) => path.posix.normalize(category.folder).replace(/\/+$/, ''));
 }
 
-/** Files that the linker scans: those inside a scanned category. */
+/** Files that the linker scans: those inside a scanned category and not generated (the linker never scans those). */
 function linkableFiles(dir, files) {
   const structure = readStructure(dir).structure ?? [];
   const scanned = folderPaths(structure, (type) => !UNSCANNED_TYPES.has(type));
-  return files.filter((rel) => scanned.some((folder) => isInside(rel, folder)));
+  return files.filter((rel) => scanned.some((folder) => isInside(rel, folder)) && !isGenerated(dir, rel));
 }
 
 function isInside(rel, folder) {

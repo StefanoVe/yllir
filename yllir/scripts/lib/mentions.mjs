@@ -34,7 +34,7 @@ const STATES = [
 const WORD_CHAR = /[\p{L}\p{N}]/u;
 
 /** True when the file frontmatter says generated: true. Unreadable files count as not generated. */
-function isGenerated(campaignRoot, file) {
+export function isGenerated(campaignRoot, file) {
   try {
     return parseFrontmatter(fs.readFileSync(path.join(campaignRoot, file), 'utf8')).data?.generated === 'true';
   } catch {

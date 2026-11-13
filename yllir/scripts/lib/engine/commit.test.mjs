@@ -879,6 +879,35 @@ test('a correct event file passes the scene checks', async (t) => {
   assert.deepEqual(check.errors.filter((e) => e.code === 'scene-checks'), [], JSON.stringify(check.errors));
 });
 
+test('a new generated session main file passes check: the engine map step does not make it unscanned', async (t) => {
+  const dir = makeCampaign(t);
+  // Session 1 is already saved: its main file and one scene.
+  fs.mkdirSync(path.join(dir, 'Trama/Sessione Prova/Eventi'), { recursive: true });
+  fs.writeFileSync(path.join(dir, SESSION_PATH), SESSION);
+  fs.writeFileSync(path.join(dir, SCENE_PATH), SCENE_OK);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'session one']);
+
+  const SESSION2_PATH = 'Trama/Sessione Due/Sessione Due.md';
+  const SCENE2_PATH = 'Trama/Sessione Due/Eventi/Il ritorno.md';
+  writeDraft(dir, SESSION2_PATH, '---\nid: sessione-due\ndepends_on: [sessione-uno]\nprovenance: generated\n---\n');
+  writeDraft(
+    dir,
+    SCENE2_PATH,
+    '---\nid: scena-ritorno\nsession: sessione-due\ndepends_on: [scena-benvenuto]\nprovenance: master\n---\n\n' +
+      '## Il ritorno\n\nIl gruppo torna al borgo e Sibilla li attende.\n',
+  );
+
+  const check = await checkBatch(dir, { files: [SESSION2_PATH, SCENE2_PATH] });
+  assert.deepEqual(check.errors.filter((e) => e.code === 'links'), [], JSON.stringify(check.errors));
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  writeReview(dir);
+  const result = await commitBatch(dir, { files: [SESSION2_PATH, SCENE2_PATH], message: 'Add session two' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.match(readAt(dir, SESSION2_PATH), /generated: true/);
+});
+
 test('with the dnd-2024 adapter, a check value that is not a D&D 2024 check is rejected', async (t) => {
   const dir = makeCampaign(t);
   const config = fs.readFileSync(path.join(dir, 'campaign.yaml'), 'utf8').replace('adapter: none', 'adapter: dnd-2024');
