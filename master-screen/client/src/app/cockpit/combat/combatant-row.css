@@ -1,30 +1,29 @@
 :host {
   display: block;
-}
-
-.row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
   min-width: 0;
 }
 
-.row.active {
-  border-color: var(--color-focus);
-  box-shadow: var(--shadow-1);
+/* List mode: hairline-separated rows, no tinted block. The active row gets the soft tint and ring. */
+.row {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-0-5);
+  min-width: 0;
+  border-radius: var(--radius-sm);
 }
 
-.row.defeated {
+.row.active {
+  background: var(--color-accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 35%, transparent);
+}
+
+.row.defeated .identity {
   opacity: 0.6;
 }
 
-.head,
-.status,
-.controls {
+.main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -32,10 +31,16 @@
   min-width: 0;
 }
 
-.row-name {
-  flex: 1;
+.identity {
+  flex: 1 1 9rem;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
-  font-weight: 600;
+}
+
+.row-name {
+  font-size: var(--font-size-base);
+  font-weight: 500;
   overflow-wrap: anywhere;
 }
 
@@ -43,21 +48,63 @@
   text-decoration: line-through;
 }
 
-.row-meta,
-.hp {
+.row-meta {
   color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
+.status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-0-5) var(--space-1);
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.hp {
+  font-size: var(--font-size-base);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hp-now {
+  font-weight: 500;
+}
+
+/* Hit points not known yet: the placeholder stands where the value would be. */
+.hp.unknown {
+  color: var(--color-text-muted);
+}
+
+.sep {
+  margin: 0 0.1em;
+  color: var(--color-text-muted);
+}
+
+.temp {
+  color: var(--color-text-muted);
+}
+
+/* Condition pill: pale tint of the warn hue, label and duration, x to remove. */
 .pill {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-0-5);
-  padding: 0 var(--space-0-5) 0 var(--space-1);
+  gap: 2px;
+  max-width: 100%;
+  height: 24px;
+  padding: 0 2px 0 var(--space-1);
   border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-2);
-  font-size: var(--font-size-sm);
+  background: color-mix(in srgb, var(--combat-warn) 14%, transparent);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+}
+
+.pill-text {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
 
@@ -65,34 +112,228 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  flex: none;
+  width: 20px;
+  height: 20px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
   color: var(--color-text-muted);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .pill-remove:hover {
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--combat-warn) 22%, transparent);
   color: var(--color-text);
 }
 
 .pill-remove:focus-visible,
-.text-button:focus-visible {
+.text-button:focus-visible,
+.icon-button:focus-visible,
+.amount:focus-visible,
+.select:focus-visible,
+.rounds:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
 
+.phase {
+  font-size: var(--font-size-sm);
+  font-style: italic;
+  overflow-wrap: anywhere;
+}
+
 .row-portrait {
   flex: none;
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid var(--color-surface);
-  box-shadow: var(--shadow-1);
+  border: 2px solid var(--color-accent);
+  background: var(--color-surface-2);
+}
+
+/* Quick controls, grouped at the right end of the main line. */
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-0-5);
+  flex: none;
+}
+
+.amount {
+  width: 3.5rem;
+  height: 36px;
+  padding: 0 var(--space-0-5);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.icon-button {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition: background-color var(--transition-fast);
+}
+
+.icon-button:hover:not(:disabled) {
+  background: var(--color-surface-2);
+}
+
+.icon-button:disabled {
+  opacity: 0.45;
+}
+
+/* Hit-point bar along the bottom edge of the row: 3 px, warn when low. */
+.hp-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  background: var(--combat-track);
+  overflow: hidden;
+}
+
+.hp-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  transition: width var(--transition-fast);
+}
+
+.row[data-side="enemy"] .hp-fill {
+  background: var(--color-danger);
+}
+
+.row[data-side="ally"] .hp-fill {
+  background: var(--combat-ally);
+}
+
+.hp-bar.low .hp-fill {
+  background: var(--combat-warn);
+}
+
+/* Lighter second block: stats, attacks and the condition picker. */
+.detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  padding: 0 0 0 calc(40px + var(--space-1));
+  min-width: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.lines {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-5) var(--space-2);
+  font-size: var(--font-size-sm);
+}
+
+.line {
+  display: inline-flex;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+
+.line dt {
+  color: var(--color-text-muted);
+}
+
+.line dd {
+  margin: 0;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+h4 {
+  margin: var(--space-0-5) 0 0;
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+/* Attacks and actions as small pills; the full text is in the tooltip and in the visually hidden text. */
+.actions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-5);
+}
+
+.action {
+  max-width: 100%;
+  padding: 2px var(--space-1);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+.action-name {
+  font-weight: 500;
+}
+
+/* "+ Condition": a small quiet button; it opens the picker below it, inline. */
+.add-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-0-5);
+  min-width: 0;
+  margin-top: var(--space-0-5);
+}
+
+.add-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  min-height: 28px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.add-toggle:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.add-toggle[aria-expanded="true"] {
+  border-style: solid;
+  color: var(--color-text);
+}
+
+.add-toggle:focus-visible {
+  outline: 3px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .add-condition {
@@ -101,18 +342,20 @@
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
+  max-width: 100%;
 }
 
 .select,
 .rounds,
 .text-button {
-  min-height: 40px;
+  min-height: 36px;
   padding: 0 var(--space-1);
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
+  font-size: var(--font-size-sm);
   max-width: 100%;
 }
 
@@ -126,7 +369,8 @@
 }
 
 .text-button {
-  font-weight: 600;
+  font-weight: 500;
+  transition: background-color var(--transition-fast);
 }
 
 .text-button:hover:not(:disabled) {
@@ -135,12 +379,6 @@
 
 .text-button:disabled {
   opacity: 0.45;
-}
-
-.phase {
-  font-size: var(--font-size-sm);
-  font-style: italic;
-  overflow-wrap: anywhere;
 }
 
 .muted {
@@ -154,81 +392,24 @@
   color: var(--color-danger);
 }
 
-.lines {
-  margin: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(7rem, 1fr));
-  gap: var(--space-0-5) var(--space-1);
-  font-size: var(--font-size-sm);
-}
-
-.line {
-  display: flex;
-  gap: var(--space-0-5);
-  min-width: 0;
-}
-
-.line dt {
-  color: var(--color-text-muted);
-}
-
-.line dd {
-  margin: 0;
-  font-weight: 600;
-}
-
-h4 {
-  margin: var(--space-0-5) 0 0;
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
-}
-
-.actions {
-  margin: 0;
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
   padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0-5);
-  font-size: var(--font-size-sm);
-  line-height: 1.4;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-.amount {
-  width: 5.5rem;
-  min-height: 40px;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-}
-
-.icon-button {
-  width: 40px;
-  height: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-
-.icon-button:hover:not(:disabled) {
-  background: var(--color-surface-2);
-}
-
-.icon-button:disabled {
-  opacity: 0.45;
-}
-
-.amount:focus-visible,
-.icon-button:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
+@media (prefers-reduced-motion: reduce) {
+  .pill-remove,
+  .icon-button,
+  .hp-fill,
+  .add-toggle,
+  .text-button {
+    transition: none;
+  }
 }

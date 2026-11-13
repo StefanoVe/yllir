@@ -3,6 +3,7 @@
   class="token"
   [attr.data-side]="isPc() ? 'pc' : combatant().kind"
   [class.active]="active()"
+  [class.defeated]="defeated()"
   [attr.aria-label]="label()"
   [attr.aria-describedby]="open() ? tooltipId : null"
   (mouseenter)="show()"

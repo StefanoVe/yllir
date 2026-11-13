@@ -36,6 +36,8 @@ interface Drag {
   cell: Cell | null;
 }
 
+let nextBoardId = 0;
+
 /**
  * The battle view: the turn panel, then the battle map with a grid and draggable chips (the
  * panel beside it on wide screens), or the combatants in initiative order when there is no map
@@ -62,9 +64,23 @@ export class BattleBoard {
   readonly moveError = signal("");
   readonly drag = signal<Drag | null>(null);
   private readonly mapFrame = viewChild<ElementRef<HTMLElement>>("mapFrame");
+  /** Id of the visually hidden text that describes how to move the chips. */
+  readonly keysId = `battle-map-keys-${nextBoardId++}`;
+  /** Width over height of the loaded map image, once it has loaded. */
+  readonly mapRatio = signal<number | null>(null);
 
   readonly hasMap = computed(() => !!this.battle()?.map?.ref && this.showMaps());
   readonly grid = computed(() => gridOf(this.battle()?.map));
+  /**
+   * The aspect ratio the map box takes: the image's own once it has loaded, else the grid's
+   * columns over rows. Empty means no ratio is known yet, and the stylesheet's fallback applies.
+   */
+  readonly ratioCss = computed(() => {
+    const ratio = this.mapRatio();
+    if (ratio) return String(ratio);
+    const grid = this.grid();
+    return grid ? String(grid.cols / grid.rows) : "";
+  });
   readonly mapUrl = computed(() => {
     const ref = this.battle()?.map?.ref;
     return ref ? this.documents.asset(ref) : "";
@@ -91,6 +107,13 @@ export class BattleBoard {
 
   percent(cell: Cell) {
     return percentAt(cell, this.grid());
+  }
+
+  /** Remembers the image's own proportions, so the map box keeps them at any size. */
+  onMapLoad(event: Event): void {
+    const img = event.target as HTMLImageElement;
+    if (img.naturalWidth > 0 && img.naturalHeight > 0)
+      this.mapRatio.set(img.naturalWidth / img.naturalHeight);
   }
 
   sideOf(c: Combatant): string {

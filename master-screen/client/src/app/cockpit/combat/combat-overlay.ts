@@ -9,7 +9,7 @@ import {
   untracked,
 } from "@angular/core";
 import type { BattleView, CombatRules, LivePlayer } from "@shared/types";
-import type { CombatNotice, SourceRef } from "@shared/cockpit-types";
+import type { CombatNotice, Combatant, SourceRef } from "@shared/cockpit-types";
 import { Icon } from "../support/icon";
 import { ConfirmButton } from "../support/confirm-button";
 import { CockpitService } from "../cockpit.service";
@@ -21,9 +21,26 @@ import { BattleApi } from "./battle-api";
 import { BattleMapPrefs } from "./battle-maps-pref";
 import { CombatOverlayService } from "./combat-overlay.service";
 import { CombatChatService } from "./combat-chat.service";
-import { fightCards, nextTurnId, noticeText } from "./combat-model";
+import {
+  byInitiative,
+  fightCards,
+  hpLow,
+  hpPercent,
+  initials,
+  nextTurnId,
+  noticeText,
+} from "./combat-model";
 import { InitiativeStep } from "./initiative-step";
 import { BattleBoard } from "./battle-board";
+
+/** True under 900 px, where the chat starts folded. Without matchMedia (old browsers, tests) it does not. */
+function narrowScreen(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(max-width: 899px)").matches
+  );
+}
 
 /**
  * Full-screen combat overlay with the table chat floating on the right. Without a combat
@@ -50,6 +67,7 @@ export class CombatOverlay implements OnDestroy {
   readonly battle = signal<BattleView | null>(null);
   readonly rules = signal<CombatRules | null>(null);
   readonly error = signal("");
+  /** Open on wide screens; folded when the overlay opens under 900 px (see the open effect). */
   readonly chatOpen = signal(true);
   readonly noticesOpen = signal(false);
   /** The `at` of the newest notice when the overlay opened: only later notices are announced. */
@@ -63,7 +81,19 @@ export class CombatOverlay implements OnDestroy {
     const c = this.combat();
     return c ? nextTurnId(c.participants, c.activeId) : null;
   });
+  /** Every participant in initiative order: the strip's tiles. */
+  readonly order = computed(() => byInitiative(this.combat()?.participants ?? []));
+  readonly initials = initials;
+  readonly hpLow = (c: Combatant) => hpLow(c.hp, c.maxHp);
+  readonly hpPct = (c: Combatant) => hpPercent(c.hp, c.maxHp);
   readonly newest = computed<CombatNotice | null>(() => this.combat()?.notices.at(-1) ?? null);
+  /**
+   * The notice shown in the header: the newest one that is not a turn change, since the strip
+   * already shows whose turn it is. Null when there is none, and then the header has no pill.
+   */
+  readonly pillNotice = computed<CombatNotice | null>(
+    () => [...(this.combat()?.notices ?? [])].reverse().find((n) => n.kind !== "turn") ?? null,
+  );
   /** The last ten notices, newest first. */
   readonly recentNotices = computed(() => [...(this.combat()?.notices ?? [])].reverse().slice(0, 10));
   /** The newest notice, only when it came after the overlay opened. */
@@ -106,10 +136,13 @@ export class CombatOverlay implements OnDestroy {
             .catch((error: unknown) => this.error.set(String(error)));
       });
     });
+    // Each time the overlay opens: mark the notices already seen, and fold the chat on phones.
     effect(() => {
       const open = this.svc.open();
       untracked(() => {
-        if (open) this.noticeMark.set(this.newest()?.at ?? "");
+        if (!open) return;
+        this.noticeMark.set(this.newest()?.at ?? "");
+        this.chatOpen.set(!narrowScreen());
       });
     });
     // Opening the overlay or any cockpit state change (also one that keeps the revision, such

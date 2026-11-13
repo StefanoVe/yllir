@@ -2,22 +2,46 @@
 <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="combat-overlay-title">
   <header class="bar">
     <ui-icon name="swords" [size]="20" />
-    <h2 id="combat-overlay-title">{{ title() }}</h2>
+    <h2 id="combat-overlay-title" class="title">{{ title() }}</h2>
     @if (combat(); as c) {
     <span class="round">{{ i18n.t("combat.round", { n: c.round }) }}</span>
+    <span class="sr-only" aria-live="polite">{{ announced() }}</span>
+    @if (pillNotice(); as n) {
+    <div class="notice-strip">
+      <button
+        type="button"
+        class="notice-toggle"
+        [attr.aria-expanded]="noticesOpen()"
+        [attr.title]="noticeLine(n)"
+        (click)="noticesOpen.set(!noticesOpen())"
+      >
+        <span class="dot" aria-hidden="true"></span>
+        <span class="notice-text">{{ noticeLine(n) }}</span>
+        <ui-icon [name]="noticesOpen() ? 'up' : 'down'" [size]="14" />
+      </button>
+      @if (noticesOpen()) {
+      <ol class="notice-list" [attr.aria-label]="i18n.t('combat.notice.list')">
+        @for (item of recentNotices(); track $index) {
+        <li>{{ noticeLine(item) }}</li>
+        }
+      </ol>
+      }
+    </div>
+    }
+    }
+    <span class="spacer"></span>
+    @if (combat()) {
     <button
       type="button"
       class="next-turn"
       [disabled]="!nextId()"
       [attr.title]="i18n.t('combat.next')"
+      [attr.aria-label]="i18n.t('combat.next')"
       (click)="nextTurn()"
     >
       <ui-icon name="chevron" [size]="16" />
-      <span>{{ i18n.t("combat.next") }}</span>
+      <span class="next-label">{{ i18n.t("combat.next") }}</span>
     </button>
-    }
-    <span class="spacer"></span>
-    @if (combat()) {
     <ui-confirm-button
       icon="stop"
       [size]="18"
@@ -37,31 +61,31 @@
     </button>
   </header>
 
-  @if (combat(); as c) { @if (newest(); as n) {
-  <div class="notice-strip">
-    <button
-      type="button"
-      class="notice-toggle"
-      [attr.aria-expanded]="noticesOpen()"
-      [attr.title]="i18n.t('combat.notice.list')"
-      (click)="noticesOpen.set(!noticesOpen())"
-    >
-      <ui-icon name="flag" [size]="14" />
-      <span class="notice-text">{{ noticeLine(n) }}</span>
-      <ui-icon [name]="noticesOpen() ? 'up' : 'down'" [size]="14" />
-    </button>
-    <span class="sr-only" aria-live="polite">{{ announced() }}</span>
-    @if (noticesOpen()) {
-    <ol class="notice-list" [attr.aria-label]="i18n.t('combat.notice.list')">
-      @for (item of recentNotices(); track $index) {
-      <li>{{ noticeLine(item) }}</li>
+  @if (combat(); as c) { @if (order().length) {
+  <section class="strip" [attr.aria-label]="i18n.t('combat.list')">
+    <ol class="strip-list">
+      @for (p of order(); track p.id) {
+      <li
+        class="tile"
+        [class.active]="p.id === c.activeId"
+        [class.defeated]="p.kind !== 'pc' && p.hp === 0"
+        [attr.data-side]="p.kind"
+      >
+        <span class="tile-avatar" aria-hidden="true">{{ initials(p.name) }}</span>
+        <span class="tile-name" [attr.title]="p.name">{{ p.name }}</span>
+        <span class="tile-init">{{ p.initiative ?? "—" }}</span>
+        @if (p.kind !== "pc" && hpPct(p) !== null) {
+        <span class="tile-hp" aria-hidden="true">
+          <span class="tile-hp-fill" [class.low]="hpLow(p)" [style.width.%]="hpPct(p)"></span>
+        </span>
+        }
+      </li>
       }
     </ol>
-    }
-  </div>
+  </section>
   } }
 
-  <div class="stage">
+  <div class="stage" [class.chat-open]="chatOpen()">
     <main class="body" [class.with-chat]="chatOpen()">
       @if (error()) {
       <p class="alert" role="alert">{{ error() }}</p>

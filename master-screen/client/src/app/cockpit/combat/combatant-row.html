@@ -1,156 +1,195 @@
-<div class="row" [class.active]="active()" [class.defeated]="defeated()">
-  <div class="head">
+<div class="row" [attr.data-side]="isPc() ? 'pc' : combatant().kind" [class.active]="active()" [class.defeated]="defeated()">
+  <div class="main">
     @if (portrait(); as src) {
     <img class="row-portrait" [attr.src]="src" alt="" draggable="false" (error)="portraitFailed.set(src)" />
     } @else {
     <cockpit-combatant-chip [combatant]="combatant()" [active]="active()" />
     }
-    <span class="row-name">{{ combatant().name }}</span>
-    <span class="row-meta">{{ i18n.t("combat.stats.initiative") }} {{ combatant().initiative ?? "—" }}</span>
+    <div class="identity head">
+      <span class="row-name">{{ combatant().name }}</span>
+      <span class="row-meta">
+        {{ i18n.t("combat.stats.initiative") }} {{ combatant().initiative ?? "—" }}@if (!isPc() && pills().length) {
+        · {{ i18n.t("combat.row.conditions", { n: pills().length }) }}
+        }
+      </span>
+    </div>
+
+    @if (!isPc()) {
+    <div class="status">
+      @if (combatant().hp !== undefined) {
+      <span class="hp" [attr.title]="hpText()">
+        <span class="hp-now">{{ combatant().hp }}</span><span class="sep">/</span>{{ combatant().maxHp ?? "—" }}@if (combatant().tempHp) {
+        <span class="temp">+{{ combatant().tempHp }}</span>
+        }
+      </span>
+      } @else {
+      <span class="hp unknown">{{ i18n.t("combat.amount.short") }} —</span>
+      }
+      @for (pill of pills(); track pill.id) {
+      <span class="pill" [attr.title]="pill.text">
+        <span class="pill-text">{{ pill.text }}</span>
+        <button
+          type="button"
+          class="pill-remove"
+          [attr.aria-label]="i18n.t('combat.condition.remove', { label: pill.label })"
+          (click)="removeCondition(pill.id)"
+        >
+          <ui-icon name="x" [size]="12" />
+        </button>
+      </span>
+      }
+      @if (combatant().phase) {
+      <span class="phase">{{ combatant().phase }}</span>
+      }
+    </div>
+
+    <div class="controls" role="group" [attr.aria-label]="i18n.t('combat.actions')">
+      @if (combatant().hp !== undefined) {
+      <input
+        type="number"
+        class="amount"
+        min="1"
+        step="1"
+        [attr.aria-label]="i18n.t('combat.amount')"
+        [attr.placeholder]="i18n.t('combat.amount.short')"
+        [value]="amount()"
+        (input)="onAmount($event)"
+      />
+      <button
+        type="button"
+        class="icon-button"
+        [disabled]="!canChangeHp()"
+        [attr.title]="i18n.t('combat.damage')"
+        [attr.aria-label]="i18n.t('combat.damage')"
+        (click)="damage()"
+      >
+        <ui-icon name="minus" [size]="16" />
+      </button>
+      <button
+        type="button"
+        class="icon-button"
+        [disabled]="!canChangeHp()"
+        [attr.title]="i18n.t('combat.heal')"
+        [attr.aria-label]="i18n.t('combat.heal')"
+        (click)="heal()"
+      >
+        <ui-icon name="plus" [size]="16" />
+      </button>
+      }
+      <ui-confirm-button
+        icon="enemy"
+        [label]="i18n.t('combat.defeat')"
+        [confirmLabel]="i18n.t('combat.defeatConfirmShort')"
+        (confirmed)="defeat()"
+      />
+      <ui-confirm-button
+        icon="trash"
+        [label]="i18n.t('combat.remove')"
+        [confirmLabel]="i18n.t('combat.removeConfirmShort')"
+        (confirmed)="remove()"
+      />
+    </div>
+    }
   </div>
 
   @if (!isPc()) {
-  <div class="status">
-    @if (combatant().hp !== undefined || combatant().maxHp !== undefined) {
-    <span class="hp">{{ hpText() }}</span>
+  <div class="detail">
+    @if (statsState() === "loading") {
+    <p class="muted">…</p>
+    } @else if (statsState() === "error") {
+    <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
+    } @else if (stats(); as s) {
+    @if (lines().length) {
+    <dl class="lines">
+      @for (line of lines(); track $index) {
+      <div class="line">
+        <dt>{{ line.label }}</dt>
+        <dd>{{ line.value }}</dd>
+      </div>
+      }
+    </dl>
     }
-    @for (pill of pills(); track pill.id) {
-    <span class="pill">
-      <span>{{ pill.text }}</span>
+    @if (s.actions.length) {
+    <h4>{{ i18n.t("combat.stats.actions") }}</h4>
+    <ul class="actions">
+      @for (action of s.actions; track $index) {
+      <li class="action" [attr.title]="action.text">
+        <span class="action-name">{{ action.name }}</span><span class="sr-only"> {{ action.text }}</span>
+      </li>
+      }
+    </ul>
+    }
+    @if (!lines().length && !s.actions.length) {
+    <p class="muted">{{ i18n.t("combat.stats.none") }}</p>
+    }
+    }
+
+    @if (addable().length) {
+    <div class="add-wrap" (keydown.escape)="escapeAdd($event)">
       <button
         type="button"
-        class="pill-remove"
-        [attr.aria-label]="i18n.t('combat.condition.remove', { label: pill.label })"
-        (click)="removeCondition(pill.id)"
+        class="add-toggle"
+        [attr.aria-expanded]="addOpen()"
+        (click)="toggleAdd()"
       >
-        <ui-icon name="x" [size]="12" />
+        <ui-icon name="plus" [size]="12" />
+        <span>{{ i18n.t("combat.condition.add") }}</span>
       </button>
-    </span>
-    }
-    @if (combatant().phase) {
-    <span class="phase">{{ combatant().phase }}</span>
-    }
-  </div>
-
-  @if (statsState() === "loading") {
-  <p class="muted">…</p>
-  } @else if (statsState() === "error") {
-  <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
-  } @else if (stats(); as s) {
-  @if (s.lines.length) {
-  <dl class="lines">
-    @for (line of s.lines; track $index) {
-    <div class="line">
-      <dt>{{ line.label }}</dt>
-      <dd>{{ line.value }}</dd>
+      @if (addOpen()) {
+      <div class="add-condition" role="group" [attr.aria-label]="i18n.t('combat.condition.pick')">
+        <select
+          class="select"
+          [attr.aria-label]="i18n.t('combat.condition.pick')"
+          (change)="pickCondition($event)"
+        >
+          @for (c of addable(); track c.id) {
+          <option [value]="c.id" [selected]="c.id === conditionChoice()">{{ c.label }}</option>
+          }
+        </select>
+        @if (durations().length) {
+        <select
+          class="select"
+          [attr.aria-label]="i18n.t('combat.condition.duration')"
+          (change)="pickDuration($event)"
+        >
+          @for (d of durations(); track d.id) {
+          <option [value]="d.id" [selected]="d.id === durationChoice()">{{ d.label }}</option>
+          }
+        </select>
+        }
+        @if (roundsChosen()) {
+        <input
+          type="number"
+          class="rounds"
+          min="1"
+          step="1"
+          [attr.aria-label]="i18n.t('combat.condition.roundsInput')"
+          [value]="newRounds()"
+          (input)="pickRounds($event)"
+        />
+        }
+        <button
+          type="button"
+          class="text-button"
+          [disabled]="!conditionChoice()"
+          (click)="addCondition()"
+        >
+          {{ i18n.t("combat.condition.confirm") }}
+        </button>
+      </div>
+      }
     </div>
-    }
-  </dl>
-  }
-  @if (s.actions.length) {
-  <h4>{{ i18n.t("combat.stats.actions") }}</h4>
-  <ul class="actions">
-    @for (action of s.actions; track $index) {
-    <li><strong>{{ action.name }}</strong> {{ action.text }}</li>
-    }
-  </ul>
-  }
-  @if (!s.lines.length && !s.actions.length) {
-  <p class="muted">{{ i18n.t("combat.stats.none") }}</p>
-  }
-  }
-
-  <div class="controls" role="group" [attr.aria-label]="i18n.t('combat.actions')">
-    <input
-      type="number"
-      class="amount"
-      min="1"
-      step="1"
-      [attr.aria-label]="i18n.t('combat.amount')"
-      [value]="amount()"
-      (input)="onAmount($event)"
-    />
-    <button
-      type="button"
-      class="icon-button"
-      [disabled]="!canChangeHp()"
-      [attr.title]="i18n.t('combat.damage')"
-      [attr.aria-label]="i18n.t('combat.damage')"
-      (click)="damage()"
-    >
-      <ui-icon name="minus" [size]="16" />
-    </button>
-    <button
-      type="button"
-      class="icon-button"
-      [disabled]="!canChangeHp()"
-      [attr.title]="i18n.t('combat.heal')"
-      [attr.aria-label]="i18n.t('combat.heal')"
-      (click)="heal()"
-    >
-      <ui-icon name="plus" [size]="16" />
-    </button>
-    <ui-confirm-button
-      icon="enemy"
-      [label]="i18n.t('combat.defeat')"
-      [confirmLabel]="i18n.t('combat.defeatConfirmShort')"
-      (confirmed)="defeat()"
-    />
-    <ui-confirm-button
-      icon="trash"
-      [label]="i18n.t('combat.remove')"
-      [confirmLabel]="i18n.t('combat.removeConfirmShort')"
-      (confirmed)="remove()"
-    />
-  </div>
-
-  <div class="add-condition" role="group" [attr.aria-label]="i18n.t('combat.condition.add')">
-    @if (addable().length) {
-    <select
-      class="select"
-      [attr.aria-label]="i18n.t('combat.condition.pick')"
-      (change)="pickCondition($event)"
-    >
-      @for (c of addable(); track c.id) {
-      <option [value]="c.id" [selected]="c.id === conditionChoice()">{{ c.label }}</option>
-      }
-    </select>
-    @if (durations().length) {
-    <select
-      class="select"
-      [attr.aria-label]="i18n.t('combat.condition.duration')"
-      (change)="pickDuration($event)"
-    >
-      @for (d of durations(); track d.id) {
-      <option [value]="d.id" [selected]="d.id === durationChoice()">{{ d.label }}</option>
-      }
-    </select>
-    }
-    @if (roundsChosen()) {
-    <input
-      type="number"
-      class="rounds"
-      min="1"
-      step="1"
-      [attr.aria-label]="i18n.t('combat.condition.roundsInput')"
-      [value]="newRounds()"
-      (input)="pickRounds($event)"
-    />
-    }
-    <button
-      type="button"
-      class="text-button"
-      [disabled]="!conditionChoice()"
-      (click)="addCondition()"
-    >
-      {{ i18n.t("combat.condition.add") }}
-    </button>
     } @else if (rules()) {
     <p class="muted">{{ i18n.t("combat.condition.none") }}</p>
     }
+    @if (error()) {
+    <p class="alert" role="alert">{{ error() }}</p>
+    }
   </div>
-  @if (error()) {
-  <p class="alert" role="alert">{{ error() }}</p>
+  @if (hpPct() !== null) {
+  <span class="hp-bar" [class.low]="low()" aria-hidden="true">
+    <span class="hp-fill" [style.width.%]="hpPct()"></span>
+  </span>
   }
   }
 </div>

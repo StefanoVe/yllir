@@ -226,6 +226,20 @@ describe('Combat overlay', () => {
     expect(root.querySelector('.round')?.textContent).toContain('Round 2');
   });
 
+  it('renders the initiative strip with one tile per participant in initiative order and marks the active one', async () => {
+    installServer({ battle: null });
+    TestBed.inject(CockpitService).session.set(session([card('c-ogre', 'enemy', 'Ogre', 'Enemies/Ogre.md')], COMBAT));
+    TestBed.inject(CombatOverlayService).openFor({ cardId: 'c-ogre', name: 'Ogre', path: 'Enemies/Ogre.md', kind: 'enemy' });
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const tiles = [...root.querySelectorAll<HTMLElement>('.strip .tile')];
+    expect(tiles.map((tile) => tile.querySelector('.tile-name')?.textContent?.trim())).toEqual(['Mira', 'Ogre']);
+    expect(tiles.map((tile) => tile.classList.contains('active'))).toEqual([false, true]);
+  });
+
   it('shows the newest notice of the combat on a strip under the title bar', async () => {
     installServer({ battle: null });
     const notices = [
@@ -244,6 +258,129 @@ describe('Combat overlay', () => {
     fixture.detectChanges();
     const items = [...root.querySelectorAll('.notice-list li')].map((li) => li.textContent?.trim());
     expect(items).toEqual(['Mira is unconscious', 'Goblin is defeated']);
+  });
+
+  it('shows no notice pill when the only notice is a turn change, which the strip already shows', async () => {
+    installServer({ battle: null });
+    const notices = [{ at: '2026-11-12T10:10:00Z', kind: 'turn' as const, id: 'c-ogre', name: 'Ogre', round: 3, newRound: true }];
+    TestBed.inject(CockpitService).session.set(session([], { ...COMBAT, notices }));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('.notice-strip')).toBeNull();
+    expect(root.querySelector('.round')?.textContent).toContain('Round 2');
+  });
+
+  it('shows the newest notice that is not a turn change in the pill, and the list keeps every kind', async () => {
+    installServer({ battle: null });
+    const notices = [
+      { at: '2026-11-12T10:00:00Z', kind: 'defeated' as const, id: 'c-goblin', name: 'Goblin' },
+      { at: '2026-11-12T10:10:00Z', kind: 'turn' as const, id: 'c-ogre', name: 'Ogre', round: 3, newRound: true },
+    ];
+    TestBed.inject(CockpitService).session.set(session([], { ...COMBAT, notices }));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('.notice-strip .notice-text')?.textContent).toContain('Goblin is defeated');
+    root.querySelector<HTMLButtonElement>('.notice-toggle')!.click();
+    fixture.detectChanges();
+    const items = [...root.querySelectorAll('.notice-list li')].map((li) => li.textContent?.trim());
+    expect(items).toEqual(["Round 3: Ogre's turn", 'Goblin is defeated']);
+  });
+
+  it('keeps the turn announcement for screen readers even when the pill is not shown', async () => {
+    installServer({ battle: null });
+    const cockpit = TestBed.inject(CockpitService);
+    cockpit.session.set(session([], COMBAT));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    cockpit.session.set(session([], { ...COMBAT, notices: [
+      { at: '2026-11-12T10:10:00Z', kind: 'turn', id: 'c-ogre', name: 'Ogre', round: 3, newRound: true },
+    ] }));
+    await settle(fixture);
+    expect(root.querySelector('.notice-strip')).toBeNull();
+    expect(root.querySelector('.sr-only')?.textContent?.trim()).toBe("Round 3: Ogre's turn");
+  });
+
+  it('puts Next turn to the right of the spacer, after the round and the notice', async () => {
+    installServer({ battle: null });
+    const notices = [{ at: '2026-11-12T10:00:00Z', kind: 'defeated' as const, id: 'c-goblin', name: 'Goblin' }];
+    TestBed.inject(CockpitService).session.set(session([], { ...COMBAT, notices }));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const bar = (fixture.nativeElement as HTMLElement).querySelector('.bar')!;
+    const order = [...bar.children].map((el) => el.className);
+    const at = (name: string) => order.findIndex((className) => className.split(' ').includes(name));
+
+    expect(at('round')).toBeLessThan(at('notice-strip'));
+    expect(at('notice-strip')).toBeLessThan(at('spacer'));
+    expect(at('spacer')).toBeLessThan(at('next-turn'));
+    expect(at('next-turn')).toBeLessThan(at('icon-button'));
+  });
+
+  it('gives each strip tile the full name as its title', async () => {
+    installServer({ battle: null });
+    TestBed.inject(CockpitService).session.set(session([], COMBAT));
+    TestBed.inject(CombatOverlayService).openFor({ cardId: 'c-ogre', name: 'Ogre', path: 'Enemies/Ogre.md', kind: 'enemy' });
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect([...root.querySelectorAll('.strip .tile-name')].map((el) => el.getAttribute('title'))).toEqual(['Mira', 'Ogre']);
+  });
+
+  it('moves the map hint to the map title and a visually hidden description, not visible text', async () => {
+    installServer({ battle: MAP });
+    TestBed.inject(PrefsService).setCampaign('test');
+    TestBed.inject(CockpitService).session.set(session([], COMBAT));
+    const fixture = create();
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('.hint')).toBeNull();
+    const map = root.querySelector<HTMLElement>('.map')!;
+    const describedBy = map.getAttribute('aria-describedby');
+    expect(describedBy).toBeTruthy();
+    const description = root.querySelector<HTMLElement>(`#${describedBy}`)!;
+    expect(description.textContent?.trim()).toContain('Arrow keys');
+    expect(description.classList.contains('sr-only')).toBe(true);
+    expect(map.getAttribute('title')).toBe(description.textContent?.trim());
+  });
+
+  it('starts with the chat folded under 900 px, and the toggle still opens it', async () => {
+    const original = window.matchMedia;
+    window.matchMedia = ((query: string) => ({
+      matches: query === '(max-width: 899px)',
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })) as unknown as typeof window.matchMedia;
+    try {
+      installServer({ battle: null });
+      TestBed.inject(CockpitService).session.set(session([], COMBAT));
+      const fixture = create();
+      fixture.detectChanges();
+      await settle(fixture);
+      const root = fixture.nativeElement as HTMLElement;
+
+      expect(root.querySelector('.chat-panel')?.classList.contains('collapsed')).toBe(true);
+      expect(root.querySelector('cockpit-chat')).toBeNull();
+      root.querySelector<HTMLButtonElement>('.chat-toggle')!.click();
+      fixture.detectChanges();
+      expect(root.querySelector('cockpit-chat')).not.toBeNull();
+    } finally {
+      window.matchMedia = original;
+    }
   });
 
   it('announces only the notices that come after the overlay opened', async () => {

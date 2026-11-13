@@ -205,6 +205,12 @@ export function hpPercent(hp?: number, maxHp?: number): number | null {
   return clamp(Math.round((hp / maxHp) * 100), 0, 100);
 }
 
+/** True when hit points are known and at most a quarter of the maximum: the hp bar turns warn. */
+export function hpLow(hp?: number, maxHp?: number): boolean {
+  const pct = hpPercent(hp, maxHp);
+  return pct !== null && pct <= 25;
+}
+
 /** Key of a combatant's stats in the battle API cache: changes with its hit points. Player characters have none. */
 export function statsKey(
   c: Pick<Combatant, "kind" | "hp" | "maxHp" | "tempHp">,

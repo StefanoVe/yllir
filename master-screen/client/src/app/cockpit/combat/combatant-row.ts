@@ -19,6 +19,8 @@ import {
   type Translate,
   conditionLabel,
   conditionSummary,
+  hpLow,
+  hpPercent,
   statsKey,
 } from "./combat-model";
 
@@ -45,9 +47,9 @@ export function parseRounds(raw: string): number | null {
 
 /**
  * One combatant in list mode: the portrait (or the chip), name, initiative and, for non-player
- * characters, hit points, conditions with their duration, phase, the stats and attacks always
- * visible, and the master's quick actions (damage, heal, defeat, remove). Player characters
- * never load stats.
+ * characters, hit points with their bar, conditions with their duration, phase and the master's
+ * quick actions (damage, heal, defeat, remove) on the main line; the stats and attacks sit in a
+ * lighter block under it. Player characters never load stats.
  */
 @Component({
   selector: "cockpit-combatant-row",
@@ -71,6 +73,8 @@ export class CombatantRow {
   readonly newCondition = signal("");
   readonly newDuration = signal("");
   readonly newRounds = signal(1);
+  /** The add-condition controls are folded until the "+ Condition" button opens them. */
+  readonly addOpen = signal(false);
   private loadSeq = 0;
   private readonly t: Translate = (key, params) => this.i18n.t(key, params);
 
@@ -79,6 +83,10 @@ export class CombatantRow {
     () => !this.isPc() && this.combatant().hp === 0,
   );
   readonly amountValue = computed(() => parseAmount(this.amount()));
+  /** Hit points as a percentage of the maximum, or null when unknown: the hp bar is hidden then. */
+  readonly hpPct = computed(() => hpPercent(this.combatant().hp, this.combatant().maxHp));
+  /** At a quarter of the maximum or below: the hp bar turns warn. */
+  readonly low = computed(() => hpLow(this.combatant().hp, this.combatant().maxHp));
   readonly canChangeHp = computed(
     () => this.combatant().hp !== undefined && this.amountValue() !== null,
   );
@@ -109,6 +117,17 @@ export class CombatantRow {
         this.t,
       ),
     }));
+  });
+  /**
+   * The stat lines without initiative: the row already shows it on its sub-line. Matched by the
+   * label in the campaign language, or by the English and Italian names.
+   */
+  readonly lines = computed(() => {
+    const own = this.i18n.t("combat.stats.initiative").toLowerCase();
+    return (this.stats()?.lines ?? []).filter((line) => {
+      const label = line.label.trim().toLowerCase();
+      return label !== own && label !== "initiative" && label !== "iniziativa";
+    });
   });
   readonly durations = computed(() => this.rules()?.durations ?? []);
   /** Conditions the combatant does not have yet. */
@@ -156,6 +175,17 @@ export class CombatantRow {
     if (rounds !== null) this.newRounds.set(rounds);
   }
 
+  toggleAdd(): void {
+    this.addOpen.update((open) => !open);
+  }
+
+  /** Escape folds the add-condition controls. Without them open the key goes on (it closes the overlay). */
+  escapeAdd(event: Event): void {
+    if (!this.addOpen()) return;
+    event.stopPropagation();
+    this.addOpen.set(false);
+  }
+
   damage(): void {
     const n = this.amountValue();
     const c = this.combatant();
@@ -191,6 +221,7 @@ export class CombatantRow {
       ...(duration === "rounds" ? { rounds: this.newRounds() } : {}),
     });
     this.newCondition.set("");
+    this.addOpen.set(false);
   }
 
   removeCondition(condition: string): void {

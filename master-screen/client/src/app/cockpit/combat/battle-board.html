@@ -1,4 +1,4 @@
-<div class="board" [class.with-map]="hasMap()">
+<div class="board">
   <cockpit-turn-panel class="turn" [combatants]="combatants()" [activeId]="activeId()" />
   <div class="field">
     @if (!hasMap() && showMaps()) {
@@ -9,8 +9,16 @@
     <p class="alert" role="alert">{{ moveError() }}</p>
     } @if (hasMap()) {
     <div class="map-scroll">
-      <div class="map" #mapFrame role="group" [attr.aria-label]="i18n.t('combat.map.label')">
-        <img class="map-image" [src]="mapUrl()" alt="" draggable="false" />
+      <div
+        class="map"
+        #mapFrame
+        role="group"
+        [style.--map-ratio]="ratioCss()"
+        [attr.aria-label]="i18n.t('combat.map.label')"
+        [attr.aria-describedby]="keysId"
+        [attr.title]="i18n.t('combat.map.keys')"
+      >
+        <img class="map-image" [src]="mapUrl()" alt="" draggable="false" (load)="onMapLoad($event)" />
         @if (grid(); as g) {
         <div class="grid" aria-hidden="true" [style.--cols]="g.cols" [style.--rows]="g.rows"></div>
         }
@@ -31,7 +39,7 @@
         }
       </div>
     </div>
-    <p class="hint muted">{{ i18n.t("combat.map.keys") }}</p>
+    <p class="sr-only" [id]="keysId">{{ i18n.t("combat.map.keys") }}</p>
     @if (tray().length) {
     <section class="tray" [attr.aria-label]="i18n.t('combat.tray')">
       <h3>{{ i18n.t("combat.tray") }}</h3>

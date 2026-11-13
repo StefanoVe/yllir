@@ -39,6 +39,8 @@ export class CombatantChip {
   readonly failedImage = signal<string | null>(null);
   readonly key = computed(() => statsKey(this.combatant()));
   readonly isPc = computed(() => this.combatant().kind === "pc");
+  /** A defeated non-player character: greyed on the map. */
+  readonly defeated = computed(() => !this.isPc() && this.combatant().hp === 0);
   readonly image = computed(() => (this.isPc() ? null : (this.stats()?.image ?? null)));
   readonly showImage = computed(() => {
     const src = this.image();

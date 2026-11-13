@@ -4,13 +4,15 @@
 }
 
 .token {
+  --ring: var(--color-border);
   position: relative;
   width: 44px;
   height: 44px;
   padding: 0;
   border-radius: 50%;
-  border: 2px solid var(--color-surface);
-  box-shadow: var(--shadow-2);
+  border: 2px solid var(--ring);
+  box-shadow: var(--shadow-1);
+  transition: box-shadow var(--transition-fast), filter var(--transition-fast);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -33,18 +35,22 @@
   pointer-events: none;
 }
 
+/* Side: the fill and the ring (2 px) in the side's hue. */
 .token[data-side="pc"] {
+  --ring: var(--color-accent);
   background: var(--color-accent);
   color: var(--color-accent-contrast);
 }
 
 .token[data-side="enemy"] {
+  --ring: var(--color-danger);
   background: var(--color-danger);
   color: var(--color-danger-contrast);
 }
 
 .token[data-side="ally"] {
-  background: color-mix(in srgb, var(--color-accent) 55%, var(--color-surface));
+  --ring: var(--combat-ally);
+  background: color-mix(in srgb, var(--combat-ally) 55%, var(--color-surface));
   color: var(--color-text);
 }
 
@@ -52,10 +58,33 @@
   filter: brightness(1.06);
 }
 
-.token.active,
+/* The active chip glows softly in the accent. */
+.token.active {
+  box-shadow:
+    var(--shadow-1),
+    0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent),
+    0 0 14px 2px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
 .token:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+/* Defeated: greyscale at half opacity. */
+.token.defeated {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
+.token.defeated:hover {
+  filter: grayscale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .token {
+    transition: none;
+  }
 }
 
 .hp {

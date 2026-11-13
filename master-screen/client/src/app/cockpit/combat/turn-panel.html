@@ -1,44 +1,85 @@
 <section class="panel" aria-labelledby="turn-now-title">
   @if (now(); as n) {
-  <div class="now">
-  <h3 id="turn-now-title" class="title">
-    {{ i18n.t(n.pc ? "combat.turn.pc" : "combat.turn.now", { name: n.name }) }}
-  </h3>
-  @if (!n.pc) { @if (n.status === "loading") {
-  <p class="muted">…</p>
-  } @else if (n.status === "error") {
-  <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
-  } @else if (n.groups.length) { @for (group of n.groups; track group.label) {
-  <h4>{{ group.label }}</h4>
-  <ul class="actions">
-    @for (action of group.actions; track $index) {
-    <li><strong>{{ action.name }}</strong> {{ action.text }}</li>
+  <div class="card now">
+    <div class="now-head">
+      @if (n.image; as src) {
+      <img class="avatar" [attr.src]="src" alt="" draggable="false" (error)="failed.set(src)" />
+      } @else {
+      <span class="avatar initials" aria-hidden="true">{{ n.initials }}</span>
+      }
+      <div class="now-text">
+        <h3 id="turn-now-title" class="title">
+          {{ i18n.t(n.pc ? "combat.turn.pc" : "combat.turn.now", { name: n.name }) }}
+        </h3>
+        @if (n.hp !== undefined) {
+        <p class="hp" [attr.title]="n.hpLabel">
+          <b class="hp-now">{{ n.hp }}</b><span class="sep">/</span>{{ n.maxHp ?? "—" }}
+        </p>
+        }
+      </div>
+    </div>
+    @if (n.hpPct !== null) {
+    <span class="hp-bar" [class.low]="n.low" aria-hidden="true">
+      <span class="hp-fill" [style.width.%]="n.hpPct"></span>
+    </span>
     }
-  </ul>
-  } } @else {
-  <p class="muted">{{ i18n.t("combat.turn.noneNow") }}</p>
-  } }
-  </div>
-  }
-
-  <h3 class="title out-of-turn">{{ i18n.t("combat.turn.others") }}</h3>
-  @if (others().length) { @for (other of others(); track other.id) {
-  <div class="other">
-    <h4 class="other-name">{{ other.name }}</h4>
-    @if (other.status === "loading") {
+    @if (!n.pc) { @if (n.status === "loading") {
     <p class="muted">…</p>
-    } @else if (other.status === "error") {
+    } @else if (n.status === "error") {
     <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
-    } @else { @for (group of other.groups; track group.label) {
-    <h5>{{ group.label }}</h5>
+    } @else if (n.groups.length) { @for (group of n.groups; track group.label) {
+    <h4 class="group-label">{{ group.label }}</h4>
     <ul class="actions">
       @for (action of group.actions; track $index) {
-      <li><strong>{{ action.name }}</strong> {{ action.text }}</li>
+      <li class="action" [attr.title]="action.text">
+        <span class="action-name">{{ action.name }}</span>
+        <span class="action-text">{{ action.text }}</span>
+      </li>
       }
     </ul>
+    } } @else {
+    <p class="muted">{{ i18n.t("combat.turn.noneNow") }}</p>
     } }
+    @if (!others().length) {
+    <p class="muted card-foot">{{ i18n.t("combat.turn.noOthers") }}</p>
+    }
   </div>
-  } } @else {
+  } @else if (!others().length) {
   <p class="muted">{{ i18n.t("combat.turn.noOthers") }}</p>
+  }
+
+  @if (others().length) {
+  <details class="card others" [open]="wide()">
+    <summary class="title">{{ i18n.t("combat.turn.others") }}</summary>
+    <div class="others-body">
+      @for (other of others(); track other.id) {
+      <div class="other">
+        <div class="other-head">
+          @if (other.image; as src) {
+          <img class="avatar sm" [attr.src]="src" alt="" draggable="false" (error)="failed.set(src)" />
+          } @else {
+          <span class="avatar sm initials" aria-hidden="true">{{ other.initials }}</span>
+          }
+          <h4 class="other-name">{{ other.name }}</h4>
+        </div>
+        @if (other.status === "loading") {
+        <p class="muted">…</p>
+        } @else if (other.status === "error") {
+        <p class="muted">{{ i18n.t("combat.stats.error") }}</p>
+        } @else { @for (group of other.groups; track group.label) {
+        <h5 class="group-label">{{ group.label }}</h5>
+        <ul class="actions">
+          @for (action of group.actions; track $index) {
+          <li class="action" [attr.title]="action.text">
+            <span class="action-name">{{ action.name }}</span>
+            <span class="action-text">{{ action.text }}</span>
+          </li>
+          }
+        </ul>
+        } }
+      </div>
+      }
+    </div>
+  </details>
   }
 </section>

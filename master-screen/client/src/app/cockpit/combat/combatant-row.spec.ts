@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CombatantStats, CombatRules } from '@shared/types';
 import type { Combatant, CockpitSessionView } from '@shared/cockpit-types';
 import { CockpitService } from '../cockpit.service';
+import { I18n } from '../../i18n';
 import { CombatantRow, hpAfterDamage, hpAfterHeal, parseAmount } from './combatant-row';
 
 const OGRE_STATS: CombatantStats = {
@@ -100,6 +101,12 @@ describe('CombatantRow', () => {
     const select = root.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`)!;
     select.value = value;
     select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+  }
+
+  /** Opens the add-condition picker with the + Condition button. */
+  function openAdd(root: HTMLElement, fixture: ComponentFixture<CombatantRow>) {
+    root.querySelector<HTMLButtonElement>('button.add-toggle')!.click();
     fixture.detectChanges();
   }
 
@@ -230,6 +237,7 @@ describe('CombatantRow', () => {
     await settle(fixture);
     const root = fixture.nativeElement as HTMLElement;
 
+    openAdd(root, fixture);
     const add = root.querySelector<HTMLButtonElement>('button.text-button')!;
     expect(add.disabled).toBe(false);
     add.click();
@@ -244,6 +252,7 @@ describe('CombatantRow', () => {
     await settle(fixture);
     const root = fixture.nativeElement as HTMLElement;
 
+    openAdd(root, fixture);
     const options = [...root.querySelectorAll<HTMLOptionElement>('select[aria-label="Condition to add"] option')];
     expect(options.map((option) => option.value)).toEqual(['stunned']);
   });
@@ -254,6 +263,7 @@ describe('CombatantRow', () => {
     await settle(fixture);
     const root = fixture.nativeElement as HTMLElement;
 
+    openAdd(root, fixture);
     setSelect(root, 'Condition to add', 'stunned', fixture);
     setSelect(root, 'Duration', 'rounds', fixture);
     const rounds = root.querySelector<HTMLInputElement>('input.rounds')!;
@@ -273,9 +283,85 @@ describe('CombatantRow', () => {
     const fixture = create(OGRE);
     await settle(fixture);
     const root = fixture.nativeElement as HTMLElement;
+    openAdd(root, fixture);
     expect(root.querySelector('input.rounds')).toBeNull();
     setSelect(root, 'Duration', 'rounds', fixture);
     expect(root.querySelector('input.rounds')).not.toBeNull();
+  });
+
+  it('keeps the condition picker folded until the + Condition button opens it', async () => {
+    installServer();
+    const fixture = create(OGRE);
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('select[aria-label="Condition to add"]')).toBeNull();
+    expect(root.querySelector('button.text-button')).toBeNull();
+    const toggle = root.querySelector<HTMLButtonElement>('button.add-toggle')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    fixture.detectChanges();
+    expect(root.querySelector('select[aria-label="Condition to add"]')).not.toBeNull();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    toggle.click();
+    fixture.detectChanges();
+    expect(root.querySelector('select[aria-label="Condition to add"]')).toBeNull();
+  });
+
+  it('folds the condition picker on Escape and after a condition is added', async () => {
+    const calls = installServer();
+    const fixture = create(OGRE);
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    openAdd(root, fixture);
+    root.querySelector<HTMLButtonElement>('button.add-toggle')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    fixture.detectChanges();
+    expect(root.querySelector('select[aria-label="Condition to add"]')).toBeNull();
+
+    openAdd(root, fixture);
+    root.querySelector<HTMLButtonElement>('button.text-button')!.click();
+    await settle(fixture);
+    expect(sentActions(calls)).toHaveLength(1);
+    expect(root.querySelector('select[aria-label="Condition to add"]')).toBeNull();
+  });
+
+  it('shows the hit points as a placeholder and no damage or heal controls when they are unknown', async () => {
+    installServer();
+    TestBed.inject(I18n).setLanguage('it');
+    const fixture = create({ id: 'c-brann', name: 'Brann', kind: 'enemy', initiative: 5, conditions: [] });
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const hp = root.querySelector<HTMLElement>('.status .hp')!;
+    expect(hp.textContent?.trim()).toBe('PF —');
+    expect(hp.classList.contains('unknown')).toBe(true);
+    expect(root.querySelector('input.amount')).toBeNull();
+    expect(root.querySelector('button[aria-label="Infliggi danno"]')).toBeNull();
+    expect(root.querySelector('button[aria-label="Cura"]')).toBeNull();
+    // Defeat and remove stay: they do not need the hit points.
+    expect(root.querySelectorAll('.controls ui-confirm-button').length).toBe(2);
+  });
+
+  it('shows the amount input with the short hit point placeholder and keeps its label', async () => {
+    installServer();
+    const fixture = create(OGRE);
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const amount = root.querySelector<HTMLInputElement>('input.amount')!;
+    expect(amount.getAttribute('placeholder')).toBe('HP');
+    expect(amount.getAttribute('aria-label')).toBe('Amount');
+  });
+
+  it('leaves the initiative out of the stat lines, since the row already shows it', async () => {
+    installServer({ lines: [{ label: 'Initiative', value: '9' }, { label: 'AC', value: '13' }], actions: [] });
+    const fixture = create(OGRE);
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect([...root.querySelectorAll('.line dt')].map((dt) => dt.textContent?.trim())).toEqual(['AC']);
+    expect(root.querySelector('.row-meta')?.textContent).toContain('9');
   });
 
   it('shows the portrait of the sheet in place of the chip when the stats have artwork', async () => {
@@ -287,6 +373,15 @@ describe('CombatantRow', () => {
     const portrait = root.querySelector<HTMLImageElement>('img.row-portrait');
     expect(portrait?.getAttribute('src')).toBe('/api/file?path=Enemies%2Fogre.png');
     expect(root.querySelector('cockpit-combatant-chip')).toBeNull();
+  });
+
+  it('marks the hp bar low when an enemy is at a quarter of its maximum or below', async () => {
+    installServer();
+    const fixture = create({ id: 'c-enemy', name: 'Goblin', kind: 'enemy', initiative: 7, hp: 5, maxHp: 31, conditions: [] });
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('.hp-bar')?.classList.contains('low')).toBe(true);
   });
 });
 

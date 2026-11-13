@@ -1,8 +1,26 @@
-:host {
-  display: block;
-}
+/*
+ * Combat overlay: header, initiative strip, stage (battle board or initiative step) and chat.
+ *
+ * Brief rules not followed exactly, and why:
+ * - Initiative strip tiles show initials only, never portraits: a portrait needs the stats of
+ *   every combatant, which the overlay does not load (the brief forbids new server calls here).
+ * - The end-combat, defeated and remove buttons are ui-confirm-button components. Their look
+ *   lives in support/confirm-button.css, outside this folder, so they keep their bordered 40 px
+ *   style instead of the quiet 36 px icon button. Only the armed state is danger, as briefed.
+ * - Map chips and the chip fallback in rows keep the 44 px token size of the chip component.
+ * - Between 900 and 1199 px the turn column is 300 px (the brief fixes 360 px from 1200 px).
+ * - The turn panel's "Out of turn" block is a <details> that is open on wide screens only.
+ * - The newest-notice list opens as a popover under the header, not as a row of its own.
+ * - The initiative step (before the fight starts) is not restyled in this pass.
+ * - Row actions keep their full text as visually hidden text (so screen readers and the text
+ *   check still see it), with the same text in a title tooltip.
+ */
 
+/* Local tokens of the combat screen. Same dark switch as styles.css. */
 .overlay {
+  --combat-warn: #b45309;
+  --combat-ally: #0f766e;
+  --combat-track: color-mix(in srgb, var(--color-text) 10%, transparent);
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -12,6 +30,23 @@
   color: var(--color-text);
 }
 
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .overlay {
+    --combat-warn: #f59e0b;
+    --combat-ally: #2dd4bf;
+  }
+}
+
+:root[data-theme="dark"] .overlay {
+  --combat-warn: #f59e0b;
+  --combat-ally: #2dd4bf;
+}
+
+:host {
+  display: block;
+}
+
+/* Header: one row, 56 px. */
 .bar {
   display: flex;
   align-items: center;
@@ -20,22 +55,30 @@
   padding: var(--space-1) var(--space-2);
   background: var(--color-surface);
   border-bottom: 1px solid var(--color-border);
-  color: var(--color-danger);
+  color: var(--color-text-muted);
 }
 
-.bar h2 {
+.bar .title {
   min-width: 0;
   margin: 0;
   color: var(--color-text);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-base);
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .round {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
@@ -44,76 +87,92 @@
 }
 
 .icon-button {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .icon-button:hover {
   background: var(--color-surface-2);
+  color: var(--color-text);
 }
 
 .icon-button:focus-visible,
-.next-turn:focus-visible {
+.next-turn:focus-visible,
+.notice-toggle:focus-visible,
+.chat-toggle:focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
 }
 
+/* The one primary action of the screen. */
 .next-turn {
-  min-height: 40px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   gap: var(--space-0-5);
-  padding: 0 var(--space-1);
+  padding: 0 var(--space-2) 0 var(--space-1);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
+  border: 0;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font-size: var(--font-size-sm);
   font-weight: 600;
   white-space: nowrap;
+  transition: background-color var(--transition-fast);
 }
 
 .next-turn:hover:not(:disabled) {
-  background: var(--color-surface-2);
+  background: var(--color-accent-hover);
 }
 
 .next-turn:disabled {
   opacity: 0.45;
 }
 
+/* Newest notice: a quiet one-line pill. The list opens below it. */
 .notice-strip {
-  border-bottom: 1px solid var(--color-border);
-  background: var(--color-surface-2);
-  font-size: var(--font-size-sm);
+  position: relative;
+  min-width: 0;
+  flex: 0 1 auto;
+  max-width: min(360px, 40%);
 }
 
 .notice-toggle {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-0-5);
   width: 100%;
-  min-height: 40px;
-  padding: var(--space-0-5) var(--space-2);
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
   text-align: left;
+  transition: background-color var(--transition-fast);
 }
 
 .notice-toggle:hover {
-  background: var(--color-surface);
+  color: var(--color-text);
 }
 
-.notice-toggle:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: -3px;
+.dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
 }
 
 .notice-text {
@@ -125,10 +184,22 @@
 }
 
 .notice-list {
-  margin: 0;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 5;
+  width: min(420px, 90vw);
   max-height: 30vh;
   overflow: auto;
-  padding: var(--space-0-5) var(--space-2) var(--space-1) calc(var(--space-2) + 1.5rem);
+  margin: 0;
+  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-2);
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-2);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
 }
 
 .notice-list li + li {
@@ -147,6 +218,131 @@
   border: 0;
 }
 
+/* Initiative strip: one row of tiles in initiative order, wrapping when they do not fit. */
+.strip {
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.strip-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.tile {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 0 1 180px;
+  min-width: 128px;
+  max-width: 220px;
+  height: 44px;
+  padding: 0 var(--space-1) 0 var(--space-0-5);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: var(--font-size-sm);
+  transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.tile.active {
+  border-color: transparent;
+  background: var(--color-accent-soft);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 45%, transparent);
+}
+
+.tile-avatar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+}
+
+.tile[data-side="pc"] .tile-avatar {
+  border-color: var(--color-accent);
+}
+
+.tile[data-side="enemy"] .tile-avatar {
+  border-color: var(--color-danger);
+}
+
+.tile[data-side="ally"] .tile-avatar {
+  border-color: var(--combat-ally);
+}
+
+.tile-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.tile-init {
+  flex: none;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.tile.defeated .tile-name {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.tile.defeated .tile-avatar {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.tile-hp {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--combat-track);
+}
+
+.tile-hp-fill {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+  transition: width var(--transition-fast);
+}
+
+.tile[data-side="enemy"] .tile-hp-fill {
+  background: var(--color-danger);
+}
+
+.tile[data-side="ally"] .tile-hp-fill {
+  background: var(--combat-ally);
+}
+
+.tile-hp-fill.low {
+  background: var(--combat-warn);
+}
+
+.tile.defeated .tile-hp-fill {
+  width: 0 !important;
+}
+
+/* Stage: the body (battle board or initiative step) and the floating chat. */
 .stage {
   position: relative;
   flex: 1;
@@ -157,6 +353,7 @@
 .body {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   overflow: auto;
   padding: var(--space-2);
 }
@@ -215,8 +412,99 @@
   min-height: 0;
 }
 
+/* Wide screens: with the chat open it is a third column instead of covering the board. */
+@media (min-width: 1200px) {
+  .stage.chat-open {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+
+  .stage.chat-open .body {
+    grid-column: 1;
+    grid-row: 1;
+    padding-right: var(--space-2);
+  }
+
+  .stage.chat-open .chat-panel {
+    grid-column: 2;
+    grid-row: 1;
+    position: static;
+    width: auto;
+    border-radius: 0;
+    border-width: 0 0 0 1px;
+    box-shadow: none;
+  }
+}
+
+/* Under 900 px: one column, the header wraps and the notice drops to a second line. */
+@media (max-width: 899px) {
+  .bar {
+    flex-wrap: wrap;
+    row-gap: var(--space-0-5);
+  }
+
+  .notice-strip {
+    order: 10;
+    flex: 1 0 100%;
+    max-width: none;
+  }
+}
+
+/* Under 900 px with the chat collapsed: a floating button at the bottom right, clear of the turn panel's title. */
+@media (max-width: 899px) {
+  .chat-panel.collapsed {
+    position: fixed;
+    top: auto;
+    right: var(--space-4);
+    bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+    z-index: 20;
+    width: auto;
+    border-radius: var(--radius-pill);
+    box-shadow: var(--shadow-2);
+  }
+
+  .chat-panel.collapsed .chat-toggle {
+    min-height: 44px;
+    border-radius: var(--radius-pill);
+  }
+}
+
+/* Under 700 px the list is the order: the strip is hidden. */
+@media (max-width: 699px) {
+  .strip {
+    display: none;
+  }
+}
+
+/* At phone width the title and the Next turn label go; their icons keep title and aria-label. */
+@media (max-width: 479px) {
+  .bar .title {
+    display: none;
+  }
+
+  .next-label {
+    display: none;
+  }
+
+  .next-turn {
+    padding: 0;
+    width: 36px;
+    justify-content: center;
+  }
+}
+
 @media (max-width: 760px) {
   .body.with-chat {
     padding-right: var(--space-2);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-button,
+  .next-turn,
+  .notice-toggle,
+  .tile,
+  .tile-hp-fill {
+    transition: none;
   }
 }
