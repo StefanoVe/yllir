@@ -96,3 +96,13 @@ export function silentCampaign(yaml: string = MUSIC_OFF_YAML): string {
     'Places/Porto/Porto.md': '# Porto di Vetro\n\nPublic description only, no music.\n',
   });
 }
+
+/** The fake mpv of fake-mpv.mjs, behind a shell wrapper so it can be used as MPV_PATH. */
+export const FAKE_MPV = fileURLToPath(new URL('./fake-mpv.mjs', import.meta.url));
+
+export function fakeMpvBinary(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ms-fake-mpv-'));
+  const file = path.join(dir, 'mpv');
+  fs.writeFileSync(file, `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(FAKE_MPV)} "$@"\n`, { mode: 0o755 });
+  return file;
+}

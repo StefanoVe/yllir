@@ -65,7 +65,7 @@ describe('music availability', () => {
     assert.equal(musicAvailableCached(root), true);
   });
 
-  it('the app serves the CSP of the cached value per request', async () => {
+  it('the app serves a CSP with no YouTube script, style, frame or connect host, whatever the music cache says', async () => {
     const root = musicCampaign(MUSIC_OFF_YAML);
     cleanup.push(root);
     invalidateMusicLibrary(root);
@@ -73,7 +73,9 @@ describe('music availability', () => {
     try {
       await musicAvailable(h.ctx);
       const csp = String((await get(h, '/status')).headers['content-security-policy']);
-      assert.match(csp, /youtube/);
+      // Thumbnails only: ytimg may appear in img-src and nowhere else.
+      assert.doesNotMatch(csp, /(script|style|frame|connect|font|object|default)-src[^;]*(youtube|ytimg)/);
+      assert.match(csp, /img-src 'self' data: https:\/\/i\.ytimg\.com(;|$)/);
     } finally {
       await h.server.close();
       await h.ctx.closeAll();

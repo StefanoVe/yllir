@@ -79,4 +79,37 @@ describe('suggest_music tool', () => {
     assert.match(result.text, /newer Yllir/);
     assert.equal(published.length, 0);
   });
+
+  it('searches the keywords and the query together as one OR query', async () => {
+    const { ctx, published } = ctxWith(musicCampaign(MUSIC_ON_YAML));
+    const result = await suggestMusic(ctx, { query: 'zzzzzz', keywords: ['nebbia', 'freddo'] });
+    assert.equal(result.isError, undefined);
+    const data = published[0].data as { tracks: Array<{ title: string }> };
+    assert.equal(data.tracks[0].title, 'Nebbia');
+  });
+
+  it('accepts keywords alone and refuses an empty call with empty keywords', async () => {
+    const { ctx, published } = ctxWith(musicCampaign(MUSIC_ON_YAML));
+    const found = await suggestMusic(ctx, { keywords: ['  ', 'nebbia'] });
+    assert.equal(found.isError, undefined);
+    assert.equal(published.length, 1);
+    const refused = await suggestMusic(ctx, { keywords: ['  '] });
+    assert.equal(refused.isError, true);
+  });
+
+  it('answers a miss with the advice to retry with generic words, and publishes nothing', async () => {
+    const { ctx, published } = ctxWith(musicCampaign(MUSIC_ON_YAML));
+    const result = await suggestMusic(ctx, { keywords: ['zzzzzz'] });
+    assert.match(result.text, /No music matches.*generic words/);
+    assert.equal(published.length, 0);
+  });
+
+  it('returns titles to the model only, never the snippets of the master text', async () => {
+    const { ctx, published } = ctxWith(musicCampaign(MUSIC_ON_YAML));
+    const result = await suggestMusic(ctx, { keywords: ['secret'] });
+    const data = published[0].data as { tracks: Array<{ snippet?: string }> };
+    assert.ok(data.tracks.some((t) => t.snippet === 'Secret plot of the port.'));
+    assert.ok(!result.text.includes('Secret plot'));
+    assert.ok(!result.text.includes('Public description'));
+  });
 });

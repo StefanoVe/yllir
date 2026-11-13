@@ -1,0 +1,131 @@
+/*
+ * Slider. The rail is 4px and grows to 6px on hover; the native range input sits over it and is
+ * transparent, except for the thumb, which shows on hover and focus only.
+ */
+:host {
+  position: relative;
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 18px;
+}
+
+.rail {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 4px;
+  transform: translateY(-50%);
+  border-radius: 999px;
+  background: rgb(236 229 210 / 0.16);
+  transition: height 120ms ease-out;
+  overflow: hidden;
+}
+
+:host(:hover) .rail {
+  height: 6px;
+}
+
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--ink-accent, #d9a548);
+}
+
+.rail.animated .fill {
+  transition: width 250ms linear;
+}
+
+/* Tick rail (the seek line of the bar): ticks on a 5px pitch, the played part in the accent. */
+.rail.ticks {
+  height: 14px;
+  border-radius: 0;
+  background: repeating-linear-gradient(90deg, rgb(155 165 150 / 0.55) 0 2px, transparent 2px 5px);
+  overflow: visible;
+}
+
+:host(:hover) .rail.ticks {
+  height: 16px;
+}
+
+.rail.ticks .fill {
+  overflow: hidden;
+  background: repeating-linear-gradient(90deg, var(--ink-accent, #d9a548) 0 2px, transparent 2px 5px);
+}
+
+.range {
+  -webkit-appearance: none;
+  appearance: none;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.range:disabled {
+  cursor: default;
+}
+
+.range:focus-visible {
+  outline: 2px solid var(--ink-text, #ece5d2);
+  outline-offset: 2px;
+}
+
+.range::-webkit-slider-runnable-track {
+  height: 100%;
+  background: transparent;
+}
+
+.range::-moz-range-track {
+  background: transparent;
+}
+
+.range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 4px;
+  height: 16px;
+  margin-top: 1px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--ink-text, #ece5d2);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.range::-moz-range-thumb {
+  width: 4px;
+  height: 16px;
+  border: 0;
+  border-radius: 2px;
+  background: var(--ink-text, #ece5d2);
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+
+.range:hover::-webkit-slider-thumb,
+.range:focus-visible::-webkit-slider-thumb {
+  opacity: 1;
+}
+
+.range:hover::-moz-range-thumb,
+.range:focus-visible::-moz-range-thumb {
+  opacity: 1;
+}
+
+:host(.is-disabled) {
+  opacity: 0.5;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail,
+  .rail.animated .fill,
+  .range::-webkit-slider-thumb,
+  .range::-moz-range-thumb {
+    transition: none;
+  }
+}

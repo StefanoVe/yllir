@@ -320,8 +320,9 @@ async function* runTurn(ctx: Ctx, executable: string, input: AgentRunInput): Asy
   );
   const suggestMusicTool = tool(
     'suggest_music',
-    'Show up to five pieces of music of the campaign on the screen, for a query (words of the title, mood or sheet) and/or one sheet path. Nothing plays by itself; the master chooses. Give a short reason when useful.',
+    'Show up to five pieces of music of the campaign on the screen. Put the mood of the scene in keywords as 3 to 6 GENERIC vibe words (mood, genre, setting, such as "tense", "snowy", "tavern", "mystery"), never names of places, people or events and never long phrases. Any word may match. If nothing is found, call again with more generic words. query is optional, for one extra word; doc limits the search to one sheet path. Nothing plays by itself; the master chooses. Give a short reason when useful.',
     {
+      keywords: z.array(z.string().min(1).max(40)).max(8).optional(),
       query: z.string().min(1).max(200).optional(),
       doc: z.string().min(1).max(512).optional(),
       reason: z.string().max(200).optional(),

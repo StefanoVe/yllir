@@ -11,10 +11,17 @@ export const YOUTUBE_HOSTS = new Set([
   'youtu.be',
 ]);
 
+export const SOUNDCLOUD_HOSTS = new Set([
+  'soundcloud.com',
+  'www.soundcloud.com',
+  'm.soundcloud.com',
+  'on.soundcloud.com', // short links
+]);
+
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 
 export interface MusicLink {
-  provider: 'youtube' | 'external';
+  provider: 'youtube' | 'soundcloud' | 'external';
   videoId?: string;
 }
 
@@ -45,6 +52,10 @@ export function classifyMusicUrl(raw: string): MusicLink | null {
   if (url.username !== '' || url.password !== '') return null;
   const host = url.hostname.toLowerCase();
   if (host === '') return null;
+  if (SOUNDCLOUD_HOSTS.has(host)) {
+    // A SoundCloud link needs at least one path segment (the bare host is not a track).
+    return url.pathname.split('/').some((part) => part !== '') ? { provider: 'soundcloud' } : { provider: 'external' };
+  }
   if (!YOUTUBE_HOSTS.has(host)) return { provider: 'external' };
   const videoId = youtubeVideoId(host, url);
   return videoId === null ? { provider: 'external' } : { provider: 'youtube', videoId };

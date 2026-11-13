@@ -6,8 +6,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { ModuleId } from '@shared/types';
 import { LiveService } from '../core/live.service';
 import { StatusService } from '../core/status.service';
-import { YOUTUBE_PLAYER } from '../music/youtube-player';
-import { FakeYouTubePlayer } from '../music/testing';
 import { Shell } from './shell';
 
 function setup(music: boolean): ComponentFixture<Shell> {
@@ -29,7 +27,6 @@ function setupModules(flags: Record<ModuleId, boolean>): ComponentFixture<Shell>
         provide: LiveService,
         useValue: { on: () => EMPTY as Observable<unknown>, resync$: EMPTY, connected: signal(true).asReadonly() },
       },
-      { provide: YOUTUBE_PLAYER, useValue: new FakeYouTubePlayer() },
     ],
   });
   const fixture = TestBed.createComponent(Shell);

@@ -90,7 +90,8 @@ export type LiveEvent =
   | { event: 'open'; data: { path: string } }                           // the agent asks the screen to open a document
   | { event: 'status'; data: StatusResponse }
   | { event: 'live'; data: { revision: string } }
-  | { event: 'music'; data: { tracks: MusicTrack[]; reason?: string } };
+  | { event: 'music'; data: { tracks: MusicTrack[]; reason?: string } }
+  | { event: 'musicstate'; data: MusicPlayback };
 
 // ---------------------------------------------------------------------------
 // Live session (phase 2). State files live in <campaign>/.campaign/state/live/.
@@ -251,7 +252,7 @@ export interface PlotSheetsResponse { sheets: PlotSheet[] }
 // of place and scene sheets (master-only block). Playback is in the browser.
 // ---------------------------------------------------------------------------
 
-export type MusicProvider = 'youtube' | 'external'; // 'external' = opens in a new tab, no in-app control
+export type MusicProvider = 'youtube' | 'soundcloud' | 'external'; // 'external' = opens in a new tab, no in-app control
 
 export interface MusicTrack {
   id: string;                  // stable: sha1 of `${docPath}|${url}` (first 12 hex)
@@ -263,8 +264,30 @@ export interface MusicTrack {
   docPath: string;             // campaign-relative path of the sheet that lists it
   docTitle: string;            // title of that sheet
   preferred?: boolean;         // the sheet marks it as the preferred one
+  snippet?: string;            // search with a query: the sheet passage that justifies the match (master-only text may be in it)
+  matches?: string[];          // search with a query: folded words of the snippet that matched, for highlighting
 }
 export interface MusicResponse { enabled: boolean; tracks: MusicTrack[]; note?: string } // note: plain-language reason when the framework is too old
+
+// Server-side playback (mpv on the server's machine). The browser only drives it.
+export type MusicPhase = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+export interface MusicPlayback {
+  available: boolean;            // mpv and yt-dlp found on the server
+  unavailableReason?: 'mpv-missing' | 'ytdlp-missing';
+  phase: MusicPhase;
+  trackId: string | null;        // id of the MusicTrack being played
+  position: number;              // seconds
+  duration: number;              // seconds, 0 when unknown
+  volume: number;                // 0..100
+  loop: boolean;
+  error?: 'unavailable' | 'failed'; // set when phase === 'error'
+}
+export type MusicCommand =
+  | { command: 'play'; trackId: string }
+  | { command: 'pause' } | { command: 'resume' } | { command: 'stop' } | { command: 'fadeout' }
+  | { command: 'seek'; value: number }
+  | { command: 'volume'; value: number }
+  | { command: 'loop'; value: boolean };
 
 // ---------------------------------------------------------------------------
 // Encyclopedia and print (phase 3, modules `encyclopedia` and `print`).

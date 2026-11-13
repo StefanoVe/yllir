@@ -3,30 +3,25 @@
 import type { RequestHandler } from 'express';
 
 export interface CspOptions {
-  /** The music module is on: YouTube (IFrame API loader, player frame, thumbnails) only. */
-  music: boolean;
   /** The encyclopedia module is on: the reader embeds the same-origin built site (`frame-src 'self'`). */
   encyclopedia?: boolean;
 }
 
 /**
- * The Content-Security-Policy. With music on it adds exactly the YouTube allowances of the
- * API contract and nothing else: no wildcards, no extra `unsafe-*` values.
+ * The Content-Security-Policy. Music plays on the server, so no third-party script, frame or
+ * connection is allowed. The only third-party host is the YouTube thumbnail host, for images.
+ * The same-origin built encyclopedia is framed when that module is on.
  */
-export function buildCsp({ music, encyclopedia = false }: CspOptions): string {
-  const scriptSrc = music ? "script-src 'self' https://www.youtube.com" : "script-src 'self'";
-  const imgSrc = music ? "img-src 'self' data: https://i.ytimg.com" : "img-src 'self' data:";
+export function buildCsp({ encyclopedia = false }: CspOptions = {}): string {
   // One frame-src directive for every module that frames something.
-  const frames = [
-    ...(encyclopedia ? ["'self'"] : []),
-    ...(music ? ['https://www.youtube-nocookie.com'] : []),
-  ];
+  const frames = encyclopedia ? ["'self'"] : [];
   const frameSrc = frames.length > 0 ? [`frame-src ${frames.join(' ')}`] : [];
   return [
     "default-src 'self'",
-    scriptSrc,
+    "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
-    imgSrc,
+    // Artwork of the YouTube tracks only (thumbnails). No script, style, frame or connect host.
+    "img-src 'self' data: https://i.ytimg.com",
     "font-src 'self' data:",
     "connect-src 'self'",
     "object-src 'none'",
@@ -37,7 +32,7 @@ export function buildCsp({ music, encyclopedia = false }: CspOptions): string {
   ].join('; ');
 }
 
-export const CONTENT_SECURITY_POLICY = buildCsp({ music: false });
+export const CONTENT_SECURITY_POLICY = buildCsp();
 
 export const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -73,20 +68,17 @@ export function isStateChanging(method: string): boolean {
 }
 
 export interface SecurityOptions {
-  /** Campaign music flag: a fixed value, or a function evaluated on every request. */
-  music?: boolean | (() => boolean);
   /** Campaign encyclopedia module flag, read once at startup. */
   encyclopedia?: boolean;
 }
 
 export function securityMiddleware(port: number, opts: SecurityOptions = {}): RequestHandler {
-  const musicOn = typeof opts.music === 'function' ? opts.music : () => opts.music === true;
   const encyclopedia = opts.encyclopedia === true;
   return (req, res, next) => {
     for (const [name, value] of Object.entries(SECURITY_HEADERS)) {
       res.setHeader(name, value);
     }
-    res.setHeader('Content-Security-Policy', buildCsp({ music: musicOn() === true, encyclopedia }));
+    res.setHeader('Content-Security-Policy', buildCsp({ encyclopedia }));
     if (req.path === '/api' || req.path.startsWith('/api/')) {
       res.setHeader('Cache-Control', 'no-store');
     }

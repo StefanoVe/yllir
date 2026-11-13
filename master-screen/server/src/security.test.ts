@@ -115,43 +115,25 @@ describe('security middleware over HTTP', () => {
   });
 });
 
-describe('Content-Security-Policy matrix', () => {
-  const off = buildCsp({ music: false });
-  const on = buildCsp({ music: true });
-  const directives = (csp: string): string[] => csp.split('; ');
+describe('Content-Security-Policy', () => {
+  const csp = buildCsp();
 
-  it('music off: no third-party host at all', () => {
-    assert.doesNotMatch(off, /youtube|ytimg|https?:/);
-    assert.equal(off, "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
+  it('has no third-party host at all: music plays on the server', () => {
+    assert.doesNotMatch(csp, /youtube/);
+    assert.match(csp, /img-src 'self' data: https:\/\/i\.ytimg\.com;/);
+    assert.doesNotMatch(csp.replace('https://i.ytimg.com', ''), /https?:/);
+    assert.equal(csp, "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://i.ytimg.com; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'");
   });
 
-  it('music on: exactly the three allowances and nothing else changes', () => {
-    const offDirectives = directives(off);
-    const onDirectives = directives(on);
-    assert.equal(onDirectives.length, offDirectives.length + 1);
-    const changed = onDirectives.filter((d) => !offDirectives.includes(d));
-    assert.deepEqual(changed, [
-      "script-src 'self' https://www.youtube.com",
-      "img-src 'self' data: https://i.ytimg.com",
-      'frame-src https://www.youtube-nocookie.com',
-    ]);
-    assert.deepEqual(
-      offDirectives.filter((d) => !onDirectives.includes(d)),
-      ["script-src 'self'", "img-src 'self' data:"],
-    );
+  it('has no wildcard and no unsafe-eval or unsafe-hashes', () => {
+    assert.doesNotMatch(csp, /\*/);
+    assert.equal(csp.match(/unsafe-eval|unsafe-hashes/g), null);
   });
 
-  it('music on: no wildcard and no new unsafe value', () => {
-    assert.doesNotMatch(on, /\*/);
-    assert.equal(on.match(/unsafe-/g)?.length, off.match(/unsafe-/g)?.length);
-    assert.equal(on.match(/unsafe-eval|unsafe-hashes/g), null);
-    assert.doesNotMatch(on, /https?:\/\/(?!www\.youtube\.com|i\.ytimg\.com|www\.youtube-nocookie\.com)/);
-  });
-
-  it('the middleware sends the CSP of its music flag', async () => {
+  it('the middleware sends the same policy for every campaign', async () => {
     const server = await startServer((port) => {
       const app = express();
-      app.use(securityMiddleware(port, { music: true }));
+      app.use(securityMiddleware(port));
       app.get('/x', (_req, res) => {
         res.json({ ok: true });
       });
@@ -159,7 +141,7 @@ describe('Content-Security-Policy matrix', () => {
     });
     try {
       const res = await request(server.port, { path: '/x', headers: { host: `127.0.0.1:${server.port}` } });
-      assert.equal(res.headers['content-security-policy'], on);
+      assert.equal(res.headers['content-security-policy'], csp);
     } finally {
       await server.close();
     }
@@ -167,13 +149,11 @@ describe('Content-Security-Policy matrix', () => {
 });
 
 describe('Content-Security-Policy with the encyclopedia module', () => {
-  const base = buildCsp({ music: false });
-  const enc = buildCsp({ music: false, encyclopedia: true });
-  const both = buildCsp({ music: true, encyclopedia: true });
-  const musicOnly = buildCsp({ music: true });
+  const base = buildCsp();
+  const enc = buildCsp({ encyclopedia: true });
 
   it('encyclopedia off is the unchanged main policy', () => {
-    assert.equal(buildCsp({ music: false, encyclopedia: false }), base);
+    assert.equal(buildCsp({ encyclopedia: false }), base);
     assert.doesNotMatch(base, /frame-src/);
   });
 
@@ -181,16 +161,10 @@ describe('Content-Security-Policy with the encyclopedia module', () => {
     assert.equal(enc, `${base}; frame-src 'self'`);
   });
 
-  it('music and encyclopedia share one frame-src directive', () => {
-    assert.equal(both, `${musicOnly}`.replace('frame-src https://www.youtube-nocookie.com', "frame-src 'self' https://www.youtube-nocookie.com"));
-    assert.equal(both.match(/frame-src/g)?.length, 1);
-    assert.doesNotMatch(both, /\*/);
-  });
-
-  it('the middleware sends the policy of both flags', async () => {
+  it('the middleware sends the encyclopedia policy', async () => {
     const server = await startServer((port) => {
       const app = express();
-      app.use(securityMiddleware(port, { music: false, encyclopedia: true }));
+      app.use(securityMiddleware(port, { encyclopedia: true }));
       app.get('/x', (_req, res) => {
         res.json({ ok: true });
       });
@@ -199,32 +173,6 @@ describe('Content-Security-Policy with the encyclopedia module', () => {
     try {
       const res = await request(server.port, { path: '/x', headers: { host: `127.0.0.1:${server.port}` } });
       assert.equal(res.headers['content-security-policy'], enc);
-    } finally {
-      await server.close();
-    }
-  });
-});
-
-describe('securityMiddleware music option as a function', () => {
-  it('allows the YouTube origins when the function returns true and not when it returns false', async () => {
-    let on = false;
-    const server = await startServer((port) => {
-      const app = express();
-      app.use(securityMiddleware(port, { music: () => on }));
-      app.get('/x', (_req, res) => {
-        res.json({ ok: true });
-      });
-      return app;
-    });
-    try {
-      const headers = { host: `127.0.0.1:${server.port}` };
-      const off = await request(server.port, { path: '/x', headers });
-      assert.doesNotMatch(String(off.headers['content-security-policy']), /youtube/);
-      on = true;
-      const onRes = await request(server.port, { path: '/x', headers });
-      const csp = String(onRes.headers['content-security-policy']);
-      assert.match(csp, /script-src 'self' https:\/\/www\.youtube\.com;/);
-      assert.match(csp, /frame-src https:\/\/www\.youtube-nocookie\.com/);
     } finally {
       await server.close();
     }

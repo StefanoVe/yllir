@@ -1,0 +1,58 @@
+/* Artwork square. The size comes from the host: 48px in rows, 56px in the bar, full width in the card. */
+:host {
+  position: relative;
+  display: block;
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #1e2723;
+}
+
+:host(.is-large) {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 12px;
+}
+
+.tone,
+.thumb,
+.note {
+  position: absolute;
+  inset: 0;
+}
+
+.tone {
+  display: block;
+}
+
+.thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 260ms ease-out;
+}
+
+.thumb.ready {
+  opacity: 1;
+}
+
+.note.is-hidden {
+  display: none;
+}
+
+.note {
+  margin: auto;
+  width: fit-content;
+  height: fit-content;
+  color: rgb(236 229 210 / 0.55);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb {
+    transition: none;
+  }
+}

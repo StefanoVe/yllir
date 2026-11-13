@@ -1,0 +1,39 @@
+<div class="row" [class.current]="current()" [class.selected]="selected()"
+     [attr.data-selected]="selected() ? 'true' : null" [attr.aria-current]="current() ? 'true' : null">
+  <div class="lead">
+    @if (index(); as n) {
+      <span class="idx" aria-hidden="true">{{ n }}</span>
+    }
+    @if (current() && playing()) {
+      <span class="eq is-moving" role="img" [attr.aria-label]="label('music.nowPlaying')">
+        <span></span><span></span><span></span>
+      </span>
+    }
+    <button type="button" class="play" [class.on]="current()" [attr.aria-label]="buttonLabel()" [attr.title]="buttonLabel()"
+            (click)="activate.emit(track())">
+      <lucide-angular [img]="isExternal() ? icons.ExternalLink : (showPause() ? icons.Pause : icons.Play)" [size]="16" aria-hidden="true" />
+    </button>
+  </div>
+
+  <ms-music-art class="art" [track]="track()" />
+
+  <div class="body">
+    <span class="title">{{ track().title }}</span>
+    <span class="sub">
+      @if (showSheet()) {
+        <a class="sheet" [routerLink]="docLink(track().docPath)" [attr.title]="label('music.openSheet')"
+           (click)="openSheet.emit()">{{ track().docTitle }}</a>
+      }
+      @if (track().preferred) {
+        <span class="preferred">{{ label('music.preferred') }}</span>
+      }
+    </span>
+    @if (showSnippet() && track().snippet) {
+      <p class="snippet">@for (part of parts(); track $index) {@if (part.hit) {<strong class="hit">{{ part.text }}</strong>} @else {<span>{{ part.text }}</span>}}</p>
+    }
+  </div>
+
+  @if (track().mood) {
+    <span class="mood">{{ track().mood }}</span>
+  }
+</div>

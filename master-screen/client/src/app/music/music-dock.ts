@@ -1,35 +1,44 @@
-import { Component, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideAngularModule, ListMusic, Music, Pause, Play, Repeat, SkipBack, SkipForward, Sunset, ExternalLink, Volume2, VolumeX, X } from 'lucide-angular';
+import {
+  ExternalLink,
+  ListMusic,
+  LucideAngularModule,
+  Music,
+  Pause,
+  Play,
+  Repeat,
+  RotateCw,
+  SkipBack,
+  SkipForward,
+  Square,
+  Sunset,
+  Volume2,
+  VolumeX,
+  X,
+} from 'lucide-angular';
 import type { MusicTrack } from '@shared/types';
 import { docUrl } from '../core/doc-nav.service';
 import { StatusService } from '../core/status.service';
 import { I18n, type TranslationKey } from '../i18n';
-import { MusicApiService } from './music-api.service';
-import { MusicPlayerService, type MusicPlayerState } from './music-player.service';
-
-export type BrowseStatus = 'idle' | 'loading' | 'done' | 'error';
-
-/** One sheet of the browse list: its tracks, in the order the server gave them. */
-export interface BrowseGroup {
-  docTitle: string;
-  tracks: MusicTrack[];
-}
-
-/** Lower case, accents removed: the form the browse filter compares in. */
-function foldForFilter(text: string): string {
-  return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
-}
+import { MusicApiService, MusicSearch } from './music-api.service';
+import { groupTracks, type TrackGroup } from './music-groups';
+import { formatClock } from './music-highlight';
+import { MusicPlayerService, type MusicUiState } from './music-player.service';
+import { MusicResult } from './music-result';
+import { MusicArt } from './music-art';
+import { MusicSlider } from './music-slider';
 
 /**
- * The bottom bar of the app, shown whenever music is on for the campaign: the current track
- * (or "nothing playing"), a "Tracks" button that opens the campaign's tracks above the bar, and
- * the suggestion tray the assistant showed. Rendered once by the shell, so it survives route
- * changes. The shell gives the bar its own row, so it never covers the page.
+ * The bottom bar of the app, shown whenever music is on for the campaign. Three zones: the track
+ * (title, sheet and state, or the idle and error lines), the transport (previous, play, next, loop,
+ * fade-out and a seek bar under them) and the side (volume, stop and the Tracks popover). The
+ * suggestion tray the assistant showed opens above it. Rendered once by the shell, so it survives
+ * route changes, and it shows only what the server reports (see MusicPlayerService).
  */
 @Component({
   selector: 'ms-music-dock',
-  imports: [LucideAngularModule, RouterLink],
+  imports: [LucideAngularModule, RouterLink, MusicResult, MusicArt, MusicSlider],
   templateUrl: './music-dock.html',
   styleUrl: './music-dock.css',
 })
@@ -43,50 +52,104 @@ export class MusicDock {
   @ViewChild('browseButton') private browseButton?: ElementRef<HTMLButtonElement>;
   @ViewChild('searchInput') private searchInput?: ElementRef<HTMLInputElement>;
 
-  readonly icons = { ListMusic, Music, Pause, Play, Repeat, SkipBack, SkipForward, Sunset, ExternalLink, Volume2, VolumeX, X };
+  readonly icons = {
+    ExternalLink,
+    ListMusic,
+    Music,
+    Pause,
+    Play,
+    Repeat,
+    RotateCw,
+    Square,
+    SkipBack,
+    SkipForward,
+    Sunset,
+    Volume2,
+    VolumeX,
+    X,
+  };
   /** The bar is shown for as long as music is on for the campaign. */
   readonly visible = computed(() => this.status.modules()?.music === true);
 
-  readonly browseOpen = signal(false);
-  readonly browseQuery = signal('');
-  readonly browseTracks = signal<MusicTrack[]>([]);
-  readonly browseStatus = signal<BrowseStatus>('idle');
-  readonly browseError = signal<string | null>(null);
+  /** Phone only: the volume slider opens from the mute button. */
+  readonly volumeOpen = signal(false);
 
-  /** The browse list after the client-side filter, grouped by sheet. */
-  readonly browseGroups = computed<BrowseGroup[]>(() => {
-    const terms = foldForFilter(this.browseQuery()).split(/\s+/).filter((term) => term !== '');
-    const groups = new Map<string, MusicTrack[]>();
-    for (const track of this.browseTracks()) {
-      const haystack = foldForFilter(`${track.title} ${track.mood} ${track.docTitle}`);
-      if (!terms.every((term) => haystack.includes(term))) continue;
-      const list = groups.get(track.docTitle) ?? [];
-      list.push(track);
-      groups.set(track.docTitle, list);
-    }
-    return [...groups].map(([docTitle, tracks]) => ({ docTitle, tracks }));
+  readonly browseOpen = signal(false);
+  /** The popover's search: the server ranks, the client only shows what it sent. */
+  readonly browse = new MusicSearch(this.api);
+  /** A typed query: the server ranking, flat. */
+  readonly browseFlat = computed(() => this.browse.text().trim() !== '');
+  /** The empty query: grouped by sheet. */
+  readonly browseGroups = computed<TrackGroup<MusicTrack>[]>(() => (this.browseFlat() ? [] : groupTracks(this.browse.tracks())));
+  /** The order the popover shows its rows in: a play from it queues them in this order. */
+  readonly browseResults = computed<MusicTrack[]>(() =>
+    this.browseFlat() ? this.browse.tracks() : this.browseGroups().flatMap((group) => group.tracks),
+  );
+
+  /** Error text for the bar: the server's phase error, or the last failed command. Null when fine. */
+  readonly errorText = computed<string | null>(() => {
+    const error = this.player.error();
+    if (error !== null) return this.label(error === 'unavailable' ? 'music.error.unavailable' : 'music.error.failed');
+    const failure = this.player.failure();
+    return failure ?? null;
   });
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => this.browse.dispose());
+  }
 
   label(key: TranslationKey): string {
     return this.i18n.t(key);
-  }
-
-  playLabel(track: MusicTrack): string {
-    return this.i18n.t(track.provider === 'external' ? 'music.open' : 'music.playTrack', { title: track.title });
   }
 
   docLink(path: string): string {
     return docUrl(path);
   }
 
-  /** A suggestion chip is an explicit request: it plays (or opens an external link). */
+  /** The track the bar shows: its title, or a plain note when the app has not seen the track. */
+  titleOf(track: MusicTrack): string {
+    return track.title || this.i18n.t('music.unknownTrack');
+  }
+
+  /** Label of a tray card's play button. */
+  playLabel(track: MusicTrack): string {
+    return this.i18n.t(track.provider === 'external' ? 'music.open' : 'music.playTrack', { title: this.titleOf(track) });
+  }
+
+  /** The title the error line shows: the track's, or the plain error name when nothing is loaded. */
+  currentTitle(): string {
+    const track = this.player.current();
+    return track ? this.titleOf(track) : this.label('music.state.error');
+  }
+
+  /** A suggestion row: the assistant's reason stands where the snippet of a search result stands. */
+  suggestionTrack(track: MusicTrack, reason?: string): MusicTrack {
+    return reason ? { ...track, snippet: reason, matches: [] } : track;
+  }
+
+  /** A suggestion is an explicit request: it plays (or opens an external link). */
   playSuggestion(track: MusicTrack): void {
     this.player.playTrack(track);
   }
 
-  /** A row of the browse list plays that track; the whole campaign list is the play queue. */
-  playFromBrowse(track: MusicTrack): void {
-    this.player.playTrack(track, this.browseTracks());
+  isCurrent(track: MusicTrack): boolean {
+    return this.player.current()?.id === track.id;
+  }
+
+  isBusy(track: MusicTrack): boolean {
+    if (!this.isCurrent(track)) return false;
+    const state = this.player.state();
+    return state === 'playing' || state === 'loading';
+  }
+
+  isPlaying(track: MusicTrack): boolean {
+    return this.isCurrent(track) && this.player.state() === 'playing';
+  }
+
+  /** A row of the popover: the loaded track toggles pause, any other starts with the popover's list as the queue. */
+  toggleFromBrowse(track: MusicTrack): void {
+    if (this.isCurrent(track)) this.player.toggle();
+    else this.player.playTrack(track, this.browseResults());
   }
 
   toggleBrowse(): void {
@@ -95,8 +158,7 @@ export class MusicDock {
       return;
     }
     this.browseOpen.set(true);
-    this.browseQuery.set('');
-    void this.loadBrowse();
+    this.browse.type('');
     setTimeout(() => this.searchInput?.nativeElement.focus());
   }
 
@@ -107,25 +169,49 @@ export class MusicDock {
   }
 
   onSearch(event: Event): void {
-    this.browseQuery.set((event.target as HTMLInputElement).value);
+    this.browse.type((event.target as HTMLInputElement).value);
   }
 
-  /** Escape closes the browse list. */
+  /** Escape closes the popover, or the phone volume panel. */
   @HostListener('document:keydown.escape')
   onEscape(): void {
+    this.volumeOpen.set(false);
     this.closeBrowse(true);
   }
 
-  /** A click outside the browse list and its button closes it. */
+  /** A click outside the popover and its button closes it. */
   @HostListener('document:click', ['$event'])
   onDocumentClick(event: Event): void {
-    if (!this.browseOpen()) return;
-    const inside = event.target instanceof Node && this.host.nativeElement.querySelector('.browse-wrap')?.contains(event.target);
-    if (!inside) this.closeBrowse(false);
+    if (!event.target || !(event.target instanceof Node)) return;
+    if (this.browseOpen()) {
+      const inside = this.host.nativeElement.querySelector('.browse-wrap')?.contains(event.target);
+      if (!inside) this.closeBrowse(false);
+    }
+    if (this.volumeOpen()) {
+      const inside = this.host.nativeElement.querySelector('.volume')?.contains(event.target);
+      if (!inside) this.volumeOpen.set(false);
+    }
   }
 
-  onVolume(event: Event): void {
-    this.player.setVolume(Number((event.target as HTMLInputElement).value));
+  onVolume(value: number): void {
+    this.player.setVolume(value);
+  }
+
+  /** The seek line: each move jumps the track to that second. */
+  onSeek(value: number): void {
+    this.player.seek(value);
+  }
+
+  seekMax(): number {
+    return Math.max(0, this.player.duration());
+  }
+
+  clock(seconds: number): string {
+    return formatClock(seconds);
+  }
+
+  seekValueText(): string {
+    return this.i18n.t('music.seekValue', { position: formatClock(this.player.position()), duration: formatClock(this.player.duration()) });
   }
 
   /** Plain-language state line shown under the track title. */
@@ -133,14 +219,19 @@ export class MusicDock {
     return this.i18n.t(STATE_KEYS[this.player.state()]);
   }
 
+  /** Transport works only when playback is available and a track is loaded. */
+  canPlay(): boolean {
+    return this.player.available() && this.player.current() !== null;
+  }
+
   /** Pause while playing or loading, play otherwise. */
-  isBusy(): boolean {
-    const state = this.player.state();
+  isBusyNow(): boolean {
+    const state: MusicUiState = this.player.state();
     return state === 'playing' || state === 'loading';
   }
 
   playPauseLabel(): string {
-    return this.i18n.t(this.isBusy() ? 'music.pause' : 'music.play');
+    return this.i18n.t(this.isBusyNow() ? 'music.pause' : 'music.play');
   }
 
   volumeIcon(): typeof VolumeX {
@@ -151,22 +242,12 @@ export class MusicDock {
     return this.i18n.t('music.volumeValue', { value: this.player.volume() });
   }
 
-  private async loadBrowse(): Promise<void> {
-    this.browseStatus.set('loading');
-    this.browseError.set(null);
-    try {
-      const res = await this.api.tracks('');
-      this.browseTracks.set(res.tracks);
-      this.browseStatus.set('done');
-    } catch (failure) {
-      this.browseTracks.set([]);
-      this.browseError.set(failure instanceof Error ? failure.message : null);
-      this.browseStatus.set('error');
-    }
+  toggleVolumePanel(): void {
+    this.volumeOpen.update((open) => !open);
   }
 }
 
-const STATE_KEYS: Record<MusicPlayerState, TranslationKey> = {
+const STATE_KEYS: Record<MusicUiState, TranslationKey> = {
   idle: 'music.state.idle',
   loading: 'music.state.loading',
   playing: 'music.state.playing',

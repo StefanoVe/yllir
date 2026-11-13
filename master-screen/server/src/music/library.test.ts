@@ -3,7 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { createCtx, type Ctx } from '../context.js';
-import { invalidateMusicLibrary, loadMusicLibrary } from './library.js';
+import { invalidateMusicLibrary, loadMusicEntries, loadMusicLibrary, passagesOf } from './library.js';
+import type { MusicEntry } from './search.js';
 import { OLD_FRAMEWORK_NOTE } from './framework.js';
 import { musicCampaign, oldFramework, REAL_FRAMEWORK } from './test-support.js';
 import type { MusicTrack } from '../../../shared/src/types.js';
@@ -119,3 +120,70 @@ describe('music library with an old framework', () => {
     assert.deepEqual(result, { ok: false, note: OLD_FRAMEWORK_NOTE });
   });
 });
+
+describe('music entries: area and search passages', () => {
+  let campaign: string;
+  let entries: MusicEntry[];
+
+  before(async () => {
+    campaign = musicCampaign();
+    cleanup.push(campaign);
+    const result = await loadMusicEntries(ctxFor(campaign));
+    assert.equal(result.ok, true);
+    entries = result.ok ? result.entries : [];
+  });
+
+  it('gives each track the parent folder of its sheet as area', () => {
+    const byTitle = Object.fromEntries(entries.map((e) => [e.track.title, e]));
+    assert.equal(byTitle['Nebbia'].area, 'Porto');
+    assert.equal(byTitle['Forest theme'].area, 'Foresta');
+  });
+
+  it('keeps the public and master-only sentences and the sheet headings as passages', () => {
+    const porto = entries.find((e) => e.track.title === 'Nebbia');
+    assert.ok(porto);
+    assert.ok(porto.passages.includes('Public description of the port.'));
+    assert.ok(porto.passages.includes('Secret plot of the port.'));
+    assert.ok(porto.passages.includes('Porto di Vetro'));
+  });
+
+  it('leaves out the music section, the framework comments and the front matter', () => {
+    const porto = entries.find((e) => e.track.title === 'Nebbia');
+    assert.ok(porto);
+    const all = porto.passages.join('\n');
+    assert.ok(!all.includes('Public leak'));
+    assert.ok(!all.includes('caldo, affollato'));
+    assert.ok(!all.includes('Taverna rumori'));
+    assert.ok(!all.includes('<!--'));
+    assert.ok(!all.includes('id: porto'));
+    assert.ok(!all.includes('Musica'));
+  });
+
+  it('keeps the entries as the same tracks as the public list', async () => {
+    const tracks = await tracksOf(campaign);
+    assert.deepEqual(entries.map((e) => e.track), tracks);
+  });
+});
+
+describe('passagesOf', () => {
+  it('cleans links, images and markup, keeping the words of the labels', () => {
+    const [sentence] = passagesOf('Una ![mappa](images/map.png) con [la torre](Places/Torre.md) e **molto** `vento`, qui.');
+    assert.equal(sentence, 'Una mappa con la torre e molto vento, qui.');
+  });
+
+  it('drops sentences of fewer than three words and cuts long ones to 240 characters', () => {
+    const long = `${'parola '.repeat(60)}fine.`;
+    const passages = passagesOf(`Corto. Tre parole qui.\n\n${long}`);
+    assert.deepEqual(passages.slice(0, 1), ['Tre parole qui.']);
+    assert.ok(passages[1].length <= 240);
+  });
+
+  it('caps the sentences at 80 and reads list items and headings in order', () => {
+    const body = Array.from({ length: 100 }, (_, i) => `- Frase numero ${i} del sito.`).join('\n');
+    const passages = passagesOf(`# Titolo del luogo\n\n${body}`);
+    assert.equal(passages[0], 'Titolo del luogo');
+    assert.equal(passages.length, 81);
+    assert.equal(passages[1], 'Frase numero 0 del sito.');
+  });
+});
+

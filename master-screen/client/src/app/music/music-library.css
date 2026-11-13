@@ -1,76 +1,304 @@
+/*
+ * The music page. Its own dark palette, whatever the app theme: the --ink-* tokens are declared on
+ * this host (and on the bar), so every row, chip and card inside inherits them. Two columns from
+ * 1100px: the list on the left, the now-playing card on the right. Below that the card is gone and
+ * the bottom bar carries the track.
+ */
 :host {
+  --ink-ground: #0e1311;
+  --ink-raised: #161d1a;
+  --ink-lift: #1e2723;
+  --ink-text: #ece5d2;
+  --ink-on-text: #0e1311;
+  --ink-muted: #9ba596;
+  --ink-accent: #d9a548;
+  --ink-on-accent: #0e1311;
+  --ink-line: rgb(236 229 210 / 0.09);
+
   display: block;
-  max-width: 72ch;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+  padding: 24px 28px;
+  border-radius: 16px;
+  background: var(--ink-ground);
+  color: var(--ink-text);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: 100%;
+  min-height: 0;
+}
+
+.main {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* Heading and search */
+.hero {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
 }
 
 h1 {
-  margin-bottom: var(--space-2);
+  margin: 0;
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
-.notice {
-  padding: var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface-2);
-  color: var(--color-text-muted);
+.search-wrap {
+  position: relative;
 }
 
-.field-wrap {
-  margin-bottom: var(--space-1);
+.search-icon {
+  position: absolute;
+  left: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--ink-muted);
+  pointer-events: none;
 }
 
-.field {
+.search {
+  box-sizing: border-box;
   width: 100%;
-  padding: 12px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
+  height: 52px;
+  padding: 0 20px 0 50px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink-raised);
+  color: var(--ink-text);
   font: inherit;
-  font-size: var(--font-size-md);
+  font-size: 15px;
+  font-weight: 500;
 }
 
-.field:focus-visible,
-.fade-toggle input:focus-visible,
-.group-title a:focus-visible,
-.icon-btn:focus-visible {
-  outline: 2px solid var(--color-focus);
+.search::placeholder {
+  color: var(--ink-muted);
+}
+
+.search:focus {
+  outline: none;
+}
+
+.search:focus-visible {
+  outline: 2px solid var(--ink-text);
   outline-offset: 2px;
 }
 
-.fade-toggle {
-  display: inline-flex;
+/* Chips: rounded pills; the selected one takes the accent fill and dark text. */
+.vibes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink-lift);
+  color: var(--ink-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 120ms ease-out, color 120ms ease-out;
+}
+
+.chip:hover {
+  background: color-mix(in srgb, var(--ink-text) 14%, var(--ink-lift));
+}
+
+.chip.on {
+  background: var(--ink-accent);
+  color: var(--ink-on-accent);
+}
+
+.chip:focus-visible,
+.pill-btn:focus-visible {
+  outline: 2px solid var(--ink-text);
+  outline-offset: 2px;
+}
+
+.notice {
+  margin: 0;
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--ink-raised);
+  color: var(--ink-muted);
+}
+
+/* Unavailable panel: one quiet block with the command in a copy block. */
+.unavailable {
+  display: flex;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: var(--ink-raised);
+}
+
+.unavailable h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.unavailable-reason,
+.unavailable-hint {
+  margin: 0;
+  color: var(--ink-muted);
+}
+
+.code {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-1);
-  min-height: 36px;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 8px 8px 8px 14px;
+  border-radius: 8px;
+  background: var(--ink-ground);
+}
+
+.code code {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  color: var(--ink-text);
+}
+
+.pill-btn {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink-lift);
+  color: var(--ink-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
 }
 
-.fade-toggle input {
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: var(--color-accent);
+.pill-btn:hover {
+  background: color-mix(in srgb, var(--ink-text) 14%, var(--ink-lift));
+}
+
+/* Results. Stale results (a new search is running) stay visible, dimmed. */
+.results-area {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-height: 0;
+  min-width: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+  padding-bottom: 24px;
+  transition: opacity 160ms ease-out;
+}
+
+.results-area.is-stale {
+  opacity: 0.4;
+}
+
+.count,
+.state-line {
+  margin: 0 0 4px;
+  color: var(--ink-muted);
+  font-size: 13px;
 }
 
 .state {
-  margin: var(--space-2) 0;
-  color: var(--color-text-muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .group {
-  margin-top: var(--space-3);
+  margin: 0;
 }
 
+/* Sticky group heading: the sheet and its count stay in view while the group scrolls. */
 .group-title {
-  margin: 0 0 var(--space-1);
-  font-size: var(--font-size-md);
-  overflow-wrap: anywhere;
+  position: sticky;
+  top: -4px;
+  z-index: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 12px 8px 8px;
+  background: var(--ink-ground);
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
 }
 
-.tracks {
+.group-title a {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-text);
+  text-decoration: none;
+}
+
+.group-title a:hover {
+  text-decoration: underline;
+}
+
+.group-title a:focus-visible {
+  outline: 2px solid var(--ink-text);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.group-count {
+  flex: 0 0 auto;
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* Loading: dark shimmer rows the height of the final rows. */
+.skeleton {
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -79,151 +307,206 @@ h1 {
   list-style: none;
 }
 
-.track {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-1);
-  padding: 8px var(--space-1) 8px 6px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+.skeleton li {
+  height: 60px;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--ink-raised) 0%, var(--ink-lift) 50%, var(--ink-raised) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1400ms ease-in-out infinite;
 }
 
-/* The current track also has a bar and a visible "Now playing" badge, not only a tint. */
-.track.current {
-  background: var(--color-accent-soft);
-  box-shadow: inset 4px 0 0 var(--color-accent);
+@keyframes shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
 }
 
-.track-body {
+/* Now-playing card: the right column, sticky, with the artwork as a blurred backdrop. */
+.card {
+  position: relative;
+  display: none;
+  box-sizing: border-box;
+  align-self: start;
+  overflow: hidden;
+  isolation: isolate;
+  border-radius: 12px;
+  background: var(--ink-raised);
+  box-shadow: 0 20px 40px -24px rgb(0 0 0 / 0.7);
+}
+
+.card-backdrop {
+  position: absolute;
+  inset: -48px;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  filter: blur(40px) saturate(1.15);
+  opacity: 0.4;
+  transform: scale(1.05);
+}
+
+.card-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-  flex: 1 1 auto;
+  gap: 14px;
+  padding: 18px;
 }
 
-.track-title {
-  font-weight: 600;
-  overflow-wrap: anywhere;
+.card-art {
+  box-shadow: 0 12px 28px -12px rgb(0 0 0 / 0.8);
 }
 
-.track.current .track-title {
+.card-title {
+  margin: 4px 0 0;
+  font-size: 22px;
   font-weight: 700;
-}
-
-.track-mood {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+  letter-spacing: -0.01em;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
-.badges {
+.card-sub {
   display: flex;
   flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: 14px;
+}
+
+.card-sub a {
+  color: var(--ink-text);
+  text-decoration: none;
+}
+
+.card-sub a:hover {
+  text-decoration: underline;
+}
+
+.card-sub a:focus-visible {
+  outline: 2px solid var(--ink-text);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.why {
+  display: flex;
+  flex-direction: column;
   gap: 4px;
-  margin-top: 2px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgb(0 0 0 / 0.22);
 }
 
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 1px 8px;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+.why-label {
+  color: var(--ink-muted);
+  font-size: 12px;
+  font-weight: 500;
 }
 
-.badge.preferred {
-  color: var(--color-accent);
-  border-color: var(--color-accent);
+.why p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 
-.badge.playing {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-accent-contrast);
-  font-weight: 600;
+.hit {
+  font-weight: 700;
+  color: var(--ink-accent);
 }
 
-.icon-btn {
-  display: inline-flex;
-  flex: 0 0 auto;
+.transport {
+  display: flex;
   align-items: center;
   justify-content: center;
+  gap: 18px;
+  margin-top: 6px;
+}
+
+.round {
+  display: inline-grid;
+  place-items: center;
   width: 40px;
   height: 40px;
   padding: 0;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-text);
   cursor: pointer;
+  transition: background-color 120ms ease-out, transform 120ms ease-out;
 }
 
-.icon-btn:hover {
-  background: var(--color-surface-2);
+.round:hover:not(:disabled) {
+  background: var(--ink-lift);
 }
 
-@media (max-width: 719px) {
-  .track {
-    padding-left: 4px;
+.round.big {
+  width: 56px;
+  height: 56px;
+  background: var(--ink-accent);
+  color: var(--ink-on-accent);
+}
+
+.round.big:hover:not(:disabled) {
+  background: var(--ink-accent);
+  transform: scale(1.06);
+}
+
+.round:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.round:focus-visible {
+  outline: 2px solid var(--ink-text);
+  outline-offset: 2px;
+}
+
+/* Two columns from 1100px: the card sits on the right, sticky. */
+@media (min-width: 1100px) {
+  .page {
+    flex-direction: row;
+    gap: 32px;
   }
 
-  .icon-btn {
-    width: 44px;
-    height: 44px;
+  .main {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .card {
+    display: block;
+    flex: 0 0 360px;
+    position: sticky;
+    top: 0;
+    max-height: 100%;
+    overflow-y: auto;
   }
 }
 
-@media (max-width: 359px) {
-  .track {
-    flex-wrap: wrap;
+/* Phone: tighter gutter; the list fills the width. */
+@media (max-width: 599px) {
+  :host {
+    padding: 16px;
+    border-radius: 0;
   }
-}
 
-/* UI polish: track rows, preferred badge, now-playing equaliser (CSS only) */
-.track {
-  align-items: center;
-  padding: 10px 12px 10px 10px;
-  transition: background-color var(--transition-fast), border-color var(--transition-fast);
-}
-
-.track:hover { border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border)); }
-
-.track-title { font-size: 0.975rem; }
-
-.badge.preferred { background: var(--color-accent-soft); }
-
-.badge.playing {
-  position: relative;
-  padding-left: 18px;
-}
-
-.badge.playing::before {
-  content: "";
-  position: absolute;
-  left: 6px;
-  top: 50%;
-  width: 8px;
-  height: 10px;
-  transform: translateY(-50%);
-  background:
-    linear-gradient(var(--color-accent-contrast), var(--color-accent-contrast)) 0 100% / 2px 100% no-repeat,
-    linear-gradient(var(--color-accent-contrast), var(--color-accent-contrast)) 3px 100% / 2px 100% no-repeat,
-    linear-gradient(var(--color-accent-contrast), var(--color-accent-contrast)) 6px 100% / 2px 100% no-repeat;
-  animation: eq 900ms ease-in-out infinite alternate;
-  transform-origin: bottom;
-}
-
-@keyframes eq {
-  from { clip-path: inset(40% 0 0 0); }
-  to { clip-path: inset(0 0 0 0); }
+  h1 {
+    font-size: 28px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .badge.playing::before { animation: none; clip-path: none; }
-  .track { transition: none; }
+  .skeleton li,
+  .results-area,
+  .chip,
+  .round {
+    animation: none;
+    transition: none;
+  }
+
+  .round.big:hover:not(:disabled) {
+    transform: none;
+  }
 }

@@ -19,7 +19,16 @@ describe('classifyMusicUrl: provider and video id', () => {
     ['https://www.youtube.com/watch?v=abcdefghij!', { provider: 'external' }],
     ['https://youtu.be/', { provider: 'external' }],
     ['https://open.spotify.com/track/abc', { provider: 'external' }],
-    ['https://soundcloud.com/x/y', { provider: 'external' }],
+    ['https://soundcloud.com/forss/flickermood', { provider: 'soundcloud' }],
+    ['https://www.soundcloud.com/forss/flickermood?si=abc#t=10', { provider: 'soundcloud' }],
+    ['https://m.soundcloud.com/forss/sets/some-set', { provider: 'soundcloud' }],
+    ['https://on.soundcloud.com/AbCdEf123', { provider: 'soundcloud' }],
+    ['https://SOUNDCLOUD.com/forss/flickermood', { provider: 'soundcloud' }],
+    ['https://soundcloud.com/', { provider: 'external' }],
+    ['https://soundcloud.com', { provider: 'external' }],
+    ['https://evilsoundcloud.com/forss/flickermood', { provider: 'external' }],
+    ['https://soundcloud.com.evil.io/forss/flickermood', { provider: 'external' }],
+    ['https://api.soundcloud.com/tracks/123', { provider: 'external' }],
     ['https://archive.org/details/x', { provider: 'external' }],
   ];
   for (const [url, expected] of cases) {
@@ -31,6 +40,8 @@ describe('classifyMusicUrl: provider and video id', () => {
   it('drops links that are not https, carry userinfo, have no host or do not parse', () => {
     for (const url of [
       'http://youtube.com/watch?v=abcdefghijk',
+      'http://soundcloud.com/forss/flickermood',
+      'https://user@soundcloud.com/forss/flickermood',
       'javascript:alert(1)',
       'data:text/html,hi',
       'ftp://example.org/x',
@@ -42,6 +53,14 @@ describe('classifyMusicUrl: provider and video id', () => {
     ]) {
       assert.equal(classifyMusicUrl(url), null, url);
     }
+  });
+});
+
+describe('classifyMusicUrl: SoundCloud links are not dropped', () => {
+  it('keeps an https SoundCloud track as provider soundcloud with no video id', () => {
+    const link = classifyMusicUrl('https://soundcloud.com/forss/flickermood');
+    assert.deepEqual(link, { provider: 'soundcloud' });
+    assert.equal(link && 'videoId' in link, false);
   });
 });
 

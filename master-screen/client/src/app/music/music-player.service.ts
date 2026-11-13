@@ -1,22 +1,29 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import type { MusicTrack } from '@shared/types';
-import { PrefsService } from '../core/prefs.service';
-import type { TranslationKey } from '../i18n';
-import { YOUTUBE_PLAYER, type PlayerEvent, clampVolume } from './youtube-player';
+import type { MusicCommand, MusicPlayback, MusicTrack } from '@shared/types';
+import { LiveService } from '../core/live.service';
+import { MusicApiService } from './music-api.service';
 
-export type MusicPlayerState = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
+/** What the bar shows: the server's phase, or 'loading' while a play is on its way. */
+export type MusicUiState = 'idle' | 'loading' | 'playing' | 'paused' | 'error';
 
-export const DEFAULT_VOLUME = 70;
-export const FADE_OUT_MS = 3000;
-export const FADE_IN_MS = 2000;
-const RAMP_STEP_MS = 50;
+/** Before the server has answered: nothing playing, and no reason to show the unavailable panel. */
+export const INITIAL_PLAYBACK: MusicPlayback = {
+  available: true,
+  phase: 'idle',
+  trackId: null,
+  position: 0,
+  duration: 0,
+  volume: 80,
+  loop: true,
+};
 
-export const PREF_VOLUME = 'music.volume';
-export const PREF_LOOP = 'music.loop';
-export const PREF_FADE = 'music.fade';
+/** A track the server plays in the app: YouTube or SoundCloud. External links open in a new tab. */
+export function isInAppTrack(track: Pick<MusicTrack, 'provider'>): boolean {
+  return track.provider === 'youtube' || track.provider === 'soundcloud';
+}
 
-/** The next (dir 1) or previous (dir -1) track that can play in the app. External tracks are skipped. */
+/** The next (dir 1) or previous (dir -1) track of the queue that plays in the app. */
 export function neighbourTrack(
   queue: readonly MusicTrack[],
   current: MusicTrack | null,
@@ -27,7 +34,7 @@ export function neighbourTrack(
   if (index < 0) return null;
   for (let i = index + dir; i >= 0 && i < queue.length; i += dir) {
     const candidate = queue[i];
-    if (candidate.provider === 'youtube' && candidate.videoId) return candidate;
+    if (isInAppTrack(candidate)) return candidate;
   }
   return null;
 }
@@ -39,78 +46,137 @@ export function openExternalTrack(track: MusicTrack): void {
 }
 
 /**
- * The one music player of the app. It lives for the whole session, so playback survives route
- * changes. Nothing plays unless playTrack() or toggle() is called from a user action. The state
- * shown is only what the player reported, so while the player has not answered it stays 'loading'.
+ * Sends one kind of slider value (volume or seek) at a time. A value set while a request is in
+ * flight is sent next, so a drag never queues a backlog. `draft` is what the slider shows until the
+ * server has answered with nothing newer to send.
+ */
+class LatestValue {
+  readonly draft = signal<number | null>(null);
+  private inFlight = false;
+  private wanted: number | null = null;
+
+  constructor(private readonly send: (value: number) => Promise<void>) {}
+
+  set(value: number): void {
+    this.draft.set(value);
+    this.wanted = value;
+    if (!this.inFlight) void this.flush();
+  }
+
+  private async flush(): Promise<void> {
+    this.inFlight = true;
+    while (this.wanted !== null) {
+      const value = this.wanted;
+      this.wanted = null;
+      await this.send(value);
+    }
+    this.inFlight = false;
+    this.draft.set(null);
+  }
+}
+
+/**
+ * The music player of the app, as the browser sees it. The sound is played by the server
+ * (mpv on the machine that runs the app), so this service holds no audio: it mirrors the server's
+ * state (`playback`, from GET /api/music/state and the live `musicstate` event) and sends commands.
+ * The UI shows only what the server reported, except for a brief 'loading' after a play request.
  */
 @Injectable({ providedIn: 'root' })
 export class MusicPlayerService {
-  private readonly player = inject(YOUTUBE_PLAYER);
-  private readonly prefs = inject(PrefsService);
+  private readonly api = inject(MusicApiService);
+  private readonly resolving = new Set<string>();
 
+  /** The server's state, as last reported. */
+  readonly playback = signal<MusicPlayback>(INITIAL_PLAYBACK);
+  /** True once the server has answered a state read. */
+  readonly ready = signal(false);
+  /** The tracks of the current queue, in order. Next and previous move through it. */
   readonly queue = signal<MusicTrack[]>([]);
-  readonly current = signal<MusicTrack | null>(null);
-  readonly state = signal<MusicPlayerState>('idle');
-  /** The volume the user chose (0..100). A fade changes the player's volume, never this value. */
-  readonly volume = signal(DEFAULT_VOLUME);
-  readonly loop = signal(false);
-  /** Preference: fade in on start and fade out with fadeOut(). Default off. */
-  readonly fade = signal(false);
-  /** Plain-language message key for the current error, or null. */
-  readonly error = signal<TranslationKey | null>(null);
-  /** 'in' or 'out' while a fade runs. */
-  readonly fading = signal<'in' | 'out' | null>(null);
+  /** A plain-language failure of the last command, or null. */
+  readonly failure = signal<string | null>(null);
+  /** The track asked for, before the server confirms it. */
+  private readonly pendingId = signal<string | null>(null);
 
+  private readonly volumeLane = new LatestValue((value) => this.send({ command: 'volume', value }));
+  private readonly seekLane = new LatestValue((value) => this.send({ command: 'seek', value }));
+  /** What the volume slider shows while the user drags it. Null otherwise. */
+  readonly volumeDraft = this.volumeLane.draft.asReadonly();
+  /** What the seek slider shows while the user drags it. Null otherwise. */
+  readonly seekDraft = this.seekLane.draft.asReadonly();
+
+  readonly available = computed(() => this.playback().available);
+  /** Why playback is unavailable, or null when it is available. */
+  readonly unavailableReason = computed(() => (this.available() ? null : (this.playback().unavailableReason ?? null)));
+  readonly trackId = computed(() => this.pendingId() ?? this.playback().trackId);
+  /** The track in the player, with its title and sheet when the app knows it. Null when nothing is loaded. */
+  readonly current = computed<MusicTrack | null>(() => {
+    const id = this.trackId();
+    if (!id) return null;
+    return this.api.known().get(id) ?? unknownTrack(id);
+  });
+  readonly state = computed<MusicUiState>(() => (this.pendingId() !== null ? 'loading' : this.playback().phase));
+  readonly position = computed(() => this.seekDraft() ?? this.playback().position);
+  readonly duration = computed(() => this.playback().duration);
+  readonly volume = computed(() => this.volumeDraft() ?? this.playback().volume);
+  readonly loop = computed(() => this.playback().loop);
+  /** The server's error kind when the phase is 'error', or null. */
+  readonly error = computed(() => (this.playback().phase === 'error' ? (this.playback().error ?? 'failed') : null));
   readonly hasNext = computed(() => neighbourTrack(this.queue(), this.current(), 1) !== null);
   readonly hasPrevious = computed(() => neighbourTrack(this.queue(), this.current(), -1) !== null);
 
-  private token = 0;
-  private timer: ReturnType<typeof setInterval> | null = null;
-
   constructor() {
-    this.restore();
-    // The campaign slug arrives after /api/status: read the saved preferences again then.
+    this.refresh();
+    const live = inject(LiveService);
+    live
+      .on('musicstate')
+      .pipe(takeUntilDestroyed())
+      .subscribe((next) => this.apply(next));
+    live.resync$.pipe(takeUntilDestroyed()).subscribe(() => this.refresh());
+    // A track the server plays but the app has not seen (after a reload, say) is looked up once.
     effect(() => {
-      this.prefs.slug();
-      untracked(() => this.restore());
+      const id = this.trackId();
+      if (!id || this.api.known().has(id)) return;
+      untracked(() => this.resolve(id));
     });
-    this.player.events.pipe(takeUntilDestroyed()).subscribe((event) => this.onPlayerEvent(event));
   }
 
-  /** Starts a track. External tracks never reach the player: they open in a new tab. */
+  /** Starts a track on the server. External tracks never reach the server: they open in a new tab. */
   playTrack(track: MusicTrack, list?: readonly MusicTrack[]): void {
     if (track.provider === 'external') {
-      this.openExternal(track);
+      openExternalTrack(track);
       return;
     }
-    this.cancelRamp();
-    const token = ++this.token;
-    const inList = list?.some((item) => item.id === track.id) ?? false;
-    this.queue.set(inList && list ? [...list] : [track]);
-    this.current.set(track);
-    this.error.set(null);
-    this.state.set('loading');
-    void this.start(track, token);
+    this.api.remember(list ? [track, ...list] : [track]);
+    const queue = this.queue();
+    this.queue.set(list ? [...list] : queue.some((item) => item.id === track.id) ? queue : [track]);
+    this.failure.set(null);
+    this.pendingId.set(track.id);
+    void this.send({ command: 'play', trackId: track.id });
   }
 
   /** Play/pause for the current track. From idle or error it starts the current track again. */
   toggle(): void {
     const track = this.current();
-    if (!track) return;
     switch (this.state()) {
       case 'playing':
       case 'loading':
-        this.cancelRamp();
-        this.player.pause();
+        void this.send({ command: 'pause' });
         return;
       case 'paused':
-        this.player.play();
+        void this.send({ command: 'resume' });
         return;
       case 'idle':
       case 'error':
-        this.playTrack(track, this.queue());
+        if (track) this.playTrack(track, this.queue());
         return;
     }
+  }
+
+  /** Starts the current track again, after an error. */
+  retry(): void {
+    const track = this.current();
+    if (track) this.playTrack(track, this.queue());
+    else this.refresh();
   }
 
   next(): void {
@@ -123,149 +189,80 @@ export class MusicPlayerService {
     if (target) this.playTrack(target, this.queue());
   }
 
+  /** Moves the playhead, clamped to the length when known. Sent as the slider moves; the server decides where it lands. */
+  seek(seconds: number): void {
+    if (!this.current() || !Number.isFinite(seconds)) return;
+    const length = this.duration();
+    let target = Math.max(0, seconds);
+    if (length > 0) target = Math.min(target, length);
+    this.seekLane.set(target);
+  }
+
   setVolume(value: number): void {
-    const next = clampVolume(value);
-    this.volume.set(next);
-    this.prefs.set(PREF_VOLUME, String(next));
-    if (this.fading() === null) this.player.setVolume(next);
+    if (!Number.isFinite(value)) return;
+    this.volumeLane.set(Math.min(100, Math.max(0, Math.round(value))));
   }
 
   toggleLoop(): void {
-    this.loop.update((on) => !on);
-    this.prefs.set(PREF_LOOP, this.loop() ? '1' : '0');
+    void this.send({ command: 'loop', value: !this.loop() });
   }
 
-  toggleFade(): void {
-    this.fade.update((on) => !on);
-    this.prefs.set(PREF_FADE, this.fade() ? '1' : '0');
-  }
-
-  /** Volume ramps down to 0, then the player pauses and the stored volume is restored. */
-  fadeOut(ms: number = FADE_OUT_MS): void {
+  /** The server ramps the volume down and pauses. */
+  fadeOut(): void {
     if (this.state() !== 'playing') return;
-    this.runRamp(this.volume(), 0, ms, 'out', () => {
-      this.player.pause();
-      this.player.setVolume(this.volume());
-    });
+    void this.send({ command: 'fadeout' });
   }
 
-  /** Volume ramps up from 0 to the stored volume. */
-  fadeIn(ms: number = FADE_IN_MS): void {
-    this.runRamp(0, this.volume(), ms, 'in', () => undefined);
-  }
-
-  /** Closes the player: stops playback, clears the queue and the current track. */
+  /** Stops the server's player and clears the queue. */
   stop(): void {
-    this.cancelRamp();
-    this.token++;
-    this.player.stop();
-    this.current.set(null);
     this.queue.set([]);
-    this.state.set('idle');
-    this.error.set(null);
+    void this.send({ command: 'stop' });
   }
 
-  /** Opens an external track in a new tab. Used by the library and the suggestion tray. */
-  openExternal(track: MusicTrack): void {
-    openExternalTrack(track);
+  /** GET /api/music/state. Failures are silent: the bar keeps what it has. */
+  refresh(): void {
+    this.api
+      .playback()
+      .then((next) => this.apply(next))
+      .catch(() => undefined);
   }
 
-  private async start(track: MusicTrack, token: number): Promise<void> {
-    if (!track.videoId) {
-      this.fail(token, 'music.error.failed');
-      return;
-    }
+  /** Copies a state the server reported. A pending play ends when the server reports that track. */
+  private apply(next: MusicPlayback): void {
+    this.playback.set(next);
+    this.ready.set(true);
+    if (this.pendingId() !== null && next.trackId === this.pendingId()) this.pendingId.set(null);
+  }
+
+  /** Sends a command and shows the state the server answers with. Never rejects. */
+  private async send(command: MusicCommand): Promise<void> {
     try {
-      await this.player.load(track.videoId);
-      if (token !== this.token) return;
-      const fadeIn = this.fade();
-      this.player.setVolume(fadeIn ? 0 : this.volume());
-      this.player.play();
-      if (fadeIn) this.fadeIn();
+      const next = await this.api.command(command);
+      this.failure.set(null);
+      this.apply(next);
+    } catch (failure) {
+      this.failure.set(failure instanceof Error ? failure.message : null);
+    } finally {
+      // The answer ends any pending play: if the server did not start the track, the bar shows that.
+      if (command.command === 'play') this.pendingId.set(null);
+    }
+  }
+
+  /** Looks the track up in the whole list, once per id. */
+  private async resolve(id: string): Promise<void> {
+    if (this.resolving.has(id)) return;
+    this.resolving.add(id);
+    try {
+      await this.api.tracks('');
     } catch {
-      this.fail(token, 'music.error.player');
+      // The bar keeps the placeholder title.
+    } finally {
+      this.resolving.delete(id);
     }
   }
+}
 
-  private onPlayerEvent(event: PlayerEvent): void {
-    if (!this.current()) return;
-    if (event.type === 'error') {
-      this.cancelRamp(false);
-      this.fail(this.token, event.kind === 'unavailable' ? 'music.error.unavailable' : 'music.error.failed');
-      return;
-    }
-    switch (event.state) {
-      case 'playing':
-        this.error.set(null);
-        this.state.set('playing');
-        return;
-      case 'paused':
-        this.state.set('paused');
-        return;
-      case 'ended':
-        this.onEnded();
-        return;
-      case 'buffering':
-      case 'cued':
-      case 'unstarted':
-        this.state.set('loading');
-        return;
-    }
-  }
-
-  /** With loop on, the same track starts again. Without it, playback stops; nothing moves on by itself. */
-  private onEnded(): void {
-    if (this.loop()) {
-      this.state.set('loading');
-      this.player.seek(0);
-      this.player.play();
-      return;
-    }
-    this.cancelRamp(false);
-    this.state.set('idle');
-  }
-
-  private fail(token: number, key: TranslationKey): void {
-    if (token !== this.token) return;
-    this.error.set(key);
-    this.state.set('error');
-  }
-
-  private runRamp(from: number, to: number, ms: number, mode: 'in' | 'out', done: () => void): void {
-    this.cancelRamp(false);
-    const start = Date.now();
-    const duration = Math.max(1, ms);
-    const step = () => {
-      const t = Math.min(1, (Date.now() - start) / duration);
-      this.player.setVolume(Math.round(from + (to - from) * t));
-      if (t >= 1) {
-        this.stopTimer();
-        this.fading.set(null);
-        done();
-      }
-    };
-    this.fading.set(mode);
-    step();
-    if (this.fading() !== null) this.timer = setInterval(step, RAMP_STEP_MS);
-  }
-
-  /** Stops a running fade. With `restore`, the player goes back to the stored volume. */
-  private cancelRamp(restore = true): void {
-    if (this.fading() === null && this.timer === null) return;
-    this.stopTimer();
-    this.fading.set(null);
-    if (restore) this.player.setVolume(this.volume());
-  }
-
-  private stopTimer(): void {
-    if (this.timer !== null) clearInterval(this.timer);
-    this.timer = null;
-  }
-
-  private restore(): void {
-    const volume = Number(this.prefs.get(PREF_VOLUME));
-    if (this.prefs.get(PREF_VOLUME) !== null && Number.isFinite(volume)) this.volume.set(clampVolume(volume));
-    this.loop.set(this.prefs.get(PREF_LOOP) === '1');
-    this.fade.set(this.prefs.get(PREF_FADE) === '1');
-  }
+/** Stands in for a track the app has not seen: no title, no sheet. The bar says it plays on the server. */
+function unknownTrack(id: string): MusicTrack {
+  return { id, title: '', url: '', mood: '', provider: 'youtube', docPath: '', docTitle: '' };
 }

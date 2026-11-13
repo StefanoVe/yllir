@@ -1,11 +1,14 @@
-import { signal, computed } from '@angular/core';
+import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { EMPTY, Subject, type Observable } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { MusicResponse, MusicTrack } from '@shared/types';
-import { LiveService } from '../core/live.service';
+import type { MusicResponse } from '@shared/types';
 import { MAX_SUGGESTIONS, MUSIC_DEBOUNCE_MS, MusicApiService, MusicSearch } from './music-api.service';
-import { settle, youtubeTrack } from './testing';
+import { FakeMusicServer, settle, youtubeTrack } from './testing';
+
+/** Lets promise callbacks run while fake timers are on (settle() uses real timers). */
+async function microtasks(): Promise<void> {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+}
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
@@ -18,9 +21,9 @@ describe('MusicSearch', () => {
     vi.useRealTimers();
   });
 
-  it('waits for a pause in typing, then asks once', async () => {
+  it('waits for a pause in typing, then asks once', () => {
     vi.useFakeTimers();
-    const tracks = vi.fn(async () => ({ enabled: true, tracks: [] as MusicTrack[] }));
+    const tracks = vi.fn(async () => ({ enabled: true, tracks: [] }));
     const search = new MusicSearch({ tracks });
     search.type('p');
     search.type('po');
@@ -33,7 +36,7 @@ describe('MusicSearch', () => {
 
   it('shows everything at once when the query is cleared', () => {
     vi.useFakeTimers();
-    const tracks = vi.fn(async () => ({ enabled: true, tracks: [] as MusicTrack[] }));
+    const tracks = vi.fn(async () => ({ enabled: true, tracks: [] }));
     const search = new MusicSearch({ tracks });
     search.type('');
     expect(tracks).toHaveBeenCalledWith('');
@@ -53,102 +56,72 @@ describe('MusicSearch', () => {
     expect(tracks).toHaveBeenNthCalledWith(2, 'ab');
 
     second.resolve({ enabled: true, tracks: [youtubeTrack('B', { title: 'Bravo' })] });
-    await second.promise;
-    await settle();
+    await microtasks();
     expect(search.tracks().map((track) => track.title)).toEqual(['Bravo']);
 
     first.resolve({ enabled: true, tracks: [youtubeTrack('A', { title: 'Alpha' })] });
-    await first.promise;
-    await settle();
+    await microtasks();
     expect(search.tracks().map((track) => track.title)).toEqual(['Bravo']);
-    expect(search.status()).toBe('done');
   });
 
-  it('drops late answers after dispose', async () => {
-    const pending = deferred<MusicResponse>();
-    const search = new MusicSearch({ tracks: vi.fn().mockReturnValue(pending.promise) });
-    search.start();
-    search.dispose();
-    pending.resolve({ enabled: true, tracks: [youtubeTrack('late')] });
-    await pending.promise;
-    await settle();
-    expect(search.tracks()).toEqual([]);
-  });
-
-  it('shows the plain error when the search fails', async () => {
-    const search = new MusicSearch({ tracks: vi.fn().mockRejectedValue(new Error('Could not search.')) });
+  it('reports a failed search with its message and clears the results', async () => {
+    const search = new MusicSearch({ tracks: async () => Promise.reject(new Error('The music could not be searched.')) });
     await search.run('x');
     expect(search.status()).toBe('error');
-    expect(search.error()).toBe('Could not search.');
+    expect(search.error()).toBe('The music could not be searched.');
     expect(search.tracks()).toEqual([]);
   });
 });
 
 describe('MusicApiService', () => {
-  let live: Subject<{ tracks: MusicTrack[]; reason?: string }>;
+  let server: FakeMusicServer;
 
   beforeEach(() => {
-    live = new Subject();
-    const fakeLive = {
-      on: () => live.asObservable() as Observable<unknown>,
-      resync$: EMPTY,
-      connected: signal(false).asReadonly(),
-    };
-    TestBed.configureTestingModule({ providers: [{ provide: LiveService, useValue: fakeLive }] });
+    server = new FakeMusicServer();
+    server.tracks = [youtubeTrack('one'), youtubeTrack('two')];
+    server.install();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), ...server.providers()] });
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    server.unstub();
     TestBed.resetTestingModule();
   });
 
-  function api(): MusicApiService {
-    return TestBed.inject(MusicApiService);
-  }
-
-  it('asks the tracks endpoint with the query and the sheet', async () => {
-    const fetchMock = vi.fn(async (_input: string) => new Response(JSON.stringify({ enabled: true, tracks: [] }), { status: 200 }));
-    vi.stubGlobal('fetch', fetchMock);
-    const response = await api().tracks('porto nebbia', 'places/porto.md');
-    expect(response).toEqual({ enabled: true, tracks: [] });
-    const url = new URL(String(fetchMock.mock.calls[0][0]), 'http://127.0.0.1');
-    expect(url.pathname).toBe('/api/music/tracks');
-    expect(url.searchParams.get('q')).toBe('porto nebbia');
-    expect(url.searchParams.get('doc')).toBe('places/porto.md');
+  it('remembers every track it sees, so the player can show a title by id', async () => {
+    const api = TestBed.inject(MusicApiService);
+    await api.tracks('');
+    expect(api.known().get('one')?.title).toBe('Track one');
+    expect(api.known().has('two')).toBe(true);
   });
 
-  it('turns a failed call into a plain message', async () => {
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 500 })));
-    await expect(api().tracks('x')).rejects.toThrow(/could not be searched/i);
+  it('sends the query and the sheet to the tracks endpoint', async () => {
+    const api = TestBed.inject(MusicApiService);
+    await api.tracks('  pioggia  ', 'places/port.md');
+    expect(server.searches).toEqual(['pioggia']);
   });
 
-  it('shows music suggestions with their reason, newest first, at most five', () => {
-    const service = api();
-    for (let i = 0; i < 4; i++) {
-      live.next({ tracks: [youtubeTrack(`old${i}`)], reason: `reason ${i}` });
-    }
-    live.next({ tracks: [youtubeTrack('n1'), youtubeTrack('n2'), youtubeTrack('n3')], reason: 'fog' });
-    const shown = service.suggestions();
-    expect(shown).toHaveLength(MAX_SUGGESTIONS);
-    expect(shown.slice(0, 3).map((item) => item.track.id)).toEqual(['n1', 'n2', 'n3']);
-    expect(shown[0].reason).toBe('fog');
-    expect(shown[3].track.id).toBe('old3');
+  it('rejects a failed tracks call with a plain message', async () => {
+    server.failSearch = true;
+    await expect(TestBed.inject(MusicApiService).tracks('x')).rejects.toThrow('The music could not be searched. Try again.');
   });
 
-  it('dismisses one suggestion, or all of them', () => {
-    const service = api();
-    live.next({ tracks: [youtubeTrack('a'), youtubeTrack('b')], reason: 'calm' });
-    const [first] = service.suggestions();
-    service.dismiss(first.id);
-    expect(service.suggestions().map((item) => item.track.id)).toEqual(['b']);
-    service.clearSuggestions();
-    expect(service.suggestions()).toEqual([]);
+  it('keeps the newest suggestions first and at most the maximum', () => {
+    const api = TestBed.inject(MusicApiService);
+    const many = Array.from({ length: MAX_SUGGESTIONS + 2 }, (_, i) => youtubeTrack(`s${i}`));
+    api.addSuggestions(many, 'The port');
+    expect(api.suggestions()).toHaveLength(MAX_SUGGESTIONS);
+    expect(api.suggestions()[0].track.id).toBe('s0');
+    expect(api.suggestions()[0].reason).toBe('The port');
+    api.dismiss(api.suggestions()[0].id);
+    expect(api.suggestions()).toHaveLength(MAX_SUGGESTIONS - 1);
   });
 
-  it('exposes the suggestions as a read-only list signal', () => {
-    const service = api();
-    const count = computed(() => service.suggestions().length);
-    live.next({ tracks: [youtubeTrack('a')] });
-    expect(count()).toBe(1);
+  it('receives the live music suggestions and never plays them', async () => {
+    const api = TestBed.inject(MusicApiService);
+    server.emit('music', { tracks: [youtubeTrack('fog')], reason: 'fog' });
+    await settle();
+    expect(api.suggestions()).toHaveLength(1);
+    expect(server.commands).toEqual([]);
   });
 });

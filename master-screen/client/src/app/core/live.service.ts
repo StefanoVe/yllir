@@ -3,7 +3,7 @@ import { Observable, Subject, filter, map } from 'rxjs';
 import type { LiveEvent } from '@shared/types';
 
 const EVENT_NAMES = [
-  'hello', 'files', 'changes', 'message', 'delta', 'turn', 'open', 'status', 'live', 'music',
+  'hello', 'files', 'changes', 'message', 'delta', 'turn', 'open', 'status', 'live', 'music', 'musicstate',
 ] as const satisfies readonly LiveEvent['event'][];
 
 export type LiveData<K extends LiveEvent['event']> = Extract<LiveEvent, { event: K }>['data'];

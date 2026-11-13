@@ -1,141 +1,187 @@
-import { provideZonelessChangeDetection, signal } from '@angular/core';
+import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { EMPTY, Subject, type Observable } from 'rxjs';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PrefsService } from '../core/prefs.service';
-import { LiveService } from '../core/live.service';
-import { StatusService } from '../core/status.service';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { MusicPlayback } from '@shared/types';
 import { I18n } from '../i18n';
-import { MusicApiService } from './music-api.service';
+import { MUSIC_DEBOUNCE_MS, MusicApiService } from './music-api.service';
 import { MusicDock } from './music-dock';
-import { YOUTUBE_PLAYER } from './youtube-player';
-import { FakeYouTubePlayer, settle, youtubeTrack } from './testing';
+import { INITIAL_PLAYBACK } from './music-player.service';
+import { FakeMusicServer, settle, youtubeTrack } from './testing';
 
-describe('MusicDock suggestions', () => {
-  let fake: FakeYouTubePlayer;
-  let live: Subject<{ tracks: ReturnType<typeof youtubeTrack>[]; reason?: string }>;
+const PLAYING: MusicPlayback = { ...INITIAL_PLAYBACK, phase: 'playing', trackId: 'fog', position: 30, duration: 200, volume: 60 };
+
+describe('MusicDock', () => {
+  let server: FakeMusicServer;
   let fixture: ComponentFixture<MusicDock>;
+  const fog = youtubeTrack('fog', { title: 'Fog on the water', docTitle: 'Port' });
 
   beforeEach(() => {
-    fake = new FakeYouTubePlayer();
-    live = new Subject();
+    server = new FakeMusicServer();
+    server.tracks = [fog, youtubeTrack('bell', { title: 'Far bell', mood: 'sorrow' })];
+    server.install();
     TestBed.configureTestingModule({
-      providers: [
-        provideZonelessChangeDetection(),
-        provideRouter([]),
-        { provide: YOUTUBE_PLAYER, useValue: fake },
-        { provide: StatusService, useValue: { modules: signal({ music: true, print: false, encyclopedia: false }).asReadonly() } },
-        {
-          provide: LiveService,
-          useValue: { on: () => live.asObservable() as Observable<unknown>, resync$: EMPTY, connected: signal(true).asReadonly() },
-        },
-      ],
+      providers: [provideZonelessChangeDetection(), provideRouter([]), ...server.providers()],
     });
-    TestBed.inject(PrefsService).setCampaign('test-campaign');
-    fixture = TestBed.createComponent(MusicDock);
-    fixture.detectChanges();
   });
 
   afterEach(() => {
+    server.unstub();
     TestBed.resetTestingModule();
   });
 
-  function chips(): HTMLButtonElement[] {
-    return Array.from(fixture.nativeElement.querySelectorAll('.chip-play'));
-  }
-
-  function dismissButtons(): HTMLButtonElement[] {
-    return Array.from(fixture.nativeElement.querySelectorAll('.chip-dismiss'));
-  }
-
-  it('shows the idle bar when music is on and nothing is loaded or suggested', () => {
-    expect(fixture.nativeElement.querySelector('.dock')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('.idle')?.textContent).toContain(TestBed.inject(I18n).t('music.dock.idle'));
-  });
-
-  it('shows a suggestion with its reason and never plays it by itself', async () => {
-    live.next({ tracks: [youtubeTrack('fog', { title: 'Fog on the water' })], reason: 'The port at night' });
-    fixture.detectChanges();
-    await settle();
-    expect(chips()).toHaveLength(1);
-    expect(chips()[0].textContent).toContain('Fog on the water');
-    expect(chips()[0].textContent).toContain('The port at night');
-    expect(fake.calls).toEqual([]);
-  });
-
-  it('plays a suggestion when its chip is clicked', async () => {
-    live.next({ tracks: [youtubeTrack('fog')], reason: 'calm' });
-    fixture.detectChanges();
-    chips()[0].click();
-    fixture.detectChanges();
-    await settle();
-    expect(fake.calls).toContain('load:fog');
-    expect(fake.calls).toContain('play');
-  });
-
-  it('removes a suggestion when its x is clicked, and does not play it', async () => {
-    live.next({ tracks: [youtubeTrack('fog')], reason: 'calm' });
-    fixture.detectChanges();
-    dismissButtons()[0].click();
-    fixture.detectChanges();
-    await settle();
-    expect(chips()).toHaveLength(0);
-    expect(TestBed.inject(MusicApiService).suggestions()).toEqual([]);
-    expect(fake.calls).toEqual([]);
-  });
-});
-
-describe('MusicDock idle bar and browse list', () => {
-  let fixture: ComponentFixture<MusicDock>;
-
-  function setup(musicOn: boolean): void {
-    TestBed.configureTestingModule({
-      providers: [
-        provideZonelessChangeDetection(),
-        provideRouter([]),
-        { provide: YOUTUBE_PLAYER, useValue: new FakeYouTubePlayer() },
-        { provide: StatusService, useValue: { modules: signal({ music: musicOn, print: false, encyclopedia: false }).asReadonly() } },
-        {
-          provide: LiveService,
-          useValue: { on: () => EMPTY as Observable<unknown>, resync$: EMPTY, connected: signal(true).asReadonly() },
-        },
-      ],
-    });
-    TestBed.inject(PrefsService).setCampaign('test-campaign');
+  async function render(playback?: MusicPlayback): Promise<void> {
+    if (playback) server.playback = playback;
     fixture = TestBed.createComponent(MusicDock);
     fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
   }
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-    TestBed.resetTestingModule();
-  });
-
-  it('renders nothing when music is off', () => {
-    setup(false);
-    expect(fixture.nativeElement.querySelector('.dock')).toBeNull();
-  });
-
-  it('lists the campaign tracks grouped by sheet, and closes with Escape', async () => {
-    setup(true);
-    const tracks = [
-      youtubeTrack('fog', { title: 'Fog on the water', docTitle: 'Porto', mood: 'calm' }),
-      youtubeTrack('market', { title: 'Market noise', docTitle: 'Mercato', mood: 'busy' }),
-    ];
-    vi.spyOn(TestBed.inject(MusicApiService), 'tracks').mockResolvedValue({ enabled: true, tracks });
-
-    (fixture.nativeElement.querySelector('.browse-btn') as HTMLButtonElement).click();
+  async function update(): Promise<void> {
+    await settle();
     fixture.detectChanges();
     await settle();
     fixture.detectChanges();
+  }
 
-    const titles = Array.from(fixture.nativeElement.querySelectorAll('.group-title') as NodeListOf<HTMLElement>).map((el) => el.textContent?.trim());
-    expect(titles).toEqual(['Porto', 'Mercato']);
-    expect(fixture.nativeElement.querySelector('.popover')).not.toBeNull();
+  function el<T extends Element = HTMLElement>(selector: string): T | null {
+    return fixture.nativeElement.querySelector(selector) as T | null;
+  }
 
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    fixture.detectChanges();
-    expect(fixture.nativeElement.querySelector('.popover')).toBeNull();
+  function text(): string {
+    return (fixture.nativeElement as HTMLElement).textContent ?? '';
+  }
+
+  it('shows the idle line with a button to the page when nothing plays', async () => {
+    await render();
+    expect(el('.dock')).not.toBeNull();
+    expect(el('.now .title')?.textContent).toContain('Pick a track');
+    expect(el('.browse-btn')).not.toBeNull();
+    expect(el<HTMLButtonElement>('.play-btn')?.disabled).toBe(true);
+  });
+
+  it('shows the title, the state and the sheet of the track in the player', async () => {
+    server.playback = PLAYING;
+    await render();
+    await update();
+    expect(el('.now .title')?.textContent).toContain('Fog on the water');
+    expect(el('.now .state')?.textContent).toContain('Playing');
+    expect(el('.now .sheet')?.textContent).toContain('Port');
+    expect(el('.controls')).not.toBeNull();
+  });
+
+  it('says that playback is unavailable, with the reason on the page and no transport', async () => {
+    await render({ ...PLAYING, available: false, unavailableReason: 'ytdlp-missing' });
+    await update();
+    expect(el('.dock')?.classList.contains('is-off')).toBe(true);
+    expect(el('.now')?.textContent).toContain('Playback is not available on this computer.');
+    expect(el<HTMLButtonElement>('.play-btn')?.disabled).toBe(true);
+  });
+
+  it('shows a plain error with a retry that plays the track again', async () => {
+    await render({ ...PLAYING, phase: 'error', error: 'failed' });
+    await update();
+    expect(el('.now [role="alert"]')).not.toBeNull();
+    expect(el('.now .meta.is-error')?.textContent).toContain('This track could not be played.');
+    (el('.retry') as HTMLButtonElement).click();
+    await update();
+    expect(server.commands.at(-1)).toEqual({ command: 'play', trackId: 'fog' });
+  });
+
+  it('pauses and resumes from the play button, as the server reports', async () => {
+    server.playback = PLAYING;
+    await render();
+    await update();
+    (el('.play-btn') as HTMLButtonElement).click();
+    await update();
+    expect(server.commands.at(-1)).toEqual({ command: 'pause' });
+    expect(el('.play-btn')?.getAttribute('aria-label')).toBe('Play');
+    (el('.play-btn') as HTMLButtonElement).click();
+    await update();
+    expect(server.commands.at(-1)).toEqual({ command: 'resume' });
+  });
+
+  it('sends loop, fade-out and stop from their buttons', async () => {
+    server.playback = PLAYING;
+    await render();
+    await update();
+    (el('[aria-label="Repeat this track"]') as HTMLButtonElement).click();
+    await update();
+    expect(server.commands.at(-1)).toEqual({ command: 'loop', value: false });
+    (el('[aria-label="Fade out and pause"]') as HTMLButtonElement).click();
+    await update();
+    expect(server.commands.at(-1)).toEqual({ command: 'fadeout' });
+    (el('[aria-label="Stop and close the player"]') as HTMLButtonElement).click();
+    await update();
+    expect(server.commands.at(-1)).toEqual({ command: 'stop' });
+  });
+
+  it('sends the seek position from the seek bar and shows elapsed and total time', async () => {
+    server.playback = PLAYING;
+    await render();
+    await update();
+    expect(el('.seek-row .clock')?.textContent).toContain('00:30');
+    expect(text()).toContain('03:20');
+    const seek = el<HTMLInputElement>('.seek input.range');
+    expect(seek).not.toBeNull();
+    seek!.value = '90';
+    seek!.dispatchEvent(new Event('input'));
+    await update();
+    expect(server.commands.at(-1)).toEqual({ command: 'seek', value: 90 });
+  });
+
+  it('sends the volume from the volume slider', async () => {
+    server.playback = PLAYING;
+    await render();
+    await update();
+    const volume = el<HTMLInputElement>('.volume-range input');
+    expect(volume?.value).toBe('60');
+    volume!.value = '25';
+    volume!.dispatchEvent(new Event('input'));
+    await update();
+    expect(server.commands.at(-1)).toEqual({ command: 'volume', value: 25 });
+  });
+
+  it('plays a suggestion when its row is pressed, and removes it with its x', async () => {
+    await render();
+    TestBed.inject(MusicApiService).addSuggestions([youtubeTrack('sug', { title: 'Suggested song' })], 'The port at night');
+    await update();
+    expect(el('.tray')?.textContent).toContain('The port at night');
+    (el('.tray .tray-play') as HTMLButtonElement).click();
+    await update();
+    expect(server.commands.at(-1)).toEqual({ command: 'play', trackId: 'sug' });
+    (el('.dismiss') as HTMLButtonElement).click();
+    await update();
+    expect(el('.tray')).toBeNull();
+  });
+
+  it('opens the Tracks popover, searches, and plays a row from it', async () => {
+    await render();
+    (el('.browse-btn') as HTMLButtonElement).click();
+    await update();
+    expect(el('.popover')).not.toBeNull();
+    const input = el<HTMLInputElement>('.pop-search')!;
+    input.value = 'bell';
+    input.dispatchEvent(new Event('input'));
+    await new Promise((done) => setTimeout(done, MUSIC_DEBOUNCE_MS + 30));
+    await update();
+    expect(el('.popover .list')?.textContent).toContain('Far bell');
+    (el('.popover .play') as HTMLButtonElement).click();
+    await update();
+    expect(server.commands.at(-1)).toEqual({ command: 'play', trackId: 'bell' });
+  });
+
+  it('shows a plain line in the popover when nothing matches', async () => {
+    await render();
+    (el('.browse-btn') as HTMLButtonElement).click();
+    await update();
+    const input = el<HTMLInputElement>('.pop-search')!;
+    server.searchOverride = [];
+    input.value = 'zzz';
+    input.dispatchEvent(new Event('input'));
+    await new Promise((done) => setTimeout(done, MUSIC_DEBOUNCE_MS + 30));
+    await update();
+    expect(el('.popover .pop-note')?.textContent).toContain(TestBed.inject(I18n).t('music.dock.noMatch'));
   });
 });

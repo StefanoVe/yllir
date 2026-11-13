@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { after, describe, it } from 'node:test';
 import type { MusicResponse } from '../../../shared/src/types.js';
-import { get, startApp, type Harness } from '../live/test-support.js';
+import { get, send, startApp, type Harness } from '../live/test-support.js';
 import { musicAvailable } from '../music/availability.js';
 import { MUSIC_OFF_YAML, MUSIC_ON_YAML, musicCampaign, oldFramework, REAL_FRAMEWORK, silentCampaign } from '../music/test-support.js';
 
@@ -59,25 +59,83 @@ describe('GET /api/music/tracks', () => {
   });
 });
 
-describe('Content-Security-Policy follows the music flag', () => {
-  it('has no YouTube host when the module is off and no document has a music item', async () => {
-    const h = await start(MUSIC_OFF_YAML, REAL_FRAMEWORK, silentCampaign(MUSIC_OFF_YAML));
-    const csp = String((await get(h, '/status')).headers['content-security-policy']);
-    assert.doesNotMatch(csp, /youtube|ytimg/);
-    assert.doesNotMatch(csp, /frame-src/);
-  });
-
-  it('adds the YouTube allowances when the module is off but a document has a music item', async () => {
-    const h = await start(MUSIC_OFF_YAML);
-    const csp = String((await get(h, '/status')).headers['content-security-policy']);
-    assert.match(csp, /youtube-nocookie/);
-  });
-
-  it('adds exactly the three YouTube allowances when the module is on', async () => {
+describe('Content-Security-Policy: YouTube only for thumbnails', () => {
+  it('with the module on, ytimg is allowed in img-src only; no YouTube script, frame or connect host', async () => {
     const h = await start(MUSIC_ON_YAML);
     const csp = String((await get(h, '/music/tracks')).headers['content-security-policy']);
-    assert.match(csp, /frame-src https:\/\/www\.youtube-nocookie\.com(;|$)/);
-    assert.match(csp, /script-src 'self' https:\/\/www\.youtube\.com;/);
-    assert.match(csp, /img-src 'self' data: https:\/\/i\.ytimg\.com;/);
+    assert.doesNotMatch(csp, /(script|style|frame|connect|font|object|default)-src[^;]*(youtube|ytimg)/);
+    assert.doesNotMatch(csp, /frame-src/);
+    assert.match(csp, /img-src 'self' data: https:\/\/i\.ytimg\.com(;|$)/);
+  });
+});
+
+describe('GET /api/music/state', () => {
+  it('answers the inactive state quietly when the module is off', async () => {
+    const h = await start(MUSIC_OFF_YAML, REAL_FRAMEWORK, silentCampaign(MUSIC_OFF_YAML));
+    const res = await get(h, '/music/state');
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json, { available: false, phase: 'idle', trackId: null, position: 0, duration: 0, volume: 80, loop: true });
+  });
+});
+
+describe('POST /api/music/command', () => {
+  it('refuses a malformed command with a plain-language 400, before anything runs', async () => {
+    const h = await start(MUSIC_ON_YAML);
+    const cases: unknown[] = [
+      undefined,
+      [],
+      { command: 'explode' },
+      { command: 'play' },
+      { command: 'play', trackId: 'NOT-HEX-ID!!' },
+      { command: 'play', trackId: 'abcdef012345', url: 'https://example.org' },
+      { command: 'seek', value: -1 },
+      { command: 'seek', value: '5' },
+      { command: 'volume', value: 101 },
+      { command: 'loop', value: 'yes' },
+      { command: 'pause', extra: true },
+    ];
+    for (const body of cases) {
+      const res = await send(h, 'POST', '/music/command', body);
+      assert.equal(res.status, 400, JSON.stringify(body));
+      assert.equal(typeof (res.json as { error?: unknown }).error, 'string');
+    }
+    assert.equal(h.events.some((e) => e.event === 'musicstate'), false);
+  });
+
+  it('answers the inactive state with 200 when the module is off', async () => {
+    const h = await start(MUSIC_OFF_YAML, REAL_FRAMEWORK, silentCampaign(MUSIC_OFF_YAML));
+    const res = await send(h, 'POST', '/music/command', { command: 'play', trackId: 'abcdef012345' });
+    assert.equal(res.status, 200);
+    assert.equal((res.json as { available: boolean }).available, false);
+  });
+
+  it('applies volume and loop, answers the new state and publishes it on the bus', async () => {
+    const h = await start(MUSIC_ON_YAML);
+    const volume = await send(h, 'POST', '/music/command', { command: 'volume', value: 35 });
+    assert.equal(volume.status, 200);
+    assert.equal((volume.json as { volume: number }).volume, 35);
+    const loop = await send(h, 'POST', '/music/command', { command: 'loop', value: false });
+    assert.equal((loop.json as { loop: boolean }).loop, false);
+    const state = (await get(h, '/music/state')).json as { volume: number; loop: boolean; phase: string };
+    assert.equal(state.volume, 35);
+    assert.equal(state.loop, false);
+    assert.equal(state.phase, 'idle');
+    const published = h.events.filter((e) => e.event === 'musicstate');
+    assert.equal(published.length >= 2, true);
+  });
+
+  it('a play of a track the library does not know answers unavailable and starts nothing', async () => {
+    const h = await start(MUSIC_ON_YAML);
+    const res = await send(h, 'POST', '/music/command', { command: 'play', trackId: 'abcdef012345' });
+    assert.equal(res.status, 200);
+    assert.equal((res.json as { phase: string }).phase, 'loading');
+    // The lookup runs in the background: poll until it answers.
+    let body: { phase: string; error?: string } = { phase: 'loading' };
+    for (let i = 0; i < 50 && body.phase === 'loading'; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      body = (await get(h, '/music/state')).json as { phase: string; error?: string };
+    }
+    assert.equal(body.phase, 'error');
+    assert.equal(body.error, 'unavailable');
   });
 });
