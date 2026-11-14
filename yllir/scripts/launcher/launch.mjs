@@ -16,7 +16,9 @@ import {
   parseArgs,
   parseReadyLine,
   readCampaignLanguage,
+  readLiveVersion,
   resolveUserClaudePath,
+  stopLiveServer,
 } from './launch-lib.mjs';
 import { ensureMasterScreen } from './master-screen-package.mjs';
 
@@ -25,6 +27,16 @@ const READY_TIMEOUT_MS = 30000;
 
 function say(text) {
   process.stdout.write(`${text}\n`);
+}
+
+/** The framework version of the installed plugin, or null when it cannot be read. */
+function readInstalledVersion() {
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(FRAMEWORK_ROOT, '.claude-plugin', 'plugin.json'), 'utf8'));
+    return typeof manifest?.version === 'string' ? manifest.version : null;
+  } catch {
+    return null;
+  }
 }
 
 function openBrowser(url) {
@@ -119,8 +131,18 @@ async function main(argv) {
 
   const live = await findLiveServer(campaign);
   if (live !== null) {
-    openBrowser(live);
-    return 0;
+    // A server started before an update still runs the old framework: replace it.
+    const installed = readInstalledVersion();
+    const running = await readLiveVersion(live);
+    const stale = typeof installed === 'string' && typeof running === 'string' && installed !== running;
+    if (!stale) {
+      openBrowser(live);
+      return 0;
+    }
+    if (!(await stopLiveServer(campaign, live))) {
+      openBrowser(live);
+      return 0;
+    }
   }
   const ensured = await ensureMasterScreen({ frameworkRoot: FRAMEWORK_ROOT, lang, say });
   if (ensured.error) {

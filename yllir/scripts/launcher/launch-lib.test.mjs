@@ -16,8 +16,10 @@ import {
   parseClaudeLookup,
   parseReadyLine,
   readCampaignLanguage,
+  readLiveVersion,
   readLock,
   resolveUserClaudePath,
+  stopLiveServer,
 } from './launch-lib.mjs';
 
 function tempDir(t) {
@@ -222,4 +224,60 @@ test('buildChildEnv omits YLLIR_CLAUDE_PATH when nothing was found and uses ; on
   assert.equal('YLLIR_CLAUDE_PATH' in out, false);
   const empty = buildChildEnv({ env: {}, nodeDir: '/n', platform: 'linux' });
   assert.equal(empty.PATH, '/n');
+});
+
+test('readLiveVersion returns the frameworkVersion of /api/status', async () => {
+  const calls = [];
+  const fetchFn = async (url) => {
+    calls.push(String(url));
+    return { ok: true, json: async () => ({ frameworkVersion: '0.67.4' }) };
+  };
+  assert.equal(await readLiveVersion('http://127.0.0.1:4317', { fetchFn }), '0.67.4');
+  assert.equal(calls[0], 'http://127.0.0.1:4317/api/status');
+});
+
+test('readLiveVersion returns null on bad JSON, a bad status or a network error', async () => {
+  const badJson = async () => ({ ok: true, json: async () => { throw new SyntaxError('bad json'); } });
+  assert.equal(await readLiveVersion('http://127.0.0.1:4317', { fetchFn: badJson }), null);
+  const notOk = async () => ({ ok: false, json: async () => ({ frameworkVersion: '1.0.0' }) });
+  assert.equal(await readLiveVersion('http://127.0.0.1:4317', { fetchFn: notOk }), null);
+  const offline = async () => {
+    throw new TypeError('fetch failed');
+  };
+  assert.equal(await readLiveVersion('http://127.0.0.1:4317', { fetchFn: offline }), null);
+});
+
+test('stopLiveServer posts shutdown and returns true once the pid is gone', async (t) => {
+  const dir = tempDir(t);
+  writeLock(dir, { pid: 42, port: 4317, url: 'http://127.0.0.1:4317' });
+  const calls = [];
+  const fetchFn = async (url, init) => {
+    calls.push({ url: String(url), method: init.method });
+    return { ok: true, json: async () => ({ ok: true }) };
+  };
+  let checks = 0;
+  const alive = () => {
+    checks += 1;
+    return checks < 3;
+  };
+  const stopped = await stopLiveServer(dir, 'http://127.0.0.1:4317', {
+    fetchFn,
+    alive,
+    sleep: async () => {},
+    timeoutMs: 5000,
+  });
+  assert.equal(stopped, true);
+  assert.deepEqual(calls, [{ url: 'http://127.0.0.1:4317/api/shutdown', method: 'POST' }]);
+});
+
+test('stopLiveServer returns false when the pid never dies', async (t) => {
+  const dir = tempDir(t);
+  writeLock(dir, { pid: 42, port: 4317, url: 'http://127.0.0.1:4317' });
+  const stopped = await stopLiveServer(dir, 'http://127.0.0.1:4317', {
+    fetchFn: async () => ({ ok: true }),
+    alive: () => true,
+    sleep: async () => {},
+    timeoutMs: 20,
+  });
+  assert.equal(stopped, false);
 });

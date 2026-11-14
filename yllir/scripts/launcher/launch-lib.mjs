@@ -160,6 +160,57 @@ export async function findLiveServer(campaignDir, { probe = probeStatus, alive =
   return (await probe(lock.url)) ? lock.url : null;
 }
 
+/** The framework version a running server reports on GET /api/status, or null. Never throws. */
+export async function readLiveVersion(url, { fetchFn = fetch } = {}) {
+  try {
+    const res = await fetchFn(new URL('/api/status', url), { signal: AbortSignal.timeout(STATUS_TIMEOUT_MS) });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return typeof data?.frameworkVersion === 'string' ? data.frameworkVersion : null;
+  } catch {
+    return null;
+  }
+}
+
+const STOP_POLL_MS = 100;
+
+/**
+ * Asks a running server to shut down (POST <url>/api/shutdown) and waits until the pid
+ * in its lock is gone. Resolves true when the process is gone within timeoutMs, else
+ * false. Never throws.
+ */
+export async function stopLiveServer(
+  campaignDir,
+  url,
+  {
+    fetchFn = fetch,
+    alive = isPidAlive,
+    sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    timeoutMs = 5000,
+  } = {},
+) {
+  try {
+    const lock = readLock(campaignDir);
+    if (lock === null) return false;
+    try {
+      await fetchFn(new URL('/api/shutdown', url), {
+        method: 'POST',
+        signal: AbortSignal.timeout(STATUS_TIMEOUT_MS),
+      });
+    } catch {
+      // The server may still be stopping on its own; the pid check below decides.
+    }
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      if (!alive(lock.pid)) return true;
+      if (Date.now() >= deadline) return false;
+      await sleep(STOP_POLL_MS);
+    }
+  } catch {
+    return false;
+  }
+}
+
 /** { url, pid } when the line is the server's READY line, else null. */
 export function parseReadyLine(line) {
   let data;
