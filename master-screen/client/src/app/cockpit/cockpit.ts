@@ -23,6 +23,7 @@ import { CombatOverlay } from "./combat/combat-overlay";
 import { I18n } from "../i18n";
 
 const CHAT_WIDTH_KEY = "yllir.cockpit.chat-width";
+const CHAT_COLLAPSED_KEY = "yllir.cockpit.chat-collapsed";
 const MIN_CHAT = 320;
 const MAX_CHAT = 640;
 
@@ -43,6 +44,8 @@ export class Cockpit implements OnInit, OnDestroy {
   private documents = inject(DocumentsService);
   private viewer = inject(ViewerService);
   chatWidth = signal(384);
+  /** The assistant folded into a 48px strip. Per browser; the width is kept while collapsed. */
+  chatCollapsed = signal(false);
   mobile = signal<"board" | "chat">("board");
   unread = signal(0);
   loadError = signal("");
@@ -53,6 +56,7 @@ export class Cockpit implements OnInit, OnDestroy {
     try {
       const saved = Number(localStorage.getItem(CHAT_WIDTH_KEY));
       if (saved >= MIN_CHAT && saved <= MAX_CHAT) this.chatWidth.set(saved);
+      this.chatCollapsed.set(localStorage.getItem(CHAT_COLLAPSED_KEY) === "1");
     } catch {}
     void this.start();
   }
@@ -89,17 +93,35 @@ export class Cockpit implements OnInit, OnDestroy {
     else this.api.modal.set({ kind: "document", source });
   }
 
+  /** Folds or unfolds the assistant. Never called automatically: new messages only mark the strip. */
+  toggleChat() {
+    const next = !this.chatCollapsed();
+    this.chatCollapsed.set(next);
+    try {
+      localStorage.setItem(CHAT_COLLAPSED_KEY, next ? "1" : "0");
+    } catch {}
+  }
+  /** Ctrl+. (Cmd+. on macOS) folds or unfolds the assistant, except while typing in a text field. */
+  @HostListener("window:keydown", ["$event"]) onShortcut(event: KeyboardEvent) {
+    if (event.key !== "." || !(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.("input, textarea, select") || target?.isContentEditable) return;
+    event.preventDefault();
+    this.toggleChat();
+  }
   beginDrag(event: PointerEvent) {
+    if (this.chatCollapsed()) return;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
   }
   moveDrag(event: PointerEvent) {
-    if (!event.buttons) return;
+    if (!event.buttons || this.chatCollapsed()) return;
     const rect = (
       event.currentTarget as HTMLElement
     ).parentElement!.getBoundingClientRect();
     this.setChatWidth(rect.right - event.clientX);
   }
   dragKey(event: KeyboardEvent) {
+    if (this.chatCollapsed()) return;
     const delta =
       event.key === "ArrowLeft" ? 16 : event.key === "ArrowRight" ? -16 : 0;
     if (!delta) return;

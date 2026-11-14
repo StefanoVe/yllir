@@ -1,4 +1,12 @@
-import { Component, computed, inject, output, signal } from "@angular/core";
+import {
+  Component,
+  ElementRef,
+  ViewChild,
+  computed,
+  inject,
+  output,
+  signal,
+} from "@angular/core";
 import { I18n, type TranslationKey } from "../../i18n";
 import { FormsModule } from "@angular/forms";
 import { Icon } from "../support/icon";
@@ -22,6 +30,7 @@ export class Composer {
   readonly i18n = inject(I18n);
   readonly api = inject(CockpitService);
   send = output<string>();
+  @ViewChild("field") field?: ElementRef<HTMLTextAreaElement>;
   draft = signal("");
   readonly models: {
     choice: LiveModelChoice;
@@ -47,6 +56,8 @@ export class Composer {
     if (text) {
       this.send.emit(text);
       this.draft.set("");
+      // An empty field is back at its minimum height (the CSS min-height).
+      if (this.field) this.field.nativeElement.style.height = "";
     }
   }
   changeModel(event: Event) {
@@ -58,8 +69,9 @@ export class Composer {
       select.value = this.modelChoice();
     });
   }
+  /** Grows the field with its text; the CSS max-height (8 rows) stops it and the field scrolls. */
   resize(target: HTMLTextAreaElement) {
     target.style.height = "auto";
-    target.style.height = `${Math.min(target.scrollHeight, 144)}px`;
+    target.style.height = `${target.scrollHeight}px`;
   }
 }

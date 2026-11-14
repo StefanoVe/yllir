@@ -1,6 +1,7 @@
 <div
   class="cockpit"
   [class.chat-only]="mobile() === 'chat'"
+  [class.chat-collapsed]="chatCollapsed()"
   [style.--chat-width]="chatWidth() + 'px'"
 >
   <nav class="pane-tabs" [attr.aria-label]="i18n.t('liveAgent.views')">
@@ -35,15 +36,20 @@
     class="splitter"
     role="separator"
     [attr.aria-label]="i18n.t('liveAgent.resizeChat')"
-    tabindex="0"
+    [attr.tabindex]="chatCollapsed() ? -1 : 0"
+    [attr.aria-hidden]="chatCollapsed() ? 'true' : null"
     aria-orientation="vertical"
     (pointerdown)="beginDrag($event)"
     (pointermove)="moveDrag($event)"
     (keydown)="dragKey($event)"
   ></div>
   <cockpit-chat
+    id="cockpit-assistant"
     class="chat-pane"
     [openSource]="openSource"
+    [collapsible]="true"
+    [collapsed]="chatCollapsed()"
+    (collapseToggle)="toggleChat()"
     (messagesArrived)="arrived($event)"
   />
 </div>

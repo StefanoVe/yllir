@@ -31,12 +31,18 @@ export class SessionModal implements OnInit {
   private returnFocus = document.activeElement as HTMLElement | null;
   title = "";
   error = signal("");
+  /** True until the first session list has arrived: the list shows placeholder rows meanwhile. */
+  loading = signal(true);
+  readonly skeletonRows = [0, 1, 2];
   /** Id of the session waiting for a second click to be deleted. */
   confirmDelete = signal("");
   busy = signal(false);
 
   ngOnInit() {
-    void this.api.listSessions().catch((e) => this.error.set(String(e)));
+    void this.api
+      .listSessions()
+      .catch((e) => this.error.set(String(e)))
+      .finally(() => this.loading.set(false));
     setTimeout(() => this.titleInput()?.nativeElement.focus(), 0);
   }
 

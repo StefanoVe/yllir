@@ -1,8 +1,40 @@
 import { describe, expect, it } from 'vitest';
-import { hashId, tiltCss, tiltDegrees, tornEdgePolygon } from './paper-edge';
+import { hashId, tiltCss, tiltDegrees, tornEdgePoints, tornEdgePolygon } from './paper-edge';
 
 const points = (polygon: string): Array<[number, number]> =>
   [...polygon.matchAll(/(-?[\d.]+)% (-?[\d.]+)%/g)].map((m) => [Number(m[1]), Number(m[2])]);
+const svgPoints = (value: string): Array<[number, number]> =>
+  value.split(' ').map((pair) => {
+    const [x, y] = pair.split(',');
+    return [Number(x), Number(y)];
+  });
+
+describe('tornEdgePoints', () => {
+  const ids = ['card-7', 'card-8', 'Morvalle', 'npc:ilaria', 'a', ''];
+
+  it('gives the same pairs as the clip-path polygon, for several ids', () => {
+    for (const id of ids) {
+      expect(svgPoints(tornEdgePoints(id))).toEqual(points(tornEdgePolygon(id)));
+    }
+  });
+
+  it('is deterministic for the same id', () => {
+    for (const id of ids) {
+      expect(tornEdgePoints(id)).toBe(tornEdgePoints(id));
+    }
+  });
+
+  it('stays within the 0 to 100 coordinate space', () => {
+    for (const id of ids) {
+      for (const [x, y] of svgPoints(tornEdgePoints(id))) {
+        expect(x).toBeGreaterThanOrEqual(0);
+        expect(x).toBeLessThanOrEqual(100);
+        expect(y).toBeGreaterThanOrEqual(0);
+        expect(y).toBeLessThanOrEqual(100);
+      }
+    }
+  });
+});
 
 describe('tornEdgePolygon', () => {
   it('gives the same string for the same id', () => {

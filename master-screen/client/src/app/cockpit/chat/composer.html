@@ -1,34 +1,40 @@
 <form class="composer" (submit)="$event.preventDefault();submit()">
-  <textarea
-    [ngModel]="draft()"
-    (ngModelChange)="draft.set($event)"
-    name="draft"
-    rows="1"
-    [placeholder]="i18n.t('liveAgent.composer.placeholder')"
-    (keydown)="key($event)"
-    (input)="resize($any($event.target))"
-  ></textarea
-  ><span class="model-wrap"
-    ><select
-      class="model"
-      [value]="modelChoice()"
-      [disabled]="!api.session()"
-      [attr.aria-label]="i18n.t('liveModel.label')"
-      (change)="changeModel($event)"
-    >
-      @for (model of models; track model.choice) {
-        <option [value]="model.choice" [title]="i18n.t(model.description)">
-          {{ i18n.t(model.label) }}
-        </option>
-      }
-    </select
-    ><ui-icon class="model-chevron" name="down" [size]="16" /></span
-  ><button
-    class="btn btn-primary send"
-    [msTooltip]="i18n.t('liveAgent.composer.send')"
-    [attr.aria-label]="i18n.t('liveAgent.composer.send')"
-    [disabled]="!draft().trim()"
-  >
-    <ui-icon name="send" [size]="16" />
-  </button>
+  <div class="box">
+    <textarea
+      #field
+      [ngModel]="draft()"
+      (ngModelChange)="draft.set($event)"
+      name="draft"
+      rows="3"
+      [placeholder]="i18n.t('liveAgent.composer.placeholder')"
+      (keydown)="key($event)"
+      (input)="resize($any($event.target))"
+    ></textarea>
+    <div class="toolbar">
+      <span class="model-wrap"
+        ><select
+          class="model"
+          [value]="modelChoice()"
+          [disabled]="!api.session()"
+          [attr.aria-label]="i18n.t('liveModel.label')"
+          (change)="changeModel($event)"
+        >
+          @for (model of models; track model.choice) {
+            <option [value]="model.choice" [title]="i18n.t(model.description)">
+              {{ i18n.t(model.label) }}
+            </option>
+          }
+        </select
+        ><ui-icon class="model-chevron" name="down" [size]="16" /></span
+      ><button
+        class="btn btn-primary send"
+        type="submit"
+        [msTooltip]="i18n.t('liveAgent.composer.send')"
+        [attr.aria-label]="i18n.t('liveAgent.composer.send')"
+        [disabled]="!draft().trim()"
+      >
+        <ui-icon name="send" [size]="16" />
+      </button>
+    </div>
+  </div>
 </form>

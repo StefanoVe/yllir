@@ -2,72 +2,92 @@
   display: block;
   box-sizing: border-box;
   width: 100%;
-  padding: 12px;
+  padding: 8px 16px 16px;
   background: var(--color-bg);
-  border-top: var(--border-width) solid var(--color-border);
 }
-/* One row: the text field, the model choice and the send button. */
 .composer {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
+  margin: 0;
 }
-/* The field is a bottom line only. On focus the line thickens and the padding gives the same
-   amount back, so the text does not move. */
-.composer textarea {
-  resize: none;
+/* The box: a square 1px frame around the text and its toolbar. On focus the frame thickens to 2px
+   and the padding gives the same amount back, so nothing moves. */
+.box {
   box-sizing: border-box;
-  min-height: 40px;
-  max-height: 144px;
-  flex: 1;
-  min-width: 0;
-  padding: 9px 0 8px;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 12px 8px;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg);
+}
+.box:focus-within {
+  border-width: var(--border-width-strong);
+  padding: 11px 11px 7px;
+}
+/* Multi-line field: 3 rows minimum, grows to 8 rows, then scrolls. No own frame. */
+.box textarea {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 63px;
+  max-height: 168px;
+  margin: 0;
+  padding: 0;
   border: 0;
-  border-bottom: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
   background: transparent;
   color: var(--color-text);
-  font: inherit;
-  font-size: var(--font-size-base);
-  line-height: 1.35;
-  overflow: auto;
-  transition: border-bottom-width var(--transition-fast);
+  font-family: var(--font-family);
+  font-size: 15px;
+  line-height: 21px;
+  resize: none;
+  overflow-y: auto;
 }
-.composer textarea:focus {
+.box textarea:focus {
   outline: none;
-  border-bottom-width: var(--border-width-strong);
-  padding-bottom: 7px;
 }
-/* Model choice: a flat select with a 1px frame, no radius; the chevron is an icon over it. */
+.box textarea::placeholder {
+  color: var(--color-text-muted);
+  opacity: 1;
+}
+/* Toolbar along the bottom edge of the box: model choice left, send right. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+/* Model choice: a flat select, 32px high, square, with the chevron as an icon over it. */
 .composer .model-wrap {
   position: relative;
   flex: 0 0 auto;
   display: inline-flex;
-  max-width: 110px;
+  max-width: 120px;
 }
 .composer .model {
   appearance: none;
   -webkit-appearance: none;
   box-sizing: border-box;
   width: 100%;
-  height: 36px;
+  height: 32px;
   margin: 0;
-  padding: 0 28px 0 10px;
+  padding: 0 26px 0 8px;
   border: var(--border-width) solid var(--color-border-strong);
   border-radius: 0;
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-family);
-  font-size: var(--font-size-base);
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
 }
 .composer .model-chevron {
   position: absolute;
   top: 50%;
-  right: 8px;
+  right: 6px;
   transform: translateY(-50%);
   color: var(--color-text);
   pointer-events: none;
@@ -80,8 +100,7 @@
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
-/* Icon-only send button: the shared primary button, square 36px. Enabled = filled, the icon in the
-   page colour. Disabled = an outlined square, not a faint filled one (no opacity fade). */
+/* Send: a 36px square. Enabled = filled, icon in the page colour. Disabled = outlined, not faded. */
 .composer .send {
   flex: 0 0 auto;
   width: 36px;
@@ -94,7 +113,7 @@
 .composer .send:disabled:hover {
   opacity: 1;
   background: transparent;
-  border-color: var(--color-border);
-  color: var(--color-text-muted);
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
   cursor: not-allowed;
 }

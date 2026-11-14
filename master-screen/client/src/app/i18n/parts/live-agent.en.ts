@@ -5,6 +5,8 @@ export const liveAgentEn = {
   'liveAgent.chat': 'Chat',
   'liveAgent.newInChat': 'New in chat',
   'liveAgent.resizeChat': 'Resize chat',
+  'liveAgent.hideAssistant': 'Hide the assistant',
+  'liveAgent.showAssistant': 'Show the assistant',
   'liveAgent.sessionNotFound': 'Session not found: it may have been deleted.',
   'liveAgent.requestFailed': 'Request failed ({status}).',
   'liveAgent.noSessionOpen': 'No session is open.',

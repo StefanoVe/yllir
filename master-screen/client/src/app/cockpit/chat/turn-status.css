@@ -1,23 +1,38 @@
+:host {
+  display: block;
+}
+
+/* Turn status: a single line above the composer box, left aligned, 12px text plus the stepped
+   indicator. The strip is only drawn while a turn is open. */
 .turn-status {
-  min-height: 42px;
-  border-top: var(--border-width) solid var(--color-border);
+  min-height: 28px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 12px;
+  padding: 8px 16px 4px;
+  border-top: var(--border-width) solid var(--color-border);
   color: var(--color-text-muted);
   font-size: 12px;
+  line-height: 1.2;
 }
 .turn-status .label {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--color-text);
 }
 .turn-status .numeric {
   font-variant-numeric: tabular-nums;
 }
+.turn-status small {
+  white-space: nowrap;
+}
 .turn-status .stop {
-  padding: 4px 8px;
+  margin-left: auto;
+  padding: 2px 6px;
 }
 /* Stepped indicator: four squares in the text colour. While a turn runs the first square is
    filled and the squares take turns to fill, one step at a time. Under reduced motion (system or
@@ -55,11 +70,6 @@
   }
   50% {
     background: transparent;
-  }
-}
-@media (max-width: 759px) {
-  .turn-status {
-    min-height: 44px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

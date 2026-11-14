@@ -47,10 +47,8 @@
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 12px minmax(
-      320px,
-      var(--chat-width, 384px)
-    );
+  /* A plain length (not minmax) so the width can animate; the drag clamp keeps it within 320..640px. */
+  grid-template-columns: minmax(0, 1fr) 12px var(--chat-width, 384px);
   background: var(--color-bg);
   color: var(--color-text);
   position: relative;
@@ -58,6 +56,7 @@
 /* Both panes are flat: no card, no border, no radius, no shadow. */
 .board-pane,
 .chat-pane {
+  box-sizing: border-box;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -160,7 +159,22 @@
     display: flex;
   }
 }
+/* Desktop only: the assistant folds into a 48px strip. The divider keeps its 0-width track and is
+   hidden; the 160ms width change is shortened to nothing by the global reduced-motion rules. */
 @media (min-width: 1100px) {
+  .cockpit {
+    transition: grid-template-columns 160ms ease;
+  }
+  .cockpit.chat-collapsed {
+    grid-template-columns: minmax(0, 1fr) 0 48px;
+  }
+  .cockpit.chat-collapsed .splitter {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .cockpit.chat-collapsed .chat-pane {
+    border-left: var(--border-width) solid var(--color-border-strong);
+  }
   .load-error {
     display: block;
     position: absolute;
@@ -170,4 +184,12 @@
     z-index: 3;
     border-radius: 0;
   }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cockpit {
+    transition: none;
+  }
+}
+:root[data-motion="reduced"] .cockpit {
+  transition: none;
 }

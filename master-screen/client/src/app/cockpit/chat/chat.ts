@@ -4,11 +4,15 @@ import {
   ElementRef,
   OnDestroy,
   ViewChild,
+  computed,
+  effect,
   inject,
   input,
   output,
   signal,
 } from "@angular/core";
+import { NgTemplateOutlet } from "@angular/common";
+import { LucideAngularModule, PanelRightClose, PanelRightOpen } from "lucide-angular";
 import { Icon } from "../support/icon";
 import { ChatSource } from "./chat-source";
 import type { SourceRef } from "@shared/cockpit-types";
@@ -17,6 +21,7 @@ import { TurnStatus } from "./turn-status";
 import { Composer } from "./composer";
 import { I18n } from "../../i18n";
 import { TooltipDirective } from "../../core/tooltip.directive";
+import { activeTurn } from "./turn-status";
 export function renderMessageMarkdown(text: string) {
   const escape = (v: string) =>
     v
@@ -24,7 +29,7 @@ export function renderMessageMarkdown(text: string) {
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
-  return escape(text)
+  const html = escape(text)
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label: string, href: string) => {
       const [path, anchor] = href.split("#", 2);
       if (/^https?:/i.test(path))
@@ -38,16 +43,25 @@ export function renderMessageMarkdown(text: string) {
         .split("\n")
         .map((line) => `<li>${line.replace(/^[-*]\s+/, "")}</li>`)
         .join("");
-      return `<ul>${rows}</ul>`;
-    })
-    .replace(/\n/g, "<br>");
+      return `\n\n<ul>${rows}</ul>\n\n`;
+    });
+  // A blank line starts a new paragraph (8px apart in CSS); a single line break stays a <br>.
+  return html
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .map((part) =>
+      part.startsWith("<ul>") ? part : `<p>${part.replace(/\n/g, "<br>")}</p>`,
+    )
+    .join("");
 }
 @Component({
   selector: "cockpit-chat",
   standalone: true,
-  imports: [Icon, TurnStatus, Composer, TooltipDirective],
+  imports: [Icon, TurnStatus, Composer, TooltipDirective, NgTemplateOutlet, LucideAngularModule],
   templateUrl: "./chat.html",
   styleUrl: "./chat.css",
+  host: { "[class.collapsed]": "collapsible() && collapsed()" },
 })
 export class Chat implements AfterViewChecked, OnDestroy {
   readonly api = inject(ChatSource);
@@ -60,12 +74,34 @@ export class Chat implements AfterViewChecked, OnDestroy {
   /** False hides the chat's own header (the combat overlay has its own). */
   showHead = input(true);
   messagesArrived = output<number>();
+  /** The cockpit shows the fold toggle and the collapsed strip; the combat overlay has neither. */
+  collapsible = input(false);
+  collapsed = input(false);
+  collapseToggle = output<void>();
+  /** Icons of the fold toggle: the panel closes when the assistant is open, opens when it is folded. */
+  readonly toggleIcons = { hide: PanelRightClose, show: PanelRightOpen };
+  /** A message arrived while folded. Cleared on unfold. */
+  private unreadNew = signal(false);
+  /** The strip's mark: a new message, a turn running or queued, or a network error, while folded. */
+  readonly needsAttention = computed(
+    () =>
+      this.collapsible() &&
+      this.collapsed() &&
+      (this.unreadNew() || !!activeTurn(this.api.session()) || !!this.api.chatError()),
+  );
   expandedActions = signal("");
   newCount = signal(0);
   atBottom = true;
   private seen = 0;
   private signature = "";
   @ViewChild("messageList") list?: ElementRef<HTMLElement>;
+
+  constructor() {
+    effect(() => {
+      if (!this.collapsed()) this.unreadNew.set(false);
+    });
+  }
+
   ngAfterViewChecked() {
     const messages = this.api.session()?.messages || [];
     const signature = messages.map((m) => `${m.id}:${m.text.length}`).join("|");
@@ -74,8 +110,10 @@ export class Chat implements AfterViewChecked, OnDestroy {
     const initial = !this.signature;
     this.signature = signature;
     this.seen = messages.length;
+    const foldedArrival = !initial && added > 0 && this.collapsed();
     // Scroll after layout: a microtask runs before the new messages have their height.
     requestAnimationFrame(() => {
+      if (foldedArrival) this.unreadNew.set(true);
       const el = this.list?.nativeElement;
       if (!el) return;
       this.observeHeight(el);
@@ -110,8 +148,26 @@ export class Chat implements AfterViewChecked, OnDestroy {
     el.scrollTop = el.scrollHeight;
     this.newCount.set(0);
   }
+  toggleLabel() {
+    return this.i18n.t(this.collapsed() ? "liveAgent.showAssistant" : "liveAgent.hideAssistant");
+  }
   markdown(text: string) {
     return renderMessageMarkdown(text);
+  }
+  /** Local 24-hour time of a message, HH:mm. Empty when the stamp does not parse. */
+  timeLabel(at: string) {
+    const date = new Date(at);
+    if (Number.isNaN(date.getTime())) return "";
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+  /** Header state of the thread: nothing while idle, the turn state while one is open. */
+  stateLabel() {
+    const turn = activeTurn(this.api.session());
+    if (!turn) return "";
+    return this.i18n.t(
+      turn.status === "queued" ? "liveAgent.turn.statusQueued" : "liveAgent.turn.statusRunning",
+    );
   }
   messageClick(event: MouseEvent) {
     const link = (event.target as HTMLElement).closest<HTMLAnchorElement>(

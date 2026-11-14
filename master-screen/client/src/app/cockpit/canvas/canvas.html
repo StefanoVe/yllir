@@ -151,11 +151,16 @@
         [style.height.px]="card.h"
         (dblclick)="activate(card)"
       >
-        <div
-          class="paper"
-          [style.clip-path]="tornEdge(card.id)"
-          [style.--tilt]="tiltCss(card.id)"
-        >
+        <div class="paper-wrap" [style.--tilt]="tiltCss(card.id)">
+          <svg
+            class="paper-outline"
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            <polygon [attr.points]="tornPoints(card.id)" />
+          </svg>
+          <div class="paper" [style.clip-path]="tornEdge(card.id)">
           @if (isImageCard(card)) {
           <img
             class="card-image"
@@ -245,6 +250,7 @@
             </button>
           </footer>
           }
+          </div>
           </div>
         </div>
         <span class="resize-handle" aria-hidden="true"></span>

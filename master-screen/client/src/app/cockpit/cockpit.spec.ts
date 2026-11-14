@@ -127,6 +127,52 @@ describe('Cockpit (live table)', () => {
     expect(root.querySelector('.provider-control, .provider-menu')).toBeNull();
   });
 
+  it('folds the assistant into a strip, hides the divider and remembers the state', async () => {
+    const fixture = TestBed.createComponent(Cockpit);
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+    const cockpit = root.querySelector('.cockpit')!;
+    const splitter = root.querySelector('.splitter')!;
+
+    expect(root.querySelector('.chat-head .assistant-toggle')?.getAttribute('aria-expanded')).toBe('true');
+    expect(cockpit.classList.contains('chat-collapsed')).toBe(false);
+
+    root.querySelector<HTMLButtonElement>('.chat-head .assistant-toggle')!.click();
+    fixture.detectChanges();
+    await settle(fixture);
+
+    expect(cockpit.classList.contains('chat-collapsed')).toBe(true);
+    expect(root.querySelector('.strip .assistant-toggle')?.getAttribute('aria-expanded')).toBe('false');
+    expect(root.querySelector('.strip .assistant-toggle')?.getAttribute('aria-controls')).toBe('cockpit-assistant');
+    expect(splitter.getAttribute('aria-hidden')).toBe('true');
+    expect(splitter.getAttribute('tabindex')).toBe('-1');
+    expect(localStorage.getItem('yllir.cockpit.chat-collapsed')).toBe('1');
+
+    root.querySelector<HTMLButtonElement>('.strip .assistant-toggle')!.click();
+    fixture.detectChanges();
+    await settle(fixture);
+
+    expect(cockpit.classList.contains('chat-collapsed')).toBe(false);
+    expect(splitter.getAttribute('aria-hidden')).toBeNull();
+    expect(localStorage.getItem('yllir.cockpit.chat-collapsed')).toBe('0');
+  });
+
+  it('starts folded when the browser remembers it, and folds on Ctrl+period', async () => {
+    localStorage.setItem('yllir.cockpit.chat-collapsed', '1');
+    const fixture = TestBed.createComponent(Cockpit);
+    fixture.detectChanges();
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('.cockpit')!.classList.contains('chat-collapsed')).toBe(true);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: '.', ctrlKey: true }));
+    fixture.detectChanges();
+    await settle(fixture);
+    expect(root.querySelector('.cockpit')!.classList.contains('chat-collapsed')).toBe(false);
+    expect(localStorage.getItem('yllir.cockpit.chat-collapsed')).toBe('0');
+  });
+
   it('remembers the session it opened', async () => {
     const fixture = TestBed.createComponent(Cockpit);
     fixture.detectChanges();

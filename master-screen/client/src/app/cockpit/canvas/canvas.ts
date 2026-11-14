@@ -43,7 +43,7 @@ import {
 } from "./geometry";
 import type { CardText, Detail, Point, Size, View } from "./geometry";
 import { capitalizeParts } from "./labels";
-import { tiltCss, tornEdgePolygon } from "./paper-edge";
+import { tiltCss, tornEdgePoints, tornEdgePolygon } from "./paper-edge";
 import { TooltipDirective } from "../../core/tooltip.directive";
 import {
   CanvasPointer,
@@ -220,6 +220,8 @@ export class CockpitCanvas {
   protected readonly capitalizeParts = capitalizeParts;
   /** Torn-edge clip and fixed tilt of a card, both derived from its id. */
   protected readonly tornEdge = tornEdgePolygon;
+  /** The same torn edge as SVG points (0..100), for the paper outline. */
+  protected readonly tornPoints = tornEdgePoints;
   protected readonly tiltCss = tiltCss;
   readonly textScale = computed(() => textScale(this.zoom()));
   readonly arrowSize = computed(() => 12 / this.zoom());
@@ -524,7 +526,7 @@ export class CockpitCanvas {
   protected frameTitleSize(frame: { w: number; title: string }): number {
     const chars = Math.max(1, [...frame.title].length);
     const fits = (frame.w - 32) / (chars * 0.56);
-    return Math.max(12, Math.min(28 * this.textScale(), fits));
+    return Math.max(12, Math.min(20 * this.textScale(), 34, fits));
   }
 
   protected isArtCard(card: BoardModuleView): boolean {

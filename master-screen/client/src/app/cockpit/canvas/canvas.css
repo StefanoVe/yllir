@@ -44,7 +44,6 @@
   width: 0;
   height: 0;
   transform-origin: 0 0;
-  will-change: transform;
 }
 
 .world.animating {
@@ -54,12 +53,8 @@
 /* ───────────────────────────── Frames ───────────────────────────── */
 
 /* Outline width in screen pixels: about 2px at every zoom (the world is scaled by --zoom). */
-.frame,
-.card {
-  --ol: min(8px, max(1.5px, calc(2px / var(--zoom, 1))));
-}
-
 .frame {
+  --ol: min(8px, max(1.5px, calc(2px / var(--zoom, 1))));
   position: absolute;
   box-sizing: border-box;
   border: var(--ol) solid var(--color-border-strong);
@@ -68,30 +63,32 @@
   pointer-events: none;
 }
 
-.frame[data-color] {
-  border-top: 3px solid var(--tone);
-}
+/* The frame colour (data-color) stays on the element for the mini-map and tools; the frame itself is monochrome. */
 
 .frame.highlighted {
   outline: 2px solid var(--color-focus);
   outline-offset: 4px;
 }
 
+/* Title as a label tab hanging from the top-left corner, sitting on the top border. */
 .frame-title {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 48px;
+  left: calc(-1 * var(--ol));
+  top: calc(-1 * var(--ol));
+  z-index: 1;
+  max-width: calc(100% - 24px);
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 2px 12px 3px;
+  box-sizing: border-box;
+  background: var(--color-text);
+  color: var(--color-bg);
   pointer-events: auto;
   cursor: grab;
   font-family: var(--font-family-hand);
-  font-size: calc(28px * var(--k));
-  font-weight: 700;
-  color: var(--color-text);
+  font-size: min(34px, calc(20px * var(--k)));
+  font-weight: 600;
+  line-height: 1.2;
   border-radius: 0;
 }
 
@@ -105,6 +102,20 @@
 .frame-title.selected {
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+
+.frame.pulse {
+  animation: pulse 1.6s ease-out 1;
+}
+
+:root[data-motion="reduced"] .frame.pulse {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame.pulse {
+    animation: none;
+  }
 }
 
 /* ───────────────────────────── Links ───────────────────────────── */
@@ -140,9 +151,10 @@
 }
 
 /* ───────────────────────────── Cards: torn paper ─────────────────────────────
-   .card is the layout box and the click target. .paper is the torn piece: clipped by the
-   polygon from paper-edge.ts (inline), tilted by --tilt. The outline is four 1px hard
-   drop-shadows on the PARENT, so it follows the torn edge (clip-path would cut a border). */
+   .card is the layout box and the click target. .paper-wrap carries the fixed tilt (--tilt).
+   Inside it, the outline is an SVG polygon with the same torn points as the clip-path of .paper,
+   so the outline follows the torn edge without any CSS filter. .paper is the clipped torn piece,
+   transparent: the fill comes from the polygon. */
 
 .card {
   position: absolute;
@@ -152,11 +164,30 @@
   color: var(--color-text);
   cursor: default;
   user-select: none;
-  filter:
-    drop-shadow(var(--ol) 0 0 var(--color-border-strong))
-    drop-shadow(calc(-1 * var(--ol)) 0 0 var(--color-border-strong))
-    drop-shadow(0 var(--ol) 0 var(--color-border-strong))
-    drop-shadow(0 calc(-1 * var(--ol)) 0 var(--color-border-strong));
+}
+
+.paper-wrap {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--tilt, 0deg));
+  transform-origin: 50% 50%;
+}
+
+.paper-outline {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.paper-outline polygon {
+  fill: var(--color-surface);
+  stroke: var(--color-border-strong);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
 }
 
 .paper {
@@ -169,9 +200,7 @@
   overflow: hidden;
   /* Container for the safe margin: its size is the card size, so cq units match the edge. */
   container-type: size;
-  background: var(--color-surface);
-  transform: rotate(var(--tilt, 0deg));
-  transform-origin: 50% 50%;
+  background: transparent;
 }
 
 /* Text and controls live here: at least 8px inside the torn edge (the edge moves 2.5% at most). */
@@ -192,20 +221,24 @@
   justify-content: flex-end;
 }
 
-/* No tilt while a card is selected or dragged, and none when motion is reduced. */
-.card.selected .paper,
-.card.highlighted .paper {
+/* No tilt while a card is selected or highlighted, and none when motion is reduced. */
+.card.selected .paper-wrap,
+.card.highlighted .paper-wrap {
   transform: none;
 }
 
-:root[data-motion="reduced"] .paper {
+:root[data-motion="reduced"] .paper-wrap {
   transform: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .paper {
+  .paper-wrap {
     transform: none;
   }
+}
+
+.card.selected .paper-outline polygon {
+  stroke-width: 3px;
 }
 
 .card.selected {
@@ -246,7 +279,7 @@
   line-height: 1.1;
   overflow-wrap: anywhere;
   font-family: var(--font-family-hand);
-  font-size: calc(26px * var(--k));
+  font-size: min(34px, calc(19px * var(--k)));
   font-weight: 600;
 }
 
@@ -457,26 +490,30 @@
 /* Selected frame, and the frame a dragged card would drop into. */
 .frame.selected {
   outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.frame.drop-target {
-  outline: 2px dashed var(--color-accent);
   outline-offset: 4px;
 }
 
+/* A dragged card over the frame: the border turns dashed, the tab stays inverted. */
+.frame.drop-target {
+  border-style: dashed;
+}
+
+/* Rename field: same place and size as the tab, with a 2px frame. */
 .frame-title-input {
-  width: 100%;
-  height: 32px;
+  width: 18em;
+  max-width: 100%;
+  height: auto;
   box-sizing: border-box;
-  padding: 0 10px;
-  border: var(--border-width-strong) solid var(--color-border-strong);
+  margin: 0;
+  padding: 2px 12px 3px;
+  border: 2px solid var(--color-border-strong);
   border-radius: 0;
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-family-hand);
-  font-size: 18px;
-  font-weight: 700;
+  font-size: inherit;
+  font-weight: 600;
+  line-height: 1.2;
   outline: none;
 }
 
@@ -786,7 +823,6 @@
 
 .mini-item.frame[data-color] {
   background: none;
-  border-color: var(--tone);
 }
 
 .mini-view {
@@ -828,8 +864,8 @@
 }
 
 /* Item cards: the printed card, whole, no overlay. */
-.card.art-card .paper {
-  background: var(--color-bg);
+.card.art-card .paper-outline polygon {
+  fill: var(--color-bg);
 }
 
 .card.art-card .card-image {

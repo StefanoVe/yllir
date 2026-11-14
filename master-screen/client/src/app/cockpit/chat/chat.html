@@ -1,6 +1,13 @@
+<div class="assistant-body">
 @if (showHead()) {
 <header class="chat-head">
   <h2>{{ i18n.t("liveBoard.chatTitle") }}</h2>
+  @if (stateLabel(); as state) {
+  <span class="chat-state">{{ state }}</span>
+  }
+  @if (collapsible()) {
+  <ng-container [ngTemplateOutlet]="toggleButton" />
+  }
 </header>
 }
 <div class="messages" #messageList (scroll)="scrollChanged(messageList)">
@@ -10,38 +17,45 @@
     [class.dm]="m.role==='dm'"
     [class.cancelled]="m.status==='cancelled'"
   >
-    @if(m.status==='error'){
-    <div class="error-pill">
-      <ui-icon
-        name="warning"
-        [size]="14"
-      />{{s.turns.find(t=>t.id===m.turnId)?.error||m.text}}<button
-        [msTooltip]="i18n.t('liveAgent.chat.retry')"
-        [attr.aria-label]="i18n.t('liveAgent.chat.retry')"
-        (click)="retry(m.role==='dm'?m.text:s.messages.find(dm=>dm.role==='dm'&&dm.turnId===m.turnId)?.text||'')"
-      >
-        <ui-icon name="retry" [size]="14" />
-      </button>
+    <div class="bubble">
+      @if(m.status==='error'){
+      <div class="error-pill">
+        <ui-icon
+          name="warning"
+          [size]="14"
+        />{{s.turns.find(t=>t.id===m.turnId)?.error||m.text}}<button
+          [msTooltip]="i18n.t('liveAgent.chat.retry')"
+          [attr.aria-label]="i18n.t('liveAgent.chat.retry')"
+          (click)="retry(m.role==='dm'?m.text:s.messages.find(dm=>dm.role==='dm'&&dm.turnId===m.turnId)?.text||'')"
+        >
+          <ui-icon name="retry" [size]="14" />
+        </button>
+      </div>
+      }@else{
+      <div
+        class="message-body"
+        [innerHTML]="markdown(m.text)"
+        (click)="messageClick($event)"
+      ></div>
+      }
     </div>
-    }@else{
-    <div
-      class="message-body"
-      [innerHTML]="markdown(m.text)"
-      (click)="messageClick($event)"
-    ></div>
-    } @if(m.status==='cancelled'){<small class="muted">{{ i18n.t("liveAgent.chat.cancelled") }}</small>}
-    @if(m.role==='agent'&&m.actions?.length){
-    <button
-      class="actions-summary"
-      [attr.aria-expanded]="expandedActions()===m.id"
-      (click)="expandedActions.set(expandedActions()===m.id?'':m.id)"
-    >
-      <ui-icon name="board" [size]="13" />{{ m.actions!.length === 1 ? i18n.t("liveAgent.chat.changeOne") : i18n.t("liveAgent.chat.changeMany", { n: m.actions!.length }) }}<ui-icon
-        [name]="expandedActions()===m.id?'up':'down'"
-        [size]="13"
-      />
-    </button>
-    @if(expandedActions()===m.id){
+    <div class="meta">
+      @if(timeLabel(m.at); as time){<time [attr.datetime]="m.at">{{ time }}</time>}
+      @if(m.status==='cancelled'){<span>{{ i18n.t("liveAgent.chat.cancelled") }}</span>}
+      @if(m.role==='agent'&&m.actions?.length){
+      <button
+        class="chip actions-summary"
+        [attr.aria-expanded]="expandedActions()===m.id"
+        (click)="expandedActions.set(expandedActions()===m.id?'':m.id)"
+      >
+        <ui-icon name="board" [size]="13" />{{ m.actions!.length === 1 ? i18n.t("liveAgent.chat.changeOne") : i18n.t("liveAgent.chat.changeMany", { n: m.actions!.length }) }}<ui-icon
+          [name]="expandedActions()===m.id?'up':'down'"
+          [size]="13"
+        />
+      </button>
+      }
+    </div>
+    @if(m.role==='agent'&&m.actions?.length&&expandedActions()===m.id){
     <div class="action-chips">
       @for(a of m.actions||[];track $index){<span
         ><ui-icon
@@ -50,11 +64,11 @@
         />{{a.label}}</span
       >}
     </div>
-    } }
+    }
   </article>
   } @empty {
   <p class="chat-empty">{{ i18n.t("liveBoard.chatEmpty") }}</p>
-  }}@else if(placeholder()){<p class="muted empty">{{ placeholder() }}</p>
+  }}@else if(placeholder()){<p class="empty">{{ placeholder() }}</p>
   }@if(newCount()){<button
     class="jump-bottom"
     [msTooltip]="i18n.t('liveAgent.chat.jumpBottom')"
@@ -77,3 +91,30 @@
 } @if(api.session()){<cockpit-turn-status
   class="desktop-turn"
 />}@if(api.session() || alwaysCompose()){<cockpit-composer (send)="send($event)" />}
+</div>
+@if (collapsible()) {
+<div class="strip">
+  <ng-container [ngTemplateOutlet]="toggleButton" />
+  @if (needsAttention()) {
+  <span class="unread-mark" [attr.aria-hidden]="stateLabel() ? null : 'true'">@if (stateLabel(); as state) {<span class="sr-only">{{ state }}</span>}</span>
+  }
+</div>
+}
+<ng-template #toggleButton>
+  <button
+    type="button"
+    class="assistant-toggle"
+    aria-controls="cockpit-assistant"
+    [attr.aria-expanded]="!collapsed()"
+    [attr.aria-label]="toggleLabel()"
+    [msTooltip]="toggleLabel()"
+    (click)="collapseToggle.emit()"
+  >
+    <lucide-icon
+      [img]="collapsed() ? toggleIcons.show : toggleIcons.hide"
+      [size]="18"
+      [strokeWidth]="1.5"
+      aria-hidden="true"
+    />
+  </button>
+</ng-template>

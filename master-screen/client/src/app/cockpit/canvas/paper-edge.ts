@@ -10,6 +10,9 @@ const DEFAULT_STEPS = 6;
 /** Tilt range in degrees, symmetric around zero. */
 const TILT_LIMIT = 1.5;
 
+/** One torn-edge point in percent of the card box, as [x, y]. */
+export type EdgePoint = [number, number];
+
 /** FNV-1a 32-bit hash of a string: the seed of every value derived from an id. */
 export function hashId(id: string): number {
   let hash = 0x811c9dc5;
@@ -33,6 +36,39 @@ function seededRandom(seed: number): () => number {
 }
 
 /**
+ * The torn-edge points, clockwise from the top-left corner. The four corners stay on the box; every
+ * edge gets `steps - 1` points that move inward by 0 to `amplitude` percent. Both formatters read
+ * this one function, so the clip-path and the SVG outline always have the same shape.
+ */
+function tornEdgePairs(
+  id: string,
+  opts: { amplitude?: number; steps?: number } = {},
+): EdgePoint[] {
+  const amplitude = opts.amplitude ?? DEFAULT_AMPLITUDE;
+  const steps = Math.max(2, Math.floor(opts.steps ?? DEFAULT_STEPS));
+  const random = seededRandom(hashId(id));
+  const points: EdgePoint[] = [[0, 0]];
+  // pinned: the axis that stays fixed on this edge ("y" for top and bottom). The other axis runs
+  // from `from` to `to`; the fixed one is pushed by 0 to amplitude percent times `inward`.
+  const edge = (pinnedAxis: "x" | "y", from: number, to: number, pinned: number, inward: number) => {
+    for (let i = 1; i < steps; i++) {
+      const along = round(from + ((to - from) * i) / steps);
+      const at = round(pinned + random() * amplitude * inward);
+      points.push(pinnedAxis === "y" ? [along, at] : [at, along]);
+    }
+  };
+  // Clockwise from the top-left corner. Inward: top edge goes down, right edge goes left, and so on.
+  edge("y", 0, 100, 0, 1); // top: left to right, moves down
+  points.push([100, 0]);
+  edge("x", 0, 100, 100, -1); // right: top to bottom, moves left
+  points.push([100, 100]);
+  edge("y", 100, 0, 100, -1); // bottom: right to left, moves up
+  points.push([0, 100]);
+  edge("x", 100, 0, 0, 1); // left: bottom to top, moves right
+  return points;
+}
+
+/**
  * A CSS `clip-path: polygon(...)` value (percentages) for a torn edge. The four corners stay on the
  * box; every edge gets `steps - 1` points that move inward by 0 to `amplitude` percent.
  */
@@ -40,32 +76,21 @@ export function tornEdgePolygon(
   id: string,
   opts: { amplitude?: number; steps?: number } = {},
 ): string {
-  const amplitude = opts.amplitude ?? DEFAULT_AMPLITUDE;
-  const steps = Math.max(2, Math.floor(opts.steps ?? DEFAULT_STEPS));
-  const random = seededRandom(hashId(id));
-  const points: string[] = ["0% 0%"];
-  // pinned: the axis that stays fixed on this edge ("y" for top and bottom). The other axis runs
-  // from `from` to `to`; the fixed one is pushed by 0 to amplitude percent times `inward`.
-  const edge = (pinnedAxis: "x" | "y", from: number, to: number, pinned: number, inward: number) => {
-    for (let i = 1; i < steps; i++) {
-      const along = from + ((to - from) * i) / steps;
-      const at = pinned + random() * amplitude * inward;
-      points.push(
-        pinnedAxis === "y"
-          ? `${round(along)}% ${round(at)}%`
-          : `${round(at)}% ${round(along)}%`,
-      );
-    }
-  };
-  // Clockwise from the top-left corner. Inward: top edge goes down, right edge goes left, and so on.
-  edge("y", 0, 100, 0, 1); // top: left to right, moves down
-  points.push("100% 0%");
-  edge("x", 0, 100, 100, -1); // right: top to bottom, moves left
-  points.push("100% 100%");
-  edge("y", 100, 0, 100, -1); // bottom: right to left, moves up
-  points.push("0% 100%");
-  edge("x", 100, 0, 0, 1); // left: bottom to top, moves right
-  return `polygon(${points.join(", ")})`;
+  const pairs = tornEdgePairs(id, opts).map(([x, y]) => `${x}% ${y}%`);
+  return `polygon(${pairs.join(", ")})`;
+}
+
+/**
+ * The same torn edge as an SVG `points` string in a 0..100 coordinate space (`"x,y x,y ..."`), for
+ * a `<polygon viewBox="0 0 100 100">`. Same generator as `tornEdgePolygon`, so the two always match.
+ */
+export function tornEdgePoints(
+  id: string,
+  opts: { amplitude?: number; steps?: number } = {},
+): string {
+  return tornEdgePairs(id, opts)
+    .map(([x, y]) => `${x},${y}`)
+    .join(" ");
 }
 
 /** A fixed tilt in degrees, between -1.5 and +1.5, derived from the id. */
