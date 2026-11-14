@@ -230,9 +230,19 @@ describe('checkUpdate', () => {
   });
 
   test('a snooze that ends after today gives null', () => {
-    const root = campaignWithMemory('last_notified_on: "2026-11-07"\nsnoozed_until: "2026-11-12"\n');
+    const root = campaignWithMemory(
+      'last_notified_version: "1.1.0"\nlast_notified_on: "2026-11-07"\nsnoozed_until: "2026-11-12"\n',
+    );
     const source = publishedSource('1.1.0', { '1.1.0.md': 'news' });
     assert.equal(checkUpdate(root, { sourceDir: source, installed: '1.0.0', today: TODAY }), null);
+  });
+
+  test('a snooze set for an older version does not suppress a newer published version', () => {
+    const root = campaignWithMemory(
+      'last_notified_version: "1.0.5"\nlast_notified_on: "2026-11-07"\nsnoozed_until: "2026-11-12"\n',
+    );
+    const source = publishedSource('1.1.0', { '1.1.0.md': 'news' });
+    assert.notEqual(checkUpdate(root, { sourceDir: source, installed: '1.0.0', today: TODAY }), null);
   });
 
   test('a snooze that ends today shows the notice', () => {

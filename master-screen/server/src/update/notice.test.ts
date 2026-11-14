@@ -9,7 +9,7 @@ describe('the notice memory', () => {
   it('reads nothing when the file is missing or unreadable', () => {
     const root = makeCampaign();
     assert.deepEqual(readNotice(root), { lastNotifiedVersion: null, lastNotifiedOn: null, snoozedUntil: null });
-    assert.equal(isSnoozed(readNotice(root), '2026-11-14'), false);
+    assert.equal(isSnoozed(readNotice(root), '2026-11-14', '1.2.0'), false);
   });
 
   it('writes the framework format with a one-day snooze and reads it back', () => {
@@ -24,8 +24,26 @@ describe('the notice memory', () => {
     assert.equal(memory.lastNotifiedVersion, '1.2.0');
     assert.equal(memory.lastNotifiedOn, '2026-11-14');
     assert.equal(memory.snoozedUntil, '2026-11-15');
-    assert.equal(isSnoozed(memory, '2026-11-14'), true);
-    assert.equal(isSnoozed(memory, '2026-11-15'), false, 'the snooze ends the next day');
+    assert.equal(isSnoozed(memory, '2026-11-14', '1.2.0'), true);
+    assert.equal(isSnoozed(memory, '2026-11-15', '1.2.0'), false, 'the snooze ends the next day');
+  });
+
+  it('a snooze set for the published version is a snooze', () => {
+    const root = makeCampaign({
+      '.campaign/state/update-notice.yaml':
+        'last_notified_version: "1.2.0"\nlast_notified_on: "2026-11-14"\nsnoozed_until: "2026-11-15"\n',
+    });
+    assert.equal(isSnoozed(readNotice(root), '2026-11-14', '1.2.0'), true);
+  });
+
+  it('a snooze set for an older version does not hide a newer published one', () => {
+    const root = makeCampaign({
+      '.campaign/state/update-notice.yaml':
+        'last_notified_version: "1.2.0"\nlast_notified_on: "2026-11-14"\nsnoozed_until: "2026-11-15"\n',
+    });
+    const memory = readNotice(root);
+    assert.equal(isSnoozed(memory, '2026-11-14', '1.3.0'), false);
+    assert.equal(isSnoozed(memory, '2026-11-14', null), false, 'no published version means no snooze');
   });
 
   it('reads a file written by the framework update check', () => {
@@ -35,12 +53,14 @@ describe('the notice memory', () => {
     const memory = readNotice(root);
     assert.equal(memory.lastNotifiedOn, '2026-11-13');
     assert.equal(memory.snoozedUntil, null);
-    assert.equal(isSnoozed(memory, '2026-11-14'), false);
+    assert.equal(isSnoozed(memory, '2026-11-14', '1.2.0'), false);
   });
 
   it('a corrupt snooze date is not a snooze', () => {
-    const root = makeCampaign({ '.campaign/state/update-notice.yaml': 'snoozed_until: "soon"\n' });
-    assert.equal(isSnoozed(readNotice(root), '2026-11-14'), false);
+    const root = makeCampaign({
+      '.campaign/state/update-notice.yaml': 'last_notified_version: "1.2.0"\nsnoozed_until: "soon"\n',
+    });
+    assert.equal(isSnoozed(readNotice(root), '2026-11-14', '1.2.0'), false);
   });
 });
 

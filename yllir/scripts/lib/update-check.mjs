@@ -63,7 +63,7 @@ export function checkUpdate(campaignRoot, options = {}) {
       return null;
     }
     const today = options.today === undefined ? localDateString(new Date()) : options.today;
-    if (!noticeDue(root, today)) {
+    if (!noticeDue(root, today, published)) {
       return null;
     }
     const language = options.language === undefined ? attempt(() => campaignLanguage(root), null) : options.language;
@@ -116,14 +116,23 @@ export function formatUpdateNotice(result) {
 
 // ---------------------------------------------------------------- checks
 
-/** True when no notice was shown today and no snooze is still running. */
-function noticeDue(root, today) {
+/**
+ * True when no notice was shown today and no snooze is still running for the
+ * published version. A snooze only counts for the version it was set on
+ * (last_notified_version); a newer published version is always due.
+ */
+function noticeDue(root, today, published) {
   const memory = attempt(() => readNoticeMemory(root), {});
   if (memory.last_notified_on === today) {
     return false;
   }
   const snoozed = memory.snoozed_until;
-  if (typeof snoozed === 'string' && DATE_RE.test(snoozed) && snoozed > today) {
+  if (
+    typeof snoozed === 'string' &&
+    DATE_RE.test(snoozed) &&
+    snoozed > today &&
+    memory.last_notified_version === published
+  ) {
     return false;
   }
   return true;

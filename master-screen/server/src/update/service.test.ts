@@ -140,6 +140,17 @@ describe('snooze', () => {
     assert.ok(file.includes('snoozed_until: "2026-11-15"'), file);
   });
 
+  it('a newer version published after the snooze is not snoozed', async () => {
+    const svc = service();
+    await svc.check();
+    assert.equal((await svc.snooze()).snoozed, true);
+    fake.world.published = '1.3.0';
+    const status = await svc.check();
+    assert.equal(status.state, 'available');
+    assert.equal(status.version, '1.3.0');
+    assert.equal(status.snoozed, false);
+  });
+
   it('writes nothing when there is no update to snooze', async () => {
     const svc = service();
     fake.world.installed = '1.2.0';

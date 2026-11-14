@@ -171,7 +171,7 @@ export class UpdateService {
   }
 
   private async compose(): Promise<UpdateStatus> {
-    const snoozed = isSnoozed(readNotice(this.deps.campaignRoot), this.deps.today());
+    const snoozed = isSnoozed(readNotice(this.deps.campaignRoot), this.deps.today(), this.snapshot?.published ?? null);
     const idle: UpdateStatus = {
       state: 'idle',
       version: null,

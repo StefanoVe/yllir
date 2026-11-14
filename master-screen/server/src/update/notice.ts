@@ -32,8 +32,12 @@ export function readNotice(campaignRoot: string): NoticeMemory {
   return memory;
 }
 
-/** True when a snooze runs past today. */
-export function isSnoozed(memory: NoticeMemory, today: string): boolean {
+/**
+ * True when a snooze runs past today AND was set for the version published now. A newer published
+ * version than the one the snooze was set for is never snoozed.
+ */
+export function isSnoozed(memory: NoticeMemory, today: string, published: string | null): boolean {
+  if (published === null || memory.lastNotifiedVersion !== published) return false;
   return memory.snoozedUntil !== null && DATE_RE.test(memory.snoozedUntil) && memory.snoozedUntil > today;
 }
 
