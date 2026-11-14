@@ -4,16 +4,19 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { By } from '@angular/platform-browser';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DocResponse, DocSummary } from '@shared/types';
+
 import { DocumentModal } from '../cockpit/modals/document-modal';
 import { DocumentsService } from '../cockpit/support/documents.service';
 import { ApiService } from '../core/api.service';
 import { Router } from '@angular/router';
 import {
   DocumentsPage,
+  RECENT_ID,
   categoryChips,
   groupDocuments,
   humanizeCategory,
   pickNeighbour,
+  previewTitles,
   pushRecent,
   splitMatch,
 } from './documents';
@@ -21,11 +24,35 @@ import {
 const flush = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const docs: DocSummary[] = [
-  { path: 'characters/rhea.md', title: 'Rhea', category: 'characters', masterOnly: false, hasMasterBlock: false },
-  { path: 'characters/aldo.md', title: 'Aldo', category: 'characters', masterOnly: true, hasMasterBlock: true },
-  { path: 'places/perche-tower.md', title: 'Perché tower', category: 'places', masterOnly: false, hasMasterBlock: false },
+  {
+    path: 'characters/rhea.md',
+    title: 'Rhea',
+    category: 'characters',
+    masterOnly: false,
+    hasMasterBlock: false,
+  },
+  {
+    path: 'characters/aldo.md',
+    title: 'Aldo',
+    category: 'characters',
+    masterOnly: true,
+    hasMasterBlock: true,
+  },
+  {
+    path: 'places/perche-tower.md',
+    title: 'Perché tower',
+    category: 'places',
+    masterOnly: false,
+    hasMasterBlock: false,
+  },
   { path: 'seed.md', title: 'Seed', category: '', masterOnly: true, hasMasterBlock: false },
-  { path: 'characters/zed.md', title: 'Zed', category: 'characters', masterOnly: false, hasMasterBlock: false },
+  {
+    path: 'characters/zed.md',
+    title: 'Zed',
+    category: 'characters',
+    masterOnly: false,
+    hasMasterBlock: false,
+  },
 ];
 
 describe('humanizeCategory', () => {
@@ -60,15 +87,18 @@ describe('groupDocuments', () => {
   });
 
   it('matches the path as well as the title, ignoring case and accents', () => {
-    expect(groupDocuments(docs, 'PERCHE', 'en', 'x').flatMap((group) => group.docs.map((doc) => doc.path))).toEqual([
-      'places/perche-tower.md',
-    ]);
+    expect(
+      groupDocuments(docs, 'PERCHE', 'en', 'x').flatMap((group) =>
+        group.docs.map((doc) => doc.path),
+      ),
+    ).toEqual(['places/perche-tower.md']);
     expect(groupDocuments(docs, 'places/', 'en', 'x')[0]!.docs).toHaveLength(1);
   });
 });
 
 describe('splitMatch', () => {
-  const hits = (parts: { text: string; hit: boolean }[]) => parts.filter((part) => part.hit).map((part) => part.text);
+  const hits = (parts: { text: string; hit: boolean }[]) =>
+    parts.filter((part) => part.hit).map((part) => part.text);
 
   it('marks the matching part of the text, ignoring case', () => {
     expect(splitMatch('Rhea of the Vale', 'RHE')).toEqual([
@@ -161,6 +191,40 @@ describe('pickNeighbour', () => {
   });
 });
 
+describe('previewTitles', () => {
+  const titles = (count: number): DocSummary[] =>
+    Array.from({ length: count }, (_, index) => ({
+      path: `places/p${index}.md`,
+      title: `Place ${index}`,
+      category: 'places',
+      masterOnly: false,
+      hasMasterBlock: false,
+    }));
+
+  it('gives no titles and no more for an empty group', () => {
+    expect(previewTitles([])).toEqual({ titles: [], more: 0 });
+  });
+
+  it('gives all titles and no more for three documents or fewer', () => {
+    expect(previewTitles(titles(3))).toEqual({
+      titles: ['Place 0', 'Place 1', 'Place 2'],
+      more: 0,
+    });
+    expect(previewTitles(titles(1))).toEqual({ titles: ['Place 0'], more: 0 });
+  });
+
+  it('gives the first three titles and counts the rest for more documents', () => {
+    expect(previewTitles(titles(5))).toEqual({
+      titles: ['Place 0', 'Place 1', 'Place 2'],
+      more: 2,
+    });
+  });
+
+  it('takes the number of titles to show from max', () => {
+    expect(previewTitles(titles(5), 1)).toEqual({ titles: ['Place 0'], more: 4 });
+  });
+});
+
 describe('pushRecent', () => {
   it('puts the path at the front without duplicates', () => {
     expect(pushRecent(['a', 'b'], 'b')).toEqual(['b', 'a']);
@@ -184,7 +248,10 @@ describe('DocumentsPage', () => {
     localStorage.clear();
     api = { docs: vi.fn(async () => ({ docs })) };
     documents = {
-      detail: vi.fn(async (path: string) => ({ path, title: path, blocks: [], masterOnly: false }) as unknown as DocResponse),
+      detail: vi.fn(
+        async (path: string) =>
+          ({ path, title: path, blocks: [], masterOnly: false }) as unknown as DocResponse,
+      ),
     };
     TestBed.configureTestingModule({
       imports: [DocumentsPage],
@@ -212,11 +279,24 @@ describe('DocumentsPage', () => {
   }
 
   function rowTitles(): string[] {
-    return [...el.querySelectorAll('button.doc .doc-title')].map((node) => node.textContent?.trim() ?? '');
+    return [...el.querySelectorAll('button.doc .doc-title')].map(
+      (node) => node.textContent?.trim() ?? '',
+    );
+  }
+
+  /** Opens every group and the recent section with the toolbar button, as the master would. */
+  function expandAllGroups(): void {
+    const expand = [...el.querySelectorAll<HTMLButtonElement>('.tool-group button')].find(
+      (item) => item.textContent?.trim() === 'Expand all',
+    )!;
+    expand.click();
+    fixture.detectChanges();
   }
 
   function headings(): string[] {
-    return [...el.querySelectorAll('h2.group-title .group-name')].map((node) => node.textContent?.trim() ?? '');
+    return [...el.querySelectorAll('h2.group-title .group-name')].map(
+      (node) => node.textContent?.trim() ?? '',
+    );
   }
 
   function chip(category: string): HTMLButtonElement {
@@ -234,6 +314,7 @@ describe('DocumentsPage', () => {
     await create();
     expect(api.docs).toHaveBeenCalledTimes(1);
     expect(headings()).toEqual(['Characters', 'Places', 'Other documents']);
+    expandAllGroups();
     expect(rowTitles()).toEqual(['Aldo', 'Rhea', 'Zed', 'Perché tower', 'Seed']);
   });
 
@@ -246,13 +327,16 @@ describe('DocumentsPage', () => {
 
   it('marks master-only documents with a lock and puts the path only in the tooltip', async () => {
     await create();
+    expandAllGroups();
     const rows = [...el.querySelectorAll<HTMLButtonElement>('button.doc')];
     expect(rows.every((row) => row.type === 'button')).toBe(true);
     const aldo = rows.find((row) => row.textContent?.includes('Aldo'))!;
     expect(aldo.querySelector('.lock .sr-only')?.textContent?.trim()).toBe('Master only');
     expect(aldo.getAttribute('title')).toBe('Aldo — characters/aldo.md');
     expect(aldo.textContent).not.toContain('characters/aldo.md');
-    expect(rows.find((row) => row.textContent?.includes('Rhea'))?.querySelector('.lock')).toBeNull();
+    expect(
+      rows.find((row) => row.textContent?.includes('Rhea'))?.querySelector('.lock'),
+    ).toBeNull();
   });
 
   it('filters the rows, ignoring accents', async () => {
@@ -266,6 +350,7 @@ describe('DocumentsPage', () => {
 
   it('shows a clear button only while the filter is not empty, and it empties the filter', async () => {
     await create();
+    expandAllGroups();
     expect(el.querySelector('button.clear')).toBeNull();
     type('rhea');
     const clear = el.querySelector<HTMLButtonElement>('button.clear')!;
@@ -300,12 +385,11 @@ describe('DocumentsPage', () => {
   it('narrows the list to one category with its chip and combines that with the text filter', async () => {
     await create();
     const chips = [...el.querySelectorAll<HTMLButtonElement>('button.chip')];
-    expect(chips.map((item) => [...item.querySelectorAll('span')].map((span) => span.textContent).join(' '))).toEqual([
-      'All 5',
-      'Characters 3',
-      'Places 1',
-      'Other documents 1',
-    ]);
+    expect(
+      chips.map((item) =>
+        [...item.querySelectorAll('span')].map((span) => span.textContent).join(' '),
+      ),
+    ).toEqual(['All 5', 'Characters 3', 'Places 1', 'Other documents 1']);
     expect(chips[0]!.getAttribute('aria-pressed')).toBe('true');
 
     chip('characters').click();
@@ -333,11 +417,12 @@ describe('DocumentsPage', () => {
 
   it('clears the text and the category together from the no-results state', async () => {
     await create();
+    expandAllGroups();
     chip('places').click();
     type('zzz');
     expect(el.querySelector('p.state')?.textContent).toContain('No document matches');
-    const reset = [...el.querySelectorAll<HTMLButtonElement>('.state-block button')].find((button) =>
-      button.textContent?.includes('Clear filters'),
+    const reset = [...el.querySelectorAll<HTMLButtonElement>('.state-block button')].find(
+      (button) => button.textContent?.includes('Clear filters'),
     )!;
     reset.click();
     fixture.detectChanges();
@@ -349,7 +434,9 @@ describe('DocumentsPage', () => {
   it('opens the clicked document in the popup, with the visible documents as its siblings', async () => {
     await create();
     type('characters/');
-    const rhea = [...el.querySelectorAll<HTMLButtonElement>('button.doc')].find((row) => row.textContent?.includes('Rhea'))!;
+    const rhea = [...el.querySelectorAll<HTMLButtonElement>('button.doc')].find((row) =>
+      row.textContent?.includes('Rhea'),
+    )!;
     rhea.click();
     fixture.detectChanges();
     await flush();
@@ -393,6 +480,7 @@ describe('DocumentsPage', () => {
     await flush();
     fixture.detectChanges();
     expect(api.docs).toHaveBeenCalledTimes(2);
+    expandAllGroups();
     expect(rowTitles()).toHaveLength(5);
   });
 
@@ -418,28 +506,69 @@ describe('DocumentsPage', () => {
     expect(marks[0]!.closest('button.doc')?.textContent).toContain('Rhea');
   });
 
-  it('collapses a group from its heading, remembers it, and shows it again when expanded', async () => {
+  it('starts with every group closed and no document list, the recent section included', async () => {
+    localStorage.setItem('yllir.docs.recent', JSON.stringify(['seed.md']));
     await create();
-    const toggle = groupToggle('Characters');
-    expect(toggle.getAttribute('aria-expanded')).toBe('true');
-    toggle.click();
-    fixture.detectChanges();
-    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('false');
-    expect(rowTitles()).toEqual(['Perché tower', 'Seed']);
-    expect(JSON.parse(localStorage.getItem('yllir.docs.collapsed')!)).toEqual(['characters']);
+    expect(localStorage.getItem('yllir.docs.expanded')).toBeNull();
+    expect(el.querySelectorAll('button.group-toggle[aria-expanded="true"]')).toHaveLength(0);
+    expect(el.querySelectorAll('button.group-toggle[aria-expanded="false"]')).toHaveLength(4);
+    expect(el.querySelectorAll('ul.docs')).toHaveLength(0);
+    expect(el.querySelectorAll('button.doc')).toHaveLength(0);
+  });
 
+  it('shows the first titles and a count of the rest in a closed heading only', async () => {
+    const crowd: DocSummary[] = [
+      ...docs,
+      {
+        path: 'characters/bo.md',
+        title: 'Bo',
+        category: 'characters',
+        masterOnly: false,
+        hasMasterBlock: false,
+      },
+    ];
+    api.docs.mockResolvedValueOnce({ docs: crowd });
     await create();
-    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('false');
-    expect(rowTitles()).toEqual(['Perché tower', 'Seed']);
+    const preview = (title: string) =>
+      groupToggle(title)
+        .querySelector('.group-preview')
+        ?.textContent?.replace(/\s+/g, ' ')
+        .trim() ?? null;
+    expect(preview('Characters')).toBe('Aldo, Bo, Rhea +1');
+    expect(preview('Places')).toBe('Perché tower');
+    expect(preview('Other documents')).toBe('Seed');
+    expect(
+      groupToggle('Characters').querySelector('.group-preview')?.getAttribute('aria-hidden'),
+    ).toBe('true');
 
     groupToggle('Characters').click();
     fixture.detectChanges();
-    expect(rowTitles()).toEqual(['Aldo', 'Rhea', 'Zed', 'Perché tower', 'Seed']);
-    expect(localStorage.getItem('yllir.docs.collapsed')).toBe('[]');
+    expect(preview('Characters')).toBeNull();
+    expect(groupToggle('Characters').textContent).not.toContain('Aldo, Bo');
+    expect(el.querySelectorAll('.group-preview')).toHaveLength(2);
   });
 
-  it('always shows the groups expanded while a text filter is active', async () => {
-    localStorage.setItem('yllir.docs.collapsed', JSON.stringify(['characters']));
+  it('opens a group from its heading, remembers it, and closes it again', async () => {
+    await create();
+    const toggle = groupToggle('Characters');
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    fixture.detectChanges();
+    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('true');
+    expect(rowTitles()).toEqual(['Aldo', 'Rhea', 'Zed']);
+    expect(JSON.parse(localStorage.getItem('yllir.docs.expanded')!)).toEqual(['characters']);
+
+    await create();
+    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('true');
+    expect(rowTitles()).toEqual(['Aldo', 'Rhea', 'Zed']);
+
+    groupToggle('Characters').click();
+    fixture.detectChanges();
+    expect(rowTitles()).toEqual([]);
+    expect(localStorage.getItem('yllir.docs.expanded')).toBe('[]');
+  });
+
+  it('always shows the groups open while a text filter is active, and ignores their toggles', async () => {
     await create();
     type('rhea');
     expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('true');
@@ -447,7 +576,8 @@ describe('DocumentsPage', () => {
 
     groupToggle('Characters').click();
     fixture.detectChanges();
-    expect(fixture.componentInstance.collapsed()).toEqual(['characters']);
+    expect(fixture.componentInstance.expanded()).toEqual([]);
+    expect(localStorage.getItem('yllir.docs.expanded')).toBeNull();
 
     type('');
     expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('false');
@@ -456,15 +586,83 @@ describe('DocumentsPage', () => {
   it('collapses and expands all groups with the toolbar buttons', async () => {
     await create();
     const button = (label: string) =>
-      [...el.querySelectorAll<HTMLButtonElement>('.tool-group button')].find((item) => item.textContent?.trim() === label)!;
-    button('Collapse all').click();
-    fixture.detectChanges();
-    expect(fixture.componentInstance.collapsed().sort()).toEqual(['', 'characters', 'places']);
-    expect(rowTitles()).toEqual([]);
-
+      [...el.querySelectorAll<HTMLButtonElement>('.tool-group button')].find(
+        (item) => item.textContent?.trim() === label,
+      )!;
     button('Expand all').click();
     fixture.detectChanges();
+    expect([...fixture.componentInstance.expanded()].sort()).toEqual(
+      ['', RECENT_ID, 'characters', 'places'].sort(),
+    );
     expect(rowTitles()).toHaveLength(5);
+    expect(el.querySelectorAll('button.group-toggle[aria-expanded="false"]')).toHaveLength(0);
+
+    button('Collapse all').click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.expanded()).toEqual([]);
+    expect(rowTitles()).toEqual([]);
+    expect(el.querySelectorAll('button.group-toggle[aria-expanded="true"]')).toHaveLength(0);
+  });
+
+  it('opens every group when the text filter matches documents in all of them', async () => {
+    await create();
+    type('e');
+    const toggles = [...el.querySelectorAll<HTMLButtonElement>('button.group-toggle')];
+    expect(toggles).toHaveLength(3);
+    expect(toggles.map((toggle) => toggle.getAttribute('aria-expanded'))).toEqual([
+      'true',
+      'true',
+      'true',
+    ]);
+    expect(rowTitles()).toEqual(['Aldo', 'Rhea', 'Zed', 'Perché tower', 'Seed']);
+  });
+
+  it('shows a group open when a category chip is selected, without storing that choice', async () => {
+    await create();
+    chip('places').click();
+    fixture.detectChanges();
+    expect(groupToggle('Places').getAttribute('aria-expanded')).toBe('true');
+    expect(rowTitles()).toEqual(['Perché tower']);
+    expect(localStorage.getItem('yllir.docs.expanded')).toBeNull();
+
+    groupToggle('Places').click();
+    fixture.detectChanges();
+    expect(groupToggle('Places').getAttribute('aria-expanded')).toBe('true');
+    expect(localStorage.getItem('yllir.docs.expanded')).toBeNull();
+  });
+
+  it('shows the only group left by a filter open, without storing that choice', async () => {
+    await create();
+    type('perche');
+    expect(groupToggle('Places').getAttribute('aria-expanded')).toBe('true');
+    expect(rowTitles()).toEqual(['Perché tower']);
+    expect(localStorage.getItem('yllir.docs.expanded')).toBeNull();
+  });
+
+  it('shows the only group of the whole list open on its own', async () => {
+    api.docs.mockResolvedValueOnce({ docs: docs.filter((doc) => doc.category === 'characters') });
+    await create();
+    expect(headings()).toEqual(['Characters']);
+    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('true');
+    expect(rowTitles()).toEqual(['Aldo', 'Rhea', 'Zed']);
+    expect(localStorage.getItem('yllir.docs.expanded')).toBeNull();
+  });
+
+  it('shows the recent section closed by default and opens it from its heading', async () => {
+    localStorage.setItem('yllir.docs.recent', JSON.stringify(['seed.md']));
+    await create();
+    const recentToggle = el.querySelector<HTMLButtonElement>('section.recent button.group-toggle')!;
+    expect(recentToggle.getAttribute('aria-expanded')).toBe('false');
+    expect(recentToggle.getAttribute('aria-label')).toBe('Show or hide Recently opened');
+    expect(el.querySelector('section.recent ul')).toBeNull();
+
+    recentToggle.click();
+    fixture.detectChanges();
+    expect(
+      el.querySelector('section.recent button.group-toggle')?.getAttribute('aria-expanded'),
+    ).toBe('true');
+    expect([...el.querySelectorAll('section.recent button.doc')].map(cardTitle)).toEqual(['Seed']);
+    expect(JSON.parse(localStorage.getItem('yllir.docs.expanded')!)).toEqual([RECENT_ID]);
   });
 
   it('works when the browser storage is blocked or holds damaged values', async () => {
@@ -475,24 +673,40 @@ describe('DocumentsPage', () => {
       throw new Error('blocked');
     });
     await create();
-    expect(rowTitles()).toHaveLength(5);
+    expect(rowTitles()).toHaveLength(0);
     groupToggle('Characters').click();
     fixture.detectChanges();
-    expect(rowTitles()).toEqual(['Perché tower', 'Seed']);
+    expect(rowTitles()).toEqual(['Aldo', 'Rhea', 'Zed']);
+    groupToggle('Characters').click();
+    fixture.detectChanges();
+    expect(rowTitles()).toEqual([]);
   });
 
   it('ignores damaged stored values instead of failing', async () => {
-    localStorage.setItem('yllir.docs.collapsed', '{not json');
+    localStorage.setItem('yllir.docs.expanded', '{not json');
     localStorage.setItem('yllir.docs.view', 'sideways');
     localStorage.setItem('yllir.docs.recent', '"oops"');
     await create();
-    expect(rowTitles()).toHaveLength(5);
+    expect(rowTitles()).toHaveLength(0);
+    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('false');
     expect(viewButton('Grid view').getAttribute('aria-pressed')).toBe('true');
     expect(el.querySelector('section.recent')).toBeNull();
+
+    localStorage.setItem('yllir.docs.expanded', JSON.stringify(['characters', 42, null]));
+    await create();
+    expect(rowTitles()).toEqual(['Aldo', 'Rhea', 'Zed']);
+  });
+
+  it('does not open a group from an old collapsed setting', async () => {
+    localStorage.setItem('yllir.docs.collapsed', JSON.stringify([]));
+    await create();
+    expect(rowTitles()).toHaveLength(0);
+    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('false');
   });
 
   it('switches between grid and list, and remembers the choice', async () => {
     await create();
+    expandAllGroups();
     expect(viewButton('Grid view').getAttribute('aria-pressed')).toBe('true');
     expect(viewButton('List view').getAttribute('aria-pressed')).toBe('false');
     expect(el.querySelector('ul.docs.is-list')).toBeNull();
@@ -505,13 +719,17 @@ describe('DocumentsPage', () => {
     expect(rowTitles()).toHaveLength(5);
 
     await create();
+    expandAllGroups();
     expect(viewButton('List view').getAttribute('aria-pressed')).toBe('true');
     expect(el.querySelector('ul.docs.is-list')).not.toBeNull();
   });
 
   it('shows the recently opened documents first, and only while nothing narrows the list', async () => {
     await create();
-    const rhea = [...el.querySelectorAll<HTMLButtonElement>('button.doc')].find((row) => row.textContent?.includes('Rhea'))!;
+    expandAllGroups();
+    const rhea = [...el.querySelectorAll<HTMLButtonElement>('button.doc')].find((row) =>
+      row.textContent?.includes('Rhea'),
+    )!;
     rhea.click();
     fixture.detectChanges();
     await flush();
@@ -534,6 +752,7 @@ describe('DocumentsPage', () => {
 
   it('lists only the recent documents that still exist in the index', async () => {
     localStorage.setItem('yllir.docs.recent', JSON.stringify(['gone/old.md', 'seed.md']));
+    localStorage.setItem('yllir.docs.expanded', JSON.stringify([RECENT_ID]));
     await create();
     const recent = el.querySelector<HTMLElement>('section.recent')!;
     expect([...recent.querySelectorAll('button.doc')].map(cardTitle)).toEqual(['Seed']);
@@ -565,6 +784,7 @@ describe('DocumentsPage', () => {
 
   it('does not throw when the URL cannot be updated (no routes in the test router)', async () => {
     await create();
+    expandAllGroups();
     expect(() => {
       type('rhea');
       fixture.componentInstance.clearFilters();
@@ -590,23 +810,33 @@ describe('DocumentsPage', () => {
 
   it('moves the focus between cards with the arrow keys, Home and End', async () => {
     await create();
+    expandAllGroups();
     const cards = [...el.querySelectorAll<HTMLButtonElement>('button.doc')];
     cards[0]!.focus();
 
-    const right = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+    const right = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+    });
     cards[0]!.dispatchEvent(right);
     expect(right.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(cards[1]);
 
-    cards[1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }));
+    cards[1]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }),
+    );
     expect(document.activeElement).toBe(cards[cards.length - 1]);
 
-    cards[cards.length - 1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    cards[cards.length - 1]!.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Home', bubbles: true }),
+    );
     expect(document.activeElement).toBe(cards[0]);
   });
 
   it('leaves keys alone that are not navigation keys', async () => {
     await create();
+    expandAllGroups();
     const card = el.querySelector<HTMLButtonElement>('button.doc')!;
     card.focus();
     const other = new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true });
@@ -616,14 +846,23 @@ describe('DocumentsPage', () => {
 
   it('moves from the search field into the list with ArrowDown and leaves the caret alone otherwise', async () => {
     await create();
+    expandAllGroups();
     const input = el.querySelector<HTMLInputElement>('input.field')!;
     input.focus();
-    const left = new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true });
+    const left = new KeyboardEvent('keydown', {
+      key: 'ArrowLeft',
+      bubbles: true,
+      cancelable: true,
+    });
     input.dispatchEvent(left);
     expect(left.defaultPrevented).toBe(false);
     expect(document.activeElement).toBe(input);
 
-    const down = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+    const down = new KeyboardEvent('keydown', {
+      key: 'ArrowDown',
+      bubbles: true,
+      cancelable: true,
+    });
     input.dispatchEvent(down);
     expect(down.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(el.querySelector('button.doc'));

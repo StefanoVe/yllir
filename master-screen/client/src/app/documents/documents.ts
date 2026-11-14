@@ -1,4 +1,12 @@
-import { Component, ElementRef, HostListener, ViewChild, computed, inject, signal } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  HostListener,
+  ViewChild,
+  computed,
+  inject,
+  signal,
+} from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import {
@@ -55,6 +63,20 @@ export type DocsView = 'grid' | 'list';
 /** How many documents the "Recently opened" section keeps. */
 export const RECENT_MAX = 6;
 
+/** The id of the "Recently opened" section in the list of open sections. */
+export const RECENT_ID = '__recent__';
+
+/** The first titles of a group and how many documents come after them, for a collapsed heading. */
+export function previewTitles(
+  docs: readonly DocSummary[],
+  max = 3,
+): { titles: string[]; more: number } {
+  return {
+    titles: docs.slice(0, max).map((doc) => doc.title),
+    more: Math.max(0, docs.length - max),
+  };
+}
+
 /** Lower-case form without accents, so that "perche" finds "Perché". */
 export function foldText(text: string): string {
   return text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
@@ -105,7 +127,12 @@ export function groupDocuments(
 
   const buckets = new Map<string, DocSummary[]>();
   for (const doc of docs) {
-    if (needle !== '' && !foldText(doc.title).includes(needle) && !foldText(doc.path).includes(needle)) continue;
+    if (
+      needle !== '' &&
+      !foldText(doc.title).includes(needle) &&
+      !foldText(doc.path).includes(needle)
+    )
+      continue;
     const bucket = buckets.get(doc.category) ?? [];
     bucket.push(doc);
     buckets.set(doc.category, bucket);
@@ -119,13 +146,19 @@ export function groupDocuments(
       docs: sortByTitle(buckets.get(category) ?? [], locale),
     }));
   if (buckets.has('')) {
-    groups.push({ category: '', title: noCategory, docs: sortByTitle(buckets.get('') ?? [], locale) });
+    groups.push({
+      category: '',
+      title: noCategory,
+      docs: sortByTitle(buckets.get('') ?? [], locale),
+    });
   }
   return groups;
 }
 
 function sortByTitle(docs: DocSummary[], locale: string): DocSummary[] {
-  return [...docs].sort((a, b) => a.title.localeCompare(b.title, locale) || a.path.localeCompare(b.path));
+  return [...docs].sort(
+    (a, b) => a.title.localeCompare(b.title, locale) || a.path.localeCompare(b.path),
+  );
 }
 
 /**
@@ -216,7 +249,7 @@ export function pushRecent(list: string[], path: string, max = RECENT_MAX): stri
 
 /** Storage keys of the explorer. Every read and write goes through the helpers below. */
 export const DOCS_STORAGE = {
-  collapsed: 'yllir.docs.collapsed',
+  expanded: 'yllir.docs.expanded',
   view: 'yllir.docs.view',
   recent: 'yllir.docs.recent',
 } as const;
@@ -245,7 +278,9 @@ function readStoredList(key: string): string[] {
   if (raw === null) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === 'string')
+      : [];
   } catch {
     return [];
   }
@@ -262,7 +297,14 @@ function isTextEntry(target: EventTarget | null): boolean {
   return false;
 }
 
-const NAV_KEYS: readonly string[] = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'];
+const NAV_KEYS: readonly string[] = [
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Home',
+  'End',
+];
 
 /**
  * The documents explorer (`/docs`): every campaign document, grouped by category, with a text filter
@@ -283,7 +325,18 @@ export class DocumentsPage {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   readonly s = inject(I18n);
 
-  readonly icons = { ChevronDown, ChevronRight, EyeOff, FileSearch, Files, LayoutGrid, List, Lock, Search, X };
+  readonly icons = {
+    ChevronDown,
+    ChevronRight,
+    EyeOff,
+    FileSearch,
+    Files,
+    LayoutGrid,
+    List,
+    Lock,
+    Search,
+    X,
+  };
   /** Placeholder cards shown while the index loads. */
   readonly skeletonRows = [0, 1, 2, 3, 4, 5, 6, 7];
 
@@ -294,14 +347,16 @@ export class DocumentsPage {
   readonly filter = signal(this.route.snapshot.queryParamMap.get('q') ?? '');
   /** The selected category, or null for all. An empty string selects the documents without one. */
   readonly category = signal<string | null>(
-    this.route.snapshot.queryParamMap.has('cat') ? this.route.snapshot.queryParamMap.get('cat') : null,
+    this.route.snapshot.queryParamMap.has('cat')
+      ? this.route.snapshot.queryParamMap.get('cat')
+      : null,
   );
   /** The document shown in the popup, or null when none is open. */
   readonly opened = signal<SourceRef | null>(null);
   /** Whether the filter field has the focus; the `/` hint hides while it does. */
   readonly filterFocused = signal(false);
-  /** The category names whose groups are collapsed. Stored per browser. */
-  readonly collapsed = signal<string[]>(readStoredList(DOCS_STORAGE.collapsed));
+  /** The category names whose groups are open, plus RECENT_ID for the recent section. Empty means all closed. Stored per browser. */
+  readonly expanded = signal<string[]>(readStoredList(DOCS_STORAGE.expanded));
   /** Grid of cards or a list of rows. Stored per browser; grid by default. */
   readonly view = signal<DocsView>(readStored(DOCS_STORAGE.view) === 'list' ? 'list' : 'grid');
   /** The paths of the documents opened most recently, newest first. Stored per browser. */
@@ -312,8 +367,14 @@ export class DocumentsPage {
   readonly chips = computed(() => categoryChips(this.docs()));
   readonly groups = computed(() => {
     const selected = this.category();
-    const scope = selected === null ? this.docs() : this.docs().filter((doc) => doc.category === selected);
-    return groupDocuments(scope, this.filter(), this.s.language(), this.s.t('documents.noCategory'));
+    const scope =
+      selected === null ? this.docs() : this.docs().filter((doc) => doc.category === selected);
+    return groupDocuments(
+      scope,
+      this.filter(),
+      this.s.language(),
+      this.s.t('documents.noCategory'),
+    );
   });
   /** The visible documents, flattened in the order they are shown: the popup's previous and next follow it. */
   readonly orderedSources = computed<SourceRef[]>(() =>
@@ -398,31 +459,46 @@ export class DocumentsPage {
    */
   subfolderPath(doc: DocSummary): string {
     const prefix = doc.category === '' ? '' : `${doc.category}/`;
-    const rest = prefix !== '' && doc.path.startsWith(prefix) ? doc.path.slice(prefix.length) : doc.path;
+    const rest =
+      prefix !== '' && doc.path.startsWith(prefix) ? doc.path.slice(prefix.length) : doc.path;
     return rest.includes('/') ? rest : '';
   }
 
-  /** A group with a text filter is always open: the filter shows what matches, wherever it is. */
+  /**
+   * Whether a group is shown closed. Every group starts closed. A text filter, a selected category or
+   * a single group left on the screen shows it open without storing anything.
+   */
   isCollapsed(group: DocGroup): boolean {
-    return this.filter().trim() === '' && this.collapsed().includes(group.category);
+    if (this.isAutoOpen()) return false;
+    return !this.expanded().includes(group.category);
   }
 
-  /** Opens or closes one group. Ignored while a text filter is active. */
+  /** The title and the first documents of a group, shown in its collapsed heading. */
+  previewOf(group: DocGroup): { titles: string[]; more: number } {
+    return previewTitles(group.docs);
+  }
+
+  /** Whether the recent section is open. */
+  isRecentOpen(): boolean {
+    return this.expanded().includes(RECENT_ID);
+  }
+
+  /** Opens or closes one group. Ignored while the screen shows it open on its own. */
   toggleGroup(group: DocGroup): void {
-    if (this.filter().trim() !== '') return;
-    const current = this.collapsed();
-    const next = current.includes(group.category)
-      ? current.filter((category) => category !== group.category)
-      : [...current, group.category];
-    this.setCollapsed(next);
+    if (this.isAutoOpen()) return;
+    this.toggleId(group.category);
+  }
+
+  toggleRecent(): void {
+    this.toggleId(RECENT_ID);
   }
 
   collapseAll(): void {
-    this.setCollapsed(this.chips().map((chip) => chip.category));
+    this.setExpanded([]);
   }
 
   expandAll(): void {
-    this.setCollapsed([]);
+    this.setExpanded([RECENT_ID, ...this.chips().map((chip) => chip.category)]);
   }
 
   setView(view: DocsView): void {
@@ -470,9 +546,20 @@ export class DocumentsPage {
     this.filterInput?.nativeElement.focus();
   }
 
-  private setCollapsed(list: string[]): void {
-    this.collapsed.set(list);
-    writeStored(DOCS_STORAGE.collapsed, JSON.stringify(list));
+  /** A text filter, a selected category, or a single group left: the groups show open without a choice. */
+  private isAutoOpen(): boolean {
+    return this.filter().trim() !== '' || this.category() !== null || this.groups().length === 1;
+  }
+
+  private toggleId(id: string): void {
+    const current = this.expanded();
+    const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id];
+    this.setExpanded(next);
+  }
+
+  private setExpanded(list: string[]): void {
+    this.expanded.set(list);
+    writeStored(DOCS_STORAGE.expanded, JSON.stringify(list));
   }
 
   /** The document cards on the screen, in the order they are shown. */

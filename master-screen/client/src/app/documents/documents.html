@@ -10,20 +10,40 @@
 
   <div class="tools-row">
     <div class="search">
-      <lucide-angular class="search-icon" [img]="icons.Search" [size]="16" [strokeWidth]="1.5" aria-hidden="true" />
-      <input #filterField class="field" type="search" autocomplete="off" spellcheck="false"
-             [attr.aria-label]="s.t('documents.filter')" [attr.placeholder]="s.t('documents.filter')"
-             [value]="filter()" (input)="onFilter($any($event.target).value)"
-             (focus)="filterFocused.set(true)" (blur)="filterFocused.set(false)"
-             (keydown.escape)="onFilterEscape($event)" />
+      <lucide-angular
+        class="search-icon"
+        [img]="icons.Search"
+        [size]="16"
+        [strokeWidth]="1.5"
+        aria-hidden="true"
+      />
+      <input
+        #filterField
+        class="field"
+        type="search"
+        autocomplete="off"
+        spellcheck="false"
+        [attr.aria-label]="s.t('documents.filter')"
+        [attr.placeholder]="s.t('documents.filter')"
+        [value]="filter()"
+        (input)="onFilter($any($event.target).value)"
+        (focus)="filterFocused.set(true)"
+        (blur)="filterFocused.set(false)"
+        (keydown.escape)="onFilterEscape($event)"
+      />
       @if (filter() === '' && !filterFocused()) {
         <span class="hint" aria-hidden="true">
           <kbd class="kbd" [attr.title]="s.t('documents.shortcutHint')">/</kbd>
         </span>
       }
       @if (filter() !== '') {
-        <button type="button" class="icon-btn clear" [attr.aria-label]="s.t('documents.clear')"
-                [title]="s.t('documents.clear')" (click)="clearFilter()">
+        <button
+          type="button"
+          class="icon-btn clear"
+          [attr.aria-label]="s.t('documents.clear')"
+          [title]="s.t('documents.clear')"
+          (click)="clearFilter()"
+        >
           <lucide-angular [img]="icons.X" [size]="16" aria-hidden="true" />
         </button>
       }
@@ -31,20 +51,39 @@
 
     @if (!loading() && !error() && docs().length > 0) {
       <div class="tool-group">
-        <button type="button" class="btn-text" (click)="collapseAll()">{{ s.t('documents.collapseAll') }}</button>
-        <button type="button" class="btn-text" (click)="expandAll()">{{ s.t('documents.expandAll') }}</button>
+        <button type="button" class="btn-text" (click)="collapseAll()">
+          {{ s.t('documents.collapseAll') }}
+        </button>
+        <button type="button" class="btn-text" (click)="expandAll()">
+          {{ s.t('documents.expandAll') }}
+        </button>
       </div>
     }
 
     <div class="view-toggle" role="group" [attr.aria-label]="s.t('documents.view')">
-      <button type="button" class="icon-btn" [attr.aria-pressed]="view() === 'grid'"
-              [attr.aria-label]="s.t('documents.viewGrid')" [title]="s.t('documents.viewGrid')"
-              (click)="setView('grid')">
-        <lucide-angular [img]="icons.LayoutGrid" [size]="16" [strokeWidth]="1.5" aria-hidden="true" />
+      <button
+        type="button"
+        class="icon-btn"
+        [attr.aria-pressed]="view() === 'grid'"
+        [attr.aria-label]="s.t('documents.viewGrid')"
+        [title]="s.t('documents.viewGrid')"
+        (click)="setView('grid')"
+      >
+        <lucide-angular
+          [img]="icons.LayoutGrid"
+          [size]="16"
+          [strokeWidth]="1.5"
+          aria-hidden="true"
+        />
       </button>
-      <button type="button" class="icon-btn" [attr.aria-pressed]="view() === 'list'"
-              [attr.aria-label]="s.t('documents.viewList')" [title]="s.t('documents.viewList')"
-              (click)="setView('list')">
+      <button
+        type="button"
+        class="icon-btn"
+        [attr.aria-pressed]="view() === 'list'"
+        [attr.aria-label]="s.t('documents.viewList')"
+        [title]="s.t('documents.viewList')"
+        (click)="setView('list')"
+      >
         <lucide-angular [img]="icons.List" [size]="16" [strokeWidth]="1.5" aria-hidden="true" />
       </button>
     </div>
@@ -52,15 +91,26 @@
 
   @if (!error() && !loading() && docs().length > 0) {
     <div class="chips">
-      <button type="button" class="chip" [attr.aria-pressed]="category() === null"
-              (click)="selectCategory(null)">
+      <button
+        type="button"
+        class="chip"
+        [attr.aria-pressed]="category() === null"
+        (click)="selectCategory(null)"
+      >
         <span>{{ s.t('documents.all') }}</span>
         <span class="chip-count">{{ docs().length }}</span>
       </button>
       @for (chip of chips(); track chip.category) {
-        <button type="button" class="chip" [attr.data-category]="chip.category"
-                [attr.aria-pressed]="category() === chip.category" (click)="selectCategory(chip.category)">
-          <span>{{ chip.category === '' ? s.t('documents.noCategory') : humanize(chip.category) }}</span>
+        <button
+          type="button"
+          class="chip"
+          [attr.data-category]="chip.category"
+          [attr.aria-pressed]="category() === chip.category"
+          (click)="selectCategory(chip.category)"
+        >
+          <span>{{
+            chip.category === '' ? s.t('documents.noCategory') : humanize(chip.category)
+          }}</span>
           <span class="chip-count">{{ chip.count }}</span>
         </button>
       }
@@ -70,8 +120,13 @@
 
 <!-- One card (grid) or row (list). The same markup serves the recent section and the groups. -->
 <ng-template #docItem let-doc>
-  <button type="button" class="doc" [class.is-master]="doc.masterOnly"
-          [title]="doc.title + ' — ' + doc.path" (click)="open(doc)">
+  <button
+    type="button"
+    class="doc"
+    [class.is-master]="doc.masterOnly"
+    [title]="doc.title + ' — ' + doc.path"
+    (click)="open(doc)"
+  >
     <span class="doc-head">
       @if (view() === 'grid') {
         <span class="doc-mark" aria-hidden="true">{{ initialOf(doc.title) }}</span>
@@ -79,18 +134,36 @@
       <span class="doc-flags">
         @if (doc.masterOnly) {
           <span class="lock" [title]="s.t('reader.masterOnly')">
-            <lucide-angular [img]="icons.Lock" [size]="14" [strokeWidth]="1.75" aria-hidden="true" />
+            <lucide-angular
+              [img]="icons.Lock"
+              [size]="14"
+              [strokeWidth]="1.75"
+              aria-hidden="true"
+            />
             <span class="sr-only">{{ s.t('reader.masterOnly') }}</span>
           </span>
         } @else if (doc.hasMasterBlock) {
           <span class="block-flag" [title]="s.t('documents.masterBlock')">
-            <lucide-angular [img]="icons.EyeOff" [size]="14" [strokeWidth]="1.75" aria-hidden="true" />
+            <lucide-angular
+              [img]="icons.EyeOff"
+              [size]="14"
+              [strokeWidth]="1.75"
+              aria-hidden="true"
+            />
             <span class="sr-only">{{ s.t('documents.masterBlock') }}</span>
           </span>
         }
       </span>
     </span>
-    <span class="doc-title">@for (part of highlight(doc.title); track $index) {@if (part.hit) {<mark class="hit">{{ part.text }}</mark>} @else {<span>{{ part.text }}</span>}}</span>
+    <span class="doc-title">
+      @for (part of highlight(doc.title); track $index) {
+        @if (part.hit) {
+          <mark class="hit">{{ part.text }}</mark>
+        } @else {
+          <span>{{ part.text }}</span>
+        }
+      }
+    </span>
     @if (view() === 'list') {
       <span class="doc-path">{{ doc.path }}</span>
     } @else if (subfolderPath(doc); as sub) {
@@ -120,18 +193,39 @@
   </div>
 } @else {
   @if (showRecent()) {
-    <section class="group recent" aria-labelledby="documents-recent">
+    <section
+      class="group recent"
+      [class.is-collapsed]="!isRecentOpen()"
+      aria-labelledby="documents-recent"
+    >
       <h2 class="group-title" id="documents-recent">
-        <span class="group-name">{{ s.t('documents.recent') }}</span>
-        <span class="group-count">{{ recentDocs().length }}</span>
+        <button
+          type="button"
+          class="group-toggle"
+          [attr.aria-expanded]="isRecentOpen()"
+          aria-controls="documents-list-recent"
+          [attr.aria-label]="s.t('documents.groupToggle', { group: s.t('documents.recent') })"
+          (click)="toggleRecent()"
+        >
+          <lucide-angular
+            [img]="isRecentOpen() ? icons.ChevronDown : icons.ChevronRight"
+            [size]="16"
+            [strokeWidth]="1.5"
+            aria-hidden="true"
+          />
+          <span class="group-name">{{ s.t('documents.recent') }}</span>
+          <span class="group-count">{{ recentDocs().length }}</span>
+        </button>
       </h2>
-      <ul class="docs" [class.is-list]="view() === 'list'">
-        @for (doc of recentDocs(); track doc.path) {
-          <li>
-            <ng-container *ngTemplateOutlet="docItem; context: { $implicit: doc }" />
-          </li>
-        }
-      </ul>
+      @if (isRecentOpen()) {
+        <ul class="docs" id="documents-list-recent" [class.is-list]="view() === 'list'">
+          @for (doc of recentDocs(); track doc.path) {
+            <li>
+              <ng-container *ngTemplateOutlet="docItem; context: { $implicit: doc }" />
+            </li>
+          }
+        </ul>
+      }
     </section>
   }
 
@@ -139,21 +233,44 @@
     <div class="state-block">
       <lucide-angular [img]="icons.FileSearch" [size]="18" aria-hidden="true" />
       <p class="state">{{ s.t('documents.noResults') }}</p>
-      <button type="button" class="btn" (click)="clearFilters()">{{ s.t('documents.clearFilters') }}</button>
+      <button type="button" class="btn" (click)="clearFilters()">
+        {{ s.t('documents.clearFilters') }}
+      </button>
     </div>
   }
 
   @for (group of groups(); track group.category; let g = $index) {
-    <section class="group" [class.is-collapsed]="isCollapsed(group)" [attr.aria-labelledby]="'documents-group-' + g">
+    <section
+      class="group"
+      [class.is-collapsed]="isCollapsed(group)"
+      [attr.aria-labelledby]="'documents-group-' + g"
+    >
       <h2 class="group-title" [id]="'documents-group-' + g">
-        <button type="button" class="group-toggle" [attr.aria-expanded]="!isCollapsed(group)"
-                [attr.aria-controls]="'documents-list-' + g"
-                [attr.aria-label]="s.t('documents.groupToggle', { group: group.title })"
-                (click)="toggleGroup(group)">
-          <lucide-angular [img]="isCollapsed(group) ? icons.ChevronRight : icons.ChevronDown" [size]="16"
-                          [strokeWidth]="1.5" aria-hidden="true" />
+        <button
+          type="button"
+          class="group-toggle"
+          [attr.aria-expanded]="!isCollapsed(group)"
+          [attr.aria-controls]="'documents-list-' + g"
+          [attr.aria-label]="s.t('documents.groupToggle', { group: group.title })"
+          (click)="toggleGroup(group)"
+        >
+          <lucide-angular
+            [img]="isCollapsed(group) ? icons.ChevronRight : icons.ChevronDown"
+            [size]="16"
+            [strokeWidth]="1.5"
+            aria-hidden="true"
+          />
           <span class="group-name">{{ group.title }}</span>
           <span class="group-count">{{ group.docs.length }}</span>
+          @if (isCollapsed(group)) {
+            @let preview = previewOf(group);
+            <span class="group-preview" aria-hidden="true"
+              >{{ preview.titles.join(', ') }}
+              @if (preview.more > 0) {
+                +{{ preview.more }}
+              }
+            </span>
+          }
         </button>
       </h2>
       @if (!isCollapsed(group)) {
@@ -170,5 +287,9 @@
 }
 
 @if (opened(); as source) {
-  <cockpit-document-modal [source]="source" [siblings]="orderedSources()" (close)="opened.set(null)" />
+  <cockpit-document-modal
+    [source]="source"
+    [siblings]="orderedSources()"
+    (close)="opened.set(null)"
+  />
 }

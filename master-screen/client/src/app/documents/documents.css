@@ -98,7 +98,9 @@ h1 {
   background: transparent;
   color: var(--color-text);
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .search .icon-btn {
@@ -109,7 +111,7 @@ h1 {
   color: var(--color-text-muted);
 }
 
-.icon-btn[aria-pressed="true"] {
+.icon-btn[aria-pressed='true'] {
   border-color: var(--color-border-strong);
   background: var(--color-text);
   color: var(--color-bg);
@@ -142,6 +144,22 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
+}
+
+/* Collapse all and expand all: a readable size and full-strength text, with a box on hover and focus. */
+.tool-group .btn-text {
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 4px var(--space-1);
+  border: var(--border-width) solid transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.tool-group .btn-text:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
 }
 
 /* Quiet text buttons: underlined, no frame. */
@@ -191,7 +209,7 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
-.chip[aria-pressed="true"] .chip-count {
+.chip[aria-pressed='true'] .chip-count {
   color: inherit;
 }
 
@@ -208,13 +226,18 @@ h1 {
   line-height: var(--line-height-tight);
 }
 
+/* The whole row is the button: a 44px target, chevron, name and count, then the preview when closed. */
 .group-toggle {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: var(--space-1);
+  box-sizing: border-box;
   width: 100%;
+  min-height: 44px;
   min-width: 0;
-  padding: var(--space-1) 0;
+  margin: 0;
+  padding: var(--space-1);
   border: 0;
   border-bottom: var(--border-width) solid var(--color-border-strong);
   border-radius: 0;
@@ -224,17 +247,43 @@ h1 {
   font-weight: 600;
   text-align: left;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--transition-fast);
+}
+
+.group-toggle:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: -2px;
 }
 
 .group-toggle lucide-angular {
   flex: none;
 }
 
+.group-name {
+  flex: none;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 .group-count {
+  flex: none;
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
+}
+
+/* The titles of a closed group, on the same line as its count; cut with an ellipsis when too long. */
+.group-preview {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .group.is-collapsed .group-title {
@@ -424,13 +473,21 @@ h1 {
   .docs.is-list .doc:hover {
     border-bottom-color: var(--color-border-strong);
   }
+
+  .group-toggle:hover {
+    background: var(--color-surface-2);
+  }
+
+  .tool-group .btn-text:hover {
+    background: var(--color-surface-2);
+  }
 }
 
 .icon-btn:hover {
   background: var(--color-surface-2);
 }
 
-.icon-btn[aria-pressed="true"]:hover {
+.icon-btn[aria-pressed='true']:hover {
   background: var(--color-text);
 }
 
