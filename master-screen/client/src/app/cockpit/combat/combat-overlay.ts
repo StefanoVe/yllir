@@ -10,7 +10,7 @@ import {
 } from "@angular/core";
 import { MusicMini } from "../../music/music-mini";
 import type { BattleView, CombatRules, LivePlayer } from "@shared/types";
-import type { CombatNotice, Combatant, SourceRef } from "@shared/cockpit-types";
+import type { Combat, CombatNotice, Combatant, SourceRef } from "@shared/cockpit-types";
 import { Icon } from "../support/icon";
 import { ConfirmButton } from "../support/confirm-button";
 import { CockpitService } from "../cockpit.service";
@@ -71,8 +71,12 @@ export class CombatOverlay implements OnDestroy {
   readonly prefs = inject(BattleMapPrefs);
   private readonly battleApi = inject(BattleApi);
   private readonly overlay = inject(OverlayService);
-  /** True while the combat thread is being created, so the effect does not ask twice. */
-  private ensuring = false;
+  /** The combat thread being created, so that a second caller waits for it instead of creating another. */
+  private ensuring: Promise<void> | null = null;
+  /** The table and whether it had a combat the last time the session was seen. */
+  private seenSession: { tableId: string | null; active: boolean } | null = null;
+  /** True once the combat on screen was handled: either it was already running when first seen, or its start was acted on. */
+  private combatHandled = false;
   readonly players = signal<LivePlayer[]>([]);
   readonly battle = signal<BattleView | null>(null);
   readonly rules = signal<CombatRules | null>(null);
@@ -141,12 +145,21 @@ export class CombatOverlay implements OnDestroy {
       const threadId = this.combat()?.threadId ?? null;
       const active = !!this.combat();
       untracked(() => {
-        if (!threadId && active && tableId) void this.ensureCombatThread(tableId);
+        if (!threadId && active && tableId)
+          void this.ensureCombatThread(tableId).catch((error: unknown) => this.error.set(String(error)));
         else
           this.combatChat
             .bind(tableId, threadId)
             .catch((error: unknown) => this.error.set(String(error)));
       });
+    });
+    // A combat that starts while the table is on screen gets its battle map looked for once,
+    // whether or not a map is set. A combat already running when the table was first seen does not.
+    effect(() => {
+      const session = this.api.session();
+      const tableId = session?.id ?? null;
+      const combat = session?.state.combat ?? null;
+      untracked(() => this.observeCombatStart(tableId, combat));
     });
     // Each time the overlay opens: mark the notices already seen and show the panels. When it
     // closes, forget the panels the pointer or focus was in, since their leave events never come.
@@ -181,18 +194,44 @@ export class CombatOverlay implements OnDestroy {
     this.combatChat.destroy();
   }
 
-  /** Creates the combat thread on the server when the combat has none yet, then follows it. */
-  private async ensureCombatThread(tableId: string): Promise<void> {
-    if (this.ensuring) return;
-    this.ensuring = true;
-    try {
-      await this.combatChat.bind(tableId, null);
-      await this.combatChat.ensureThread();
-    } catch (error) {
-      this.error.set(String(error));
-    } finally {
-      this.ensuring = false;
+  /** Decides whether the combat on screen just started, and if it has a non-player combatant, looks for its map. */
+  private observeCombatStart(tableId: string | null, combat: Combat | null): void {
+    const previous = this.seenSession;
+    this.seenSession = { tableId, active: !!combat };
+    if (!combat) {
+      this.combatHandled = false;
+      return;
     }
+    if (this.combatHandled) return;
+    this.combatHandled = true;
+    // A start is only observed on the same table, seen before without a combat. A session that
+    // loads late (null, then the table with its combat) is not a start.
+    const started = tableId !== null && previous !== null && previous.tableId === tableId && !previous.active;
+    if (started && combat.participants.some((p) => p.kind !== "pc")) void this.findMapForNewCombat(tableId);
+  }
+
+  /** Creates the combat thread on the server when the combat has none yet, then follows it. */
+  private ensureCombatThread(tableId: string): Promise<void> {
+    this.ensuring ??= this.createCombatThread(tableId).finally(() => {
+      this.ensuring = null;
+    });
+    return this.ensuring;
+  }
+
+  private async createCombatThread(tableId: string): Promise<void> {
+    await this.combatChat.bind(tableId, null);
+    await this.combatChat.ensureThread();
+  }
+
+  /** Waits for the combat thread to exist, then sends the same find-map request as the button. */
+  private async findMapForNewCombat(tableId: string): Promise<void> {
+    try {
+      await this.ensureCombatThread(tableId);
+    } catch (error) {
+      this.combatChat.chatError.set(String(error));
+      return;
+    }
+    await this.requestBattleMap();
   }
 
   @HostListener("document:keydown.escape")
@@ -295,6 +334,11 @@ export class CombatOverlay implements OnDestroy {
   /** Asks the agent, in the campaign language, to find and set the battle map of the place. */
   async findMap(): Promise<void> {
     this.hud.setChat(true);
+    await this.requestBattleMap();
+  }
+
+  /** The find-map request itself, which does not open the chat panel. */
+  private async requestBattleMap(): Promise<void> {
     try {
       await this.combatChat.send(this.i18n.t("combat.map.findPrompt"), crypto.randomUUID());
     } catch (error) {

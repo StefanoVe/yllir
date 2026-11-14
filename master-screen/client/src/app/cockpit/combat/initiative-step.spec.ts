@@ -168,4 +168,106 @@ describe('Initiative step', () => {
     const fixture = create();
     expect(startButton(fixture.nativeElement as HTMLElement).disabled).toBe(true);
   });
+
+  /** Creature row names in display order. */
+  function creatureNames(root: HTMLElement): string[] {
+    return [...root.querySelectorAll<HTMLElement>('.row .name')].map((n) => n.textContent?.trim() ?? '');
+  }
+
+  function duplicateButton(root: HTMLElement, name: string): HTMLButtonElement {
+    return root.querySelector<HTMLButtonElement>(`button[aria-label="Duplicate ${name}"]`)!;
+  }
+
+  it('duplicate adds "Ogre 2" right after the source, then "Ogre 3" after the last copy', () => {
+    const fixture = create({ clicked: OGRE, cards: [OGRE, BRANN] });
+    const root = fixture.nativeElement as HTMLElement;
+    duplicateButton(root, 'Ogre').click();
+    fixture.detectChanges();
+    expect(creatureNames(root)).toEqual(['Ogre', 'Ogre 2', 'Brann']);
+
+    duplicateButton(root, 'Ogre').click();
+    fixture.detectChanges();
+    expect(creatureNames(root)).toEqual(['Ogre', 'Ogre 2', 'Ogre 3', 'Brann']);
+    expect(rowOf(root, 'Ogre').querySelector('button[aria-label="Remove Ogre"]')).toBeNull();
+    expect(rowOf(root, 'Ogre 2').querySelector('button[aria-label="Remove Ogre 2"]')).not.toBeNull();
+  });
+
+  it('sends each copy as its own participant with the same path and its own initiative', async () => {
+    const fixture = create({ clicked: OGRE, cards: [OGRE] });
+    const root = fixture.nativeElement as HTMLElement;
+    duplicateButton(root, 'Ogre').click();
+    duplicateButton(root, 'Ogre').click();
+    fixture.detectChanges();
+    setNumber(root, 'Ogre', '12');
+    setNumber(root, 'Ogre 2', '7');
+    fixture.detectChanges();
+    expect(previewLines(root)).toEqual(['Ogre 12', 'Ogre 2 7', 'Ogre 3 —']);
+
+    const payload = (await start(root)) as { actions: Array<{ participants: unknown[] }> };
+    expect(payload.actions[0]!.participants).toEqual([
+      { name: 'Ogre', kind: 'enemy', initiative: 12, conditions: [], source: { path: 'Enemies/Ogre.md' } },
+      { name: 'Ogre 2', kind: 'enemy', initiative: 7, conditions: [], source: { path: 'Enemies/Ogre.md' } },
+      { name: 'Ogre 3', kind: 'enemy', initiative: null, conditions: [], source: { path: 'Enemies/Ogre.md' } },
+    ]);
+  });
+
+  it('a copy takes the side of its source at that moment and has its own side toggle', async () => {
+    const fixture = create({ clicked: OGRE, cards: [OGRE] });
+    const root = fixture.nativeElement as HTMLElement;
+    rowOf(root, 'Ogre').querySelector<HTMLButtonElement>('button.side[data-side="ally"]')!.click();
+    fixture.detectChanges();
+    duplicateButton(root, 'Ogre').click();
+    fixture.detectChanges();
+    expect(rowOf(root, 'Ogre 2').querySelector('button.side[data-side="ally"]')?.getAttribute('aria-pressed')).toBe('true');
+
+    rowOf(root, 'Ogre 2').querySelector<HTMLButtonElement>('button.side[data-side="enemy"]')!.click();
+    fixture.detectChanges();
+    expect(rowOf(root, 'Ogre').querySelector('button.side[data-side="ally"]')?.getAttribute('aria-pressed')).toBe('true');
+
+    const payload = (await start(root)) as { actions: Array<{ participants: Array<{ name: string; kind: string }> }> };
+    expect(payload.actions[0]!.participants.map((p) => [p.name, p.kind])).toEqual([
+      ['Ogre', 'ally'],
+      ['Ogre 2', 'enemy'],
+    ]);
+  });
+
+  it('a copy can be unticked on its own, and duplicate is disabled on an unticked row', async () => {
+    const fixture = create({ clicked: OGRE, cards: [OGRE] });
+    const root = fixture.nativeElement as HTMLElement;
+    duplicateButton(root, 'Ogre').click();
+    fixture.detectChanges();
+    setNumber(root, 'Ogre', '9');
+    setNumber(root, 'Ogre 2', '4');
+
+    rowOf(root, 'Ogre 2').querySelector<HTMLInputElement>('.tick')!.click();
+    fixture.detectChanges();
+    expect(rowOf(root, 'Ogre').querySelector<HTMLInputElement>('.tick')!.checked).toBe(true);
+    expect(previewLines(root)).toEqual(['Ogre 9']);
+
+    rowOf(root, 'Ogre').querySelector<HTMLInputElement>('.tick')!.click();
+    fixture.detectChanges();
+    expect(duplicateButton(root, 'Ogre').disabled).toBe(true);
+    const payload = (await start(root)) as { actions: Array<{ participants: unknown[] }> };
+    expect(payload.actions).toEqual([]);
+  });
+
+  it('removes a copy and keeps the others; the original cannot be removed', () => {
+    const fixture = create({ clicked: OGRE, cards: [OGRE] });
+    const root = fixture.nativeElement as HTMLElement;
+    duplicateButton(root, 'Ogre').click();
+    duplicateButton(root, 'Ogre').click();
+    fixture.detectChanges();
+    setNumber(root, 'Ogre 2', '6');
+    fixture.detectChanges();
+
+    rowOf(root, 'Ogre 2').querySelector<HTMLButtonElement>('button[aria-label="Remove Ogre 2"]')!.click();
+    fixture.detectChanges();
+    expect(creatureNames(root)).toEqual(['Ogre', 'Ogre 3']);
+    expect(previewLines(root)).toEqual(['Ogre —', 'Ogre 3 —']);
+
+    // A new copy after a removal does not reuse a name that is still taken.
+    duplicateButton(root, 'Ogre').click();
+    fixture.detectChanges();
+    expect(creatureNames(root)).toEqual(['Ogre', 'Ogre 3', 'Ogre 4']);
+  });
 });

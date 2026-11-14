@@ -109,10 +109,12 @@ test("il prompt di sistema nomina il sistema di gioco solo se è noto e non cita
   }
 });
 
-test("il prompt di sistema del tavolo non ha strumenti di combattimento e rimanda alla chat dello scontro", () => {
+test("il prompt di sistema del tavolo avvia lo scontro con combat_start e rimanda alla chat dello scontro", () => {
   const prompt = buildSystemPrompt({ language: "it", systemName: null });
+  expect(prompt).toContain("combat_start");
   expect(prompt).not.toContain("combat_turn");
   expect(prompt).not.toContain("battle_move");
+  expect(prompt).not.toContain("you have no combat tools");
   expect(prompt).toContain("combat chat");
 });
 

@@ -19,6 +19,16 @@ interface CreatureState {
   side: Side;
 }
 
+/**
+ * A copy of a creature made in this step, before the fight. It has the same sheet as its source
+ * (`sourceId`, a card of the board) and its own row, tick, side and initiative under `cardId`.
+ */
+interface CreatureCopy {
+  cardId: string;
+  sourceId: string;
+  name: string;
+}
+
 /** A player character typed in this step, not listed by the battle API. */
 interface AdHocPc {
   key: string;
@@ -55,11 +65,14 @@ export class InitiativeStep {
   readonly unticked = signal<Record<string, true>>({});
   readonly creatureState = signal<Record<string, CreatureState>>({});
   readonly adHocPcs = signal<AdHocPc[]>([]);
+  /** Copies of creature rows made in this step, in creation order. */
+  readonly copies = signal<CreatureCopy[]>([]);
   readonly newPcName = signal("");
   readonly busy = signal(false);
   readonly error = signal("");
   readonly initials = initials;
   private adHocCount = 0;
+  private copySeq = 0;
 
   readonly pcRows = computed(() => {
     const listed = this.players().map((p) => ({
@@ -82,18 +95,28 @@ export class InitiativeStep {
     const others = this.cards().filter((c) => c.cardId !== clicked?.cardId);
     const cards = clicked ? [clicked, ...others] : others;
     const state = this.creatureState();
-    return cards.map((card) => {
-      const key = `card:${card.cardId}`;
+    const initiatives = this.initiatives();
+    const copies = this.copies();
+    const row = (cardId: string, name: string, path: string, copy: boolean) => {
+      const key = `card:${cardId}`;
       return {
         key,
-        cardId: card.cardId,
-        name: card.name,
-        path: card.path,
-        checked: state[card.cardId]?.checked ?? card.cardId === clicked?.cardId,
-        side: state[card.cardId]?.side ?? ("enemy" as Side),
-        initiative: this.initiatives()[key] ?? "",
+        cardId,
+        name,
+        path,
+        copy,
+        checked: state[cardId]?.checked ?? cardId === clicked?.cardId,
+        side: state[cardId]?.side ?? ("enemy" as Side),
+        initiative: initiatives[key] ?? "",
       };
-    });
+    };
+    // Each copy sits right after its source, in creation order.
+    return cards.flatMap((card) => [
+      row(card.cardId, card.name, card.path, false),
+      ...copies
+        .filter((copy) => copy.sourceId === card.cardId)
+        .map((copy) => row(copy.cardId, copy.name, card.path, true)),
+    ]);
   });
 
   readonly title = computed(() => {
@@ -161,6 +184,48 @@ export class InitiativeStep {
       ...all,
       [cardId]: { checked: all[cardId]?.checked ?? this.clicked()?.cardId === cardId, side },
     }));
+  }
+
+  /**
+   * Adds a copy of a ticked creature row right after its source. The copy takes the side of the
+   * row it was made from, is ticked and has no initiative. Copies of a copy count as copies of
+   * the original sheet. Names are the source name with 2, 3, ... (the original keeps its name).
+   */
+  duplicate(cardId: string): void {
+    const row = this.creatureRows().find((r) => r.cardId === cardId);
+    if (!row?.checked) return;
+    const sourceId = this.copies().find((c) => c.cardId === cardId)?.sourceId ?? cardId;
+    const source = this.cards().find((c) => c.cardId === sourceId);
+    if (!source) return;
+    const existing = this.copies().filter((c) => c.sourceId === sourceId);
+    let number = existing.length + 2;
+    while (existing.some((c) => c.name === `${source.name} ${number}`)) number += 1;
+    this.copySeq += 1;
+    const copyId = `${sourceId}#${this.copySeq}`;
+    this.copies.update((list) => [
+      ...list,
+      { cardId: copyId, sourceId, name: `${source.name} ${number}` },
+    ]);
+    this.creatureState.update((all) => ({
+      ...all,
+      [copyId]: { checked: true, side: row.side },
+    }));
+  }
+
+  /** Removes a copy made by duplicate(). The original rows cannot be removed. */
+  removeCopy(cardId: string): void {
+    if (!this.copies().some((c) => c.cardId === cardId)) return;
+    this.copies.update((list) => list.filter((c) => c.cardId !== cardId));
+    this.creatureState.update((all) => {
+      const next = { ...all };
+      delete next[cardId];
+      return next;
+    });
+    this.initiatives.update((all) => {
+      const next = { ...all };
+      delete next[`card:${cardId}`];
+      return next;
+    });
   }
 
   /** Adds a player character typed by the master. Empty names are ignored. */

@@ -89,6 +89,21 @@
               (click)="setSide(row.cardId, 'enemy')"
             >{{ i18n.t("combat.side.enemy") }}</button>
           </div>
+          <button
+            type="button"
+            class="ghost mini"
+            [attr.aria-label]="i18n.t('combat.copy.duplicateOf', { name: row.name })"
+            [disabled]="!row.checked"
+            (click)="duplicate(row.cardId)"
+          >{{ i18n.t("combat.copy.duplicate") }}</button>
+          @if (row.copy) {
+          <button
+            type="button"
+            class="ghost mini"
+            [attr.aria-label]="i18n.t('combat.copy.removeOf', { name: row.name })"
+            (click)="removeCopy(row.cardId)"
+          >{{ i18n.t("combat.copy.remove") }}</button>
+          }
           <input
             type="number"
             step="1"

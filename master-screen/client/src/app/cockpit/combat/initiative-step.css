@@ -263,6 +263,14 @@ h3 {
   opacity: 0.45;
 }
 
+/* Small ghost button in a creature row: Duplicate and Remove of a copy. */
+.ghost.mini {
+  min-height: 32px;
+  padding: 0 var(--space-1);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
 .order h3 {
   margin-bottom: var(--space-1);
 }

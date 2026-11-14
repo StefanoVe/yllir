@@ -207,7 +207,7 @@ Error messages are plain language, in the campaign language, with no stack trace
 
 - `POST /mcp/cockpit` is the MCP endpoint (streamable HTTP, JSON responses, one server per request). It is outside `/api`.
 - Each turn gets its own random token (32 bytes, base64url). The token is valid only while that turn runs and is revoked when the turn ends. A request needs `Authorization: Bearer <token>`; without a valid token it gets 401. The `Host` header must be `127.0.0.1` or `localhost`, otherwise 403.
-- The Claude provider receives this URL and the token of its own turn only. Each turn token carries its own tool list, and the endpoint lists only the tools of that turn. A table turn gets every cockpit tool below except the combat and battle-screen ones (`combat_*`, `find_battle_map`, `battle_map_set`, `battle_move`). A combat-thread turn gets exactly `search_docs`, `read_doc`, `ledger_note`, `combat_start`, `combat_add`, `combat_update`, `combat_remove`, `combat_turn`, `combat_notes`, `combat_end`, `find_battle_map`, `battle_map_set` and `battle_move`.
+- The Claude provider receives this URL and the token of its own turn only. Each turn token carries its own tool list, and the endpoint lists only the tools of that turn. A table turn gets every cockpit tool below except the combat and battle-screen ones (`combat_*`, `find_battle_map`, `battle_map_set`, `battle_move`), with the exception of `combat_start`, which the table has too. A combat-thread turn gets exactly `search_docs`, `read_doc`, `ledger_note`, `combat_start`, `combat_add`, `combat_update`, `combat_remove`, `combat_turn`, `combat_notes`, `combat_end`, `find_battle_map`, `battle_map_set` and `battle_move`.
 
 ### Agent tools
 
@@ -248,7 +248,7 @@ Session log (framework library `session-log`):
 Music:
 - `music_play`, `music_stop`: only when the master explicitly asks.
 
-The table agent has none of the combat tools (`combat_*`) nor the battle-screen tools (`find_battle_map`, `battle_map_set`, `battle_move`): a fight starts only from the swords button of the overlay, and the master's stop button ends it.
+Among the combat tools the table agent has only `combat_start`, so it can start a fight when the master declares one (creatures are given with their sheet path as source, initiative only when the master gives it). It has none of the other combat tools (`combat_*`) nor the battle-screen tools (`find_battle_map`, `battle_map_set`, `battle_move`): damage, turns and conditions go in the combat chat. The swords button of the overlay still starts a fight too, and the master's stop button ends it.
 
 #### Combat thread tools
 

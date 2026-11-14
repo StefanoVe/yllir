@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { CockpitStore } from "./store.js";
 import { CockpitBus } from "./bus.js";
-import { CARD_TOOL_NAMES, COCKPIT_TOOL_NAMES, TABLE_TOOL_NAMES, createCockpitTools, type ToolContext } from "./tools.js";
+import { CARD_TOOL_NAMES, COCKPIT_TOOL_NAMES, COMBAT_TOOL_NAMES, TABLE_TOOL_NAMES, createCockpitTools, type ToolContext } from "./tools.js";
 import { CockpitLive } from "./live.js";
 import { createFakeFramework } from "./test-helpers/fake-framework.js";
 import { fakeKindOf } from "./fake-ports.js";
@@ -949,6 +949,33 @@ test("combat_card_set passa l'input validato a setCard e rifiuta un'azione senza
   const bad = await h.call("combat_card_set", { sheet: "Creature/Verme.md", actions: [senza] });
   expect(bad.isError).toBe(true);
   expect(calls).toHaveLength(1);
+  await h.close();
+});
+
+test("il tavolo ha solo combat_start tra gli strumenti di combattimento, e combat_start avvia lo scontro", async () => {
+  const table: readonly string[] = TABLE_TOOL_NAMES;
+  const combatOnly = ["combat_add", "combat_update", "combat_remove", "combat_turn", "combat_notes", "combat_end", "combat_condition", "find_battle_map", "battle_map_set", "battle_move", "combat_card_set"];
+  expect(table).toContain("combat_start");
+  for (const name of combatOnly) expect(table).not.toContain(name);
+  expect(COMBAT_TOOL_NAMES).toContain("combat_start");
+  for (const name of combatOnly.filter((name) => name !== "combat_card_set")) expect(COMBAT_TOOL_NAMES).toContain(name);
+  expect(COMBAT_TOOL_NAMES).not.toContain("combat_card_set");
+
+  const h = await setup(new Map());
+  h.context.tools = TABLE_TOOL_NAMES;
+  const started = h.json(
+    await h.call("combat_start", {
+      title: "Porto",
+      participants: [
+        { name: "Custode", kind: "enemy", initiative: null },
+        { name: "Ada", kind: "pc", initiative: 10 },
+      ],
+    }),
+  );
+  expect(started).toBeDefined();
+  const state = (await h.live.hydrate(await h.store.get(h.session.id))).state;
+  expect(state.combat?.title).toBe("Porto");
+  expect(state.combat?.participants.map((p) => p.name).sort()).toEqual(["Ada", "Custode"]);
   await h.close();
 });
 

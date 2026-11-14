@@ -215,7 +215,7 @@ export const COMBAT_TOOL_NAMES = [
   "find_battle_map", "battle_map_set", "battle_move",
 ] as const satisfies readonly (typeof COCKPIT_TOOL_NAMES)[number][];
 const COMBAT_ONLY = new Set<string>([
-  "combat_start", "combat_add", "combat_update", "combat_remove",
+  "combat_add", "combat_update", "combat_remove",
   "combat_turn", "combat_notes", "combat_end", "combat_condition",
   "find_battle_map", "battle_map_set", "battle_move", "combat_card_set",
 ]);
@@ -1628,7 +1628,7 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
   ][] = [
     [
       "combat_start",
-      "Usalo quando il master dichiara l’inizio dello scontro e fornisce partecipanti e iniziative. Non tirare dadi né inventare dati; per i PG registra solo nome e iniziativa. Restituisce il riepilogo dello scontro avviato.",
+      "Usalo quando il master dichiara l’inizio dello scontro e fornisce partecipanti e iniziative. Per le creature indica come source il percorso della loro scheda; non tirare dadi né inventare l’iniziativa (lascia null se il master non la dà); per i PG registra solo nome e iniziativa. Restituisce il riepilogo dello scontro avviato.",
       z
         .object({
           title: z.string().min(1).max(200),

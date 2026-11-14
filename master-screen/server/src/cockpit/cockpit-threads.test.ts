@@ -67,8 +67,11 @@ test("table tools exclude combat and battle screen, combat tools include the sha
   const table: readonly string[] = TABLE_TOOL_NAMES;
   const combat: readonly string[] = COMBAT_TOOL_NAMES;
   for (const name of table) {
+    if (name === "combat_start") continue;
     assert.ok(!name.startsWith("combat_") && !name.startsWith("battle_"), name);
   }
+  assert.ok(table.includes("combat_start"));
+  assert.ok(combat.includes("combat_start"));
   assert.ok(!table.includes("find_battle_map"));
   assert.ok(table.includes("ledger_note"));
   assert.ok(table.includes("board_place"));
@@ -82,5 +85,5 @@ test("table tools exclude combat and battle screen, combat tools include the sha
   assert.ok(!combat.includes("board_place"));
   assert.ok(!table.includes("combat_card_set"));
   assert.ok(!combat.includes("combat_card_set"));
-  assert.equal(table.length, COCKPIT_TOOL_NAMES.length - 12);
+  assert.equal(table.length, COCKPIT_TOOL_NAMES.length - 11);
 });

@@ -648,6 +648,91 @@ describe('Combat overlay', () => {
     expect(calls.filter((call) => call.url === '/api/battle' && call.method === 'GET').length).toBe(2);
     expect(root.querySelector('img.map-image')).not.toBeNull();
   });
+
+  describe('when a combat starts', () => {
+    const FIND_PROMPT = 'Find and set the battle map of the current place.';
+    const PC_ONLY: Combat = {
+      ...COMBAT,
+      participants: [{ id: 'c-mira', name: 'Mira', kind: 'pc', initiative: 14, conditions: [] }],
+    };
+
+    /** The find-map requests the agent received: the chat messages of the combat thread. */
+    function findRequests(calls: Call[]): string[] {
+      return calls
+        .filter((call) => call.url === '/api/cockpit/sessions/th1/messages')
+        .map((call) => (call.body as { text: string }).text)
+        .filter((text) => text === FIND_PROMPT);
+    }
+
+    it('asks for the battle map once when a combat with an enemy starts, even though a map is set', async () => {
+      const calls = installServer({ battle: MAP });
+      const cockpit = TestBed.inject(CockpitService);
+      cockpit.session.set(session([], null));
+      const fixture = create();
+      fixture.detectChanges();
+      await settle(fixture);
+
+      cockpit.session.set(session([], COMBAT));
+      await settle(fixture);
+
+      expect(findRequests(calls)).toEqual([FIND_PROMPT]);
+    });
+
+    it('does not ask for the battle map when the combat has only player characters', async () => {
+      const calls = installServer({ battle: null });
+      const cockpit = TestBed.inject(CockpitService);
+      cockpit.session.set(session([], null));
+      const fixture = create();
+      fixture.detectChanges();
+      await settle(fixture);
+
+      cockpit.session.set(session([], PC_ONLY));
+      await settle(fixture);
+
+      expect(findRequests(calls)).toEqual([]);
+    });
+
+    it('does not ask again when the state of the same combat changes, including its thread', async () => {
+      const calls = installServer({ battle: null });
+      const cockpit = TestBed.inject(CockpitService);
+      cockpit.session.set(session([], null));
+      const fixture = create();
+      fixture.detectChanges();
+      await settle(fixture);
+
+      cockpit.session.set(session([], COMBAT));
+      await settle(fixture);
+      cockpit.session.set(session([], { ...COMBAT, round: 3, activeId: 'c-mira', threadId: 'th1' }));
+      await settle(fixture);
+      cockpit.stateTick.update((n) => n + 1);
+      await settle(fixture);
+
+      expect(findRequests(calls)).toEqual([FIND_PROMPT]);
+    });
+
+    it('does not ask when the overlay opens on a combat that was already running', async () => {
+      const calls = installServer({ battle: null });
+      TestBed.inject(CockpitService).session.set(session([], COMBAT));
+      const fixture = create();
+      fixture.detectChanges();
+      await settle(fixture);
+
+      expect(findRequests(calls)).toEqual([]);
+    });
+
+    it('does not ask when the session loads late with a combat already running', async () => {
+      const calls = installServer({ battle: null });
+      const cockpit = TestBed.inject(CockpitService);
+      const fixture = create();
+      fixture.detectChanges();
+      await settle(fixture);
+
+      cockpit.session.set(session([], COMBAT));
+      await settle(fixture);
+
+      expect(findRequests(calls)).toEqual([]);
+    });
+  });
 });
 
 describe('CombatOverlayService', () => {
