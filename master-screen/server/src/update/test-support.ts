@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { makeCampaign } from '../live/test-support.js';
+import type { OpenSession } from '../../../shared/src/types.js';
 import type { UpdateDeps } from './service.js';
 import { NEWS_DOWNLOAD_PREFIX, NEWS_LIST_URL, PLUGIN_MANIFEST_URL } from './source.js';
 
@@ -14,8 +15,8 @@ export interface FakeWorld {
   installed: string;
   news: string;
   offline: boolean;
-  turn: boolean;
-  live: boolean;
+  /** The sessions the update would close. closeSessions empties it. */
+  sessions: OpenSession[];
   installPath: string;
 }
 
@@ -28,6 +29,8 @@ export interface FakeUpdate {
   shutdowns: () => number;
   logs: string[];
   order: string[];
+  /** The ids of the sessions closeSessions closed, in order. */
+  closed: string[];
   campaignRoot: string;
   installDir: string;
 }
@@ -52,8 +55,7 @@ export function fakeUpdate(): FakeUpdate {
     installed: '1.1.0',
     news: 'Something new for the master.',
     offline: false,
-    turn: false,
-    live: false,
+    sessions: [],
     installPath: installDir,
   };
   const execs: Array<{ file: string; args: string[] }> = [];
@@ -61,6 +63,7 @@ export function fakeUpdate(): FakeUpdate {
   const logs: string[] = [];
   const order: string[] = [];
   const clock = { now: 1_000_000 };
+  const closed: string[] = [];
   let shutdowns = 0;
   const deps: UpdateDeps = {
     campaignRoot: root,
@@ -83,8 +86,12 @@ export function fakeUpdate(): FakeUpdate {
     findClaude: () => '/fake/bin/claude',
     installedVersion: async () => world.installed,
     language: () => 'en',
-    liveOpen: async () => world.live,
-    chatTurnOpen: () => world.turn,
+    openSessions: async () => world.sessions.map((session) => ({ ...session })),
+    closeSessions: async () => {
+      order.push('close');
+      closed.push(...world.sessions.map((session) => session.id));
+      world.sessions = [];
+    },
     restart: (opts) => {
       restarts.push(opts);
       order.push('restart');
@@ -104,6 +111,7 @@ export function fakeUpdate(): FakeUpdate {
     shutdowns: () => shutdowns,
     logs,
     order,
+    closed,
     campaignRoot: root,
     installDir,
   };

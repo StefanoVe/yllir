@@ -652,6 +652,30 @@ export class TurnManager {
     }
     throw new Error("Turno non attivo o non trovato");
   }
+  /**
+   * Cancels every queued and running turn of every session. Unlike close(), the manager
+   * stays open: new turns can be submitted afterwards. Never throws.
+   */
+  async cancelAll(): Promise<void> {
+    try {
+      // A few passes: a turn submitted while the previous pass was cancelling is caught too.
+      for (let pass = 0; pass < 3; pass++) {
+        const sessionIds = new Set([...this.queues.keys(), ...this.running.keys()]);
+        if (!sessionIds.size) return;
+        for (const sessionId of sessionIds) {
+          // Queued turns first, so the pump has nothing left to start when the running one ends.
+          const queued = (this.queues.get(sessionId) ?? []).map((job) => job.turnId);
+          for (const turnId of queued) {
+            await this.cancel(sessionId, turnId).catch(() => {});
+          }
+          const active = this.running.get(sessionId);
+          if (active) await this.cancel(sessionId, active.turnId).catch(() => {});
+        }
+      }
+    } catch (error) {
+      console.error("[cockpit] annullamento turni:", error);
+    }
+  }
   async recover() {
     for (const summary of await this.deps.store.list()) {
       const session = await this.deps.store.get(summary.id);

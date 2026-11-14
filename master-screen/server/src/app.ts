@@ -62,6 +62,7 @@ export function createApp(ctx: Ctx): express.Express {
   // middleware, so the Host, Origin and security headers apply to it too.
   const { cockpit, battle } = createCampaignCockpit(ctx);
   ctx.onClose(() => cockpit.close());
+  ctx.cancelCockpitTurns = () => cockpit.cancelAllTurns();
   app.use(['/api/cockpit', '/mcp/cockpit'], webHandlerMiddleware((req) => cockpit.handle(req)));
   app.use(express.json({ limit: '64kb' }));
 

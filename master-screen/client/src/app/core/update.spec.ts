@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { UpdateStatus } from '@shared/types';
+import type { OpenSession, UpdateStatus } from '@shared/types';
 import { RESTART_GIVE_UP_MS, UPDATE_POLL_MS, UpdateService } from './update';
 
 function json(status: number, body: unknown): Response {
@@ -8,12 +8,12 @@ function json(status: number, body: unknown): Response {
 }
 
 function status(partial: Partial<UpdateStatus> = {}): UpdateStatus {
-  return { state: 'idle', news: null, snoozed: false, canApply: true, blockedReason: null, ...partial };
+  return { state: 'idle', news: null, snoozed: false, canApply: true, blockedReason: null, sessions: [], ...partial };
 }
 
 /** A fake server: `route` answers each call by method and path. Throwing from it simulates a dropped connection. */
-function serve(route: (method: string, path: string) => Response | Promise<Response>): ReturnType<typeof vi.fn> {
-  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => route(init?.method ?? 'GET', url.replace(/^\/api/, '')));
+function serve(route: (method: string, path: string, init?: RequestInit) => Response | Promise<Response>): ReturnType<typeof vi.fn> {
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => route(init?.method ?? 'GET', url.replace(/^\/api/, ''), init));
   vi.stubGlobal('fetch', fetchMock);
   return fetchMock;
 }
@@ -91,17 +91,86 @@ describe('UpdateService', () => {
   });
 
   it('a refused apply (409) keeps the state and shows the server sentence as the reason', async () => {
-    current = status({ state: 'available', canApply: false, blockedReason: 'live-open' });
+    current = status({ state: 'available' });
     await start();
     serve((method, path) => {
       if (method === 'POST' && path === '/update/apply') return json(409, { error: 'A live table is open: close it first' });
       return json(200, current);
     });
-    await service.apply();
+    await service.apply(false);
     expect(service.actionError()).toBe('A live table is open: close it first');
     expect(service.status()?.state).toBe('available');
     await vi.advanceTimersByTimeAsync(UPDATE_POLL_MS * 3);
     expect(service.status()?.state).toBe('available');
+  });
+
+  describe('apply with open sessions', () => {
+    const SESSIONS: OpenSession[] = [
+      { kind: 'live', id: 'l1', title: 'Tavolo del martedì' },
+      { kind: 'chat', id: 'c1', title: 'Chat' },
+    ];
+
+    it('requestApply with sessions shows the confirmation and does not call the API until confirmed', async () => {
+      current = status({ state: 'available', sessions: SESSIONS });
+      await start();
+      const fetchMock = serve((method, path) => (method === 'GET' && path === '/update' ? json(200, current) : json(202, { ok: true })));
+      await service.load();
+
+      service.requestApply();
+      expect(service.confirming()).toBe(true);
+      expect(fetchMock.mock.calls.some((call) => call[1]?.method === 'POST')).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(UPDATE_POLL_MS * 2);
+      expect(fetchMock.mock.calls.some((call) => call[1]?.method === 'POST')).toBe(false);
+      expect(service.status()?.state).toBe('available');
+    });
+
+    it('cancelling the confirmation sends nothing and leaves the offer as it was', async () => {
+      current = status({ state: 'available', sessions: SESSIONS });
+      await start();
+      const fetchMock = serve((method, path) => (method === 'GET' && path === '/update' ? json(200, current) : json(202, { ok: true })));
+      service.requestApply();
+      service.cancelApply();
+      expect(service.confirming()).toBe(false);
+      expect(fetchMock.mock.calls.some((call) => call[1]?.method === 'POST')).toBe(false);
+    });
+
+    it('confirming sends the apply with confirmClose true, and the update then runs', async () => {
+      current = status({ state: 'available', sessions: SESSIONS });
+      await start();
+      const bodies: unknown[] = [];
+      serve((method, path, init) => {
+        if (method === 'POST' && path === '/update/apply') {
+          bodies.push(JSON.parse(String(init?.body)));
+          return json(202, { ok: true });
+        }
+        return json(200, current);
+      });
+      service.requestApply();
+      await service.apply(true);
+      expect(bodies).toEqual([{ confirmClose: true }]);
+      expect(service.confirming()).toBe(false);
+      expect(service.status()?.state).toBe('updating');
+      expect(service.status()?.sessions).toEqual([]);
+    });
+
+    it('without open sessions requestApply applies at once with confirmClose false', async () => {
+      current = status({ state: 'available', sessions: [] });
+      await start();
+      const bodies: unknown[] = [];
+      serve((method, path, init) => {
+        if (method === 'POST' && path === '/update/apply') {
+          bodies.push(JSON.parse(String(init?.body)));
+          return json(202, { ok: true });
+        }
+        return json(200, current);
+      });
+      service.requestApply();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(service.confirming()).toBe(false);
+      expect(bodies).toEqual([{ confirmClose: false }]);
+      expect(service.status()?.state).toBe('updating');
+    });
   });
 
   it('an accepted apply shows the update at once and polls every 2 s until the server is idle again', async () => {

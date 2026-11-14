@@ -186,6 +186,32 @@ test("cancel annulla sia un turno queued sia quello running", async () => {
   expect(b.turn.status).toBe("cancelled");
 });
 
+test("cancelAll annulla i turni di tutte le sessioni e il gestore resta utilizzabile", async () => {
+  const { provider, session, store, turns } = await setup([{ type: "block" }], {
+    idleTimeoutMs: 1000,
+    turnTimeoutMs: 3000,
+  });
+  const other = await store.create({
+    title: "Altra",
+    provider: provider.id,
+    model: provider.defaultModel,
+  });
+  const first = await turns.submit(session.id, "uno");
+  const second = await turns.submit(other.id, "due");
+  await waitForTurn(store, session.id, first.turnId, ["running"]);
+  await waitForTurn(store, other.id, second.turnId, ["running"]);
+  await turns.cancelAll();
+  const a = await waitForTurn(store, session.id, first.turnId, ["cancelled"]);
+  const b = await waitForTurn(store, other.id, second.turnId, ["cancelled"]);
+  expect(a.turn.status).toBe("cancelled");
+  expect(b.turn.status).toBe("cancelled");
+  expect(turns.hasRunningSession(session.id)).toBe(false);
+  provider.steps = [{ type: "event", event: { type: "text", text: "di nuovo" } }];
+  const next = await turns.submit(session.id, "ancora");
+  const done = await waitForTurn(store, session.id, next.turnId, ["done", "error"]);
+  expect(done.turn.status).toBe("done");
+});
+
 test("non ripete con resume se il primo tentativo ha già applicato azioni", async () => {
   const kinds: string[] = [];
   const tool: FakeStep = {

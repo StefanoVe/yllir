@@ -6,8 +6,10 @@ export interface UpdateTexts {
   offline: string;
   noUpdate: string;
   checkFirst: string;
-  turnRunning: string;
-  liveOpen: string;
+  /** The 409 when open sessions must be confirmed before the update closes them. */
+  confirmClose: string;
+  /** The title of a chat conversation that has no title yet. */
+  chatTitle: string;
 }
 
 export const UPDATE_TEXTS: Record<Lang, UpdateTexts> = {
@@ -16,15 +18,15 @@ export const UPDATE_TEXTS: Record<Lang, UpdateTexts> = {
     offline: 'The update cannot be checked right now. Check your connection and try again.',
     noUpdate: 'There is no update to apply right now.',
     checkFirst: 'The last update did not work. Check for updates again first.',
-    turnRunning: 'The assistant is still answering. Wait for it to finish, then update.',
-    liveOpen: 'A live session is open. End it, then update.',
+    confirmClose: 'The update will close the open sessions: confirm to continue.',
+    chatTitle: 'Chat',
   },
   it: {
     alreadyRunning: "Un aggiornamento è già in corso.",
     offline: 'Non riesco a controllare gli aggiornamenti in questo momento. Controlla la connessione e riprova.',
     noUpdate: 'Al momento non c\'è nessun aggiornamento da applicare.',
     checkFirst: "L'ultimo aggiornamento non è riuscito. Controlla di nuovo gli aggiornamenti.",
-    turnRunning: "L'assistente sta ancora rispondendo. Aspetta che finisca, poi aggiorna.",
-    liveOpen: 'Una sessione live è aperta. Chiudila, poi aggiorna.',
+    confirmClose: "L'aggiornamento chiuderà le sessioni aperte: conferma per continuare.",
+    chatTitle: 'Chat',
   },
 };

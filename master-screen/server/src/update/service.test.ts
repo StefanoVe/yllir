@@ -3,13 +3,18 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { describe, it } from 'node:test';
 import { NOTICE_RELATIVE_PATH } from './notice.js';
-import { CHECK_INTERVAL_MS, UpdateService } from './service.js';
+import { CHECK_INTERVAL_MS, createUpdateService, UpdateService } from './service.js';
 import { fakeUpdate, settle, type FakeUpdate } from './test-support.js';
+import type { OpenSession } from '../../../shared/src/types.js';
+import { createCtx } from '../context.js';
+import { makeCampaign } from '../live/test-support.js';
 import { PLUGIN_MANIFEST_URL } from './source.js';
 import { UPDATE_TEXTS } from './text.js';
 
 const EN = UPDATE_TEXTS.en;
-const STATUS_KEYS = ['blockedReason', 'canApply', 'news', 'snoozed', 'state'];
+const STATUS_KEYS = ['blockedReason', 'canApply', 'news', 'sessions', 'snoozed', 'state'];
+const LIVE: OpenSession = { kind: 'live', id: '2026-11-14', title: 'Night in the crypt' };
+const CHAT: OpenSession = { kind: 'chat', id: 'conv-1', title: 'Chat' };
 
 let fake: FakeUpdate;
 
@@ -23,7 +28,14 @@ describe('status', () => {
     const svc = service();
     fake.world.installed = '1.2.0';
     const status = await svc.check();
-    assert.deepEqual(status, { state: 'idle', news: null, snoozed: false, canApply: false, blockedReason: null });
+    assert.deepEqual(status, {
+      state: 'idle',
+      news: null,
+      snoozed: false,
+      canApply: false,
+      blockedReason: null,
+      sessions: [],
+    });
   });
 
   it('is available with the news, and never carries a version number', async () => {
@@ -33,6 +45,7 @@ describe('status', () => {
     assert.equal(status.news, 'Something new for the master.');
     assert.equal(status.canApply, true);
     assert.equal(status.blockedReason, null);
+    assert.deepEqual(status.sessions, []);
     assert.deepEqual(Object.keys(status).sort(), STATUS_KEYS);
     assert.ok(!JSON.stringify(status).includes('1.2.0'));
   });
@@ -63,17 +76,18 @@ describe('status', () => {
       snoozed: false,
       canApply: false,
       blockedReason: 'offline',
+      sessions: [],
     });
     assert.deepEqual(fake.logs, []);
   });
 
-  it('a running chat turn or an open live session blocks the update, with the reason', async () => {
+  it('lists the open sessions, and open sessions do not block the update', async () => {
     const svc = service();
-    fake.world.turn = true;
-    assert.deepEqual(await svc.check().then((s) => [s.canApply, s.blockedReason]), [false, 'turn-running']);
-    fake.world.turn = false;
-    fake.world.live = true;
-    assert.deepEqual(await svc.status().then((s) => [s.canApply, s.blockedReason]), [false, 'live-open']);
+    fake.world.sessions = [LIVE, CHAT];
+    const status = await svc.check();
+    assert.deepEqual(status.sessions, [LIVE, CHAT]);
+    assert.equal(status.canApply, true);
+    assert.equal(status.blockedReason, null);
   });
 
   it('checks at most once an hour, and a forced check always reads the source', async () => {
@@ -144,16 +158,28 @@ describe('apply refusals', () => {
     assert.deepEqual(await svc.apply(), { ok: false, error: EN.offline });
   });
 
-  it('refuses while a chat turn runs, and while a live session is open, without starting', async () => {
+  it('without confirmation, open sessions answer with them and nothing is closed or started', async () => {
     const svc = service();
-    fake.world.turn = true;
+    fake.world.sessions = [LIVE, CHAT];
     await svc.check();
-    assert.deepEqual(await svc.apply(), { ok: false, error: EN.turnRunning });
-    fake.world.turn = false;
-    fake.world.live = true;
-    assert.deepEqual(await svc.apply(), { ok: false, error: EN.liveOpen });
+    assert.deepEqual(await svc.apply(), { ok: false, error: EN.confirmClose, sessions: [LIVE, CHAT] });
+    assert.deepEqual(fake.closed, []);
     assert.equal(fake.execs.length, 0);
+    assert.equal(fake.restarts.length, 0);
     assert.equal(fake.shutdowns(), 0);
+    assert.deepEqual(fake.world.sessions, [LIVE, CHAT], 'the sessions stay open');
+    // A later refusal does not leave the update half started: the next apply can still be confirmed.
+    assert.equal((await svc.status()).state, 'available');
+  });
+
+  it('a second confirmed apply while the first runs is refused as already running', async () => {
+    const svc = service();
+    fake.world.sessions = [CHAT];
+    await svc.check();
+    const first = await svc.apply(() => {}, { confirmClose: true });
+    assert.equal(first.ok, true);
+    assert.deepEqual(await svc.apply(() => {}, { confirmClose: true }), { ok: false, error: EN.alreadyRunning });
+    if (first.ok) await first.done;
   });
 
   it('refuses a second update while one runs', async () => {
@@ -207,6 +233,45 @@ describe('apply', () => {
     ]);
     assert.equal(fake.shutdowns(), 1);
     assert.equal((await svc.status()).state, 'restarting');
+  });
+
+  it('with confirmation, the sessions are closed first, then the update runs as usual', async () => {
+    const svc = service();
+    fake.world.sessions = [LIVE, CHAT];
+    await svc.check();
+    const accepted: string[] = [];
+    const result = await svc.apply(
+      () => {
+        accepted.push('202');
+        fake.order.push('202');
+      },
+      { confirmClose: true },
+    );
+    assert.equal(result.ok, true);
+    if (!result.ok) return;
+    await result.done;
+    assert.deepEqual(accepted, ['202']);
+    assert.deepEqual(fake.closed, [LIVE.id, CHAT.id]);
+    assert.deepEqual(fake.order, [
+      '202',
+      'close',
+      'exec plugin update yllir@yllir --json',
+      'exec plugin list --json',
+      'restart',
+      'shutdown',
+    ]);
+    assert.equal(fake.shutdowns(), 1);
+  });
+
+  it('with no open sessions, the update runs directly, without closing anything', async () => {
+    const svc = service();
+    await svc.check();
+    const result = await svc.apply(() => {}, { confirmClose: true });
+    assert.equal(result.ok, true);
+    if (result.ok) await result.done;
+    assert.deepEqual(fake.closed, []);
+    assert.ok(!fake.order.includes('close'));
+    assert.equal(fake.shutdowns(), 1);
   });
 
   it('a failed plugin update is failed: nothing restarts, the server keeps running', async () => {
@@ -275,5 +340,24 @@ describe('apply', () => {
     assert.equal(retry.ok, true);
     if (retry.ok) await retry.done;
     assert.equal(fake.shutdowns(), 1);
+  });
+});
+
+describe('closeSessions', () => {
+  it('calls the cockpit cancel hook, and does nothing extra when the hook is unset', async () => {
+    const root = makeCampaign();
+    const ctx = createCtx({ campaignRoot: root, frameworkRoot: root, port: 0, log: () => {} });
+    let cancelled = 0;
+    ctx.cancelCockpitTurns = () => {
+      cancelled += 1;
+    };
+    const svc = createUpdateService(ctx, { findClaude: () => null });
+    const deps = (svc as unknown as { deps: { closeSessions(): Promise<void> } }).deps;
+    await deps.closeSessions();
+    assert.equal(cancelled, 1);
+
+    delete ctx.cancelCockpitTurns;
+    await deps.closeSessions();
+    assert.equal(cancelled, 1);
   });
 });

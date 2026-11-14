@@ -341,7 +341,10 @@
       @if (updates.status(); as update) {
         @switch (update.state) {
           @case ('idle') {
-            <p class="update-line">{{ t('update.upToDate') }}</p>
+            <p class="update-line">
+              <lucide-angular [img]="icons.Check" [size]="16" aria-hidden="true" />
+              <span>{{ t('update.upToDate') }}</span>
+            </p>
           }
           @case ('available') {
             <p class="update-line update-title">{{ t('update.available') }}</p>
@@ -361,11 +364,26 @@
                 }
               </div>
             }
-            <div class="update-actions">
-              <button type="button" class="update-btn primary" [disabled]="!update.canApply" (click)="applyUpdate()">{{ t('update.now') }}</button>
-              <button type="button" class="update-btn" [disabled]="update.snoozed" (click)="snoozeUpdate()">{{ t('update.later') }}</button>
-            </div>
-            @if (!update.canApply && update.blockedReason) {
+            @if (updates.confirming()) {
+              <div class="update-confirm" role="group" [attr.aria-labelledby]="'h-update-confirm'">
+                <p id="h-update-confirm" class="update-line">{{ t('update.confirm.intro') }}</p>
+                <ul class="update-sessions">
+                  @for (session of update.sessions; track session.kind + session.id) {
+                    <li>{{ session.title }}</li>
+                  }
+                </ul>
+                <div class="update-actions">
+                  <button type="button" class="update-btn primary" (click)="confirmUpdate()">{{ t('update.confirm.go') }}</button>
+                  <button type="button" class="update-btn" (click)="cancelUpdate()">{{ t('update.cancel') }}</button>
+                </div>
+              </div>
+            } @else {
+              <div class="update-actions">
+                <button type="button" class="update-btn primary" (click)="applyUpdate()">{{ t('update.now') }}</button>
+                <button type="button" class="update-btn" [disabled]="update.snoozed" (click)="snoozeUpdate()">{{ t('update.later') }}</button>
+              </div>
+            }
+            @if (update.blockedReason) {
               <p class="muted">{{ blockedText(update.blockedReason) }}</p>
             }
           }
@@ -391,7 +409,7 @@
             }
           }
           @case ('failed') {
-            <p class="error" role="alert">
+            <p class="update-line update-failed" role="alert">
               <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
               <span>{{ t('update.failed') }}</span>
             </p>

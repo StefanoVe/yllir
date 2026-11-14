@@ -1,0 +1,48 @@
+@if (visible()) {
+  <section class="notice" [attr.role]="confirm() ? 'dialog' : 'region'" aria-labelledby="update-notice-title"
+           (keydown.escape)="onEscape()">
+    <h2 id="update-notice-title" class="notice-title" #title tabindex="-1">
+      {{ t(status()?.state === 'available' ? 'update.title' : 'update.section') }}
+    </h2>
+
+    @if (confirm()) {
+      <p class="notice-text" id="update-notice-intro">{{ t('update.confirm.intro') }}</p>
+      <ul class="notice-sessions" [attr.aria-label]="t('update.confirm.intro')">
+        @for (session of sessions(); track session.kind + session.id) {
+          <li>{{ session.title }}</li>
+        }
+      </ul>
+      <div class="notice-actions">
+        <button type="button" class="btn primary" (click)="confirmApply()">{{ t('update.confirm.go') }}</button>
+        <button type="button" class="btn" (click)="cancel()">{{ t('update.cancel') }}</button>
+      </div>
+    } @else if (status()?.state === 'available') {
+      @if (preview() !== '') {
+        <p class="notice-text clamp">{{ preview() }}</p>
+      }
+      @if (updates.actionError(); as message) {
+        <p class="notice-error" role="alert">{{ message }}</p>
+      }
+      <div class="notice-actions">
+        <button type="button" class="btn primary" (click)="ask()">{{ t('update.now') }}</button>
+        <button type="button" class="btn" (click)="later()">{{ t('update.later') }}</button>
+      </div>
+    } @else if (status()?.state === 'failed') {
+      <p class="notice-error" role="alert">
+        <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
+        <span>{{ t('update.failed') }}</span>
+      </p>
+      <div class="notice-actions">
+        <button type="button" class="btn primary" (click)="retry()">{{ t('update.retry') }}</button>
+      </div>
+    } @else {
+      <p class="notice-progress" role="status">
+        <lucide-angular [img]="icons.LoaderCircle" [size]="16" aria-hidden="true" class="spin" />
+        <span>{{ t(status()?.state === 'restarting' ? 'update.restarting' : 'update.updating') }}</span>
+      </p>
+      @if (updates.reopenNotice()) {
+        <p class="notice-text">{{ t('update.reopen') }}</p>
+      }
+    }
+  </section>
+}

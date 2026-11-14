@@ -42,7 +42,7 @@ export function registerUpdateRoutes(app: Router, ctx: Ctx, options: UpdateRoute
 
   app.post(
     '/update/apply',
-    wrap(async (_req, res) => {
+    wrap(async (req, res) => {
       // The campaign alignment owns the campaign while it runs or waits for the master.
       const blocked = align.applyBlocked();
       if (blocked !== null) {
@@ -50,10 +50,17 @@ export function registerUpdateRoutes(app: Router, ctx: Ctx, options: UpdateRoute
         return;
       }
       // The 202 is sent before the update starts, so the shutdown that follows a restart never cuts it off.
-      const result = await service.apply(() => {
-        res.status(202).json({ ok: true });
-      });
-      if (!result.ok) res.status(409).json({ error: result.error });
+      // With open sessions and no confirmClose, the 409 lists them and nothing is closed or started.
+      const confirmClose = req.body?.confirmClose === true;
+      const result = await service.apply(
+        () => {
+          res.status(202).json({ ok: true });
+        },
+        { confirmClose },
+      );
+      if (result.ok) return;
+      if (result.sessions) res.status(409).json({ error: result.error, sessions: result.sessions });
+      else res.status(409).json({ error: result.error });
     }),
   );
 

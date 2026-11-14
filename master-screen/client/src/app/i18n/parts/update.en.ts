@@ -1,13 +1,15 @@
-// English keys of the update notice and section (settings and rail). Spread into en.ts.
+// English keys of the update notice and section (settings and the top notice). Spread into en.ts.
 export const updateEn = {
   'update.section': 'Update',
+  'update.title': 'Update available',
   'update.upToDate': 'Everything is up to date',
   'update.available': 'An update for Yllir is ready.',
   'update.news': "What's new",
-  'update.now': 'Update now',
+  'update.now': 'Update',
   'update.later': 'Later',
-  'update.blocked.turnRunning': 'The assistant is still working: wait for it to finish',
-  'update.blocked.liveOpen': 'A live table is open: close it first',
+  'update.cancel': 'Cancel',
+  'update.confirm.intro': 'The update will close these sessions:',
+  'update.confirm.go': 'Close the sessions and update',
   'update.blocked.offline': 'No connection: the update needs the internet',
   'update.updating': 'Updating, it takes a few seconds',
   'update.restarting': 'Almost done, reopening',
@@ -15,6 +17,7 @@ export const updateEn = {
   'update.retry': 'Try again',
   'update.offline': 'No connection. Yllir keeps working as it is.',
   'update.reopen': 'The page will reopen by itself; if it does not, close this window and open Yllir again.',
+  'update.card.dialog': 'Yllir update',
   'update.align.title': 'Updating your campaign',
   'update.align.working': 'Wait, I am working',
   'update.align.answer': 'Answer the question',

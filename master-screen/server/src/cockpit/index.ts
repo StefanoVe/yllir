@@ -237,6 +237,8 @@ export function createCockpit(options: CreateCockpitOptions) {
       if (url.pathname === "/mcp/cockpit") return mcp(request);
       return api(request);
     },
+    /** Cancels the running and queued turns of every session; the table keeps working afterwards. */
+    cancelAllTurns: () => turns.cancelAll(),
     async close() {
       unwatch?.();
       cards.close();

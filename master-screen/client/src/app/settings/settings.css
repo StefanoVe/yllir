@@ -613,7 +613,7 @@ summary {
   }
 }
 
-/* Update */
+/* Update: the state line, the news, and the optional confirmation with the sessions it would close. */
 .update-line {
   display: flex;
   align-items: center;
@@ -622,7 +622,11 @@ summary {
 }
 
 .update-title {
-  font-weight: 500;
+  font-weight: 600;
+}
+
+.update-failed {
+  color: var(--color-danger);
 }
 
 .update-news {
@@ -635,6 +639,20 @@ summary {
   margin: 0 0 var(--space-1);
 }
 
+.update-confirm {
+  margin-top: var(--space-2);
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.update-sessions {
+  margin: var(--space-1) 0 0;
+  padding: 0 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
 .update-actions {
   display: flex;
   flex-wrap: wrap;
@@ -642,30 +660,30 @@ summary {
   margin-top: var(--space-2);
 }
 
-/* Square buttons: a filled primary, and a secondary with only a border. */
 .update-btn {
   min-height: 40px;
   padding: 0 var(--space-2);
-  border: 1px solid var(--color-text);
-  border-radius: 0;
-  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
   color: var(--color-text);
   font: inherit;
+  font-weight: 600;
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  transition: background-color var(--transition-fast);
 }
 
 .update-btn.primary {
-  background: var(--color-text);
-  color: var(--color-surface);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 
 .update-btn:hover:not(:disabled) {
-  background: var(--color-surface-2);
+  background: var(--color-selection);
 }
 
 .update-btn.primary:hover:not(:disabled) {
-  background: var(--color-text-muted);
+  background: var(--color-accent-hover);
 }
 
 .update-btn:focus-visible {

@@ -8,10 +8,8 @@ export const UPDATE_POLL_MS = 2000;
 /** While the server restarts, failed reads are expected; after this long without an answer, the page says it reopens by itself (ms). */
 export const RESTART_GIVE_UP_MS = 60_000;
 
-/** Keys of the reason sentences shown next to a disabled "Update now" button. */
+/** Keys of the reason sentences of a blocked update. */
 export const BLOCKED_REASON_KEYS: Record<NonNullable<UpdateStatus['blockedReason']>, TranslationKey> = {
-  'turn-running': 'update.blocked.turnRunning',
-  'live-open': 'update.blocked.liveOpen',
   offline: 'update.blocked.offline',
 };
 
@@ -31,10 +29,15 @@ export class UpdateService {
   readonly checking = signal(false);
   /** Plain sentence from the last refused or failed action (for example the 409 of "Update now"). */
   readonly actionError = signal<string | null>(null);
+  /**
+   * True while the master is asked to confirm the update: open sessions would be closed. Shared by the
+   * notice and the settings, so both show the same confirmation. Nothing is sent to the server while true.
+   */
+  readonly confirming = signal(false);
   /** True once a restart has gone on for a while, or the connection came back after it: the page will reopen by itself. */
   readonly reopenNotice = signal(false);
 
-  /** The notice in the rail: an update is ready and the master has not said "later". */
+  /** The notice: an update is ready and the master has not said "later". */
   readonly showNotice = computed(() => {
     const status = this.status();
     return status?.state === 'available' && !status.snoozed;
@@ -95,12 +98,27 @@ export class UpdateService {
   }
 
   /**
-   * "Update now" from the available state. A 409 keeps the state and shows the server's sentence
-   * as the reason. On 202 the update is shown as running at once and followed by polling.
+   * "Update" from the available state. With open sessions the master is asked first: the call is made
+   * only after apply(true). Without open sessions the update starts at once.
    */
-  async apply(): Promise<void> {
+  requestApply(): void {
+    if (this.hasOpenSessions()) this.confirming.set(true);
+    else void this.apply(false);
+  }
+
+  /** "Cancel" of the confirmation: back to the update offer, nothing is sent. */
+  cancelApply(): void {
+    this.confirming.set(false);
+  }
+
+  /**
+   * Starts the update. `confirmClose` true is the master's yes to closing the open sessions. A 409 keeps the
+   * state and shows the server's sentence; on 202 the update is shown as running at once and followed by polling.
+   */
+  async apply(confirmClose = false): Promise<void> {
     try {
-      await this.api.applyUpdate();
+      await this.api.applyUpdate(confirmClose);
+      this.confirming.set(false);
       this.actionError.set(null);
       this.restartSince = null;
       this.reopenNotice.set(false);
@@ -111,6 +129,7 @@ export class UpdateService {
         snoozed: false,
         canApply: false,
         blockedReason: null,
+        sessions: [],
       });
     } catch (failure) {
       this.actionError.set(this.messageOf(failure));
@@ -124,7 +143,12 @@ export class UpdateService {
    */
   async retry(): Promise<void> {
     await this.check();
-    await this.apply();
+    if (this.hasOpenSessions()) this.confirming.set(true);
+    else await this.apply(false);
+  }
+
+  private hasOpenSessions(): boolean {
+    return (this.status()?.sessions.length ?? 0) > 0;
   }
 
   private applyStatus(next: UpdateStatus): void {

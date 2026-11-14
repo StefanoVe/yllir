@@ -54,6 +54,8 @@ export interface Ctx {
   onTurn(listener: (turn: Turn) => void): void;
   /** The chat service of the campaign (its store and turn runner), set when the chat routes are registered; null before. */
   chat: ChatService | null;
+  /** Cancels the running and queued cockpit (live table) turns; set by app.ts when the cockpit exists, unset before. */
+  cancelCockpitTurns?: () => Promise<void> | void;
   /** Asks the process to shut down gracefully (used by POST /api/shutdown). */
   requestShutdown(): void;
   /** Registers a cleanup that runs once at shutdown, last registered first. */

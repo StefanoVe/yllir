@@ -143,9 +143,12 @@ export class ApiService {
     return this.request('POST', '/update/snooze');
   }
 
-  /** Starts the update. Rejects with 409 and a plain sentence when it cannot start yet. */
-  applyUpdate(): Promise<{ ok: true }> {
-    return this.request('POST', '/update/apply');
+  /**
+   * Starts the update. Rejects with 409 when open sessions need the master's yes: the call is then repeated
+   * with `confirmClose` true, which closes them first.
+   */
+  applyUpdate(confirmClose = false): Promise<{ ok: true }> {
+    return this.request('POST', '/update/apply', { body: { confirmClose } });
   }
 
   /** The campaign alignment after an update: what state it is in and which conversation shows it. */

@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import express from 'express';
 import { after, describe, it } from 'node:test';
 import type { AlignStatus, Turn, UpdateStatus } from '../../../shared/src/types.js';
@@ -15,6 +17,7 @@ import { UPDATE_TEXTS } from '../update/text.js';
 import { registerUpdateRoutes } from './update.js';
 
 const EN = UPDATE_TEXTS.en;
+const LIVE_ID = '2026-11-14';
 const servers: RunningServer[] = [];
 after(async () => {
   for (const s of servers) await s.close();
@@ -66,7 +69,7 @@ describe('update routes', () => {
     assert.equal(status.state, 'available');
     assert.equal(status.canApply, true);
     assert.equal(status.news, 'Something new for the master.');
-    assert.deepEqual(Object.keys(status).sort(), ['blockedReason', 'canApply', 'news', 'snoozed', 'state']);
+    assert.deepEqual(Object.keys(status).sort(), ['blockedReason', 'canApply', 'news', 'sessions', 'snoozed', 'state']);
   });
 
   it('POST snooze answers the status with snoozed true', async () => {
@@ -103,37 +106,125 @@ describe('update routes', () => {
   });
 });
 
-describe('update routes with the real chat turn tracking', () => {
-  function turn(state: Turn['state']): Turn {
+describe('update routes with the open sessions', () => {
+  it('POST apply answers 409 with the sessions and closes nothing, then confirmed it closes them and runs', async () => {
+    const fake = fakeUpdate();
+    fake.world.sessions = [
+      { kind: 'live', id: 'session-a', title: 'Night in the crypt' },
+      { kind: 'chat', id: 'conv-1', title: 'Chat' },
+    ];
+    const server = await serve(new UpdateService(fake.deps));
+    const status = (await call(server, 'POST', '/update/check')).json as UpdateStatus;
+    assert.deepEqual(status.sessions, fake.world.sessions);
+
+    const refused = await call(server, 'POST', '/update/apply');
+    assert.equal(refused.status, 409, refused.text);
+    assert.deepEqual(refused.json, { error: EN.confirmClose, sessions: fake.world.sessions });
+    assert.deepEqual(fake.closed, []);
+    assert.equal(fake.execs.length, 0);
+
+    const accepted = await request(server.port, {
+      method: 'POST',
+      path: '/api/update/apply',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ confirmClose: true }),
+    });
+    assert.equal(accepted.status, 202, accepted.text);
+    assert.deepEqual(accepted.json, { ok: true });
+    await settle();
+    assert.deepEqual(fake.closed, ['session-a', 'conv-1']);
+    assert.deepEqual(fake.order.slice(0, 2), ['close', 'exec plugin update yllir@yllir --json']);
+    assert.equal(fake.shutdowns(), 1);
+  });
+
+  it('POST apply with no open sessions runs directly', async () => {
+    const fake = fakeUpdate();
+    const server = await serve(new UpdateService(fake.deps));
+    await call(server, 'POST', '/update/check');
+    const res = await call(server, 'POST', '/update/apply');
+    assert.equal(res.status, 202, res.text);
+    await settle();
+    assert.deepEqual(fake.closed, []);
+    assert.equal(fake.shutdowns(), 1);
+  });
+
+  it('a confirmClose that is not true is treated as no confirmation', async () => {
+    const fake = fakeUpdate();
+    fake.world.sessions = [{ kind: 'chat', id: 'conv-1', title: 'Chat' }];
+    const server = await serve(new UpdateService(fake.deps));
+    await call(server, 'POST', '/update/check');
+    const res = await request(server.port, {
+      method: 'POST',
+      path: '/api/update/apply',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ confirmClose: 'yes' }),
+    });
+    assert.equal(res.status, 409, res.text);
+    assert.deepEqual(fake.closed, []);
+  });
+});
+
+describe('update routes with the real session tracking', () => {
+  function turn(id: string, state: Turn['state'], conversationId: string): Turn {
     return {
-      id: 'turn-1',
-      messageId: 'message-1',
+      id,
+      messageId: `message-${id}`,
       state,
       activity: '',
       startedAt: new Date().toISOString(),
+      conversationId,
     };
   }
 
-  it('a chat turn that is running blocks the apply until it ends, and the status says why', async () => {
+  it('the chat turns and the live session come from the campaign, and the apply closes them', async () => {
     const root = makeCampaign();
+    fs.mkdirSync(path.join(root, '.campaign', 'state', 'live'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.campaign', 'state', 'live', 'active.json'), JSON.stringify({ sessionId: LIVE_ID }));
     const ctx = createCtx({ campaignRoot: root, frameworkRoot: root, port: 0, log: () => undefined });
+    const cancelled: string[] = [];
+    const settled: string[] = [];
+    ctx.chat = {
+      store: {
+        conversations: () => [
+          { id: 'conv-1', title: '', createdAt: '', updatedAt: '', messageCount: 0 },
+          { id: 'conv-2', title: 'The tavern', createdAt: '', updatedAt: '', messageCount: 3 },
+        ],
+      },
+      runner: {
+        cancelConversation: (id: string) => cancelled.push(id),
+        settleConversation: async (id: string) => {
+          settled.push(id);
+        },
+      },
+    } as unknown as NonNullable<Ctx['chat']>;
     const fake: FakeUpdate = fakeUpdate();
-    const service = createUpdateService(ctx, { ...fake.deps, campaignRoot: root, chatTurnOpen: () => ctx.chatTurnOpen() });
+    // The real session tracking is kept: only the network, Claude Code and restart fakes are injected.
+    const { openSessions: _open, closeSessions: _close, ...fakes } = fake.deps;
+    const service = createUpdateService(ctx, { ...fakes, campaignRoot: root });
     const server = await serve(service);
     await call(server, 'POST', '/update/check');
 
-    ctx.bus.publish('turn', turn('running'));
-    const blocked = await call(server, 'POST', '/update/apply');
-    assert.equal(blocked.status, 409, blocked.text);
-    assert.deepEqual(blocked.json, { error: EN.turnRunning });
+    ctx.bus.publish('turn', turn('t1', 'running', 'conv-1'));
+    ctx.bus.publish('turn', turn('t2', 'queued', 'conv-2'));
     const status = (await call(server, 'GET', '/update')).json as UpdateStatus;
-    assert.equal(status.blockedReason, 'turn-running');
-    assert.equal(status.canApply, false);
+    assert.deepEqual(status.sessions, [
+      { kind: 'live', id: LIVE_ID, title: LIVE_ID },
+      { kind: 'chat', id: 'conv-1', title: 'Chat' },
+      { kind: 'chat', id: 'conv-2', title: 'The tavern' },
+    ]);
+    assert.equal(status.canApply, true);
 
-    ctx.bus.publish('turn', turn('done'));
+    const refused = await call(server, 'POST', '/update/apply');
+    assert.equal(refused.status, 409, refused.text);
+    assert.equal((refused.json as { sessions: unknown[] }).sessions.length, 3);
+    assert.deepEqual(cancelled, [], 'nothing is cancelled without confirmation');
+
+    ctx.bus.publish('turn', turn('t1', 'done', 'conv-1'));
+    ctx.bus.publish('turn', turn('t2', 'cancelled', 'conv-2'));
     const free = (await call(server, 'GET', '/update')).json as UpdateStatus;
-    assert.equal(free.blockedReason, null);
-    assert.equal(free.canApply, true);
+    assert.deepEqual(free.sessions, [{ kind: 'live', id: LIVE_ID, title: LIVE_ID }]);
+
+    await ctx.closeAll();
   });
 });
 

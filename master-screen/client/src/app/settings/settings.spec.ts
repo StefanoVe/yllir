@@ -7,18 +7,20 @@ import { PrefsService } from '../core/prefs.service';
 import { DEFAULT_SCREEN_SETTINGS, SettingsService } from '../core/settings.service';
 import { StatusService } from '../core/status.service';
 import { ThemeService } from '../core/theme.service';
-import type { UpdateStatus } from '@shared/types';
+import type { OpenSession, UpdateStatus } from '@shared/types';
 import { UpdateService } from '../core/update';
 import { Settings, checkSummary, parseNews } from './settings';
 
 const EMPTY_CHECKS: ChecksResponse = { brokenLinks: [], sketches: [], exclusions: [], checkedAt: '2026-11-13T10:30:00Z' };
-const UPDATE_IDLE: UpdateStatus = { state: 'idle', news: null, snoozed: false, canApply: true, blockedReason: null };
+const SESSIONS: OpenSession[] = [{ kind: 'live', id: 'l1', title: 'Tavolo del martedì' }, { kind: 'chat', id: 'c1', title: 'Chat' }];
+const UPDATE_IDLE: UpdateStatus = { state: 'idle', news: null, snoozed: false, canApply: true, blockedReason: null, sessions: [] };
 const UPDATE_AVAILABLE: UpdateStatus = {
   state: 'available',
   news: 'Better search.\nThe search finds more.\n\n- New cards\n- Fixed the map',
   snoozed: false,
   canApply: true,
   blockedReason: null,
+  sessions: [],
 };
 
 function withSettings(change: (s: ScreenSettings) => void): ScreenSettings {
@@ -49,8 +51,11 @@ describe('Settings page', () => {
     checking: ReturnType<typeof signal<boolean>>;
     actionError: ReturnType<typeof signal<string | null>>;
     reopenNotice: ReturnType<typeof signal<boolean>>;
+    confirming: ReturnType<typeof signal<boolean>>;
     check: ReturnType<typeof vi.fn>;
+    requestApply: ReturnType<typeof vi.fn>;
     apply: ReturnType<typeof vi.fn>;
+    cancelApply: ReturnType<typeof vi.fn>;
     snooze: ReturnType<typeof vi.fn>;
     retry: ReturnType<typeof vi.fn>;
   };
@@ -79,8 +84,11 @@ describe('Settings page', () => {
       checking: signal(false),
       actionError: signal<string | null>(null),
       reopenNotice: signal(false),
+      confirming: signal(false),
       check: vi.fn(),
+      requestApply: vi.fn(),
       apply: vi.fn(),
+      cancelApply: vi.fn(),
       snooze: vi.fn(),
       retry: vi.fn(),
     };
@@ -220,12 +228,12 @@ describe('Settings page', () => {
     it('says everything is up to date, with a check button', async () => {
       const root = await render();
       expect(section(root).textContent).toContain('Everything is up to date');
-      expect(buttons(root).some((button) => button.textContent?.includes('Update now'))).toBe(false);
+      expect(buttons(root).some((button) => button.textContent?.trim() === 'Update')).toBe(false);
       q<HTMLButtonElement>(root, '#s-update button.icon-btn').click();
       expect(updateFake.check).toHaveBeenCalledTimes(1);
     });
 
-    it('shows the news as paragraphs and a list, with Update now and Later', async () => {
+    it('shows the news as paragraphs and a list, with Update and Later', async () => {
       updateFake.status.set(UPDATE_AVAILABLE);
       const root = await render();
       const text = section(root).textContent ?? '';
@@ -234,32 +242,45 @@ describe('Settings page', () => {
       expect([...section(root).querySelectorAll('.update-news li')].map((li) => li.textContent)).toEqual(['New cards', 'Fixed the map']);
       expect(text).not.toMatch(/version|plugin|server|package|\d+\.\d+/i);
 
-      const now = buttons(root).find((button) => button.textContent?.includes('Update now'));
-      now?.click();
-      expect(updateFake.apply).toHaveBeenCalledTimes(1);
+      buttons(root).find((button) => button.textContent?.trim() === 'Update')?.click();
+      expect(updateFake.requestApply).toHaveBeenCalledTimes(1);
       buttons(root).find((button) => button.textContent?.includes('Later'))?.click();
       expect(updateFake.snooze).toHaveBeenCalledTimes(1);
     });
 
-    it('disables Update now with the reason when the update cannot start yet', async () => {
-      updateFake.status.set({ ...UPDATE_AVAILABLE, canApply: false, blockedReason: 'turn-running' });
+    it('with open sessions, Update shows the list first and sends nothing until it is confirmed', async () => {
+      updateFake.status.set({ ...UPDATE_AVAILABLE, sessions: SESSIONS });
       const root = await render();
-      const now = buttons(root).find((button) => button.textContent?.includes('Update now'));
-      expect(now?.disabled).toBe(true);
-      expect(section(root).textContent).toContain('The assistant is still working: wait for it to finish');
+      // The page only asks the service; the service decides whether a confirmation comes first.
+      buttons(root).find((button) => button.textContent?.trim() === 'Update')?.click();
+      expect(updateFake.requestApply).toHaveBeenCalledTimes(1);
+      expect(updateFake.apply).not.toHaveBeenCalled();
+
+      updateFake.confirming.set(true);
+      fixture.detectChanges();
+      expect(section(root).textContent).toContain('The update will close these sessions:');
+      expect([...section(root).querySelectorAll('.update-sessions li')].map((li) => li.textContent)).toEqual(['Tavolo del martedì', 'Chat']);
+      expect(buttons(root).some((button) => button.textContent?.trim() === 'Update')).toBe(false);
+      expect(updateFake.apply).not.toHaveBeenCalled();
+
+      buttons(root).find((button) => button.textContent?.includes('Close the sessions and update'))?.click();
+      expect(updateFake.apply).toHaveBeenCalledWith(true);
     });
 
-    it('shows the live table reason when a live table is open', async () => {
-      updateFake.status.set({ ...UPDATE_AVAILABLE, canApply: false, blockedReason: 'live-open' });
+    it('cancelling the session confirmation goes back to the offer and sends nothing', async () => {
+      updateFake.status.set({ ...UPDATE_AVAILABLE, sessions: SESSIONS });
+      updateFake.confirming.set(true);
       const root = await render();
-      expect(section(root).textContent).toContain('A live table is open: close it first');
+      buttons(root).find((button) => button.textContent?.trim() === 'Cancel')?.click();
+      expect(updateFake.cancelApply).toHaveBeenCalledTimes(1);
+      expect(updateFake.apply).not.toHaveBeenCalled();
     });
 
     it('shows the running update in plain words, with no buttons to press', async () => {
       updateFake.status.set({ ...UPDATE_AVAILABLE, state: 'updating' });
       const root = await render();
       expect(section(root).textContent).toContain('Updating, it takes a few seconds');
-      expect(buttons(root).every((button) => button.textContent?.includes('Update now') === false)).toBe(true);
+      expect(buttons(root).every((button) => button.textContent?.trim() !== 'Update')).toBe(true);
     });
 
     it('shows the reopen notice while restarting only when the updates service raises it', async () => {
@@ -289,10 +310,10 @@ describe('Settings page', () => {
     });
 
     it('shows the refusal sentence of a 409 as an alert', async () => {
-      updateFake.status.set({ ...UPDATE_AVAILABLE, canApply: false, blockedReason: 'live-open' });
-      updateFake.actionError.set('A live table is open: close it first');
+      updateFake.status.set(UPDATE_AVAILABLE);
+      updateFake.actionError.set('The update is not possible now');
       const root = await render();
-      expect(section(root).querySelector('[role="alert"]')?.textContent).toContain('A live table is open: close it first');
+      expect(section(root).querySelector('[role="alert"]')?.textContent).toContain('The update is not possible now');
     });
   });
 

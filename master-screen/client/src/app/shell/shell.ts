@@ -14,6 +14,7 @@ import { StatusService } from '../core/status.service';
 import { UpdateService } from '../core/update';
 import { ThemeService } from '../core/theme.service';
 import { UpdateAlign } from '../update-align/update-align';
+import { UpdateNotice } from '../update-notice/update-notice';
 import { ViewModeService } from '../core/view-mode.service';
 import { I18n, type TranslationKey } from '../i18n';
 import { Palette, PaletteController } from '../search/palette';
@@ -21,7 +22,7 @@ import { applyTextScale, readTextScale } from './text-scale';
 
 @Component({
   selector: 'ms-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock, UpdateAlign],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock, UpdateAlign, UpdateNotice],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })
@@ -42,7 +43,7 @@ export class Shell {
   private readonly updates = inject(UpdateService);
   private readonly document = inject(DOCUMENT);
 
-  /** A small dot on the settings entry while an update is ready and the master has not said "later". */
+  /** A small dot on the settings entry while an update is ready and the master has not said "later" (the card at the top right is the main notice). */
   readonly showUpdateNotice = this.updates.showNotice;
   readonly settingsLabel = computed(() => this.i18n.t(this.showUpdateNotice() ? 'shell.updateNotice' : 'nav.settings'));
 

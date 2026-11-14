@@ -124,14 +124,20 @@ export interface SettingsResponse {
 }
 
 /** The framework update as the screen shows it. Never carries a version number. */
+/** A session the framework update closes: the open live table, or a chat conversation with a turn queued or running. */
+export interface OpenSession { kind: 'live' | 'chat'; id: string; title: string }
+
 export interface UpdateStatus {
   state: 'idle' | 'available' | 'offline' | 'updating' | 'restarting' | 'failed';
   /** Plain-language news of the newer versions, in the campaign language; null when there are none. */
   news: string | null;
   /** True while the notice memory has a snooze that runs past today. */
   snoozed: boolean;
+  /** True whenever state is 'available'. Open sessions do not block it: they are listed in `sessions`. */
   canApply: boolean;
-  blockedReason: 'turn-running' | 'live-open' | 'offline' | null;
+  blockedReason: 'offline' | null;
+  /** The sessions the update would close, when state is 'available'; empty otherwise. */
+  sessions: OpenSession[];
 }
 
 /** The campaign alignment after a framework update, run by the assistant in a dedicated conversation. */

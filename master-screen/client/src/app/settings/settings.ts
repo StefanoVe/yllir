@@ -337,8 +337,17 @@ export class Settings {
     void this.updates.check();
   }
 
+  /** "Update": with open sessions the confirmation list comes first; nothing is sent until it is confirmed. */
   applyUpdate(): void {
-    void this.updates.apply();
+    this.updates.requestApply();
+  }
+
+  confirmUpdate(): void {
+    void this.updates.apply(true);
+  }
+
+  cancelUpdate(): void {
+    this.updates.cancelApply();
   }
 
   retryUpdate(): void {

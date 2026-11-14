@@ -1,0 +1,134 @@
+/* A small card in the top right corner. It floats over the page: nothing around it moves. */
+:host {
+  display: contents;
+}
+
+.notice {
+  position: fixed;
+  top: calc(var(--space-2) + env(safe-area-inset-top, 0px));
+  right: var(--space-2);
+  z-index: 40;
+  width: min(340px, calc(100vw - 2 * var(--space-2)));
+  box-sizing: border-box;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2), 0 0 0 1px var(--color-border);
+  animation: notice-in var(--transition-base) both;
+}
+
+@keyframes notice-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+
+.notice-title {
+  margin: 0 0 var(--space-0-5);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  line-height: var(--line-height-tight);
+}
+
+.notice-title:focus {
+  outline: none;
+}
+
+.notice-title:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.notice-text {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  color: var(--color-text-muted);
+}
+
+/* The news: three lines at most, the rest is shown in Settings. */
+.notice-text.clamp {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.notice-sessions {
+  margin: var(--space-1) 0 0;
+  padding: 0 0 0 var(--space-2);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.notice-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+.notice-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.btn {
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.btn:hover {
+  background: var(--color-selection);
+}
+
+.btn.primary {
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.btn.primary:hover {
+  background: var(--color-accent-hover);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.spin {
+  animation: notice-spin 1s linear infinite;
+}
+
+@keyframes notice-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .notice,
+  .spin {
+    animation: none;
+  }
+}

@@ -3,11 +3,13 @@
 // restart of the screen on the new framework. Owner: update engineer.
 import fs from 'node:fs';
 import path from 'node:path';
-import type { UpdateStatus } from '../../../shared/src/types.js';
+import type { OpenSession, Turn, UpdateStatus } from '../../../shared/src/types.js';
 import { findClaudeCode } from '../agent/claude-provider.js';
 import { campaignLanguage, type Lang } from '../chat/text.js';
 import { readFrameworkVersion } from '../campaign.js';
+import { CockpitStore } from '../cockpit/store.js';
 import type { Ctx } from '../context.js';
+import { callLog } from '../live/framework.js';
 import { readActiveId } from '../live/snapshot.js';
 import { execText, installPathOf, LIST_TIMEOUT_MS, PLUGIN_ID, UPDATE_TIMEOUT_MS, type ExecText } from './claude.js';
 import { fetchNews, fetchPublishedVersion, fetchText, type FetchText } from './source.js';
@@ -37,14 +39,27 @@ export interface UpdateDeps {
   findClaude(): string | null;
   installedVersion(): Promise<string>;
   language(): Lang;
-  liveOpen(): Promise<boolean>;
-  chatTurnOpen(): boolean;
+  /** The sessions the update would close: the open live session and the chat conversations with a turn queued or running. */
+  openSessions(): Promise<OpenSession[]>;
+  /** Cancels every chat and cockpit turn and ends the live session, waiting for them to end. Never throws. */
+  closeSessions(): Promise<void>;
   restart: SpawnRestart;
   requestShutdown(): void;
   log(msg: string): void;
 }
 
-export type ApplyResult = { ok: true; done: Promise<void> } | { ok: false; error: string };
+export interface ApplyOptions {
+  /** True when the master confirmed that the open sessions are closed. */
+  confirmClose?: boolean;
+}
+
+/**
+ * ok: false with `sessions` means the update needs the master's confirmation first (nothing was
+ * closed or started); the caller answers it with those sessions.
+ */
+export type ApplyResult =
+  | { ok: true; done: Promise<void> }
+  | { ok: false; error: string; sessions?: OpenSession[] };
 
 export class UpdateService {
   private snapshot: Snapshot | null = null;
@@ -79,10 +94,12 @@ export class UpdateService {
   }
 
   /**
-   * Starts the update when it is allowed. `accept` runs after the checks pass and before any work
-   * starts, so the caller can answer 202 before the server may shut down.
+   * Starts the update when it is allowed. Open sessions are closed first when the master confirmed
+   * it; without the confirmation the result carries the sessions and nothing is closed or started.
+   * `accept` runs once the work is about to start, so the caller can answer 202 before the server
+   * may shut down.
    */
-  async apply(accept: () => void = () => {}): Promise<ApplyResult> {
+  async apply(accept: () => void = () => {}, options: ApplyOptions = {}): Promise<ApplyResult> {
     const current = await this.compose();
     if (this.phase === 'updating' || this.phase === 'restarting') {
       return { ok: false, error: this.texts().alreadyRunning };
@@ -90,12 +107,31 @@ export class UpdateService {
     if (current.state === 'offline') return { ok: false, error: this.texts().offline };
     if (current.state === 'failed') return { ok: false, error: this.texts().checkFirst };
     if (current.state !== 'available') return { ok: false, error: this.texts().noUpdate };
-    if (current.blockedReason === 'turn-running') return { ok: false, error: this.texts().turnRunning };
-    if (current.blockedReason === 'live-open') return { ok: false, error: this.texts().liveOpen };
-    // No await between this check and the next line: two requests cannot both start an update.
+    const sessions = await this.safeOpenSessions();
+    if (sessions.length > 0 && options.confirmClose !== true) {
+      return { ok: false, error: this.texts().confirmClose, sessions };
+    }
+    // No await between this re-check and the next line: two requests cannot both start an update.
+    if (this.isBusy()) {
+      return { ok: false, error: this.texts().alreadyRunning };
+    }
     this.phase = 'updating';
     accept();
-    return { ok: true, done: this.run() };
+    return { ok: true, done: this.run(sessions.length > 0) };
+  }
+
+  /** True while an update runs or restarts the screen. */
+  private isBusy(): boolean {
+    return this.phase === 'updating' || this.phase === 'restarting';
+  }
+
+  private async safeOpenSessions(): Promise<OpenSession[]> {
+    try {
+      return await this.deps.openSessions();
+    } catch (err) {
+      this.deps.log(`open sessions failed: ${err instanceof Error ? err.message : String(err)}`);
+      return [];
+    }
   }
 
   private texts() {
@@ -134,7 +170,7 @@ export class UpdateService {
 
   private async compose(): Promise<UpdateStatus> {
     const snoozed = isSnoozed(readNotice(this.deps.campaignRoot), this.deps.today());
-    const idle: UpdateStatus = { state: 'idle', news: null, snoozed, canApply: false, blockedReason: null };
+    const idle: UpdateStatus = { state: 'idle', news: null, snoozed, canApply: false, blockedReason: null, sessions: [] };
     if (this.phase === 'updating' || this.phase === 'restarting') return { ...idle, state: this.phase };
     if (this.phase === 'failed') return { ...idle, state: 'failed' };
     const snap = this.snapshot;
@@ -144,23 +180,20 @@ export class UpdateService {
     }
     const installed = await this.deps.installedVersion();
     if (compareVersions(snap.published, installed) !== 1) return idle;
-    const blockedReason = this.deps.chatTurnOpen()
-      ? 'turn-running'
-      : (await this.deps.liveOpen())
-        ? 'live-open'
-        : null;
     return {
       state: 'available',
       news: snap.news,
       snoozed,
-      canApply: blockedReason === null,
-      blockedReason,
+      canApply: true,
+      blockedReason: null,
+      sessions: await this.safeOpenSessions(),
     };
   }
 
   /** The update itself. Never rejects: every failure ends in the 'failed' phase. */
-  private async run(): Promise<void> {
+  private async run(closed: boolean): Promise<void> {
     try {
+      if (closed) await this.deps.closeSessions();
       const claude = this.deps.findClaude();
       if (claude === null) throw new Error('Claude Code was not found');
       await this.deps.exec(claude, ['plugin', 'update', PLUGIN_ID, '--json'], { timeout: UPDATE_TIMEOUT_MS });
@@ -179,8 +212,36 @@ export class UpdateService {
   }
 }
 
+/** Conversations that have a turn queued or running, by the turn events on the bus. */
+function trackOpenChatTurns(ctx: Ctx): () => string[] {
+  const openByTurn = new Map<string, string>();
+  ctx.onTurn((turn: Turn) => {
+    const open = turn.state === 'queued' || turn.state === 'running';
+    if (open && turn.conversationId) openByTurn.set(turn.id, turn.conversationId);
+    else openByTurn.delete(turn.id);
+  });
+  return () => [...new Set(openByTurn.values())];
+}
+
+/** The title of the cockpit session attached to the live session, or null when there is none. */
+async function cockpitTitleOf(root: string, liveId: string): Promise<string | null> {
+  const sessionsRoot = path.join(root, '.campaign', 'state', 'live', 'cockpit');
+  if (!fs.existsSync(sessionsRoot)) return null;
+  const store = new CockpitStore(root, { sessionsRoot });
+  for (const summary of await store.list()) {
+    const session = await store.get(summary.id);
+    if (session.liveSessionId === liveId) return session.title;
+  }
+  return null;
+}
+
 export function createUpdateService(ctx: Ctx, overrides: Partial<UpdateDeps> = {}): UpdateService {
   const root = ctx.campaignRoot;
+  const openChatIds = trackOpenChatTurns(ctx);
+  const chatTitle = (id: string): string => {
+    const found = ctx.chat?.store.conversations().find((c) => c.id === id);
+    return found && found.title !== '' ? found.title : UPDATE_TEXTS[campaignLanguage(root)].chatTitle;
+  };
   return new UpdateService({
     campaignRoot: root,
     pid: process.pid,
@@ -191,8 +252,39 @@ export function createUpdateService(ctx: Ctx, overrides: Partial<UpdateDeps> = {
     findClaude: () => findClaudeCode(),
     installedVersion: () => readFrameworkVersion(ctx.frameworkRoot),
     language: () => campaignLanguage(root),
-    liveOpen: async () => (await readActiveId(root)) !== null,
-    chatTurnOpen: () => ctx.chatTurnOpen(),
+    openSessions: async () => {
+      const sessions: OpenSession[] = [];
+      const liveId = await readActiveId(root);
+      if (liveId !== null) {
+        const title = await cockpitTitleOf(root, liveId).catch(() => null);
+        sessions.push({ kind: 'live', id: liveId, title: title || liveId });
+      }
+      for (const id of openChatIds()) sessions.push({ kind: 'chat', id, title: chatTitle(id) });
+      return sessions;
+    },
+    closeSessions: async () => {
+      try {
+        const ids = openChatIds();
+        const runner = ctx.chat?.runner;
+        if (runner) {
+          for (const id of ids) runner.cancelConversation(id);
+          for (const id of ids) await runner.settleConversation(id);
+        }
+      } catch (err) {
+        ctx.log(`closing chat turns failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      try {
+        await ctx.cancelCockpitTurns?.();
+      } catch (err) {
+        ctx.log(`cancelling cockpit turns failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      try {
+        const ended = await callLog(ctx, (lib) => lib.endSession(root));
+        if (!ended.ok) ctx.log(`ending the live session failed: ${ended.error.message}`);
+      } catch (err) {
+        ctx.log(`ending the live session failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
     restart: spawnRestart,
     requestShutdown: () => ctx.requestShutdown(),
     log: (msg) => ctx.log(msg),
