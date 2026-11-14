@@ -54,7 +54,7 @@
   <nav class="toc" [attr.aria-label]="t('settingsPage.sectionsNav')">
     @for (item of visibleToc(); track item.id) {
       <a class="toc-link" [attr.href]="'#' + item.id" [class.active]="activeId() === item.id"
-         [attr.aria-current]="activeId() === item.id ? 'true' : null" (click)="jump($event, item.id)">{{ t(item.label) }}@if (isChanged(item.id)) {<span class="changed" [title]="t('settingsPage.changed')"><span class="sr-only">{{ t('settingsPage.changed') }}</span></span>}</a>
+         [attr.aria-current]="activeId() === item.id ? 'true' : null" (click)="jump($event, item.id)">{{ t(item.label) }}@if (isChanged(item.id)) {<span class="changed-mark" [title]="t('settingsPage.changed')">{{ t('settings.changedMark') }}</span>}</a>
     }
   </nav>
 
@@ -82,7 +82,7 @@
           </button>
           <h2 id="h-table">{{ t('settingsPage.section.table') }}</h2>
           @if (isChanged('s-table')) {
-            <span class="changed" [title]="t('settingsPage.changed')"><span class="sr-only">{{ t('settingsPage.changed') }}</span></span>
+            <span class="changed-mark" [title]="t('settingsPage.changed')">{{ t('settings.changedMark') }}</span>
           }
         </div>
         <button type="button" class="link-btn" (click)="resetTable()" [disabled]="sectionIsDefault('table') || !canSave()">{{ t('settingsPage.reset') }}</button>
@@ -141,7 +141,7 @@
           </button>
           <h2 id="h-combat">{{ t('combat.settings.heading') }}</h2>
           @if (isChanged('s-combat')) {
-            <span class="changed" [title]="t('settingsPage.changed')"><span class="sr-only">{{ t('settingsPage.changed') }}</span></span>
+            <span class="changed-mark" [title]="t('settingsPage.changed')">{{ t('settings.changedMark') }}</span>
           }
         </div>
         <button type="button" class="link-btn" (click)="resetCombat()" [disabled]="sectionIsDefault('combat') || !canSave()">{{ t('settingsPage.reset') }}</button>
@@ -155,9 +155,12 @@
                 <span class="row-hint">{{ t('combat.settings.showMapsHint') }}</span>
               </div>
               <div class="row-control">
-                <button type="button" class="switch" role="switch" aria-labelledby="l-show-maps"
-                        [attr.aria-checked]="shown().combat.showMaps" [disabled]="!canSave()"
-                        (click)="setCombat({ showMaps: !shown().combat.showMaps })"><span class="thumb"></span></button>
+                <span class="switch-wrap">
+                  <button type="button" class="switch" role="switch" aria-labelledby="l-show-maps"
+                          [attr.aria-checked]="shown().combat.showMaps" [disabled]="!canSave()"
+                          (click)="setCombat({ showMaps: !shown().combat.showMaps })"><span class="thumb"></span></button>
+                  <span class="switch-state">{{ t(shown().combat.showMaps ? 'settings.switchOn' : 'settings.switchOff') }}</span>
+                </span>
               </div>
             </div>
             <div class="row">
@@ -183,9 +186,12 @@
                 <span class="row-hint">{{ t('settingsPage.combat.autoHideHint') }}</span>
               </div>
               <div class="row-control">
-                <button type="button" class="switch" role="switch" aria-labelledby="l-autohide"
-                        [attr.aria-checked]="shown().combat.autoHide" [disabled]="!canSave()"
-                        (click)="setCombat({ autoHide: !shown().combat.autoHide })"><span class="thumb"></span></button>
+                <span class="switch-wrap">
+                  <button type="button" class="switch" role="switch" aria-labelledby="l-autohide"
+                          [attr.aria-checked]="shown().combat.autoHide" [disabled]="!canSave()"
+                          (click)="setCombat({ autoHide: !shown().combat.autoHide })"><span class="thumb"></span></button>
+                  <span class="switch-state">{{ t(shown().combat.autoHide ? 'settings.switchOn' : 'settings.switchOff') }}</span>
+                </span>
               </div>
             </div>
             <div class="row">
@@ -222,7 +228,7 @@
             </button>
             <h2 id="h-music">{{ t('nav.music') }}</h2>
             @if (isChanged('s-music')) {
-              <span class="changed" [title]="t('settingsPage.changed')"><span class="sr-only">{{ t('settingsPage.changed') }}</span></span>
+              <span class="changed-mark" [title]="t('settingsPage.changed')">{{ t('settings.changedMark') }}</span>
             }
           </div>
           <button type="button" class="link-btn" (click)="resetSection('music')" [disabled]="sectionIsDefault('music') || !canSave()">{{ t('settingsPage.reset') }}</button>
@@ -260,9 +266,12 @@
                   <span class="row-hint">{{ t('settingsPage.music.loopHint') }}</span>
                 </div>
                 <div class="row-control">
-                  <button type="button" class="switch" role="switch" aria-labelledby="l-loop"
-                          [attr.aria-checked]="shown().music.loop" [disabled]="!canSave()"
-                          (click)="setMusic({ loop: !shown().music.loop })"><span class="thumb"></span></button>
+                  <span class="switch-wrap">
+                    <button type="button" class="switch" role="switch" aria-labelledby="l-loop"
+                            [attr.aria-checked]="shown().music.loop" [disabled]="!canSave()"
+                            (click)="setMusic({ loop: !shown().music.loop })"><span class="thumb"></span></button>
+                    <span class="switch-state">{{ t(shown().music.loop ? 'settings.switchOn' : 'settings.switchOff') }}</span>
+                  </span>
                 </div>
               </div>
               <div class="row">
@@ -302,12 +311,13 @@
           </button>
           <h2 id="h-appearance">{{ t('settings.appearance') }}</h2>
           @if (isChanged('s-appearance')) {
-            <span class="changed" [title]="t('settingsPage.changed')"><span class="sr-only">{{ t('settingsPage.changed') }}</span></span>
+            <span class="changed-mark" [title]="t('settingsPage.changed')">{{ t('settings.changedMark') }}</span>
           }
         </div>
         <button type="button" class="link-btn" (click)="resetSection('ui')" [disabled]="sectionIsDefault('ui') || !canSave()">{{ t('settingsPage.reset') }}</button>
       </div>
       <div class="section-body" id="b-appearance" [hidden]="isCollapsed('s-appearance')">
+        <h3 class="row-group" [title]="t('settingsPage.localNote')">{{ t('settings.groupDevice') }}</h3>
         <div class="rows local">
           <div class="row">
             <div class="row-text">
@@ -340,8 +350,7 @@
             </div>
           </div>
         </div>
-        <p class="note">{{ t('settingsPage.localNote') }}</p>
-
+        <h3 class="row-group">{{ t('settings.groupCampaign') }}</h3>
         <div class="rows">
           @if (settingsService.loaded()) {
             <div class="row">
@@ -652,6 +661,13 @@
       </div>
     </section>
 
+    <!-- Session: the stop button, last. A panel like the sections, but not one of them: it is not in the table of contents. -->
+    <section class="quit-panel" id="s-session" aria-labelledby="h-session">
+      <div class="card-head">
+        <div class="head-title">
+          <h2 id="h-session">{{ t('settings.sessionTitle') }}</h2>
+        </div>
+      </div>
     <div class="quit">
       <button type="button" class="quit-btn" [class.armed]="quitArmed()" [disabled]="quitDone() || quitting()" (click)="onQuitClick()">
         <lucide-angular [img]="icons.Power" [size]="18" aria-hidden="true" />
@@ -661,5 +677,6 @@
         <p class="muted" role="status">{{ t('settings.quitDone') }}</p>
       }
     </div>
+    </section>
   </div>
 </div>

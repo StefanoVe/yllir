@@ -8,7 +8,7 @@
   max-height: 80vh;
 }
 .cockpit-modal.session-modal .modal-title h2 {
-  font-size: 28px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
 }
 
@@ -69,9 +69,10 @@
   margin: 0;
   padding: 0 12px;
   border: var(--border-width) solid var(--color-danger);
+  border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-danger);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: var(--line-pitch);
 }
 
@@ -104,14 +105,14 @@
   column-gap: 8px;
   padding: 0 0 0 68px;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-/* Margin square: filled for the open session, an empty frame for the others. */
+/* Margin square: filled in the accent (the chosen session) for the open session, an empty frame for the others. */
 .cockpit-modal.session-modal .session-open::before {
   content: "";
   position: absolute;
@@ -124,7 +125,8 @@
   background: transparent;
 }
 .cockpit-modal.session-modal .session-list li.current .session-open::before {
-  background: var(--color-text);
+  border-color: var(--color-accent);
+  background: var(--color-accent);
 }
 .cockpit-modal.session-modal .session-open:focus-visible {
   outline: 2px solid var(--color-focus);
@@ -142,7 +144,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 16px;
+  font-size: var(--font-size-base);
   font-weight: 500;
   line-height: var(--line-pitch);
 }
@@ -153,11 +155,11 @@
 .cockpit-modal.session-modal .session-leader {
   grid-area: leader;
   min-width: 24px;
-  border-bottom: var(--border-width-strong) dotted var(--color-border-strong);
+  border-bottom: var(--border-width-strong) dotted var(--color-border);
 }
 .cockpit-modal.session-modal .session-date {
   grid-area: date;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: var(--line-pitch);
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
@@ -169,7 +171,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   line-height: var(--line-pitch);
   color: var(--color-text-muted);
 }
@@ -237,7 +239,7 @@
   min-height: 0;
   padding: 0 0 0 68px;
   font-family: var(--font-family-hand);
-  font-size: 24px;
+  font-size: var(--font-size-lg);
   line-height: var(--line-pitch);
   color: var(--color-text);
 }

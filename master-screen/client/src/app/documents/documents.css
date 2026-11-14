@@ -1,7 +1,7 @@
 /*
- * The documents explorer, a notebook page: black on white (white on black in the dark theme), flat,
- * square, thin lines. Colours come from the tokens in styles.css; no shadows, no fades, no
- * accent colours. The hand font is for the page title only.
+ * The documents explorer, a notebook page: warm paper, thin borders and small radii. Colours come from
+ * the tokens in styles.css. The chosen option (view toggle) is the only filled look; no shadows.
+ * The hand font is for the page title only.
  */
 :host {
   display: block;
@@ -47,7 +47,7 @@ h1 {
 .count {
   margin-left: auto;
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -94,7 +94,7 @@ h1 {
   height: 32px;
   padding: 0;
   border: var(--border-width) solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   cursor: pointer;
@@ -111,10 +111,12 @@ h1 {
   color: var(--color-text-muted);
 }
 
+/* The chosen option (the pressed view toggle): a soft blue-tinted fill, blue text and a blue outline. */
 .icon-btn[aria-pressed='true'] {
-  border-color: var(--color-border-strong);
-  background: var(--color-text);
-  color: var(--color-bg);
+  border-color: var(--color-selected-border);
+  background: var(--color-selected-bg);
+  color: var(--color-accent);
+  font-weight: 600;
 }
 
 /* The `/` hint: a bordered key on the right of the empty field, out of the way of the clear control. */
@@ -131,7 +133,7 @@ h1 {
   min-width: 22px;
   padding: 0 6px;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text-muted);
   font-family: var(--font-family-mono);
@@ -146,12 +148,13 @@ h1 {
   gap: var(--space-1);
 }
 
-/* Collapse all and expand all: a readable size and full-strength text, with a box on hover and focus. */
+/* The one expand or collapse toggle: a readable size and full-strength text, with a soft fill on hover and focus. */
 .tool-group .btn-text {
   box-sizing: border-box;
   min-height: 32px;
-  padding: 4px var(--space-1);
+  padding: var(--space-0-5) var(--space-1);
   border: var(--border-width) solid transparent;
+  border-radius: var(--radius-sm);
   color: var(--color-text);
   font-size: var(--font-size-sm);
   transition: background-color var(--transition-fast);
@@ -164,9 +167,9 @@ h1 {
 
 /* Quiet text buttons: underlined, no frame. */
 .btn-text {
-  padding: 4px 2px;
+  padding: var(--space-0-5) 2px;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--color-text-muted);
   font: inherit;
@@ -185,6 +188,11 @@ h1 {
 
 .view-toggle .icon-btn {
   border-color: var(--color-border-strong);
+}
+
+/* The chosen view keeps its blue outline (this rule would otherwise override the pressed one). */
+.view-toggle .icon-btn[aria-pressed='true'] {
+  border-color: var(--color-selected-border);
 }
 
 .view-toggle .icon-btn + .icon-btn {
@@ -221,8 +229,8 @@ h1 {
 .group-title {
   margin: 0 0 var(--space-2);
   font-family: var(--font-family);
-  font-size: var(--font-size-base);
-  font-weight: 600;
+  font-size: var(--font-size-md);
+  font-weight: 650;
   line-height: var(--line-height-tight);
 }
 
@@ -239,12 +247,12 @@ h1 {
   margin: 0;
   padding: var(--space-1);
   border: 0;
-  border-bottom: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font: inherit;
-  font-weight: 600;
+  font-weight: 650;
   text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
@@ -269,7 +277,7 @@ h1 {
 .group-count {
   flex: none;
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
@@ -290,7 +298,7 @@ h1 {
   margin-bottom: 0;
 }
 
-/* Cards: a square frame in a grid, at least 220px wide each. */
+/* Cards: a framed card in a grid, at least 220px wide each. */
 .docs {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -313,8 +321,8 @@ h1 {
   min-height: 120px;
   padding: var(--space-2);
   border: var(--border-width) solid var(--color-border);
-  border-radius: 0;
-  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
   text-align: left;
@@ -338,32 +346,37 @@ h1 {
   min-width: 0;
 }
 
+/* The initial of the title: quiet, so the title reads first. */
 .doc-mark {
-  font-family: var(--font-family-hand);
-  font-size: var(--font-size-xl);
-  font-weight: 700;
+  color: var(--color-text-muted);
+  font-family: var(--font-family);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
   line-height: 1;
 }
 
+/* The lock and the eye-off flag: full text colour, because the master must notice them. */
 .doc-flags {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-0-5);
   margin-left: auto;
-  color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
 .lock,
 .block-flag {
   display: inline-flex;
-  color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
 .doc-title {
   display: -webkit-box;
   min-width: 0;
   overflow: hidden;
-  font-weight: 500;
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text);
   line-clamp: 2;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -379,10 +392,13 @@ h1 {
   text-underline-offset: 2px;
 }
 
+/* The path line: one line, cut with an ellipsis, never wider than the card. The full path is in the tooltip. */
 .doc-path {
+  display: block;
+  max-width: 100%;
   overflow: hidden;
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -430,8 +446,9 @@ h1 {
   -webkit-line-clamp: 1;
 }
 
+/* The flags sit right after the title; the path is pushed to the far end. */
 .docs.is-list .doc-path {
-  order: 2;
+  order: 3;
   flex: 0 1 auto;
   max-width: 50%;
   margin-left: auto;
@@ -439,7 +456,7 @@ h1 {
 }
 
 .docs.is-list .doc-flags {
-  order: 3;
+  order: 2;
   margin-left: 0;
 }
 
@@ -462,6 +479,17 @@ h1 {
 
 .state-block .btn {
   margin-top: var(--space-1);
+}
+
+/* Recently opened: a band set apart from the categories. Its heading hovers one step darker than the band. */
+.group.recent {
+  padding: var(--space-2);
+  background: var(--color-surface-2);
+  border-radius: var(--radius-md);
+}
+
+.group.recent .group-toggle:hover {
+  background: var(--color-surface-3);
 }
 
 /* Hover only where a pointer can hover, so touch screens do not keep a stuck highlight. */
@@ -487,8 +515,9 @@ h1 {
   background: var(--color-surface-2);
 }
 
+/* The chosen view keeps its fill when hovered. */
 .icon-btn[aria-pressed='true']:hover {
-  background: var(--color-text);
+  background: var(--color-selected-bg);
 }
 
 .btn-text:hover {

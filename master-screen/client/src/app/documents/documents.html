@@ -51,11 +51,12 @@
 
     @if (!loading() && !error() && docs().length > 0) {
       <div class="tool-group">
-        <button type="button" class="btn-text" (click)="collapseAll()">
-          {{ s.t('documents.collapseAll') }}
-        </button>
-        <button type="button" class="btn-text" (click)="expandAll()">
-          {{ s.t('documents.expandAll') }}
+        <button
+          type="button"
+          class="btn-text"
+          (click)="anyExpanded ? collapseAll() : expandAll()"
+        >
+          {{ anyExpanded ? s.t('documents.collapseAll') : s.t('documents.expandAll') }}
         </button>
       </div>
     }
@@ -165,9 +166,9 @@
       }
     </span>
     @if (view() === 'list') {
-      <span class="doc-path">{{ doc.path }}</span>
+      <span class="doc-path" [title]="doc.path">{{ doc.path }}</span>
     } @else if (subfolderPath(doc); as sub) {
-      <span class="doc-path">{{ sub }}</span>
+      <span class="doc-path" [title]="sub">{{ sub }}</span>
     }
   </button>
 </ng-template>

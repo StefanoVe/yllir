@@ -10,6 +10,7 @@ import { polishEn } from './parts/polish.en';
 import { settingsPageEn } from './parts/settings-page.en';
 import { helpersEn } from './parts/helpers.en';
 import { updateEn } from './parts/update.en';
+import { restyleEn } from './parts/restyle.en';
 
 export const en = {
   ...liveAgentEn,
@@ -24,6 +25,7 @@ export const en = {
   ...polishEn,
   ...settingsPageEn,
   ...updateEn,
+  ...restyleEn,
   'combat.copy.duplicate': 'Duplicate',
   'combat.copy.duplicateOf': 'Duplicate {name}',
   'combat.copy.remove': 'Remove',

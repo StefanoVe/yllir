@@ -2,7 +2,7 @@
   display: block;
 }
 
-/* Turn status: a single line above the composer box, left aligned, 12px text plus the stepped
+/* Turn status: a single line above the composer box, left aligned, xs text plus the stepped
    indicator. The strip is only drawn while a turn is open. */
 .turn-status {
   min-height: 28px;
@@ -13,7 +13,7 @@
   padding: 8px 16px 4px;
   border-top: var(--border-width) solid var(--color-border);
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.2;
 }
 .turn-status .label {

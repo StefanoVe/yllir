@@ -1,8 +1,10 @@
 /*
- * Combatant row, notebook look: one line per creature under a 1 px rule, the current one inverted.
- * The mark next to the name is the shape of its side (filled square: ally or player character,
- * empty square: enemy). Hit points are a segmented bar with the numbers. Condition tags are
- * rectangles with their duration. Actions are flat square buttons with a tooltip.
+ * Combatant row, notebook look: one line per creature under a 1 px rule, the current one filled
+ * with the current-turn ink. The mark next to the name is the shape of its side (filled square:
+ * ally or player character, hollow diamond: enemy) with a small side tag. Hit points are a
+ * segmented bar with the numbers; low hit points get a hatch as well as the danger colour. Condition
+ * tags are small rectangles with their duration. Actions are flat buttons with a tooltip: damage
+ * in the danger ink, heal in the accent. A defeated row is faded and struck through.
  */
 
 :host {
@@ -20,10 +22,10 @@
   color: var(--color-text);
 }
 
-/* The current creature: the inverted row. */
+/* The current creature: the current-turn fill. */
 .row.active {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-current-bg);
+  color: var(--color-current-text);
 }
 
 .row.active .muted,
@@ -32,6 +34,11 @@
 .row.active .line dt,
 .row.active .line dd {
   color: inherit;
+}
+
+/* Down: faded, the name struck through. */
+.row.defeated {
+  opacity: 0.6;
 }
 
 .main {
@@ -48,7 +55,7 @@
   height: 44px;
   object-fit: cover;
   border: var(--border-width-strong) solid currentColor;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
 }
 
 .identity {
@@ -66,7 +73,8 @@
   min-width: 0;
 }
 
-/* Filled square for allies and player characters, empty square for enemies. */
+/* Ally and player character: filled square. Enemy: hollow diamond (a square turned by 45 degrees,
+   a little smaller so the turned box fits the same place). */
 .mark {
   flex: none;
   width: 10px;
@@ -76,7 +84,22 @@
 }
 
 .row[data-side="enemy"] .mark {
+  width: 9px;
+  height: 9px;
+  border-width: 1.5px;
   background: transparent;
+  transform: rotate(45deg);
+}
+
+/* The side in words, beside the mark: a small muted tag. */
+.side-tag {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.row.active .side-tag {
+  color: inherit;
 }
 
 .row-name {
@@ -97,9 +120,10 @@
   flex: none;
 }
 
+/* The count line: initiative and how many conditions. */
 .row-meta {
   color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -138,16 +162,22 @@
   font-size: var(--font-size-xs);
 }
 
-/* Condition tags: rectangles with the duration in their text. */
+/* Condition tags: small rectangles with the duration in their text, on a quiet band. */
 .pill {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   padding: 0 2px 0 var(--space-0-5);
-  border: var(--border-width) solid currentColor;
-  border-radius: 0;
-  font-size: var(--font-size-xs);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
   line-height: 1.6;
+}
+
+.row.active .pill {
+  color: var(--color-text);
 }
 
 .pill-text {
@@ -162,7 +192,7 @@
   justify-content: center;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
 }
@@ -195,7 +225,7 @@
   padding: 4px 4px;
   border: 0;
   border-bottom: var(--border-width) solid currentColor;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
   font-size: var(--font-size-sm);
@@ -215,7 +245,7 @@
   justify-content: center;
   padding: 0;
   border: var(--border-width) solid currentColor;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
 }
@@ -226,7 +256,26 @@
 }
 
 .icon-button:disabled {
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
+}
+
+/* Damage: the danger ink. Heal: the accent ink. The colour stays on hover too. */
+.icon-button.dmg {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.icon-button.heal {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.icon-button.dmg:hover:not(:disabled) {
+  color: var(--color-danger);
+}
+
+.icon-button.heal:hover:not(:disabled) {
+  color: var(--color-accent);
 }
 
 /* Detail: stats and attacks, lighter, under the main line. */
@@ -300,7 +349,7 @@
   min-height: 32px;
   padding: 0 var(--space-1);
   border: var(--border-width) solid currentColor;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
   font-size: var(--font-size-sm);
@@ -323,7 +372,7 @@
   min-height: 32px;
   padding: 4px 6px;
   border: var(--border-width) solid currentColor;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -338,7 +387,7 @@
   min-height: 32px;
   padding: 4px var(--space-1);
   border: var(--border-width) solid currentColor;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: inherit;
   font-size: var(--font-size-sm);
@@ -351,7 +400,7 @@
 }
 
 .text-button:disabled {
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
 .alert {
@@ -377,13 +426,43 @@
   background: currentColor;
 }
 
+/* Low hit points: the danger fill with a diagonal hatch, so the state is not colour alone. */
 .hp-bar.low .seg.on {
-  background: var(--color-danger);
+  background-color: var(--color-danger);
+  background-image: repeating-linear-gradient(45deg, transparent 0 3px, var(--color-surface) 3px 4px);
   border-color: var(--color-danger);
+}
+
+/* Defeat and remove sit in a group that shows only on hover or focus inside the row; touch screens
+   have no hover, so the group stays visible there. The amount box and the damage and heal buttons
+   are always visible. */
+.row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.row:hover .row-actions,
+.row:focus-within .row-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .row-actions {
+    opacity: 1;
+  }
 }
 
 @media (max-width: 479px) {
   .detail {
     padding-left: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .row-actions {
+    transition: none;
   }
 }

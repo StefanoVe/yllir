@@ -18,71 +18,75 @@
       </div>
     </div>
     <div class="head-actions">
-      @if (history().length > 1) {
-      <button
-        type="button"
-        class="back-button"
-        [title]="i18n.t('liveAgent.back')"
-        [attr.aria-label]="i18n.t('liveAgent.backToPrevious')"
-        (click)="back()"
-      >
-        <ui-icon name="left" [size]="16" />
-        <span>{{ i18n.t("liveAgent.backShort") }}</span>
-      </button>
-      }
-      @if (navigator(); as nav) {
-      <div class="segmented">
+      <div class="nav-group">
+        @if (history().length > 1) {
         <button
           type="button"
-          class="icon-button"
-          [msTooltip]="i18n.t('liveAgent.previousSheet')"
-          msTooltipPosition="bottom"
-          [attr.aria-label]="i18n.t('liveAgent.previousSheet')"
-          [disabled]="!nav.prev"
-          (click)="step(-1)"
+          class="back-button"
+          [title]="i18n.t('liveAgent.back')"
+          [attr.aria-label]="i18n.t('liveAgent.backToPrevious')"
+          (click)="back()"
         >
-          <ui-icon name="left" [size]="17" />
+          <ui-icon name="back" [size]="16" />
+          <span>{{ i18n.t("liveAgent.backShort") }}</span>
         </button>
-        <span
-          class="sheet-position"
-          [title]="i18n.t('liveAgent.sheetPosition', { current: nav.index + 1, total: nav.total })"
-          >{{ nav.index + 1 }} / {{ nav.total }}</span
-        >
+        }
+        @if (navigator(); as nav) {
+        <div class="segmented">
+          <button
+            type="button"
+            class="icon-button"
+            [msTooltip]="i18n.t('liveAgent.previousSheet')"
+            msTooltipPosition="bottom"
+            [attr.aria-label]="i18n.t('liveAgent.previousSheet')"
+            [disabled]="!nav.prev"
+            (click)="step(-1)"
+          >
+            <ui-icon name="left" [size]="17" />
+          </button>
+          <span
+            class="sheet-position"
+            [title]="i18n.t('liveAgent.sheetPosition', { current: nav.index + 1, total: nav.total })"
+            >{{ nav.index + 1 }} / {{ nav.total }}</span
+          >
+          <button
+            type="button"
+            class="icon-button"
+            [msTooltip]="i18n.t('liveAgent.nextSheet')"
+            msTooltipPosition="bottom"
+            [attr.aria-label]="i18n.t('liveAgent.nextSheet')"
+            [disabled]="!nav.next"
+            (click)="step(1)"
+          >
+            <ui-icon name="right" [size]="17" />
+          </button>
+        </div>
+        }
+      </div>
+      <div class="end-group">
+        <span class="head-divider" aria-hidden="true"></span>
         <button
           type="button"
           class="icon-button"
-          [msTooltip]="i18n.t('liveAgent.nextSheet')"
+          [msTooltip]="i18n.t('liveAgent.openInReader')"
           msTooltipPosition="bottom"
-          [attr.aria-label]="i18n.t('liveAgent.nextSheet')"
-          [disabled]="!nav.next"
-          (click)="step(1)"
+          [attr.aria-label]="i18n.t('liveAgent.openInReaderAria')"
+          (click)="openInReader()"
         >
-          <ui-icon name="right" [size]="17" />
+          <ui-icon name="external" [size]="17" />
+        </button>
+        <button
+          #closeButton
+          type="button"
+          class="icon-button close-button"
+          [msTooltip]="i18n.t('liveAgent.closeEsc')"
+          msTooltipPosition="bottom"
+          [attr.aria-label]="i18n.t('liveAgent.close')"
+          (click)="dismiss()"
+        >
+          <ui-icon name="x" [size]="18" />
         </button>
       </div>
-      }
-      <span class="head-divider" aria-hidden="true"></span>
-      <button
-        type="button"
-        class="icon-button"
-        [msTooltip]="i18n.t('liveAgent.openInReader')"
-        msTooltipPosition="bottom"
-        [attr.aria-label]="i18n.t('liveAgent.openInReaderAria')"
-        (click)="openInReader()"
-      >
-        <ui-icon name="external" [size]="17" />
-      </button>
-      <button
-        #closeButton
-        type="button"
-        class="icon-button close-button"
-        [msTooltip]="i18n.t('liveAgent.closeEsc')"
-        msTooltipPosition="bottom"
-        [attr.aria-label]="i18n.t('liveAgent.close')"
-        (click)="dismiss()"
-      >
-        <ui-icon name="x" [size]="18" />
-      </button>
     </div>
     <span
       class="reading-progress"

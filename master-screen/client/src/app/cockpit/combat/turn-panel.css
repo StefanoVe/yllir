@@ -1,7 +1,8 @@
 /*
- * Turn panel, notebook look: flat sections, 1 px lines, square portraits with a 1 px frame,
- * hit points as a segmented bar with the numbers, condition-like chips as rectangles. The
- * "reading" indicator is a stepped square, still under reduced motion.
+ * Turn panel, notebook look: flat sections, 1 px lines, portraits with a 1 px frame,
+ * hit points as a segmented bar with the numbers (low hit points hatched as well as red),
+ * condition-like chips as small rectangles. The "reading" indicator is a stepped square in the
+ * current-turn fill, still under reduced motion.
  */
 
 :host {
@@ -43,7 +44,7 @@
   height: 48px;
   object-fit: cover;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--color-surface-2);
 }
 
@@ -90,7 +91,7 @@ summary.title {
   align-items: center;
   padding: 0 var(--space-0-5);
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   color: var(--color-text);
   font-size: var(--font-size-xs);
   font-weight: 500;
@@ -126,11 +127,13 @@ summary.title {
 }
 
 .hp-bar .seg.on {
-  background: var(--color-text);
+  background: currentColor;
 }
 
+/* Low hit points: the danger fill with a diagonal hatch, so the state is not colour alone. */
 .hp-bar.low .seg.on {
-  background: var(--color-danger);
+  background-color: var(--color-danger);
+  background-image: repeating-linear-gradient(45deg, transparent 0 3px, var(--color-surface) 3px 4px);
   border-color: var(--color-danger);
 }
 
@@ -148,7 +151,7 @@ summary.title {
   flex: none;
   width: 8px;
   height: 8px;
-  background: var(--color-text);
+  background: var(--color-current-bg);
   animation: step 1s steps(2, jump-none) infinite;
 }
 
@@ -230,7 +233,7 @@ h5.group-label {
   align-items: center;
   padding: 1px var(--space-0-5);
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-size: var(--font-size-xs);

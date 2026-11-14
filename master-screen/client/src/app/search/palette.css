@@ -8,7 +8,7 @@
 .backdrop {
   position: absolute;
   inset: 0;
-  background: rgb(10 14 20 / 0.45);
+  background: var(--color-scrim);
 }
 
 .dialog {
@@ -124,7 +124,7 @@
 }
 
 .backdrop {
-  background: rgb(10 14 20 / 0.4);
+  background: var(--color-scrim);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
 }

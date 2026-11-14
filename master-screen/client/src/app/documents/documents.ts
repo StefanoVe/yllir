@@ -478,6 +478,17 @@ export class DocumentsPage {
     return previewTitles(group.docs);
   }
 
+  /**
+   * Whether any group or the recent section on the screen is open; the toolbar toggle reads it to pick
+   * its action. Ids stored for groups that are not shown now (filtered out, or gone from the index) do
+   * not count.
+   */
+  get anyExpanded(): boolean {
+    const shown = new Set<string>(this.groups().map((group) => group.category));
+    if (this.showRecent()) shown.add(RECENT_ID);
+    return this.expanded().some((id) => shown.has(id));
+  }
+
   /** Whether the recent section is open. */
   isRecentOpen(): boolean {
     return this.expanded().includes(RECENT_ID);

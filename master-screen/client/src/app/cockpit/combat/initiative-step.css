@@ -1,7 +1,8 @@
 /*
  * Initiative step (before the fight), notebook look: two flat panels with a 1 px line under each
- * title, participants as table rows with 1 px rules, sides as a pair of square buttons (the chosen
- * one inverted), the order as a table. Stacks on narrow screens.
+ * title, participants as table rows with 1 px rules, sides as a pair of buttons (the chosen one in
+ * the selected look), the order as a table, and the start button as the one main action. Stacks on
+ * narrow screens.
  */
 
 :host {
@@ -25,7 +26,7 @@
   padding: var(--space-2);
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-border);
-  border-radius: 0;
+  border-radius: var(--radius-md);
 }
 
 /* Panel titles: sans, medium, with a 1 px line under them. */
@@ -97,15 +98,16 @@
   width: 18px;
   height: 18px;
   border: var(--border-width-strong) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
 }
 
+/* A ticked box: the chosen look, an accent square inside. */
 .tick:checked + .box::after {
   content: "";
   position: absolute;
   inset: 3px;
-  background: var(--color-text);
+  background: var(--color-accent);
 }
 
 .tick:focus-visible + .box {
@@ -113,7 +115,7 @@
   outline-offset: 2px;
 }
 
-/* Avatar: a square with initials. Players and allies filled, enemies empty. */
+/* Avatar: a square with initials. Players and allies on a quiet band, enemies empty. */
 .avatar {
   flex: none;
   display: inline-flex;
@@ -122,7 +124,7 @@
   width: 28px;
   height: 28px;
   border: var(--border-width) solid var(--color-text);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-size: var(--font-size-xs);
@@ -131,8 +133,9 @@
 
 .avatar[data-side="pc"],
 .avatar[data-side="ally"] {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  font-weight: 600;
 }
 
 .name {
@@ -150,7 +153,7 @@
   padding: 6px 0;
   border: 0;
   border-bottom: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -170,10 +173,10 @@
 
 .initiative:disabled {
   border-bottom-color: var(--color-border);
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
-/* Side: a pair of square buttons, the chosen one inverted. */
+/* Side: a pair of buttons; the chosen one takes the selected look. */
 .segment {
   display: inline-flex;
 }
@@ -182,7 +185,7 @@
   min-height: 32px;
   padding: 4px var(--space-1);
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-size: var(--font-size-xs);
@@ -193,21 +196,24 @@
   border-left-width: 0;
 }
 
+/* The chosen side: the selected look. */
 .side[aria-pressed="true"] {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-selected-bg);
+  color: var(--color-accent);
+  border-color: var(--color-selected-border);
+  font-weight: 600;
 }
 
 .side:disabled {
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
-/* Ghost buttons: square outline. */
+/* Ghost buttons: outline only. */
 .ghost {
   min-height: 32px;
   padding: 4px var(--space-1);
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -219,7 +225,7 @@
 }
 
 .ghost:disabled {
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
 .ghost.icon-only {
@@ -270,6 +276,7 @@
   border-bottom: 0;
 }
 
+/* Players and allies: a quiet band with the initials. Enemies: empty. */
 .tile-avatar {
   width: 22px;
   height: 22px;
@@ -277,8 +284,9 @@
   align-items: center;
   justify-content: center;
   border: var(--border-width) solid var(--color-text);
-  background: var(--color-text);
-  color: var(--color-bg);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+  color: var(--color-text);
   font-size: var(--font-size-xs);
   font-weight: 600;
 }
@@ -318,14 +326,14 @@
   font-size: var(--font-size-sm);
 }
 
-/* The start button: a filled square. */
+/* The start button: the one main action, the accent fill. */
 .primary {
   min-height: 40px;
   padding: 8px var(--space-2);
-  border: var(--border-width) solid var(--color-text);
-  border-radius: 0;
-  background: var(--color-text);
-  color: var(--color-bg);
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
   font-size: var(--font-size-sm);
   font-weight: 500;
 }
@@ -336,7 +344,7 @@
 }
 
 .primary:disabled {
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
 @media (max-width: 719px) {

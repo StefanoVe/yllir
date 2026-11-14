@@ -59,6 +59,9 @@
           <span [title]="frame.title">{{ frame.title }}</span>
           }
         </header>
+        @if (board().highlightId === frame.id) {
+        <span class="in-view-tag">{{ i18n.t('liveAgent.canvas.inView') }}</span>
+        }
         <span class="resize-handle" aria-hidden="true"></span>
       </section>
       }
@@ -253,6 +256,9 @@
           </div>
           </div>
         </div>
+        @if (board().highlightId === card.id) {
+        <span class="in-view-tag">{{ i18n.t('liveAgent.canvas.inView') }}</span>
+        }
         <span class="resize-handle" aria-hidden="true"></span>
       </article>
       }
@@ -323,8 +329,8 @@
   @if (bar.card; as card) {
   <button
     type="button"
-    [msTooltip]="card.pinned ? 'Sblocca' : 'Fissa'"
-    [attr.aria-label]="card.pinned ? 'Sblocca' : 'Fissa'"
+    [msTooltip]="card.pinned ? i18n.t('liveAgent.canvas.unpin') : i18n.t('liveAgent.canvas.pin')"
+    [attr.aria-label]="card.pinned ? i18n.t('liveAgent.canvas.unpin') : i18n.t('liveAgent.canvas.pin')"
     (click)="pinSelection()"
   >
     <ui-icon [name]="card.pinned ? 'unpin' : 'pin'" [size]="16" />
@@ -338,7 +344,7 @@
     [attr.aria-expanded]="colorOpen()"
     (click)="toggleColorPicker()"
   >
-    <ui-icon name="sparkles" [size]="16" />
+    <ui-icon name="palette" [size]="16" />
   </button>
   @if (colorOpen()) {
   <span class="swatches">
@@ -415,7 +421,7 @@
     [attr.aria-label]="i18n.t('liveAgent.canvas.fitAll')"
     (click)="fitAll()"
   >
-    <ui-icon name="maximize" [size]="16" />
+    <ui-icon name="scan" [size]="16" />
   </button>
   <button
     type="button"
@@ -424,7 +430,7 @@
     [disabled]="!board().highlightId"
     (click)="goToHighlight()"
   >
-    <ui-icon name="locate" [size]="16" />
+    <ui-icon name="scanEye" [size]="16" />
   </button>
   <span class="sep" aria-hidden="true"></span>
   <button

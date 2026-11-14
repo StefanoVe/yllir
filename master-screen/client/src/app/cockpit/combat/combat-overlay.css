@@ -4,7 +4,9 @@
  * initiative table (left), the turn card (right), the chat drawer and the music player float over
  * it as flat panels. The rail of toggles opens and folds them; the floating layer fades out after
  * a few seconds without activity (combat-hud.service.ts). Under 900 px the turn and the chat are
- * bottom sheets. Square corners, 1 px lines, no shadows, no blur, no gradients, no accent colour.
+ * bottom sheets. Small radii and 1 px lines; the floating panels get the one soft shadow, the
+ * overlay itself none. The accent is for the main action and the chosen options; the current turn
+ * is the only inverted fill. No blur, no gradients (except the low hit points hatch).
  */
 
 .overlay {
@@ -58,7 +60,7 @@
   margin: 0;
   color: var(--color-text);
   font-family: var(--font-family-hand);
-  font-size: 22px;
+  font-size: var(--font-size-lg);
   font-weight: 700;
   line-height: 1.1;
   overflow: hidden;
@@ -90,7 +92,7 @@
   justify-content: center;
   padding: 0;
   border: var(--border-width) solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   transition: background-color var(--transition-fast), color var(--transition-fast);
@@ -101,22 +103,25 @@
   border-color: var(--color-border-strong);
 }
 
+/* A toggle that is on: the chosen-option look. */
 .icon-button[aria-pressed="true"] {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-selected-bg);
+  border-color: var(--color-selected-border);
+  color: var(--color-accent);
+  font-weight: 600;
 }
 
-/* The one primary action of the screen: a filled square. */
+/* The one primary action of the screen: the accent fill. */
 .next-turn {
   min-height: 36px;
   display: inline-flex;
   align-items: center;
   gap: var(--space-0-5);
   padding: 0 var(--space-2) 0 var(--space-1);
-  border: var(--border-width) solid var(--color-text);
-  border-radius: 0;
-  background: var(--color-text);
-  color: var(--color-bg);
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
   font-size: var(--font-size-sm);
   font-weight: 500;
   white-space: nowrap;
@@ -129,7 +134,7 @@
 }
 
 .next-turn:disabled {
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
 /*
@@ -154,7 +159,7 @@
   padding: var(--space-1) var(--space-2);
   border: var(--border-width) solid var(--color-border-strong);
   border-bottom-width: 4px;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -171,11 +176,13 @@
   background: var(--color-accent-soft);
 }
 
+/* The notice dot: the accent, round. */
 .dot {
   flex: none;
   width: 8px;
   height: 8px;
-  background: var(--color-text);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
 }
 
 .notice-toggle[data-kind="defeated"] .dot,
@@ -203,8 +210,9 @@
   padding: var(--space-1) var(--space-2);
   list-style: none;
   background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
   color: var(--color-text);
   font-size: var(--font-size-sm);
 }
@@ -225,18 +233,18 @@
   border: 0;
 }
 
-/* Every floating panel: a flat square surface with a 1 px structure line. */
+/* Every floating panel: a surface with a 1 px line, a small radius and the one soft shadow. */
 .panel-card {
   position: absolute;
   pointer-events: auto;
   background: var(--color-surface);
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
-  box-shadow: none;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
   color: var(--color-text);
 }
 
-/* Initiative table: rows separated by 1 px lines, the current creature inverted, on the left. */
+/* Initiative table: rows separated by 1 px lines, the current creature in the current-turn fill, on the left. */
 .strip {
   top: calc(var(--bar-h) + 12px);
   bottom: 76px;
@@ -276,7 +284,8 @@
   color: var(--color-text-muted);
 }
 
-/* Allies and player characters: filled square. Enemies: empty square. */
+/* Allies and player characters: filled square. Enemies: hollow diamond (a square turned by 45 degrees,
+   a little smaller so the turned box fits the same place). */
 .tile-mark {
   width: 10px;
   height: 10px;
@@ -285,7 +294,11 @@
 }
 
 .tile[data-side="enemy"] .tile-mark {
+  width: 9px;
+  height: 9px;
+  border-width: 1.5px;
   background: transparent;
+  transform: rotate(45deg);
 }
 
 .tile-name {
@@ -296,10 +309,10 @@
   font-weight: 500;
 }
 
-/* The current creature: the inverted row. */
+/* The current creature: the current-turn fill. */
 .tile.active {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-current-bg);
+  color: var(--color-current-text);
 }
 
 .tile.active .tile-init {
@@ -340,14 +353,17 @@
   background: currentColor;
 }
 
+/* Low hit points: the danger fill with a diagonal hatch, so the state is not colour alone. */
 .tile-hp.low .tile-seg.on {
-  background: var(--color-danger);
+  background-color: var(--color-danger);
+  background-image: repeating-linear-gradient(45deg, transparent 0 3px, var(--color-surface) 3px 4px);
   border-color: var(--color-danger);
 }
 
 .tile-hp-text {
   flex: none;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -428,7 +444,7 @@
   justify-content: center;
   padding: 0;
   border: var(--border-width) solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   transition: background-color var(--transition-fast), color var(--transition-fast);
@@ -439,11 +455,12 @@
   background: var(--color-accent-soft);
 }
 
-/* The active toggle: inverted inside a filled square. */
+/* A toggle that is on: the chosen-option look. */
 .rail-button[aria-pressed="true"] {
-  background: var(--color-text);
-  border-color: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-selected-bg);
+  border-color: var(--color-selected-border);
+  color: var(--color-accent);
+  font-weight: 600;
 }
 
 /* Turn card: at the right, under the header. */

@@ -24,7 +24,7 @@
   padding: var(--space-2) 0;
   overflow-y: auto;
   background: var(--color-surface);
-  border-right: var(--border-width) solid var(--color-border-strong);
+  border-right: var(--border-width) solid var(--color-border);
 }
 
 /* Square 40 px buttons, no border. The focus outline (2 px + 2 px offset) fits inside the rail's padding. */
@@ -37,7 +37,7 @@
   width: 40px;
   height: 40px;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   cursor: pointer;
@@ -51,14 +51,25 @@
 }
 
 .rail-item:active {
-  background: var(--color-border);
+  background: var(--color-surface-3);
 }
 
-/* Active: the entry is inverted (filled with the text colour, icon in the background colour). */
+/* Active: soft accent fill, accent icon and a 3 px accent bar at the rail edge. */
 .rail-item.active,
 .rail-item.active:hover {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-selected-bg);
+  color: var(--color-accent);
+}
+
+.rail-item.active::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--space-1) * -1);
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
 }
 
 .rail-item:focus-visible {
@@ -90,7 +101,7 @@
   margin: 0 0 var(--space-2);
   padding: var(--space-1) var(--space-2);
   border: var(--border-width) dashed var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -129,7 +140,7 @@
   max-width: calc(100vw - var(--rail-width) - 2 * var(--space-2));
   padding: var(--space-1) var(--space-2);
   border: var(--border-width) solid var(--color-danger);
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: var(--color-surface);
   color: var(--color-text);
   box-shadow: none;
@@ -230,16 +241,15 @@
   }
 }
 
-/* Update ready: a small filled square at the icon's top-right corner. Neutral colour, outlined in the
-   background so it reads on the inverted entry too. */
+/* Update ready: a small accent dot at the icon's top-right corner, outlined in the background colour. */
 .rail-dot {
   position: absolute;
   top: 6px;
   right: 6px;
   width: 8px;
   height: 8px;
-  border-radius: 0;
-  background: var(--color-text);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
   outline: 2px solid var(--color-bg);
   outline-offset: 0;
 }

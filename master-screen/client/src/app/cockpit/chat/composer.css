@@ -19,7 +19,7 @@
   flex-direction: column;
   padding: 12px 12px 8px;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--color-bg);
 }
 .box:focus-within {
@@ -36,11 +36,11 @@
   margin: 0;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-family: var(--font-family);
-  font-size: 15px;
+  font-size: var(--font-size-base);
   line-height: 21px;
   resize: none;
   overflow-y: auto;
@@ -76,11 +76,11 @@
   margin: 0;
   padding: 0 26px 0 8px;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-family);
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   line-height: 1;
   cursor: pointer;
 }
@@ -93,21 +93,24 @@
   pointer-events: none;
 }
 .composer .model:disabled {
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
   cursor: default;
 }
 .composer .model:focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
-/* Send: a 36px square. Enabled = filled, icon in the page colour. Disabled = outlined, not faded. */
+/* Send: a 36px button. Enabled = the main action, filled with the accent. Disabled = outlined, not faded. */
 .composer .send {
   flex: 0 0 auto;
   width: 36px;
   height: 36px;
   min-width: 36px;
   padding: 0;
-  color: var(--color-bg);
+  border: var(--border-width) solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 .composer .send:disabled,
 .composer .send:disabled:hover {

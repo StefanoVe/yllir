@@ -38,7 +38,7 @@
   gap: var(--space-1);
   min-height: 40px;
   padding: var(--space-0-5) var(--space-2);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   border: var(--border-width) solid var(--color-border-strong);
   background: var(--color-surface);
   color: var(--color-text);
@@ -89,7 +89,7 @@
   max-width: 100%;
   aspect-ratio: var(--map-ratio, 1.3333);
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--color-surface-2);
   user-select: none;
   touch-action: none;
@@ -145,7 +145,7 @@
   visibility: hidden;
 }
 
-/* Chips not yet on the map: a small strip at the bottom centre of the board, flat. */
+/* Chips not yet on the map: a small floating strip at the bottom centre of the board. */
 .tray {
   position: absolute;
   left: 50%;
@@ -157,10 +157,10 @@
   gap: var(--space-1);
   max-width: calc(100% - 2 * var(--space-2));
   padding: var(--space-0-5) var(--space-1);
-  border-radius: 0;
-  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  border: var(--border-width) solid var(--color-border);
   background: var(--color-surface);
-  box-shadow: none;
+  box-shadow: var(--shadow-1);
 }
 
 .tray h3 {
@@ -192,7 +192,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   border: var(--border-width-strong) solid var(--color-border-strong);
   background: var(--color-surface);
   color: var(--color-text);
@@ -209,7 +209,8 @@
   opacity: 1;
 }
 
-/* Allies: a filled square mark. Enemies: an empty square mark. Never colour. */
+/* Allies: a filled square mark. Enemies: a hollow diamond (a square turned by 45 degrees, a little
+   smaller so the turned box fits). The mark takes the text colour; no other colour. */
 .ghost::before {
   content: "";
   position: absolute;
@@ -217,12 +218,18 @@
   left: 3px;
   width: 10px;
   height: 10px;
-  background: var(--color-text);
-  border: var(--border-width) solid var(--color-text);
+  background: currentColor;
+  border: var(--border-width) solid currentColor;
 }
 
 .ghost[data-side="enemy"]::before {
-  background: var(--color-surface);
+  top: 4px;
+  left: 4px;
+  width: 9px;
+  height: 9px;
+  background: transparent;
+  border-width: 1.5px;
+  transform: rotate(45deg);
 }
 
 .list {

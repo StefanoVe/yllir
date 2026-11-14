@@ -1,42 +1,50 @@
 /* Bundled fonts (offline): Inter variable is used for text and titles. */
 @import "@fontsource-variable/inter/wght.css";
 
-/* Design tokens. Notebook look: black on white (light), white on black (dark). Flat, square,
-   thin borders, no shadows, no gradients, no accent colour. Dark follows the system unless the
-   master overrides it with data-theme on <html> (set by ThemeService). The three colour blocks
-   below must keep the same token list. Names are stable: other views use them. */
+/* Design tokens. Notebook look: warm paper and warm ink, one blue ink accent (decided 2026-11-15).
+   Roles: accent fill = the one main action; selected/on = accent border and text on --color-selected-bg;
+   current turn = --color-current-bg. Small radii; shadows only on floating things. Thin borders, no gradients.
+   Dark follows the system unless the master overrides it with data-theme on <html> (set by ThemeService).
+   The three colour blocks below must keep the same token list. Names are stable: other views use them. */
 :root {
   color-scheme: light;
 
   /* Surfaces and text. */
-  --color-bg: #ffffff;
-  --color-surface: #ffffff;
-  --color-surface-2: #f2f2f2;
-  --color-border: #c4c4c4;
-  --color-border-strong: #111111;
-  --color-text: #111111;
-  --color-text-muted: #595959;
+  --color-bg: #F7F3EA;
+  --color-surface: #FFFDF8;
+  --color-surface-2: #EFE9DD;
+  --color-surface-3: #E4DCCC;
+  --color-border: #D8CFBF;
+  --color-border-strong: #8C8373;
+  --color-text: #2A2520;
+  --color-text-muted: #5F574D;
 
-  /* Accent: the text colour itself. Hover and active are one step lighter. */
-  --color-accent: #111111;
-  --color-accent-hover: #333333;
-  --color-accent-active: #4d4d4d;
-  --color-accent-contrast: #ffffff;
-  --color-accent-soft: #f2f2f2;
-  --color-focus: #111111;
-  --color-danger: #a33a32;
-  --color-selection: #d9d9d9;
-  --color-danger-contrast: #ffffff;
+  /* Accent: blue ink. Used for the main action, links in documents, selection and focus. */
+  --color-accent: #2E4C8F;
+  --color-accent-hover: #243D75;
+  --color-accent-active: #1C3160;
+  --color-accent-contrast: #FFFDF8;
+  --color-accent-soft: #E3E9F4;
+  --color-focus: #2E4C8F;
+  --color-danger: #A33A32;
+  --color-selection: #D6DEEE;
+  --color-danger-contrast: #FFFFFF;
+  --color-selected-bg: #E3E9F4;
+  --color-selected-border: #2E4C8F;
+  --color-highlight: #2E4C8F;
+  --color-current-bg: #2A2520;
+  --color-current-text: #FFFDF8;
+  --color-scrim: rgba(42, 37, 32, 0.45);
 
   /* Diff colours: no colour of their own, the change is read from the text. */
-  --color-diff-add: #111111;
-  --color-diff-del: #111111;
+  --color-diff-add: #2A2520;
+  --color-diff-del: #2A2520;
   --color-diff-add-bg: transparent;
   --color-diff-del-bg: transparent;
 
   /* Notebook paper: ruled lines and the margin line of .notebook-page. */
-  --color-rule: #efdcd9;
-  --color-margin: #c98a84;
+  --color-rule: #E9DDD0;
+  --color-margin: #C98A84;
 
   /* Card colour labels: content, so they keep their hues in the monochrome UI. Ink = text on the colour. */
   --card-red: #b3342b;
@@ -51,16 +59,18 @@
   --card-violet-ink: #ffffff;
 
   /* Scrollbar. */
-  --scrollbar-thumb: #b3b3b3;
+  --scrollbar-thumb: #C9BFAE;
   --scrollbar-track: transparent;
 
-  /* No shadows, no radii: the look is flat and square. */
-  --shadow-1: none;
-  --shadow-2: none;
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-pill: 0;
+  /* Shadows only on floating things (toolbars, menus, popups, modals). */
+  --shadow-1: 0 1px 2px rgba(42, 37, 32, 0.08), 0 2px 6px rgba(42, 37, 32, 0.06);
+  --shadow-2: 0 4px 12px rgba(42, 37, 32, 0.10), 0 12px 32px rgba(42, 37, 32, 0.10);
+
+  /* Small radii. */
+  --radius-sm: 3px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-pill: 999px;
 
   /* Borders. */
   --border-width: 1px;
@@ -85,6 +95,7 @@
   --font-size-md: 1.125rem;
   --font-size-lg: 1.375rem;
   --font-size-xl: 1.75rem;
+  --opacity-disabled: 0.5;
   --line-height: 1.5;
   --line-height-tight: 1.25;
   --line-pitch: 28px;
@@ -99,31 +110,38 @@
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --color-bg: #000000;
-    --color-surface: #000000;
-    --color-surface-2: #141414;
-    --color-border: #3a3a3a;
-    --color-border-strong: #f5f5f5;
-    --color-text: #f5f5f5;
-    --color-text-muted: #b3b3b3;
+    --color-bg: #1B1916;
+    --color-surface: #23211D;
+    --color-surface-2: #2C2924;
+    --color-surface-3: #36322C;
+    --color-border: #3F3A33;
+    --color-border-strong: #7D7569;
+    --color-text: #ECE5D8;
+    --color-text-muted: #ADA497;
 
-    --color-accent: #f5f5f5;
-    --color-accent-hover: #d9d9d9;
-    --color-accent-active: #bfbfbf;
-    --color-accent-contrast: #000000;
-    --color-accent-soft: #141414;
-    --color-focus: #f5f5f5;
-    --color-danger: #e0827a;
-    --color-selection: #3a3a3a;
-    --color-danger-contrast: #000000;
+    --color-accent: #93ABE3;
+    --color-accent-hover: #ABBFEA;
+    --color-accent-active: #C0CFF0;
+    --color-accent-contrast: #1B1916;
+    --color-accent-soft: #26304A;
+    --color-focus: #93ABE3;
+    --color-danger: #E0827A;
+    --color-selection: #33405F;
+    --color-danger-contrast: #1B1916;
+    --color-selected-bg: #26304A;
+    --color-selected-border: #93ABE3;
+    --color-highlight: #93ABE3;
+    --color-current-bg: #ECE5D8;
+    --color-current-text: #1B1916;
+    --color-scrim: rgba(0, 0, 0, 0.6);
 
-    --color-diff-add: #f5f5f5;
-    --color-diff-del: #f5f5f5;
+    --color-diff-add: #ECE5D8;
+    --color-diff-del: #ECE5D8;
     --color-diff-add-bg: transparent;
     --color-diff-del-bg: transparent;
 
-    --color-rule: #3a2523;
-    --color-margin: #85403a;
+    --color-rule: #3A2F28;
+    --color-margin: #85403A;
 
     --card-red: #ff8a80;
     --card-amber: #f2b84b;
@@ -136,42 +154,49 @@
     --card-blue-ink: #000000;
     --card-violet-ink: #000000;
 
-    --scrollbar-thumb: #4d4d4d;
+    --scrollbar-thumb: #4A443C;
     --scrollbar-track: transparent;
 
-    --shadow-1: none;
-    --shadow-2: none;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 12px 32px rgba(0, 0, 0, 0.4);
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --color-bg: #000000;
-  --color-surface: #000000;
-  --color-surface-2: #141414;
-  --color-border: #3a3a3a;
-  --color-border-strong: #f5f5f5;
-  --color-text: #f5f5f5;
-  --color-text-muted: #b3b3b3;
+  --color-bg: #1B1916;
+  --color-surface: #23211D;
+  --color-surface-2: #2C2924;
+  --color-surface-3: #36322C;
+  --color-border: #3F3A33;
+  --color-border-strong: #7D7569;
+  --color-text: #ECE5D8;
+  --color-text-muted: #ADA497;
 
-  --color-accent: #f5f5f5;
-  --color-accent-hover: #d9d9d9;
-  --color-accent-active: #bfbfbf;
-  --color-accent-contrast: #000000;
-  --color-accent-soft: #141414;
-  --color-focus: #f5f5f5;
-  --color-danger: #e0827a;
-  --color-selection: #3a3a3a;
-  --color-danger-contrast: #000000;
+  --color-accent: #93ABE3;
+  --color-accent-hover: #ABBFEA;
+  --color-accent-active: #C0CFF0;
+  --color-accent-contrast: #1B1916;
+  --color-accent-soft: #26304A;
+  --color-focus: #93ABE3;
+  --color-danger: #E0827A;
+  --color-selection: #33405F;
+  --color-danger-contrast: #1B1916;
+  --color-selected-bg: #26304A;
+  --color-selected-border: #93ABE3;
+  --color-highlight: #93ABE3;
+  --color-current-bg: #ECE5D8;
+  --color-current-text: #1B1916;
+  --color-scrim: rgba(0, 0, 0, 0.6);
 
-  --color-diff-add: #f5f5f5;
-  --color-diff-del: #f5f5f5;
+  --color-diff-add: #ECE5D8;
+  --color-diff-del: #ECE5D8;
   --color-diff-add-bg: transparent;
   --color-diff-del-bg: transparent;
 
-  --color-rule: #3a2523;
-  --color-margin: #85403a;
+  --color-rule: #3A2F28;
+  --color-margin: #85403A;
 
   --card-red: #ff8a80;
   --card-amber: #f2b84b;
@@ -184,11 +209,11 @@
   --card-blue-ink: #000000;
   --card-violet-ink: #000000;
 
-  --scrollbar-thumb: #4d4d4d;
+  --scrollbar-thumb: #4A443C;
   --scrollbar-track: transparent;
 
-  --shadow-1: none;
-  --shadow-2: none;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 4px 12px rgba(0, 0, 0, 0.45), 0 12px 32px rgba(0, 0, 0, 0.4);
 }
 
 /* Compact density (set on <html> from the settings): tighter spacing, same scale names. */
@@ -224,10 +249,10 @@ html {
   background: var(--scrollbar-track);
 }
 
-/* Square thumb, no pill. */
+/* Rounded thumb. */
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
-  border-radius: 0;
+  border-radius: var(--radius-pill);
   border: 3px solid transparent;
   background-clip: padding-box;
 }
@@ -341,13 +366,13 @@ a:has(> ui-icon) {
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
 input,
 select,
 textarea {
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   transition: border-color var(--transition-fast);
 }
 
@@ -358,7 +383,7 @@ textarea {
 
 /* Shared utilities. Single-class selectors: a view that sets its own look still wins. */
 
-/* Buttons: square, thin border. */
+/* Buttons: small radius, thin border. The main action is the accent fill. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -366,7 +391,7 @@ textarea {
   gap: 6px;
   padding: 8px 14px;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-family: var(--font-family);
@@ -378,19 +403,19 @@ textarea {
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.btn:hover {
-  background: var(--color-accent-soft);
+.btn:not(.btn-primary):hover {
+  background: var(--color-surface-2);
 }
 
 .btn:disabled {
   cursor: not-allowed;
-  opacity: 0.55;
+  opacity: var(--opacity-disabled);
 }
 
 .btn-primary {
-  background: var(--color-text);
-  border-color: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 
 .btn-primary:hover {
@@ -418,7 +443,7 @@ textarea {
   color: var(--color-accent-hover);
 }
 
-/* Text field: only a bottom line. On focus the line gets thicker; the padding shrinks by the same
+/* Text field: only a bottom line. On focus the line gets thicker and takes the accent; the padding shrinks by the same
    amount so the text does not move. */
 .field {
   width: 100%;
@@ -435,17 +460,18 @@ textarea {
 
 .field:focus {
   border-bottom-width: var(--border-width-strong);
+  border-bottom-color: var(--color-accent);
   padding-bottom: 5px;
 }
 
-/* Chips: rectangle with a thin border; the active one is inverted. */
+/* Chips: small radius, thin border; the active one takes the soft accent fill. */
 .chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-size: var(--font-size-sm);
@@ -455,13 +481,15 @@ textarea {
 }
 
 .chip:hover {
-  background: var(--color-accent-soft);
+  background: var(--color-surface-2);
 }
 
 .chip.active,
 .chip[aria-pressed="true"] {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-selected-bg);
+  color: var(--color-accent);
+  border-color: var(--color-selected-border);
+  font-weight: 600;
 }
 
 /* Notebook page: ruled lines and a margin line, both hard-stop gradients drawn in the background.
@@ -483,7 +511,7 @@ textarea {
 .master-only {
   padding: var(--space-1) var(--space-2);
   border: var(--border-width) dashed var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-md);
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -512,12 +512,12 @@ describe('Settings page', () => {
       settingsFake.explicit.set(['combat.showMaps']);
       const root = await render();
 
-      expect(q(root, '#s-combat .changed').getAttribute('title')).toBe('Changed from the default');
-      expect(q(root, '#s-combat .changed .sr-only').textContent).toContain('Changed from the default');
-      expect(q(root, 'nav.toc a[href="#s-combat"] .changed')).toBeTruthy();
-      expect(root.querySelector('#s-table .changed')).toBeNull();
-      expect(root.querySelector('nav.toc a[href="#s-table"] .changed')).toBeNull();
-      expect(root.querySelector('#s-update .changed')).toBeNull();
+      expect(q(root, '#s-combat .changed-mark').getAttribute('title')).toBe('Changed from the default');
+      expect(q(root, '#s-combat .changed-mark').textContent?.trim()).toBe('Changed');
+      expect(q(root, 'nav.toc a[href="#s-combat"] .changed-mark')).toBeTruthy();
+      expect(root.querySelector('#s-table .changed-mark')).toBeNull();
+      expect(root.querySelector('nav.toc a[href="#s-table"] .changed-mark')).toBeNull();
+      expect(root.querySelector('#s-update .changed-mark')).toBeNull();
     });
 
     it('a fragment in the address opens its section and scrolls to it, without throwing', async () => {

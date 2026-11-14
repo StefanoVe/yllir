@@ -164,6 +164,9 @@ export class SettingsService {
       this.apply(await this.api.saveSettings(patch));
       this.saveError.set(null);
       this.saveState.set('saved');
+      setTimeout(() => {
+        if (this.saveState() === 'saved') this.saveState.set('idle');
+      }, 3000);
     } catch (failure) {
       if (isApiFailure(failure) && failure.status === 409) this.canSave.set(false);
       this.saveError.set(isApiFailure(failure) ? failure.error : this.i18n.t('errors.generic'));

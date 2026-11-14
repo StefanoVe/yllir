@@ -49,7 +49,7 @@ h1 {
   line-height: var(--line-height-tight);
 }
 
-/* Save state line: empty when idle, quiet in the header. */
+/* Save state line: empty when idle, ink while saving or saved, danger on error. */
 .save-state {
   margin: 0;
   display: inline-flex;
@@ -57,7 +57,7 @@ h1 {
   gap: var(--space-0-5);
   min-height: 20px;
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
 .save-state.error {
@@ -113,7 +113,7 @@ h1 {
   min-width: 22px;
   padding: 0 var(--space-0-5);
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text-muted);
   font-family: var(--font-family-mono);
@@ -139,7 +139,7 @@ h1 {
 .link-btn {
   padding: var(--space-0-5) 2px;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--color-text);
   font: inherit;
@@ -149,10 +149,10 @@ h1 {
   cursor: pointer;
 }
 
+/* Disabled reset links keep their underline: they still read as links, only faded. */
 .btn-text:disabled,
 .link-btn:disabled {
-  color: var(--color-text-muted);
-  text-decoration: none;
+  opacity: var(--opacity-disabled);
   cursor: default;
 }
 
@@ -166,7 +166,7 @@ h1 {
   height: 40px;
   padding: 0;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   cursor: pointer;
@@ -177,9 +177,10 @@ h1 {
   background: var(--color-surface-2);
 }
 
+/* Disabled while the check or update runs: the spinning icon says so, the button only stops answering. */
 .icon-btn:disabled {
-  cursor: progress;
-  opacity: 0.7;
+  cursor: not-allowed;
+  opacity: var(--opacity-disabled);
 }
 
 .search .icon-btn.clear {
@@ -218,7 +219,7 @@ h1 {
   min-height: 36px;
   padding: 0 var(--space-2);
   border-left: var(--border-width-strong) solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   color: var(--color-text-muted);
   text-decoration: none;
   white-space: nowrap;
@@ -234,26 +235,37 @@ h1 {
   font-weight: 600;
 }
 
-/* The "Changed" dot: a small square, after the name. */
-.changed {
+/* The "Changed" mark: a word on a selected band, after the name. */
+.changed-mark {
   display: inline-block;
   flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 0;
-  background: var(--color-text);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--color-selected-bg);
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .sections {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-5);
   min-width: 0;
 }
 
-/* A section is a flat block: a thin rule under its heading, no card. */
-.card {
+/* A section is a panel: a thin outline on the surface, a rule under its heading. The session panel looks the same. */
+.card,
+.quit-panel {
   min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.card {
   scroll-margin-top: var(--head-offset);
 }
 
@@ -292,7 +304,7 @@ h2 {
   margin-left: calc(var(--space-1) * -1);
   padding: 0;
   border: var(--border-width) solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   cursor: pointer;
@@ -327,6 +339,7 @@ h2 {
 }
 
 .row-label {
+  font-size: var(--font-size-base);
   font-weight: 500;
 }
 
@@ -351,13 +364,15 @@ h2 {
   height: 56px;
   margin-top: var(--space-0-5);
   border: var(--border-width) dashed var(--color-border);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
 }
 
-.note {
-  margin: var(--space-1) 0 0;
+/* Subheading of a group of rows in a section: on this device, or for this campaign. */
+.row-group {
+  margin: var(--space-2) 0 var(--space-0-5);
   font-size: var(--font-size-sm);
+  font-weight: 600;
   color: var(--color-text-muted);
 }
 
@@ -365,7 +380,7 @@ h2 {
   margin: 0;
   padding: var(--space-1) var(--space-2);
   border: var(--border-width) solid var(--color-danger);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   color: var(--color-danger);
   font-size: var(--font-size-sm);
 }
@@ -386,15 +401,16 @@ h2 {
   color: var(--color-text-muted);
 }
 
-/* Segmented control: one outlined strip, the chosen segment inverted. */
+/* Segmented control: one outlined strip, the chosen segment takes the soft selected fill. */
 .segmented {
   display: inline-grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(max-content, 1fr);
   gap: 0;
   max-width: 100%;
+  overflow: hidden;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
 }
 
@@ -415,6 +431,7 @@ h2 {
   min-width: 0;
   border: 0;
   border-left: var(--border-width) solid var(--color-border-strong);
+  /* Square on purpose: the segments are cells of one strip, which clips its rounded corners. */
   border-radius: 0;
   background: transparent;
   color: var(--color-text);
@@ -434,18 +451,20 @@ h2 {
   background: var(--color-surface-2);
 }
 
+/* The chosen segment: soft selected fill, accent text, selected edge. */
 .segment.active {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-selected-bg);
+  color: var(--color-accent);
+  border-left-color: var(--color-selected-border);
   font-weight: 600;
 }
 
 .segment:disabled {
   cursor: default;
-  opacity: 0.6;
+  opacity: var(--opacity-disabled);
 }
 
-/* Switch: a square outline; the thumb is a square that slides to the right when on. */
+/* Switch: a pill track. On takes the accent; off is a surface band with a strong outline. The thumb slides right when on. */
 .switch {
   position: relative;
   box-sizing: border-box;
@@ -454,10 +473,10 @@ h2 {
   height: 24px;
   padding: 0;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
-  background: transparent;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-3);
   cursor: pointer;
-  transition: background-color var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .switch .thumb {
@@ -466,23 +485,37 @@ h2 {
   left: var(--space-0-5);
   width: 14px;
   height: 14px;
-  border-radius: 0;
-  background: var(--color-text);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
   transition: translate var(--transition-fast), background-color var(--transition-fast);
 }
 
 .switch[aria-checked='true'] {
-  background: var(--color-text);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .switch[aria-checked='true'] .thumb {
   translate: 22px 0;
-  background: var(--color-bg);
+  background: var(--color-accent-contrast);
 }
 
 .switch:disabled {
   cursor: default;
-  opacity: 0.6;
+  opacity: var(--opacity-disabled);
+}
+
+/* A switch with its state word after it ("On" or "Off"). */
+.switch-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.switch-state {
+  min-width: 2.5em;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
 }
 
 /* Chips: toggles for a set of items; the chosen one is inverted. */
@@ -500,7 +533,7 @@ h2 {
   min-height: 32px;
   padding: 0 var(--space-1);
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font: inherit;
@@ -514,14 +547,15 @@ h2 {
 }
 
 .chip[aria-pressed='true'] {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-selected-bg);
+  color: var(--color-accent);
+  border-color: var(--color-selected-border);
   font-weight: 600;
 }
 
 .chip:disabled {
   cursor: default;
-  opacity: 0.6;
+  opacity: var(--opacity-disabled);
 }
 
 /* Range input and its value */
@@ -530,11 +564,11 @@ h2 {
   max-width: 100%;
   height: 6px;
   margin: 0;
-  accent-color: var(--color-text);
+  accent-color: var(--color-accent);
 }
 
 .range:disabled {
-  opacity: 0.6;
+  opacity: var(--opacity-disabled);
 }
 
 .value {
@@ -558,7 +592,7 @@ h2 {
   min-width: 0;
   padding: var(--space-1) var(--space-2);
   border: var(--border-width) solid var(--color-border);
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: transparent;
 }
 
@@ -567,7 +601,7 @@ h2 {
 }
 
 .kpi-count {
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-lg);
   font-weight: 600;
   line-height: var(--line-height-tight);
   font-variant-numeric: tabular-nums;
@@ -596,7 +630,7 @@ h2 {
 .kpi-skel {
   height: 86px;
   border: var(--border-width) dashed var(--color-border);
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: transparent;
 }
 
@@ -676,22 +710,23 @@ summary {
   min-height: 32px;
   padding: 0 var(--space-1);
   border: var(--border-width) solid var(--color-border);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
 }
 
-/* A status square: filled when the module is on, hollow and muted when it is off. */
+/* A status dot: filled accent when the module is on, hollow and muted when it is off. */
 .dot {
   flex: none;
   width: 8px;
   height: 8px;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-pill);
   background: transparent;
 }
 
 .dot.on {
-  background: var(--color-text);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .spin {
@@ -740,7 +775,7 @@ summary {
   margin-top: var(--space-2);
   padding: var(--space-2);
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-md);
   background: transparent;
 }
 
@@ -762,7 +797,7 @@ summary {
   min-height: 40px;
   padding: 0 var(--space-2);
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font: inherit;
@@ -771,9 +806,11 @@ summary {
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
+/* The main action of the update: accent fill. "Later" stays an outline. */
 .update-btn.primary {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
 }
 
 .update-btn:hover:not(:disabled):not(.primary) {
@@ -781,7 +818,7 @@ summary {
 }
 
 .update-btn:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -791,7 +828,6 @@ summary {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-1);
-  margin-block-start: var(--space-3);
 }
 
 .quit-btn {
@@ -801,7 +837,7 @@ summary {
   min-height: 40px;
   padding: 0 var(--space-2);
   border: var(--border-width) solid var(--color-danger);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-danger);
   font: inherit;
@@ -816,7 +852,7 @@ summary {
 }
 
 .quit-btn:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 

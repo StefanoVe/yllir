@@ -8,6 +8,9 @@
     <div class="identity head">
       <span class="name-line">
         <span class="mark" aria-hidden="true"></span>
+        @if (!isPc()) {
+        <span class="side-tag">{{ i18n.t(combatant().kind === "enemy" ? "combat.side.enemy" : "combat.side.ally") }}</span>
+        }
         <span class="row-name">{{ combatant().name }}</span>
         @if (defeated()) {
         <ui-icon class="down" name="x" [size]="14" aria-hidden="true" />
@@ -65,7 +68,7 @@
       />
       <button
         type="button"
-        class="icon-button"
+        class="icon-button dmg"
         [disabled]="!canChangeHp()"
         [msTooltip]="i18n.t('combat.damage')"
         msTooltipPosition="top"
@@ -76,7 +79,7 @@
       </button>
       <button
         type="button"
-        class="icon-button"
+        class="icon-button heal"
         [disabled]="!canChangeHp()"
         [msTooltip]="i18n.t('combat.heal')"
         msTooltipPosition="top"
@@ -86,18 +89,20 @@
         <ui-icon name="plus" [size]="16" />
       </button>
       }
-      <ui-confirm-button
-        icon="enemy"
-        [label]="i18n.t('combat.defeat')"
-        [confirmLabel]="i18n.t('combat.defeatConfirmShort')"
-        (confirmed)="defeat()"
-      />
-      <ui-confirm-button
-        icon="trash"
-        [label]="i18n.t('combat.remove')"
-        [confirmLabel]="i18n.t('combat.removeConfirmShort')"
-        (confirmed)="remove()"
-      />
+      <div class="row-actions">
+        <ui-confirm-button
+          icon="enemy"
+          [label]="i18n.t('combat.defeat')"
+          [confirmLabel]="i18n.t('combat.defeatConfirmShort')"
+          (confirmed)="defeat()"
+        />
+        <ui-confirm-button
+          icon="trash"
+          [label]="i18n.t('combat.remove')"
+          [confirmLabel]="i18n.t('combat.removeConfirmShort')"
+          (confirmed)="remove()"
+        />
+      </div>
     </div>
     }
   </div>

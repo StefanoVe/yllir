@@ -284,12 +284,10 @@ describe('DocumentsPage', () => {
     );
   }
 
-  /** Opens every group and the recent section with the toolbar button, as the master would. */
+  /** Opens every group and the recent section with the toolbar toggle, as the master would. Does nothing when it already reads "Collapse all". */
   function expandAllGroups(): void {
-    const expand = [...el.querySelectorAll<HTMLButtonElement>('.tool-group button')].find(
-      (item) => item.textContent?.trim() === 'Expand all',
-    )!;
-    expand.click();
+    const toggle = el.querySelector<HTMLButtonElement>('.tool-group button')!;
+    if (toggle.textContent?.trim() === 'Expand all') toggle.click();
     fixture.detectChanges();
   }
 
@@ -583,22 +581,22 @@ describe('DocumentsPage', () => {
     expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('collapses and expands all groups with the toolbar buttons', async () => {
+  it('collapses and expands all groups with the one toolbar toggle', async () => {
     await create();
-    const button = (label: string) =>
-      [...el.querySelectorAll<HTMLButtonElement>('.tool-group button')].find(
-        (item) => item.textContent?.trim() === label,
-      )!;
-    button('Expand all').click();
+    const toggle = () => el.querySelector<HTMLButtonElement>('.tool-group button')!;
+    expect(toggle().textContent?.trim()).toBe('Expand all');
+    toggle().click();
     fixture.detectChanges();
+    expect(toggle().textContent?.trim()).toBe('Collapse all');
     expect([...fixture.componentInstance.expanded()].sort()).toEqual(
       ['', RECENT_ID, 'characters', 'places'].sort(),
     );
     expect(rowTitles()).toHaveLength(5);
     expect(el.querySelectorAll('button.group-toggle[aria-expanded="false"]')).toHaveLength(0);
 
-    button('Collapse all').click();
+    toggle().click();
     fixture.detectChanges();
+    expect(toggle().textContent?.trim()).toBe('Expand all');
     expect(fixture.componentInstance.expanded()).toEqual([]);
     expect(rowTitles()).toEqual([]);
     expect(el.querySelectorAll('button.group-toggle[aria-expanded="true"]')).toHaveLength(0);

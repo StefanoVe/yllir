@@ -28,19 +28,19 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  border-bottom: var(--border-width) solid var(--color-border-strong);
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 .chat-head h2 {
   margin: 0;
   color: var(--color-text);
   font-family: var(--font-family-hand);
-  font-size: 26px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
   line-height: 1;
 }
 .chat-state {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -70,6 +70,7 @@
 .unread-mark {
   width: 8px;
   height: 8px;
+  border-radius: var(--radius-pill);
   background: var(--color-text);
 }
 
@@ -79,16 +80,17 @@
   max-width: min(100%, 36ch);
   margin: 0;
   padding: 16px;
-  border: var(--border-width) dashed var(--color-border-strong);
+  border: var(--border-width) dashed var(--color-border);
+  border-radius: var(--radius-md);
   text-align: left;
   color: var(--color-text);
-  font-size: 15px;
+  font-size: var(--font-size-base);
   line-height: 1.5;
 }
 .empty {
   margin: 0;
   color: var(--color-text);
-  font-size: 15px;
+  font-size: var(--font-size-base);
 }
 
 /* One rhythm for the whole list: 16px between turns, no outer margins. */
@@ -110,15 +112,15 @@
   min-width: 0;
   max-width: 100%;
   align-self: stretch;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   line-height: 1.5;
 }
-/* Agent message: plain text on the page, with a 2px structure line at its left. */
+/* Agent message: plain text on the page, with a 2px line at its left. */
 .message:not(.dm) {
   padding-left: 12px;
-  border-left: 2px solid var(--color-border-strong);
+  border-left: 2px solid var(--color-border);
 }
-/* Master message: an inverted block, aligned right, the meta line under it. */
+/* Master message: a chosen-option block, aligned right, the meta line under it. */
 .message.dm {
   align-self: flex-end;
   align-items: flex-end;
@@ -134,17 +136,18 @@
 }
 .message.dm .bubble {
   padding: 10px 12px;
-  background: var(--color-text);
-  color: var(--color-bg);
+  border-radius: var(--radius-md);
+  background: var(--color-selected-bg);
+  color: var(--color-text);
 }
 .message.dm .message-body a {
-  color: var(--color-bg);
+  color: var(--color-accent);
 }
 .message.cancelled .message-body {
   color: var(--color-text-muted);
 }
 
-/* Meta line: time and changes, muted, 12px. */
+/* Meta line: time and changes, muted, xs. */
 .meta {
   display: flex;
   flex-wrap: wrap;
@@ -152,7 +155,7 @@
   gap: 8px;
   margin-top: 6px;
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.2;
 }
 .message.dm .meta {
@@ -184,11 +187,12 @@
   margin: 8px 0;
   padding-left: 20px;
 }
-/* Rich content: square, thin borders, mono code on the surface-2 tint (inverted in a master block). */
+/* Rich content: thin borders, mono code on the surface-2 tint (on the surface in a master block). */
 .message-body code,
 .message-body pre {
   font-family: var(--font-family-mono);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
+  border-radius: var(--radius-sm);
   background: var(--color-surface-2);
   color: var(--color-text);
 }
@@ -203,17 +207,18 @@
 }
 .message.dm .message-body code,
 .message.dm .message-body pre {
-  background: var(--color-accent-active);
-  color: var(--color-accent-contrast);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 /* Changes chip: a rectangle with a 1px frame, not a filled button. */
 .message .actions-summary {
   padding: 2px 8px;
   border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   line-height: 1.2;
 }
 .message .actions-summary:hover {
@@ -235,9 +240,10 @@
   gap: 4px;
   padding: 2px 6px;
   border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 /* Errors: a thin danger frame, no tint. */
@@ -247,9 +253,10 @@
   gap: 6px;
   padding: 6px 8px;
   border: var(--border-width) solid var(--color-danger);
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-danger);
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   line-height: 1.4;
 }
 .error-pill button {
@@ -266,14 +273,15 @@
   align-self: center;
   padding: 6px 10px;
   border: var(--border-width) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   background: var(--color-bg);
   color: var(--color-text);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 
 .muted {
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
 }
 .desktop-turn:empty {
   display: none;

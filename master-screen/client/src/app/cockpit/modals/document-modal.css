@@ -1,14 +1,19 @@
 /* Document reader popup (DocumentModal). Every selector is scoped to .document-modal, and the
    shared look stays in modal.css, which is loaded first. The page is a notebook page: the global
    .notebook-page class draws the ruled lines and the margin, and the rules below set the text on
-   them. Colors and spacing come from the tokens in styles.css only. */
+   them. Colors and spacing come from the tokens in styles.css only. The document body (tables,
+   code, the master-only block) is styled in reader/doc-body.css; this file only sets what the
+   notebook lines need. */
 
-/* Size: a fixed height, so the popup does not jump while loading. Square, no shadow (from modal.css). */
+/* Size: a fixed height, so the popup does not jump while loading. A notebook page: a thin frame,
+   small corners and a soft shadow, the ruled lines stay inside (from modal.css, overridden here). */
 .document-modal {
   width: min(1120px, calc(100vw - 48px));
   height: min(90vh, 1000px);
   max-height: none;
-  border-radius: 0;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
 }
 
 /* Opening animation. The scrim is the sibling before the dialog, so it is matched from the dialog's side. */
@@ -51,24 +56,23 @@
   align-items: center;
   gap: 12px;
   min-height: 64px;
-  padding: 12px 16px 12px 24px;
+  padding: 12px var(--space-2) 12px var(--space-3);
 }
 .document-modal .head-title {
   flex: 1;
   min-width: 0;
 }
+/* Category line: sentence case, small metadata. */
 .document-modal .eyebrow {
   margin: 0 0 2px;
   font-size: var(--font-size-xs);
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--color-text-muted);
 }
 .document-modal .title-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-1);
   min-width: 0;
 }
 /* Document title: the hand font, as every page title of the notebook look. */
@@ -81,32 +85,51 @@
   overflow: hidden;
   white-space: normal;
   font-family: var(--font-family-hand);
-  font-size: 26px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
   line-height: 1.1;
 }
+/* Master-only badge: a dashed tag, like the master-only block it names. */
 .document-modal .master-pill {
   flex: none;
-  padding: 2px 8px;
+  padding: 2px var(--space-1);
   border: var(--border-width) dashed var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-size: var(--font-size-xs);
   font-weight: 600;
   white-space: nowrap;
 }
-/* Header actions: one row that never wraps or shrinks; groups are separated by the gap. */
+/* Header actions: one row that never wraps or shrinks; the two groups sit apart. */
 .document-modal .head-actions {
   display: flex;
   align-items: center;
   flex: none;
   flex-wrap: nowrap;
-  gap: 8px;
+  gap: var(--space-1);
 }
 .document-modal .head-actions ui-icon {
   display: flex;
   flex: none;
+}
+
+/* Navigation group: back, then the sheet navigator. */
+.document-modal .nav-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  min-width: 0;
+}
+/* End group: open in reader and close, behind a thin separator pushed to the right edge. */
+.document-modal .end-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  flex: none;
+  margin-left: auto;
+  padding-left: var(--space-1);
+  border-left: var(--border-width) solid var(--color-border);
 }
 
 /* Icon buttons: 36px square, no border, hover on the soft surface. */
@@ -121,7 +144,7 @@
   height: 36px;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
@@ -168,7 +191,7 @@
   height: 36px;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
 }
 .document-modal .segmented .icon-button {
@@ -178,14 +201,14 @@
 .document-modal .sheet-position {
   min-width: 48px;
   padding: 0 4px;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
   text-align: center;
   white-space: nowrap;
   color: var(--color-text-muted);
 }
 
-/* The divider is not drawn: the gap between groups does that job. */
+/* The divider is not drawn: the separator of .end-group does that job. */
 .document-modal .head-divider {
   display: none;
 }
@@ -224,15 +247,16 @@
   box-sizing: content-box;
   max-width: 72ch;
   margin: 0 auto;
-  padding: var(--line-pitch) 40px var(--space-1);
+  padding: var(--line-pitch) var(--space-5) var(--space-1);
 }
-/* Master-only notice: dashed frame and lock icon, on the lines. */
+/* Master-only notice: the same look as the master-only block (dashed frame, quiet band), with the lock icon. */
 .document-modal .master-banner {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-1);
   margin: 0 0 var(--line-pitch);
   padding: 0 12px;
+  background: var(--color-surface-2);
   line-height: var(--line-pitch);
   font-size: var(--font-size-sm);
 }
@@ -257,15 +281,15 @@
     max-height: calc(90vh - 120px);
     box-sizing: border-box;
     overflow-y: auto;
-    padding: var(--line-pitch) 16px var(--line-pitch) 0;
+    padding: var(--line-pitch) var(--space-2) var(--line-pitch) 0;
     border-left: var(--border-width) solid var(--color-border);
   }
 }
 .document-modal .outline-title {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-1);
   padding-left: 12px;
   font-family: var(--font-family-hand);
-  font-size: 22px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   line-height: var(--line-pitch);
   color: var(--color-text);
@@ -281,7 +305,7 @@
   padding: 0 10px 0 12px;
   border: 0;
   border-left: var(--border-width-strong) solid transparent;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--color-text-muted);
   font: inherit;
@@ -310,9 +334,9 @@
   border-top: var(--border-width) solid var(--color-border);
 }
 .document-modal .backlinks-title {
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-0-5);
   font-family: var(--font-family-hand);
-  font-size: 22px;
+  font-size: var(--font-size-lg);
   font-weight: 600;
   line-height: var(--line-pitch);
   color: var(--color-text);
@@ -320,14 +344,15 @@
 .document-modal .backlink-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-1);
 }
+/* Backlink chips: no frame, a quiet band, and an underline on hover. They differ from the filter chips on purpose. */
 .document-modal .backlink-chip {
   max-width: 100%;
-  padding: 4px 10px;
-  border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
-  background: transparent;
+  padding: var(--space-0-5) 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
   color: var(--color-text);
   font: inherit;
   font-size: var(--font-size-sm);
@@ -337,25 +362,26 @@
   cursor: pointer;
 }
 .document-modal .backlink-chip:hover {
-  background: var(--color-surface-2);
+  background: var(--color-surface-3);
+  text-decoration: underline;
 }
 
 /* Loading skeleton: flat grey blocks. They pulse only when motion is allowed. */
 .document-modal .doc-skeleton {
   display: grid;
   gap: 12px;
-  padding-top: 8px;
+  padding-top: var(--space-1);
 }
 .document-modal .skeleton-bar {
   display: block;
   height: 12px;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: var(--color-surface-2);
 }
 .document-modal .skeleton-title {
   width: 60%;
   height: 22px;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-1);
 }
 .document-modal .skel-1 { width: 96%; }
 .document-modal .skel-2 { width: 88%; }
@@ -385,8 +411,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  padding: 48px 16px;
+  gap: var(--space-1);
+  padding: var(--space-6) var(--space-2);
   text-align: center;
   color: var(--color-text-muted);
 }
@@ -395,18 +421,18 @@
 }
 .document-modal .error-path {
   margin: 0;
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-sm);
   overflow-wrap: anywhere;
 }
 
-/* Footer hint: desktop only, with the navigator. */
+/* Footer hint: desktop only, with the navigator. A thin rule above it, in the internal-divider colour. */
 .document-modal .modal-hint {
   display: none;
   align-items: center;
   justify-content: center;
   flex: none;
-  gap: 8px;
-  padding: 6px 16px;
+  gap: var(--space-1);
+  padding: 6px var(--space-2);
   border-top: var(--border-width) solid var(--color-border);
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
@@ -420,11 +446,11 @@
   margin-right: 2px;
   padding: 0 4px;
   border: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text);
   font-family: inherit;
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   line-height: 1;
 }
 @media (min-width: 760px) {
@@ -435,7 +461,8 @@
 
 /* The document itself, as text on the notebook lines. Every value is a multiple of the
    line pitch, so the text, the headings and the blocks stay on the rules. The rules come
-   from .notebook-page; the blocks are server HTML, styled from here through ms-doc-body. */
+   from .notebook-page; the blocks are server HTML, styled from here through ms-doc-body
+   and, for tables, code and the master-only block, from reader/doc-body.css. */
 .document-modal .notebook-page ms-doc-body {
   font-size: 1.0625rem;
 }
@@ -451,7 +478,7 @@
   padding: 0;
   border: 0;
   font-family: var(--font-family-hand);
-  font-size: 28px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
   line-height: var(--line-pitch);
   letter-spacing: 0;
@@ -464,54 +491,40 @@
 .document-modal ms-doc-body .block-body li + li {
   margin-top: 0;
 }
+/* Quotes: a thin bar in the internal-divider colour, italic, no band, on the lines. */
 .document-modal ms-doc-body .block-body blockquote {
   padding: 0 12px;
-  border-left: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-left: var(--border-width) solid var(--color-border);
   background: none;
   font-style: italic;
 }
 .document-modal ms-doc-body .block-body code {
-  padding: 0 4px;
-  border-radius: 0;
-  background: var(--color-surface-2);
+  padding: 0 var(--space-0-5);
 }
+/* Code blocks: a quiet band with a small corner, the text on the lines. */
 .document-modal ms-doc-body .block-body pre {
   line-height: var(--line-pitch);
-  border: var(--border-width) solid var(--color-border);
-  border-radius: 0;
-  background: var(--color-surface);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
 }
 .document-modal ms-doc-body .block-body pre code {
   padding: 0;
   background: transparent;
 }
-.document-modal ms-doc-body .block-body table {
-  width: 100%;
-  border: var(--border-width) solid var(--color-border);
-  border-radius: 0;
-}
-.document-modal ms-doc-body .block-body thead th {
-  background: none;
-  font-weight: 600;
-}
-.document-modal ms-doc-body .block-body tbody tr:nth-child(even) {
-  background: none;
-}
+/* Table cells sit on the lines: one row per line pitch. The table look is in reader/doc-body.css. */
 .document-modal ms-doc-body .block-body th,
 .document-modal ms-doc-body .block-body td {
   padding: 0 12px;
   line-height: var(--line-pitch);
-  border-bottom: var(--border-width) solid var(--color-border);
 }
-/* Images: in colour, in a square frame with a thin border. */
+/* Images: a thin frame, small corners, no shadow. */
 .document-modal ms-doc-body .block-body img {
   display: block;
   margin: var(--line-pitch) auto;
   padding: 0;
   border: var(--border-width) solid var(--color-border);
-  border-radius: 0;
-  box-shadow: none;
+  border-radius: var(--radius-sm);
 }
 .document-modal ms-doc-body .block-body figcaption {
   margin: 0;
@@ -520,34 +533,28 @@
 .document-modal ms-doc-body .block-body hr {
   margin: var(--line-pitch) 0;
 }
-/* Master-only blocks: dashed frame, no tint. */
+/* Master-only block: the look is in reader/doc-body.css. Here only the padding changes, so the
+   text stays on the ruled lines and the top padding is one line pitch. */
 .document-modal ms-doc-body .block-master {
   padding: 0 12px;
-  border: var(--border-width) dashed var(--color-border-strong);
-  border-radius: 0;
-  background: none;
 }
 .document-modal ms-doc-body .master-mark {
   top: 4px;
-  right: 8px;
-  padding: 0 4px;
-  border-radius: 0;
-  background: var(--color-surface);
-  color: var(--color-text);
 }
 
-/* Narrow screens: full screen, larger hit areas, smaller gutters. */
+/* Narrow screens: full screen, larger hit areas, smaller gutters. A full-screen page is full-bleed: square, no frame. */
 @media (max-width: 759px) {
   .document-modal {
     width: 100vw;
     height: 100dvh;
+    border: 0;
     border-radius: 0;
   }
   .document-modal .modal-head {
-    padding: 12px 12px 12px 16px;
+    padding: 12px 12px 12px var(--space-2);
   }
   .document-modal .doc-main {
-    padding: var(--line-pitch) 16px var(--space-1);
+    padding: var(--line-pitch) var(--space-2) var(--space-1);
   }
   .document-modal .icon-button {
     width: 44px;

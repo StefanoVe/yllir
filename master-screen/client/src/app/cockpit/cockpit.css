@@ -5,10 +5,10 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
 }
 :host ::ng-deep button:disabled {
-  opacity: 0.35;
+  opacity: var(--opacity-disabled);
   cursor: default;
 }
 :host ::ng-deep button:hover:not(:disabled) {
@@ -29,7 +29,7 @@
   background: transparent;
   border: 0;
   border-bottom: var(--border-width) solid var(--color-border-strong);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   padding: var(--space-1) 0;
 }
 
@@ -77,7 +77,7 @@
   bottom: 0;
   left: 50%;
   width: var(--border-width);
-  background: var(--color-border-strong);
+  background: var(--color-border);
   transform: translateX(-50%);
 }
 .pane-tabs,
@@ -92,7 +92,7 @@
   color: var(--color-danger);
   background: var(--color-bg);
   border: var(--border-width) solid var(--color-danger);
-  border-radius: 0;
+  border-radius: var(--radius-sm);
 }
 /* Below 1100px one region at a time: tabs on top, in the flow (the app has its own
    bottom bars on the phone, so nothing here is fixed to the bottom). */
@@ -116,24 +116,27 @@
     gap: 8px;
     height: 40px;
     border: var(--border-width) solid var(--color-border-strong);
-    border-radius: 0;
+    border-radius: var(--radius-sm);
     background: transparent;
     color: var(--color-text);
     font-weight: 500;
   }
+  /* The chosen pane tab: the selected look. */
   .pane-tabs button.selected {
-    background: var(--color-text);
-    color: var(--color-bg);
+    background: var(--color-selected-bg);
+    border-color: var(--color-selected-border);
+    color: var(--color-accent);
+    font-weight: 600;
   }
   .pane-tabs button.selected:hover:not(:disabled) {
-    background: var(--color-accent-hover);
-    color: var(--color-bg);
+    background: var(--color-selected-bg);
+    color: var(--color-accent-hover);
   }
   /* The unread dot: a status dot, the one round shape allowed. */
   .pane-tabs i {
     width: 7px;
     height: 7px;
-    border-radius: 50%;
+    border-radius: var(--radius-pill);
     background: var(--color-accent);
   }
   .pane-turn {
@@ -173,7 +176,7 @@
     pointer-events: none;
   }
   .cockpit.chat-collapsed .chat-pane {
-    border-left: var(--border-width) solid var(--color-border-strong);
+    border-left: var(--border-width) solid var(--color-border);
   }
   .load-error {
     display: block;
@@ -182,7 +185,7 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 3;
-    border-radius: 0;
+    border-radius: var(--radius-sm);
   }
 }
 @media (prefers-reduced-motion: reduce) {

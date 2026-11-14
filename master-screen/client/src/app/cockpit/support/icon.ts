@@ -88,6 +88,9 @@ import {
   ImageIcon,
   ListOrdered,
   Crosshair,
+  ScanEye,
+  Scan,
+  Palette,
 } from "lucide-angular";
 const icons = {
   music: Music2,
@@ -179,6 +182,10 @@ const icons = {
   image: ImageIcon,
   listOrdered: ListOrdered,
   crosshair: Crosshair,
+  scanEye: ScanEye,
+  scan: Scan,
+  palette: Palette,
+  back: Undo2,
 };
 @Component({
   selector: "ui-icon",

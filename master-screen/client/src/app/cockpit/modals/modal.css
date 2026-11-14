@@ -1,9 +1,9 @@
-/* Shared by the cockpit modals. Z-index from the --z-* scale in styles.css: the scrim sits at --z-modal, the dialog one step above it, so the map lightbox, the Spotlight and the image viewer stay on top. Notebook look: flat scrim, square dialog, thin structure line, no shadow. */
+/* Shared by the cockpit modals. Z-index from the --z-* scale in styles.css: the scrim sits at --z-modal, the dialog one step above it, so the map lightbox, the Spotlight and the image viewer stay on top. Notebook look: flat scrim, a dialog with a large radius, a 1px line and the modal shadow. */
 .cockpit-scrim {
   position: fixed;
   inset: 0;
   z-index: 55;
-  background: color-mix(in srgb, var(--color-text) 60%, transparent);
+  background: var(--color-scrim);
 }
 .cockpit-modal {
   position: fixed;
@@ -17,9 +17,9 @@
   max-height: min(86vh, 980px);
   background: var(--color-surface);
   color: var(--color-text);
-  border: var(--border-width-strong) solid var(--color-border-strong);
-  border-radius: 0;
-  box-shadow: none;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
   overflow: hidden;
 }
 .cockpit-modal .modal-head {
@@ -37,7 +37,7 @@
 .cockpit-modal .modal-title h2 {
   margin: 0;
   font-family: var(--font-family-hand);
-  font-size: 26px;
+  font-size: var(--font-size-xl);
   font-weight: 600;
   line-height: 1.1;
   overflow: hidden;
@@ -46,7 +46,7 @@
 }
 .cockpit-modal .modal-title p {
   margin: 2px 0 0;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
 .cockpit-modal .icon-button {
@@ -58,7 +58,7 @@
   height: 36px;
   padding: 0;
   border: 0;
-  border-radius: 0;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--color-text-muted);
 }
@@ -67,7 +67,7 @@
   color: var(--color-text);
 }
 .cockpit-modal .icon-button:disabled {
-  opacity: 0.35;
+  opacity: var(--opacity-disabled);
   cursor: default;
   background: none;
   color: var(--color-text-muted);
@@ -79,7 +79,7 @@
 .cockpit-modal .sheet-position {
   flex: none;
   padding: 0 4px;
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;

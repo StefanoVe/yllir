@@ -7,7 +7,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-2);
-  background: color-mix(in srgb, var(--color-text) 40%, transparent);
+  background: var(--color-scrim);
 }
 
 .align-panel {

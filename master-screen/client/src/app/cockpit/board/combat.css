@@ -21,7 +21,7 @@
 .combat header span {
   white-space: nowrap;
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
 }
 .spacer {
@@ -40,10 +40,10 @@
 .combat table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
 }
 .combat th {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
   color: var(--color-text-muted);
   font-weight: 500;
   text-align: left;
@@ -69,10 +69,10 @@
 .combat tbody tr:last-child td {
   border-bottom: 0;
 }
-/* The creature whose turn it is: the inverted row. */
+/* The creature whose turn it is: the current-turn row (the only inverted fill left). */
 .combat tr.current td {
-  background: var(--color-text);
-  color: var(--color-bg);
+  background: var(--color-current-bg);
+  color: var(--color-current-text);
 }
 .combat tr.current td.name {
   font-weight: 600;
@@ -97,8 +97,8 @@
   background: transparent;
 }
 .combat tr.current .mark {
-  background: var(--color-bg);
-  border-color: var(--color-bg);
+  background: var(--color-current-text);
+  border-color: var(--color-current-text);
 }
 .combat tr.current .mark.enemy {
   background: transparent;
@@ -137,7 +137,7 @@
   border: var(--border-width) dashed var(--color-text);
 }
 .combat tr.current .hp-bar i {
-  background: var(--color-bg);
+  background: var(--color-current-text);
   opacity: 0.35;
 }
 .combat tr.current .hp-bar i.on {
@@ -145,7 +145,7 @@
 }
 .combat tr.current .hp-bar i.temp {
   background: transparent;
-  border-color: var(--color-bg);
+  border-color: var(--color-current-text);
   opacity: 1;
 }
 /* Conditions: rectangles with a thin frame in the row's text colour, the duration after the name. */
@@ -157,11 +157,11 @@
   margin-right: 4px;
   border: var(--border-width) solid currentColor;
   background: transparent;
-  font-size: 12px;
+  font-size: var(--font-size-sm);
   white-space: nowrap;
 }
 .condition-chip small {
-  font-size: 11px;
+  font-size: var(--font-size-xs);
 }
 /* Second line of a row: shown on the phone only. */
 .combat .row-meta {
@@ -181,7 +181,7 @@
     flex-wrap: wrap;
     gap: 4px 8px;
     margin-top: 4px;
-    font-size: 12px;
+    font-size: var(--font-size-xs);
     font-weight: 400;
     color: var(--color-text-muted);
   }
