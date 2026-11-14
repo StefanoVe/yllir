@@ -39,6 +39,7 @@ Every implementation is orchestrated through sub-agents running Haiku or Luna. T
 - **Sub-agents running in parallel** must never write the same file.
 - **If a brief fails**, rewrite it to be more explicit and rerun it. Do not take the task over yourself. A brief that only works for a stronger model is a defect, so treat it like a failing test.
 - **Codex implementation workflow.** Before each new implementation, Codex must prepare an explicit plan that breaks the work into tasks with completion criteria. It must launch executor sub-agents with `model: "gpt-6-luna"` explicitly, actively supervise their progress, review their results, and resolve blockers by refining briefs and relaunching Luna. Before finishing, Codex must verify that every plan item is complete. The main agent orchestrates this work and does not take over implementation.
+- **Master screen frontend.** When the work touches the frontend of the master screen (`master-screen/`), load the `frontend-design` and `dashboard-design:dashboard-design` skills first and follow them. Put them in the brief of every executor that writes UI.
 
 ## Versioning and commits (automatic)
 
