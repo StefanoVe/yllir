@@ -9,6 +9,9 @@ import { buildWorldIndex } from '../world-graph.mjs';
 import { DRAFT_DIR, checkBatch, commitBatch, recordReview } from './commit.mjs';
 import { ensureRepo } from '../versions.mjs';
 import { toCommentMetadata } from '../frontmatter.mjs';
+import { parseYamlLite } from '../yaml-lite.mjs';
+import { stringifyConfig } from '../config-write.mjs';
+import { findEconomyDocument } from '../economy/economy.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURE = path.resolve(here, '../../../../testbench/fixtures/morvalle-legacy/campaign');
@@ -1240,4 +1243,151 @@ test('without an economy document a priced vendor adds no economy error', async 
   writeDraft(dir, FOSCO_PATH, FOSCO_OUT_OF_RANGE);
   const check = await checkBatch(dir, { files: [FOSCO_PATH] });
   assert.equal(check.errors.some((item) => item.code.startsWith('economy')), false, JSON.stringify(check.errors));
+});
+
+// ---------------------------------------------------------------------------
+// campaign.yaml drafts: the guard, the review rule and the instructions
+// ---------------------------------------------------------------------------
+
+const STORIA = { id: 'storia', folder: 'Storia', type: 'free' };
+const EXCLUSION = { subject: 'pozzo-antico', attribute: 'number.depth', values: ['12'], reason: 'Il master: prova', date: '2026-11-14' };
+
+/**
+ * The fixture without the storia category and without its Storia folder: the economy document is then
+ * the only document of the folder, so the registration adds no error about the fixture's legacy documents.
+ */
+function makeCampaignWithoutStoria(t) {
+  const dir = makeCampaign(t);
+  const config = parseYamlLite(readAt(dir, 'campaign.yaml')).data;
+  config.structure = config.structure.filter((entry) => entry.id !== 'storia');
+  fs.writeFileSync(path.join(dir, 'campaign.yaml'), stringifyConfig(config));
+  fs.rmSync(path.join(dir, 'Storia'), { recursive: true, force: true });
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'fixture without storia']);
+  return dir;
+}
+
+/** The full text of the campaign's config with `change` applied to the parsed config. */
+function configDraft(dir, change) {
+  const config = parseYamlLite(readAt(dir, 'campaign.yaml')).data;
+  change(config);
+  return stringifyConfig(config);
+}
+
+test('an economy document and its free category in one batch are checked, saved as one version and registered', async (t) => {
+  const dir = makeCampaignWithoutStoria(t);
+  const before = commitCount(dir);
+  const batch = { files: [ECONOMY_PATH, 'campaign.yaml'] };
+  writeDraft(dir, ECONOMY_PATH, ECONOMY);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => c.structure.push(STORIA)));
+
+  const check = await checkBatch(dir, batch);
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, true);
+  writeReview(dir);
+
+  const result = await commitBatch(dir, { ...batch, message: 'Economy document and Storia category' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(commitCount(dir), before + 1);
+  assert.deepEqual(parseYamlLite(readAt(dir, 'campaign.yaml')).data.structure.at(-1), STORIA);
+  assert.equal(fs.existsSync(path.join(dir, DRAFT_DIR, 'campaign.yaml')), false);
+  assert.equal(fs.existsSync(path.join(dir, DRAFT_DIR, ECONOMY_PATH)), false);
+  assert.equal(git(dir, ['status', '--porcelain']).trim(), '', 'the regenerated instructions are saved with the batch');
+  assert.equal(findEconomyDocument(dir), ECONOMY_PATH);
+});
+
+test('a campaign.yaml draft that only adds an audit exclusion needs no review and is saved', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  const count = parseYamlLite(readAt(dir, 'campaign.yaml')).data.audit.exclusions.length;
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => c.audit.exclusions.push(EXCLUSION)));
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, false);
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Add an audit exclusion' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(result.reviewRequired, false);
+  assert.equal(commitCount(dir), before + 1);
+  assert.equal(parseYamlLite(readAt(dir, 'campaign.yaml')).data.audit.exclusions.length, count + 1);
+});
+
+test('a campaign.yaml draft that changes language.main is refused with config-change-refused and saves nothing', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => { c.language.main = 'en'; }));
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, false);
+  const error = check.errors.find((item) => item.code === 'config-change-refused');
+  assert.ok(error, JSON.stringify(check.errors));
+  assert.match(error.message, /language\.main/);
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Change the language' });
+  assert.equal(result.ok, false);
+  assert.equal(commitCount(dir), before);
+  assert.match(readAt(dir, 'campaign.yaml'), /main: it/);
+});
+
+test('a campaign.yaml draft that removes a structure entry is refused with config-change-refused', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => c.structure.splice(1, 1)));
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, false);
+  const error = check.errors.find((item) => item.code === 'config-change-refused');
+  assert.ok(error, JSON.stringify(check.errors));
+  assert.match(error.message, /structure\[1\]/);
+});
+
+test('a campaign.yaml draft that is not valid YAML is refused with config-yaml', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, 'campaign.yaml', 'schema: 1\ncampaign: [\n');
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, false);
+  assert.ok(check.errors.some((item) => item.code === 'config-yaml'), JSON.stringify(check.errors));
+});
+
+test('a campaign.yaml that is not at the campaign root or is deleted is refused with bad-path', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, 'Other.yaml', 'schema: 1\n');
+  const other = await checkBatch(dir, { files: ['Other.yaml'] });
+  assert.ok(other.errors.some((item) => item.code === 'bad-path'), JSON.stringify(other.errors));
+
+  const deleted = await checkBatch(dir, { deletes: ['campaign.yaml'] });
+  assert.ok(deleted.errors.some((item) => item.code === 'bad-path'), JSON.stringify(deleted.errors));
+});
+
+test('an economy document left outside the structure is registered by a campaign.yaml draft alone', async (t) => {
+  const dir = makeCampaignWithoutStoria(t);
+  fs.mkdirSync(path.dirname(path.join(dir, ECONOMY_PATH)), { recursive: true });
+  fs.writeFileSync(path.join(dir, ECONOMY_PATH), ECONOMY);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'economy saved without its category']);
+  assert.equal(findEconomyDocument(dir), null);
+
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => c.structure.push(STORIA)));
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, false);
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Register the Storia category' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(findEconomyDocument(dir), ECONOMY_PATH);
+});
+
+test('a new structure entry whose folder does not exist yet is saved, and no empty folder is created', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => c.structure.push({ id: 'diario', folder: 'Diario', type: 'free' })));
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Add the diary category' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(commitCount(dir), before + 1);
+  assert.equal(fs.existsSync(path.join(dir, 'Diario')), false);
 });

@@ -14,6 +14,7 @@ import { buildSubjectIndex, compareStrings, readStructure } from '../subjects.mj
 import { buildWorldIndex, writeWorldIndex } from '../world-graph.mjs';
 import { planGeographicLayout, applyGeographicLayout } from '../geographic-layout.mjs';
 import { validateConfig } from '../config.mjs';
+import { generateInstructions } from '../instructions.mjs';
 import { loadAdapter, pluginRootFromHere } from '../adapter.mjs';
 import { parseYamlLite } from '../yaml-lite.mjs';
 import { findMetadataBlock, parseFrontmatter, toCommentMetadata } from '../frontmatter.mjs';
@@ -44,6 +45,8 @@ const NOTE_FILE = '.campaign/state/work-note.md';
 const SUBJECTS_FILE = '.campaign/cache/subjects.json';
 // Categories whose documents are never scanned for mentions (see scanMentions).
 const UNSCANNED_TYPES = new Set(['notes', 'sources', 'external']);
+// The only config file a batch may write: its draft is .campaign/drafts/campaign.yaml (see configChange).
+const CONFIG_FILE = 'campaign.yaml';
 const CONFLICT_MESSAGE = 'changed by hand since the last saved version: read it again and redo the draft';
 const REVIEW_MESSAGE = 'no model review with outcome APPLY matches the current drafts: check the batch again and review it';
 const NO_GIT_MESSAGE = 'the campaign is not a git repository; the framework does not write without git';
@@ -270,6 +273,10 @@ async function evaluate(dir, { files, deletes, sources, tmpRoot }) {
   if (preflightErrors.length > 0) {
     return { errors: preflightErrors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map() };
   }
+  const config = configChange(dir, files);
+  if (config.errors.length > 0) {
+    return { errors: config.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map() };
+  }
   const retired = planRetiredIds(dir, { files, deletes, draftRoot: path.join(dir, DRAFT_DIR) });
   if (retired.errors.length > 0) {
     return { errors: retired.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map() };
@@ -290,8 +297,13 @@ async function evaluate(dir, { files, deletes, sources, tmpRoot }) {
       return result;
     }
 
-    const after = await validate(copy, scopesFor(copy, transformed.finalFiles, deletes));
+    const after = await validate(copy, scopesFor(copy, transformed.finalFiles, deletes), { pendingPaths: config.pendingPaths });
     result.errors = newErrors(baseline, after, transformed.pathMap);
+    if (result.errors.length === 0 && config.structureAdded > 0) {
+      // What add-category does after a structure change: the instruction files are regenerated. They are
+      // generated in the copy, so they are synced and saved with the batch, in the same version.
+      result.errors = generateInstructions(copy).errors.map((item) => normalize('instructions', item));
+    }
   } catch (error) {
     result.errors = [{ file: '', code: 'check-failed', message: error.message }];
   }
@@ -305,7 +317,7 @@ function preflight(dir, files, deletes, sources) {
   const draftRoot = path.join(dir, DRAFT_DIR);
 
   for (const rel of files) {
-    const why = relativeProblem(rel, true);
+    const why = relativeProblem(rel, rel !== CONFIG_FILE);
     if (why !== null) {
       add(rel, 'bad-path', `${rel} ${why}`);
       continue;
@@ -339,6 +351,10 @@ function preflight(dir, files, deletes, sources) {
       add(rel, 'bad-path', `${rel} ${why}`);
       continue;
     }
+    if (rel === CONFIG_FILE) {
+      add(rel, 'bad-path', `${CONFIG_FILE} cannot be deleted`);
+      continue;
+    }
     if (symlinkAbove(dir, rel)) {
       add(rel, 'symlink-target', `${rel} must not pass through a symbolic link`);
       continue;
@@ -352,6 +368,10 @@ function preflight(dir, files, deletes, sources) {
     const why = relativeProblem(rel, false, { source: true });
     if (why !== null) {
       add(rel, 'bad-path', `${rel} ${why}`);
+      continue;
+    }
+    if (rel === CONFIG_FILE) {
+      add(rel, 'bad-path', `${CONFIG_FILE} is written only as a batch file`);
       continue;
     }
     if (symlinkAbove(dir, rel)) {
@@ -452,7 +472,7 @@ async function transform(dir, copy, { files, deletes, retired }) {
  * @param {string} dir campaign folder (the real one, or the copy)
  * @param {{ files: string[], checkFiles: string[]|null, planFiles: string[]|null }} scope
  */
-async function validate(dir, { files, checkFiles, planFiles }) {
+async function validate(dir, { files, checkFiles, planFiles }, { pendingPaths = new Set() } = {}) {
   const out = [];
   const run = (code, produce, fallbackFile = '') => {
     try {
@@ -476,7 +496,10 @@ async function validate(dir, { files, checkFiles, planFiles }) {
     run('pc-sheet', () => checkPlayerSheets(dir, { files }).errors);
     run('enemies', () => checkEnemies(dir, { files }).errors);
   }
-  run('config', () => validateConfig(dir).errors.map((e) => ({ ...e, message: e.path ? `${e.path}: ${e.message}` : e.message })), 'campaign.yaml');
+  // A folder of a category that this batch appends may not exist yet: it appears when its documents are written.
+  run('config', () => validateConfig(dir).errors
+    .filter((e) => !(e.code === 'missing-folder' && pendingPaths.has(e.path)))
+    .map((e) => ({ ...e, message: e.path ? `${e.path}: ${e.message}` : e.message })), CONFIG_FILE);
   run('plot', () => plotMap(dir).errors);
   run('geographic-layout', () => planGeographicLayout(dir).errors);
   out.push(...(await adapterErrors(dir, files)));
@@ -562,10 +585,12 @@ async function adapterErrors(dir, files) {
 
 /** Scope of the validators: the batch files, and the whole campaign when a file is deleted. */
 function scopesFor(dir, files, deletes) {
+  // campaign.yaml is checked by validate's config run, not by the per-document checks.
+  const documents = files.filter((rel) => rel !== CONFIG_FILE);
   return {
-    files,
-    checkFiles: deletes.length > 0 ? null : files,
-    planFiles: deletes.length > 0 ? null : linkableFiles(dir, files),
+    files: documents,
+    checkFiles: deletes.length > 0 ? null : documents,
+    planFiles: deletes.length > 0 ? null : linkableFiles(dir, documents),
   };
 }
 
@@ -606,6 +631,116 @@ function normalize(code, item, fallbackFile = '') {
 
 function conflictError(file) {
   return { file, code: 'manual-change', message: CONFLICT_MESSAGE };
+}
+
+// ---------------------------------------------------------------------------
+// campaign.yaml guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Guard of the campaign.yaml draft. The draft must parse, and compared with the current file it may only
+ * append entries: new structure entries at the end of structure, and new entries at the end of
+ * audit.exclusions. Any other difference is refused with config-change-refused, naming the first differing
+ * key path. The full validation of the resulting config is done on the copy by validate.
+ * @returns {{ errors: object[], structureAdded: number, pendingPaths: Set<string> }} pendingPaths: the
+ *   structure[i].folder paths of the appended entries (their folders may not exist yet).
+ */
+function configChange(dir, files) {
+  const none = { errors: [], structureAdded: 0, pendingPaths: new Set() };
+  if (!files.includes(CONFIG_FILE)) return none;
+  const fail = (errors) => ({ ...none, errors });
+  const refuse = (message, at) => fail([{ file: CONFIG_FILE, code: 'config-change-refused', path: at, message }]);
+
+  const draftText = readText(path.join(dir, DRAFT_DIR, CONFIG_FILE));
+  if (draftText === null) return fail([{ file: CONFIG_FILE, code: 'missing-draft', message: `there is no draft for ${CONFIG_FILE}` }]);
+  const draft = parseYamlLite(draftText);
+  if (draft.errors.length > 0) {
+    return fail(draft.errors.map((error) => ({ file: CONFIG_FILE, code: 'config-yaml', message: `line ${error.line}: ${error.message}` })));
+  }
+  if (!isMapping(draft.data)) {
+    return fail([{ file: CONFIG_FILE, code: 'config-yaml', message: `${CONFIG_FILE} must be a mapping of settings` }]);
+  }
+
+  const currentText = readText(path.join(dir, CONFIG_FILE));
+  const current = currentText === null ? { errors: [], data: null } : parseYamlLite(currentText);
+  if (current.errors.length > 0 || !isMapping(current.data)) {
+    return refuse(`the current ${CONFIG_FILE} cannot be read, so the draft cannot be compared with it`, CONFIG_FILE);
+  }
+
+  const diff = compareConfig(current.data, draft.data);
+  if (diff.at !== null) {
+    return refuse(
+      `${diff.at} may not change in a batch: only new entries at the end of structure and of audit.exclusions are allowed`,
+      diff.at,
+    );
+  }
+  return { errors: [], structureAdded: diff.structureAdded, pendingPaths: diff.pendingPaths };
+}
+
+/** Where the draft first differs from the current config in a way a batch may not make, and what it appends. */
+function compareConfig(current, draft) {
+  const none = { at: null, structureAdded: 0, pendingPaths: new Set() };
+  const keys = [...new Set([...Object.keys(current), ...Object.keys(draft)])];
+  for (const key of keys) {
+    if (key === 'structure' || key === 'audit') continue;
+    const at = firstDifference(current[key], draft[key], key);
+    if (at !== null) return { ...none, at };
+  }
+
+  const currentStructure = current.structure ?? [];
+  const draftStructure = draft.structure ?? [];
+  if (!Array.isArray(currentStructure) || !Array.isArray(draftStructure)) return { ...none, at: 'structure' };
+  for (let i = 0; i < currentStructure.length; i++) {
+    const at = firstDifference(currentStructure[i], draftStructure[i], `structure[${i}]`);
+    if (at !== null) return { ...none, at };
+  }
+  const appended = draftStructure.length - currentStructure.length;
+  const pendingPaths = new Set();
+  for (let i = currentStructure.length; i < draftStructure.length; i++) pendingPaths.add(`structure[${i}].folder`);
+
+  const currentAudit = current.audit ?? {};
+  const draftAudit = draft.audit ?? {};
+  if (!isMapping(currentAudit) || !isMapping(draftAudit)) return { ...none, at: 'audit' };
+  const auditKeys = [...new Set([...Object.keys(currentAudit), ...Object.keys(draftAudit)])].filter((key) => key !== 'exclusions');
+  for (const key of auditKeys) {
+    const at = firstDifference(currentAudit[key], draftAudit[key], `audit.${key}`);
+    if (at !== null) return { ...none, at };
+  }
+  const currentExclusions = currentAudit.exclusions ?? [];
+  const draftExclusions = draftAudit.exclusions ?? [];
+  if (!Array.isArray(currentExclusions) || !Array.isArray(draftExclusions)) return { ...none, at: 'audit.exclusions' };
+  for (let i = 0; i < currentExclusions.length; i++) {
+    const at = firstDifference(currentExclusions[i], draftExclusions[i], `audit.exclusions[${i}]`);
+    if (at !== null) return { ...none, at };
+  }
+
+  return { at: null, structureAdded: appended, pendingPaths };
+}
+
+/** The path of the first place where two parsed values differ (a missing value differs), or null when they are equal. */
+function firstDifference(a, b, at) {
+  if (a === undefined && b === undefined) return null;
+  if (a === undefined || b === undefined) return at;
+  if (isMapping(a) && isMapping(b)) {
+    for (const key of new Set([...Object.keys(a), ...Object.keys(b)])) {
+      const found = firstDifference(a[key], b[key], `${at}.${key}`);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  if (Array.isArray(a) && Array.isArray(b)) {
+    const length = Math.max(a.length, b.length);
+    for (let i = 0; i < length; i++) {
+      const found = firstDifference(a[i], b[i], `${at}[${i}]`);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  return a === b ? null : at;
+}
+
+function isMapping(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 // ---------------------------------------------------------------------------
@@ -734,10 +869,14 @@ function hashDrafts(dir, files, deletes, sources) {
  * embeds (the author adding links to ambiguous mentions, or images, which add no facts).
  */
 function needsReview(dir, files, deletes, sources) {
+  // A campaign.yaml draft that only appends structure or audit exclusions (see configChange) adds no facts: it is not reviewed.
+  const reviewed = files.includes(CONFIG_FILE) && configChange(dir, files).errors.length === 0
+    ? files.filter((rel) => rel !== CONFIG_FILE)
+    : files;
   // Image styles and image providers are configuration, not canon: their Markdown prompts need no review.
   const markdownSources = sources.some((rel) => rel.endsWith('.md') && !isCampaignContentSource(rel));
-  if (files.length > 0 && deletes.length === 0 && !markdownSources && onlyLinksOrImagesChanged(dir, files)) return false;
-  return files.length > 0 || deletes.length > 0 || markdownSources;
+  if (reviewed.length > 0 && deletes.length === 0 && !markdownSources && onlyLinksOrImagesChanged(dir, reviewed)) return false;
+  return reviewed.length > 0 || deletes.length > 0 || markdownSources;
 }
 
 /**
