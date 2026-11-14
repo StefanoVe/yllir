@@ -42,4 +42,7 @@ export const settingsPageIt = {
   'settingsPage.ui.startPageHint': "La pagina mostrata all'apertura dello schermo.",
   'settingsPage.ui.rail': 'Barra laterale',
   'settingsPage.ui.railHint': 'Le voci mostrate nella barra laterale.',
+  'settings.quit': 'Ferma il master screen',
+  'settings.quitConfirm': 'Clicca ancora per fermare',
+  'settings.quitDone': 'Master screen fermato. Puoi chiudere questa scheda.',
 } as const;

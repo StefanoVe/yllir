@@ -527,5 +527,15 @@
       </ul>
       <p class="muted">{{ t('settings.modulesNote') }}</p>
     </section>
+
+    <div class="quit">
+      <button type="button" class="quit-btn" [class.armed]="quitArmed()" [disabled]="quitDone() || quitting()" (click)="onQuitClick()">
+        <lucide-angular [img]="icons.Power" [size]="18" aria-hidden="true" />
+        <span>{{ t(quitArmed() ? 'settings.quitConfirm' : 'settings.quit') }}</span>
+      </button>
+      @if (quitDone()) {
+        <p class="muted" role="status">{{ t('settings.quitDone') }}</p>
+      }
+    </div>
   </div>
 </div>

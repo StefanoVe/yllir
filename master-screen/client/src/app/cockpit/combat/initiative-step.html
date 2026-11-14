@@ -91,11 +91,12 @@
           </div>
           <button
             type="button"
-            class="ghost mini"
+            class="ghost icon-only"
             [attr.aria-label]="i18n.t('combat.copy.duplicateOf', { name: row.name })"
+            [attr.title]="i18n.t('combat.copy.duplicateOf', { name: row.name })"
             [disabled]="!row.checked"
             (click)="duplicate(row.cardId)"
-          >{{ i18n.t("combat.copy.duplicate") }}</button>
+          ><ui-icon name="copy" [size]="16" /></button>
           @if (row.copy) {
           <button
             type="button"

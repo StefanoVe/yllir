@@ -3,6 +3,7 @@ import type { CockpitAction } from "@shared/cockpit-types";
 import type { LivePlayer } from "@shared/types";
 import { CockpitService } from "../cockpit.service";
 import { I18n } from "../../i18n";
+import { Icon } from "../support/icon";
 import {
   type CreatureRow,
   type FightCard,
@@ -51,6 +52,7 @@ export interface OrderItem {
   selector: "cockpit-initiative-step",
   templateUrl: "./initiative-step.html",
   styleUrl: "./initiative-step.css",
+  imports: [Icon],
 })
 export class InitiativeStep {
   readonly i18n = inject(I18n);

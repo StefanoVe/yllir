@@ -45,7 +45,7 @@ describe('Settings page', () => {
     reset: ReturnType<typeof vi.fn>;
   };
   let modules: ReturnType<typeof signal<Record<ModuleId, boolean> | null>>;
-  let api: { checks: ReturnType<typeof vi.fn>; runChecks: ReturnType<typeof vi.fn> };
+  let api: { checks: ReturnType<typeof vi.fn>; runChecks: ReturnType<typeof vi.fn>; shutdown: ReturnType<typeof vi.fn> };
   let updateFake: {
     status: ReturnType<typeof signal<UpdateStatus | null>>;
     checking: ReturnType<typeof signal<boolean>>;
@@ -78,6 +78,7 @@ describe('Settings page', () => {
     api = {
       checks: vi.fn(async () => EMPTY_CHECKS),
       runChecks: vi.fn(async () => EMPTY_CHECKS),
+      shutdown: vi.fn(async () => ({ ok: true as const })),
     };
     updateFake = {
       status: signal<UpdateStatus | null>(UPDATE_IDLE),
@@ -136,6 +137,23 @@ describe('Settings page', () => {
     fixture.detectChanges();
     expect(root.querySelector('#s-music')).toBeNull();
     expect(root.querySelectorAll('nav.toc a').length).toBe(6);
+  });
+
+  it('the stop button asks for a second click, and only the second one calls shutdown', async () => {
+    const root = await render();
+    const button = () => q<HTMLButtonElement>(root, '.quit-btn');
+
+    button().click();
+    fixture.detectChanges();
+    expect(api.shutdown).not.toHaveBeenCalled();
+    expect(button().textContent).toContain('Click again to stop');
+
+    button().click();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(api.shutdown).toHaveBeenCalledTimes(1);
+    expect(root.querySelector('.quit [role="status"]')?.textContent).toContain('Master screen stopped');
+    expect(button().disabled).toBe(true);
   });
 
   it('clicking the autoHide switch saves autoHide false', async () => {

@@ -42,4 +42,7 @@ export const settingsPageEn = {
   'settingsPage.ui.startPageHint': 'The page shown when the screen opens.',
   'settingsPage.ui.rail': 'Sidebar',
   'settingsPage.ui.railHint': 'The items shown in the sidebar.',
+  'settings.quit': 'Stop the master screen',
+  'settings.quitConfirm': 'Click again to stop',
+  'settings.quitDone': 'Master screen stopped. You can close this tab.',
 } as const;

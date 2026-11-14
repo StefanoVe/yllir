@@ -10,7 +10,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Check, LoaderCircle, LucideAngularModule, Monitor, Moon, RefreshCw, Sun, TriangleAlert, WifiOff } from 'lucide-angular';
+import { Check, LoaderCircle, LucideAngularModule, Monitor, Moon, Power, RefreshCw, Sun, TriangleAlert, WifiOff } from 'lucide-angular';
 import type { ChecksResponse, ModuleId, ScreenModel, ScreenSettings, ScreenSettingsPatch, UpdateStatus } from '@shared/types';
 import { ApiService, isApiFailure } from '../core/api.service';
 import { BLOCKED_REASON_KEYS, UpdateService } from '../core/update';
@@ -30,6 +30,7 @@ import {
 } from '../shell/text-scale';
 
 const MODULE_ORDER: ModuleId[] = ['music', 'print', 'encyclopedia'];
+const QUIT_CONFIRM_MS = 4000;
 const THEME_OPTIONS: Array<{ pref: ThemePref; key: TranslationKey; icon: 'monitor' | 'sun' | 'moon' }> = [
   { pref: 'system', key: 'theme.system', icon: 'monitor' },
   { pref: 'light', key: 'theme.light', icon: 'sun' },
@@ -174,7 +175,7 @@ export class Settings {
   readonly updates = inject(UpdateService);
   readonly i18n = inject(I18n);
 
-  readonly icons = { Check, LoaderCircle, Monitor, Moon, RefreshCw, Sun, TriangleAlert, WifiOff };
+  readonly icons = { Check, LoaderCircle, Monitor, Moon, Power, RefreshCw, Sun, TriangleAlert, WifiOff };
   readonly themeOptions = THEME_OPTIONS;
   readonly modelOptions = MODEL_OPTIONS;
   readonly densityOptions = DENSITY_OPTIONS;
@@ -197,6 +198,12 @@ export class Settings {
   readonly checkError = signal<string | null>(null);
   readonly checking = signal(false);
   readonly activeId = signal('s-table');
+  /** Stop button: the first click arms it for a few seconds, the second one stops the process. */
+  readonly quitArmed = signal(false);
+  readonly quitting = signal(false);
+  readonly quitDone = signal(false);
+  private quitTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly quitCleanup = inject(DestroyRef).onDestroy(() => this.clearQuitTimer());
   readonly lines = computed<CheckLine[]>(() => {
     const result = this.checks();
     return result ? checkSummary(result, (key, params) => this.t(key, params)) : [];
@@ -429,6 +436,31 @@ export class Settings {
 
   onFadeSeconds(raw: string): void {
     this.setMusic({ fadeSeconds: Number(raw) });
+  }
+
+  /** First click asks for a second one for a few seconds; the second click stops the master screen. */
+  onQuitClick(): void {
+    if (this.quitDone() || this.quitting()) return;
+    if (!this.quitArmed()) {
+      this.quitArmed.set(true);
+      this.clearQuitTimer();
+      this.quitTimer = setTimeout(() => this.quitArmed.set(false), QUIT_CONFIRM_MS);
+      return;
+    }
+    this.clearQuitTimer();
+    this.quitArmed.set(false);
+    this.quitting.set(true);
+    // The server exits after answering, so a failed request usually means it already stopped.
+    const finish = () => {
+      this.quitting.set(false);
+      this.quitDone.set(true);
+    };
+    this.api.shutdown().then(finish, finish);
+  }
+
+  private clearQuitTimer(): void {
+    if (this.quitTimer !== null) clearTimeout(this.quitTimer);
+    this.quitTimer = null;
   }
 
   // Scroll spy and table of contents.
