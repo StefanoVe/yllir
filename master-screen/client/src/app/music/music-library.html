@@ -7,8 +7,8 @@
         <p class="notice" role="status">{{ label('music.off') }}</p>
       } @else {
         <div class="search-wrap">
-          <lucide-angular class="search-icon" [img]="icons.Search" [size]="20" aria-hidden="true" />
-          <input #searchInput class="search" type="search" autocomplete="off" spellcheck="false"
+          <lucide-angular class="search-icon" [img]="icons.Search" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
+          <input #searchInput class="field search" type="search" autocomplete="off" spellcheck="false"
                  [attr.aria-label]="label('music.search.label')" [attr.placeholder]="label('music.search.placeholder')"
                  [attr.title]="label('music.search.keys')"
                  [value]="search.text()" (input)="onInput($any($event.target).value)" />
@@ -16,7 +16,7 @@
 
         <div class="vibes" role="group" [attr.aria-label]="label('music.vibes.label')">
           @for (vibe of vibes; track vibe) {
-            <button type="button" class="chip" [class.on]="vibeOn(vibe)" [attr.aria-pressed]="vibeOn(vibe)"
+            <button type="button" class="chip" [attr.aria-pressed]="vibeOn(vibe)"
                     (click)="toggleVibe(vibe)">{{ vibeLabel(vibe) }}</button>
           }
         </div>
@@ -31,8 +31,8 @@
           <p class="unavailable-hint">{{ label('music.unavailable.install') }}</p>
           <div class="code">
             <code>{{ installCommand }}</code>
-            <button type="button" class="pill-btn" (click)="copyCommand()">
-              <lucide-angular [img]="icons.Copy" [size]="14" aria-hidden="true" />
+            <button type="button" class="btn btn-secondary" (click)="copyCommand()">
+              <lucide-angular [strokeWidth]="1.5" [img]="icons.Copy" [size]="16" aria-hidden="true" />
               <span>{{ label(copied() ? 'music.copied' : 'music.copy') }}</span>
             </button>
           </div>
@@ -43,8 +43,8 @@
         @if (search.status() === 'error') {
           <div class="state" role="alert">
             <p class="state-line">{{ search.error() }}</p>
-            <button type="button" class="pill-btn retry" (click)="search.retry()">
-              <lucide-angular [img]="icons.RotateCw" [size]="14" aria-hidden="true" />
+            <button type="button" class="btn btn-secondary retry" (click)="search.retry()">
+              <lucide-angular [strokeWidth]="1.5" [img]="icons.RotateCw" [size]="16" aria-hidden="true" />
               <span>{{ label('music.retry') }}</span>
             </button>
           </div>
@@ -54,7 +54,7 @@
               <li></li><li></li><li></li><li></li>
             </ul>
           } @else if (search.status() === 'done') {
-            <p class="state-line">{{ emptyText() }}</p>
+            <p class="empty">{{ emptyText() }}</p>
           }
         }
 
@@ -75,13 +75,13 @@
           @for (group of groups(); track group.docPath; let g = $index) {
             <section class="group" [attr.aria-labelledby]="'music-group-' + g">
               <h2 class="group-title" [id]="'music-group-' + g">
-                <a [routerLink]="docLink(group.docPath)" [attr.title]="label('music.openSheet')">{{ group.docTitle }}</a>
+                <a [routerLink]="docLink(group.docPath)" [msTooltip]="label('music.openSheet')" msTooltipPosition="top">{{ group.docTitle }}</a>
                 <span class="group-count">{{ groupCountText(group.tracks.length) }}</span>
               </h2>
-              <ul class="list">
+              <ul class="grid">
                 @for (track of group.tracks; track track.id) {
                   <li>
-                    <ms-music-result [track]="track" [current]="isCurrent(track)" [busy]="isBusy(track)"
+                    <ms-music-result variant="card" [track]="track" [current]="isCurrent(track)" [busy]="isBusy(track)"
                                      [playing]="isPlaying(track)" [selected]="isSelected(track)" [index]="indexOf(track)"
                                      [showSheet]="false" [showSnippet]="false" (activate)="toggleTrack($event)" />
                   </li>
@@ -95,14 +95,13 @@
   </div>
 
   <aside class="card" [attr.aria-label]="label('music.card.label')">
-    <div class="card-backdrop" [style.background-image]="backdrop()" aria-hidden="true"></div>
     <div class="card-body">
       <ms-music-art class="card-art" [track]="card()" [large]="true" />
       <h2 class="card-title">{{ cardTitle() }}</h2>
       @if (card(); as track) {
         <p class="card-sub">
           @if (track.docTitle) {
-            <a [routerLink]="docLink(track.docPath)" [attr.title]="label('music.openSheet')">{{ track.docTitle }}</a>
+            <a [routerLink]="docLink(track.docPath)" [msTooltip]="label('music.openSheet')" msTooltipPosition="top">{{ track.docTitle }}</a>
           }
           @if (track.mood) {
             <span>{{ track.mood }}</span>
@@ -116,17 +115,17 @@
         }
       }
       <div class="transport">
-        <button type="button" class="round" [disabled]="!player.hasPrevious()"
-                [attr.aria-label]="label('music.previous')" [attr.title]="label('music.previous')" (click)="player.previous()">
-          <lucide-angular [img]="icons.SkipBack" [size]="18" aria-hidden="true" />
+        <button type="button" class="icon-btn" [disabled]="!player.hasPrevious()"
+                [attr.aria-label]="label('music.previous')" [msTooltip]="label('music.previous')" msTooltipPosition="top" (click)="player.previous()">
+          <lucide-angular [strokeWidth]="1.5" [img]="icons.SkipBack" [size]="20" aria-hidden="true" />
         </button>
-        <button type="button" class="round big" [disabled]="!card()" [attr.aria-label]="playPauseLabel()"
-                [attr.title]="playPauseLabel()" (click)="togglePlay()">
-          <lucide-angular [img]="isBusyNow() ? icons.Pause : icons.Play" [size]="24" aria-hidden="true" />
+        <button type="button" class="play-btn" [disabled]="!card()" [attr.aria-label]="playPauseLabel()"
+                [msTooltip]="playPauseLabel()" msTooltipPosition="top" (click)="togglePlay()">
+          <lucide-angular [strokeWidth]="1.5" [img]="isBusyNow() ? icons.Pause : icons.Play" [size]="24" aria-hidden="true" />
         </button>
-        <button type="button" class="round" [disabled]="!player.hasNext()"
-                [attr.aria-label]="label('music.next')" [attr.title]="label('music.next')" (click)="player.next()">
-          <lucide-angular [img]="icons.SkipForward" [size]="18" aria-hidden="true" />
+        <button type="button" class="icon-btn" [disabled]="!player.hasNext()"
+                [attr.aria-label]="label('music.next')" [msTooltip]="label('music.next')" msTooltipPosition="top" (click)="player.next()">
+          <lucide-angular [strokeWidth]="1.5" [img]="icons.SkipForward" [size]="20" aria-hidden="true" />
         </button>
       </div>
     </div>

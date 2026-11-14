@@ -6,6 +6,7 @@ import { docUrl } from '../core/doc-nav.service';
 import { I18n, type TranslationKey } from '../i18n';
 import { snippetParts } from './music-highlight';
 import { MusicArt } from './music-art';
+import { TooltipDirective } from '../core/tooltip.directive';
 
 /**
  * One track row, shared by the library list, the dock's Tracks popover and the suggestion strip.
@@ -15,7 +16,7 @@ import { MusicArt } from './music-art';
  */
 @Component({
   selector: 'ms-music-result',
-  imports: [LucideAngularModule, RouterLink, MusicArt],
+  imports: [LucideAngularModule, RouterLink, MusicArt, TooltipDirective],
   templateUrl: './music-result.html',
   styleUrl: './music-result.css',
 })
@@ -35,6 +36,8 @@ export class MusicResult {
   readonly index = input<number | null>(null);
   /** Flat lists show the sheet on every row; grouped lists show it in the group heading. */
   readonly showSheet = input(true);
+  /** 'row': a line in a list (search results, the dock). 'card': a square cover in a grid (the grouped library). */
+  readonly variant = input<'row' | 'card'>('row');
   /** Show the matched sentence of the sheet (only while a search is typed). */
   readonly showSnippet = input(true);
 

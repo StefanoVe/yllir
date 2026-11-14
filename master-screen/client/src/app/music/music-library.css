@@ -1,37 +1,27 @@
 /*
- * The music page. Its own dark palette, whatever the app theme: the --ink-* tokens are declared on
- * this host (and on the bar), so every row, chip and card inside inherits them. Two columns from
- * 1100px: the list on the left, the now-playing card on the right. Below that the card is gone and
- * the bottom bar carries the track.
+ * The music page, a notebook page: black on white (white on black in the dark theme), flat, square,
+ * thin lines. Colours come from the tokens in styles.css. Tracks grouped by sheet are a grid of
+ * square cards; a typed search is one flat list of rows. Cover art keeps its colours.
+ * Two columns from 1100px: the list on the left, the now-playing panel on the right.
  */
 :host {
-  --ink-ground: #0e1311;
-  --ink-raised: #161d1a;
-  --ink-lift: #1e2723;
-  --ink-text: #ece5d2;
-  --ink-on-text: #0e1311;
-  --ink-muted: #9ba596;
-  --ink-accent: #d9a548;
-  --ink-on-accent: #0e1311;
-  --ink-line: rgb(236 229 210 / 0.09);
-
   display: block;
   box-sizing: border-box;
   height: 100%;
   min-height: 0;
   min-width: 0;
-  padding: 24px 28px;
-  border-radius: 16px;
-  background: var(--ink-ground);
-  color: var(--ink-text);
-  font-size: 14px;
+  padding: var(--space-3);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
 .page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-3);
   height: 100%;
   min-height: 0;
 }
@@ -40,133 +30,80 @@
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-3);
   min-height: 0;
   min-width: 0;
 }
 
-/* Heading and search */
+/* Page title in the hand font; the search and the atmosphere chips under it. */
 .hero {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-2);
   min-width: 0;
 }
 
 h1 {
   margin: 0;
-  font-size: 30px;
+  font-family: var(--font-family-hand);
+  font-size: var(--font-size-xl);
   font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
+  line-height: var(--line-height-tight);
 }
 
+/* Search: a text field with only a bottom line; the icon sits on that line. */
 .search-wrap {
   position: relative;
 }
 
 .search-icon {
   position: absolute;
-  left: 18px;
+  left: 0;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--ink-muted);
+  color: var(--color-text-muted);
   pointer-events: none;
 }
 
 .search {
-  box-sizing: border-box;
-  width: 100%;
-  height: 52px;
-  padding: 0 20px 0 50px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--ink-raised);
-  color: var(--ink-text);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 500;
+  padding-left: var(--space-4);
+  font-size: var(--font-size-base);
 }
 
-.search::placeholder {
-  color: var(--ink-muted);
-}
-
-.search:focus {
-  outline: none;
-}
-
-.search:focus-visible {
-  outline: 2px solid var(--ink-text);
-  outline-offset: 2px;
-}
-
-/* Chips: rounded pills; the selected one takes the accent fill and dark text. */
 .vibes {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chip {
-  min-height: 32px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--ink-lift);
-  color: var(--ink-text);
-  font: inherit;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 120ms ease-out, color 120ms ease-out;
-}
-
-.chip:hover {
-  background: color-mix(in srgb, var(--ink-text) 14%, var(--ink-lift));
-}
-
-.chip.on {
-  background: var(--ink-accent);
-  color: var(--ink-on-accent);
-}
-
-.chip:focus-visible,
-.pill-btn:focus-visible {
-  outline: 2px solid var(--ink-text);
-  outline-offset: 2px;
+  gap: var(--space-1);
 }
 
 .notice {
   margin: 0;
-  padding: 16px;
-  border-radius: 12px;
-  background: var(--ink-raised);
-  color: var(--ink-muted);
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  color: var(--color-text-muted);
 }
 
-/* Unavailable panel: one quiet block with the command in a copy block. */
+/* Unavailable panel: one quiet frame with the command in a copy block. */
 .unavailable {
   display: flex;
   flex: 0 0 auto;
   flex-direction: column;
   gap: 6px;
-  padding: 16px 18px;
-  border-radius: 12px;
-  background: var(--ink-raised);
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-border-strong);
 }
 
 .unavailable h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--font-size-base);
   font-weight: 600;
 }
 
 .unavailable-reason,
 .unavailable-hint {
   margin: 0;
-  color: var(--ink-muted);
+  color: var(--color-text-muted);
 }
 
 .code {
@@ -174,40 +111,18 @@ h1 {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--space-1);
   margin-top: 6px;
-  padding: 8px 8px 8px 14px;
-  border-radius: 8px;
-  background: var(--ink-ground);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-border);
 }
 
 .code code {
   min-width: 0;
   overflow-wrap: anywhere;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 13px;
-  color: var(--ink-text);
-}
-
-.pill-btn {
-  display: inline-flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--ink-lift);
-  color: var(--ink-text);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.pill-btn:hover {
-  background: color-mix(in srgb, var(--ink-text) 14%, var(--ink-lift));
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
 }
 
 /* Results. Stale results (a new search is running) stay visible, dimmed. */
@@ -215,37 +130,64 @@ h1 {
   display: flex;
   flex: 1 1 auto;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-3);
   min-height: 0;
   min-width: 0;
   overflow-y: auto;
   padding-right: 4px;
   padding-bottom: 24px;
-  transition: opacity 160ms ease-out;
+  transition: opacity var(--transition-base);
 }
 
 .results-area.is-stale {
   opacity: 0.4;
 }
 
-.count,
-.state-line {
-  margin: 0 0 4px;
-  color: var(--ink-muted);
-  font-size: 13px;
+.count {
+  margin: 0 0 var(--space-1);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
 }
 
+/* Empty state: one centred sentence in the hand font, no illustration. */
+.empty {
+  margin: 0;
+  padding: var(--space-4) 0;
+  text-align: center;
+  font-family: var(--font-family-hand);
+  font-size: var(--font-size-lg);
+  color: var(--color-text-muted);
+}
+
+/* Errors: the text and a 1px frame in the muted red. */
 .state {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-danger);
+}
+
+.state-line {
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--color-danger);
 }
 
 .list {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Square cards: a fixed minimum so the grid grows with the width; 16px gap. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -255,20 +197,23 @@ h1 {
   margin: 0;
 }
 
-/* Sticky group heading: the sheet and its count stay in view while the group scrolls. */
+/* Group heading in the hand font, with the count beside it like an index. Sticky while the group scrolls. */
 .group-title {
   position: sticky;
   top: -4px;
   z-index: 1;
   display: flex;
   align-items: baseline;
-  gap: 10px;
-  margin: 0;
-  padding: 12px 12px 8px 8px;
-  background: var(--ink-ground);
-  font-size: 14px;
-  font-weight: 600;
+  gap: var(--space-1);
   min-width: 0;
+  margin: 0 0 var(--space-2);
+  padding: var(--space-1) 0;
+  border-bottom: var(--border-width) solid var(--color-border-strong);
+  background: var(--color-bg);
+  font-family: var(--font-family-hand);
+  font-size: var(--font-size-lg);
+  font-weight: 700;
+  line-height: var(--line-height-tight);
 }
 
 .group-title a {
@@ -276,91 +221,75 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ink-text);
+  color: var(--color-text);
   text-decoration: none;
 }
 
 .group-title a:hover {
   text-decoration: underline;
-}
-
-.group-title a:focus-visible {
-  outline: 2px solid var(--ink-text);
-  outline-offset: 2px;
-  border-radius: 2px;
+  text-underline-offset: 2px;
 }
 
 .group-count {
   flex: 0 0 auto;
-  color: var(--ink-muted);
-  font-size: 12px;
+  color: var(--color-text-muted);
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
   font-weight: 400;
 }
 
-/* Loading: dark shimmer rows the height of the final rows. */
+/* Loading: flat grey blocks in the shape of the cards. They pulse by opacity; still when motion is reduced. */
 .skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .skeleton li {
-  height: 60px;
-  border-radius: 8px;
-  background: linear-gradient(90deg, var(--ink-raised) 0%, var(--ink-lift) 50%, var(--ink-raised) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 1400ms ease-in-out infinite;
+  aspect-ratio: 1;
+  background: var(--color-surface-2);
+  animation: skeleton-pulse 1400ms ease-in-out infinite;
 }
 
-@keyframes shimmer {
-  from { background-position: 100% 0; }
-  to { background-position: -100% 0; }
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
-/* Now-playing card: the right column, sticky, with the artwork as a blurred backdrop. */
+/* Now-playing panel: the right column, sticky, flat, with a line under its title. */
 .card {
-  position: relative;
   display: none;
   box-sizing: border-box;
   align-self: start;
-  overflow: hidden;
-  isolation: isolate;
-  border-radius: 12px;
-  background: var(--ink-raised);
-  box-shadow: 0 20px 40px -24px rgb(0 0 0 / 0.7);
-}
-
-.card-backdrop {
-  position: absolute;
-  inset: -48px;
-  z-index: -1;
-  background-size: cover;
-  background-position: center;
-  filter: blur(40px) saturate(1.15);
-  opacity: 0.4;
-  transform: scale(1.05);
+  max-height: 100%;
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-border-strong);
+  background: var(--color-bg);
 }
 
 .card-body {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 18px;
-}
-
-.card-art {
-  box-shadow: 0 12px 28px -12px rgb(0 0 0 / 0.8);
+  gap: var(--space-2);
 }
 
 .card-title {
-  margin: 4px 0 0;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  line-height: 1.2;
+  margin: 0;
+  padding-bottom: var(--space-1);
+  border-bottom: var(--border-width) solid var(--color-border-strong);
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  font-weight: 650;
+  line-height: var(--line-height-tight);
   overflow-wrap: anywhere;
 }
 
@@ -369,105 +298,98 @@ h1 {
   flex-wrap: wrap;
   gap: 4px 12px;
   margin: 0;
-  color: var(--ink-muted);
-  font-size: 14px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
 }
 
 .card-sub a {
-  color: var(--ink-text);
-  text-decoration: none;
+  color: var(--color-text);
 }
 
-.card-sub a:hover {
-  text-decoration: underline;
-}
-
-.card-sub a:focus-visible {
-  outline: 2px solid var(--ink-text);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-
+/* The matched sentence: a rule on the left; the matched words in bold and underlined, never coloured. */
 .why {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  background: rgb(0 0 0 / 0.22);
+  padding: var(--space-1) var(--space-2);
+  border-left: var(--border-width-strong) solid var(--color-border-strong);
 }
 
 .why-label {
-  color: var(--ink-muted);
-  font-size: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
   font-weight: 500;
 }
 
 .why p {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--font-size-sm);
   line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
 .hit {
+  color: inherit;
   font-weight: 700;
-  color: var(--ink-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
+/* Transport: square stroke icons; the main one is a filled square, as in the bar. */
 .transport {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  margin-top: 6px;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
 }
 
-.round {
+.icon-btn,
+.play-btn {
   display: inline-grid;
+  flex: 0 0 auto;
   place-items: center;
+  box-sizing: border-box;
   width: 40px;
   height: 40px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ink-text);
+  border-radius: 0;
   cursor: pointer;
-  transition: background-color 120ms ease-out, transform 120ms ease-out;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.round:hover:not(:disabled) {
-  background: var(--ink-lift);
+.icon-btn {
+  background: transparent;
+  color: var(--color-text);
 }
 
-.round.big {
-  width: 56px;
-  height: 56px;
-  background: var(--ink-accent);
-  color: var(--ink-on-accent);
+.icon-btn:hover:not(:disabled) {
+  background: var(--color-surface-2);
 }
 
-.round.big:hover:not(:disabled) {
-  background: var(--ink-accent);
-  transform: scale(1.06);
+.play-btn {
+  width: 48px;
+  height: 48px;
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 
-.round:disabled {
-  opacity: 0.4;
+.play-btn:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.icon-btn:disabled,
+.play-btn:disabled {
+  opacity: 0.55;
   cursor: default;
 }
 
-.round:focus-visible {
-  outline: 2px solid var(--ink-text);
-  outline-offset: 2px;
-}
-
-/* Two columns from 1100px: the card sits on the right, sticky. */
+/* Two columns from 1100px: the panel sits on the right, sticky. */
 @media (min-width: 1100px) {
   .page {
     flex-direction: row;
-    gap: 32px;
+    gap: var(--space-4);
   }
 
   .main {
@@ -480,33 +402,25 @@ h1 {
     flex: 0 0 360px;
     position: sticky;
     top: 0;
-    max-height: 100%;
     overflow-y: auto;
   }
 }
 
-/* Phone: tighter gutter; the list fills the width. */
+/* Phone: the 16px gutter; the cards fill the width. */
 @media (max-width: 599px) {
   :host {
-    padding: 16px;
-    border-radius: 0;
-  }
-
-  h1 {
-    font-size: 28px;
+    padding: var(--space-2);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .skeleton li,
-  .results-area,
-  .chip,
-  .round {
+  .results-area {
     animation: none;
     transition: none;
   }
+}
 
-  .round.big:hover:not(:disabled) {
-    transform: none;
-  }
+:root[data-motion="reduced"] .skeleton li {
+  animation: none;
 }

@@ -1,39 +1,69 @@
-<div class="row" [class.current]="current()" [class.selected]="selected()"
-     [attr.data-selected]="selected() ? 'true' : null" [attr.aria-current]="current() ? 'true' : null">
-  <div class="lead">
-    @if (index(); as n) {
-      <span class="idx" aria-hidden="true">{{ n }}</span>
-    }
-    @if (current() && playing()) {
-      <span class="eq is-moving" role="img" [attr.aria-label]="label('music.nowPlaying')">
-        <span></span><span></span><span></span>
+@if (variant() === 'card') {
+  <div class="card-item" [class.current]="current()" [attr.aria-current]="current() ? 'true' : null">
+    <div class="cover">
+      <ms-music-art class="cover-art" [track]="track()" [large]="true" />
+      <span class="badge" [class.hint]="!current()" aria-hidden="true">
+        @if (current() && playing()) {
+          <span class="eq is-moving"><span></span><span></span><span></span></span>
+        } @else {
+          <lucide-angular [strokeWidth]="1.5" [img]="isExternal() ? icons.ExternalLink : (showPause() ? icons.Pause : icons.Play)" [size]="16" aria-hidden="true" />
+        }
       </span>
-    }
-    <button type="button" class="play" [class.on]="current()" [attr.aria-label]="buttonLabel()" [attr.title]="buttonLabel()"
-            (click)="activate.emit(track())">
-      <lucide-angular [img]="isExternal() ? icons.ExternalLink : (showPause() ? icons.Pause : icons.Play)" [size]="16" aria-hidden="true" />
-    </button>
-  </div>
-
-  <ms-music-art class="art" [track]="track()" />
-
-  <div class="body">
-    <span class="title">{{ track().title }}</span>
-    <span class="sub">
+    </div>
+    <span class="card-name">{{ track().title }}</span>
+    <span class="card-sub">
       @if (showSheet()) {
-        <a class="sheet" [routerLink]="docLink(track().docPath)" [attr.title]="label('music.openSheet')"
+        <a class="sheet" [routerLink]="docLink(track().docPath)" [msTooltip]="label('music.openSheet')" msTooltipPosition="top"
            (click)="openSheet.emit()">{{ track().docTitle }}</a>
       }
       @if (track().preferred) {
         <span class="preferred">{{ label('music.preferred') }}</span>
       }
+      @if (track().mood) {
+        <span class="mood">{{ track().mood }}</span>
+      }
     </span>
-    @if (showSnippet() && track().snippet) {
-      <p class="snippet">@for (part of parts(); track $index) {@if (part.hit) {<strong class="hit">{{ part.text }}</strong>} @else {<span>{{ part.text }}</span>}}</p>
+    <!-- The whole card is the button: it covers the card, the sheet link sits above it. -->
+    <button type="button" class="hit-area" [attr.aria-label]="buttonLabel()" (click)="activate.emit(track())"></button>
+  </div>
+} @else {
+  <div class="row" [class.current]="current()" [class.selected]="selected()"
+       [attr.data-selected]="selected() ? 'true' : null" [attr.aria-current]="current() ? 'true' : null">
+    <div class="lead">
+      @if (index(); as n) {
+        <span class="idx" aria-hidden="true">{{ n }}</span>
+      }
+      @if (current() && playing()) {
+        <span class="eq is-moving" role="img" [attr.aria-label]="label('music.nowPlaying')">
+          <span></span><span></span><span></span>
+        </span>
+      }
+      <button type="button" class="play" [class.on]="current()" [attr.aria-label]="buttonLabel()"
+              [msTooltip]="buttonLabel()" msTooltipPosition="top" (click)="activate.emit(track())">
+        <lucide-angular [strokeWidth]="1.5" [img]="isExternal() ? icons.ExternalLink : (showPause() ? icons.Pause : icons.Play)" [size]="16" aria-hidden="true" />
+      </button>
+    </div>
+
+    <ms-music-art class="art" [track]="track()" />
+
+    <div class="body">
+      <span class="title">{{ track().title }}</span>
+      <span class="sub">
+        @if (showSheet()) {
+          <a class="sheet" [routerLink]="docLink(track().docPath)" [msTooltip]="label('music.openSheet')" msTooltipPosition="top"
+             (click)="openSheet.emit()">{{ track().docTitle }}</a>
+        }
+        @if (track().preferred) {
+          <span class="preferred">{{ label('music.preferred') }}</span>
+        }
+      </span>
+      @if (showSnippet() && track().snippet) {
+        <p class="snippet">@for (part of parts(); track $index) {@if (part.hit) {<strong class="hit">{{ part.text }}</strong>} @else {<span>{{ part.text }}</span>}}</p>
+      }
+    </div>
+
+    @if (track().mood) {
+      <span class="mood">{{ track().mood }}</span>
     }
   </div>
-
-  @if (track().mood) {
-    <span class="mood">{{ track().mood }}</span>
-  }
-</div>
+}

@@ -21,8 +21,9 @@ import { I18n, type TranslationKey } from '../i18n';
 import { MusicApiService, MusicSearch } from './music-api.service';
 import { groupTracks, type TrackGroup } from './music-groups';
 import { MusicPlayerService, isInAppTrack } from './music-player.service';
+import { TooltipDirective } from '../core/tooltip.directive';
 import { MusicResult } from './music-result';
-import { MusicArt, artUrl } from './music-art';
+import { MusicArt } from './music-art';
 import { snippetParts } from './music-highlight';
 import { VIBES, hasTerm, toggleTerm, type Vibe } from './music-vibes';
 
@@ -59,7 +60,7 @@ export const INSTALL_COMMAND = 'brew install mpv yt-dlp deno';
  */
 @Component({
   selector: 'ms-music-library',
-  imports: [LucideAngularModule, RouterLink, MusicResult, MusicArt],
+  imports: [LucideAngularModule, RouterLink, MusicResult, MusicArt, TooltipDirective],
   templateUrl: './music-library.html',
   styleUrl: './music-library.css',
 })
@@ -176,11 +177,6 @@ export class MusicLibrary {
   cardTitle(): string {
     const track = this.card();
     return track && track.title ? track.title : this.i18n.t('music.card.empty');
-  }
-  /** The blurred backdrop of the card: the artwork, or nothing (the card keeps its own tone). */
-  backdrop(): string | null {
-    const url = artUrl(this.card());
-    return url ? `url("${url}")` : null;
   }
   /** The matched sentence of the card's track, split for highlighting. */
   cardWhy(): { text: string; hit: boolean }[] {

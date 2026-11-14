@@ -107,14 +107,14 @@ describe('MusicLibrary', () => {
   it('shows the empty library with how to add music', async () => {
     server.tracks = [];
     await render();
-    expect(el('.state-line')?.textContent).toContain('No music in this campaign yet');
+    expect(el('.empty')?.textContent).toContain('No music in this campaign yet');
   });
 
   it('suggests a general word when nothing matches', async () => {
     await render();
     type('zzzz');
     await wait();
-    expect(el('.state-line')?.textContent).toContain('No track matches. Try a general word such as “Tension”.');
+    expect(el('.empty')?.textContent).toContain('No track matches. Try a general word such as “Tension”.');
   });
 
   it('shows loading placeholders first, and a retry after a failed search', async () => {
@@ -129,7 +129,7 @@ describe('MusicLibrary', () => {
     (el('.state .retry') as HTMLButtonElement).click();
     await settle();
     fixture.detectChanges();
-    expect(el('.row')).not.toBeNull();
+    expect(el('.card-item')).not.toBeNull();
   });
 
   it('shows the unavailable panel with the exact install command and the reason', async () => {
@@ -143,8 +143,8 @@ describe('MusicLibrary', () => {
   it('plays a SoundCloud result in the app, not in a new tab', async () => {
     server.tracks = [soundcloudTrack('sc', { title: 'Cloud song', docTitle: 'Port', docPath: 'places/port.md' })];
     await render();
-    expect(el('.row .play')?.getAttribute('aria-label')).toBe('Play Cloud song');
-    el<HTMLButtonElement>('.row .play')!.click();
+    expect(el('.card-item .hit-area')?.getAttribute('aria-label')).toBe('Play Cloud song');
+    el<HTMLButtonElement>('.card-item .hit-area')!.click();
     await settle();
     expect(server.commands.at(-1)).toEqual({ command: 'play', trackId: 'sc' });
   });
@@ -152,7 +152,7 @@ describe('MusicLibrary', () => {
   it('keeps external links as results that open in a new tab', async () => {
     server.tracks = [externalTrack('ext', { title: 'Outside link', docTitle: 'Port', docPath: 'places/port.md' })];
     await render();
-    expect(el('.row .play')?.getAttribute('aria-label')).toBe('Open in a new tab');
+    expect(el('.card-item .hit-area')?.getAttribute('aria-label')).toBe('Open in a new tab');
   });
 
   it('focuses the search with "/", plays by digit, and pauses with Space while playing', async () => {

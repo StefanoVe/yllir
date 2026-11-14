@@ -6,7 +6,7 @@
         <ul class="tray-list">
           @for (item of api.suggestions(); track item.id) {
             <li class="tray-item">
-              <button type="button" class="tray-play" [attr.aria-label]="playLabel(item.track)" [attr.title]="playLabel(item.track)"
+              <button type="button" class="tray-play" [attr.aria-label]="playLabel(item.track)" [msTooltip]="playLabel(item.track)" msTooltipPosition="top"
                       (click)="playSuggestion(item.track)">
                 <ms-music-art class="tray-art" [track]="item.track" />
                 <span class="tray-name">{{ titleOf(item.track) }}</span>
@@ -54,7 +54,7 @@
                 <span class="state" aria-live="polite">{{ stateText() }}</span>
                 @if (track.docTitle) {
                   <span class="sep" aria-hidden="true">·</span>
-                  <a class="sheet" [routerLink]="docLink(track.docPath)" [attr.title]="label('music.openSheet')">{{ track.docTitle }}</a>
+                  <a class="sheet" [routerLink]="docLink(track.docPath)" [msTooltip]="label('music.openSheet')" msTooltipPosition="top">{{ track.docTitle }}</a>
                 }
               </p>
             </div>
@@ -134,7 +134,7 @@
         <div class="browse-wrap">
           <button #browseButton type="button" class="browse-btn" aria-haspopup="dialog"
                   [attr.aria-expanded]="browseOpen()" [attr.aria-label]="label('music.dock.browseAria')"
-                  [attr.title]="label('music.dock.browseAria')" (click)="toggleBrowse()">
+                  [msTooltip]="label('music.dock.browseAria')" msTooltipPosition="top" (click)="toggleBrowse()">
             <lucide-angular [strokeWidth]="1.5" [img]="icons.ListMusic" [size]="16" aria-hidden="true" />
             <span>{{ label('music.dock.browse') }}</span>
           </button>

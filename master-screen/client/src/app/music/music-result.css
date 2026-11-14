@@ -1,36 +1,43 @@
 /*
- * A track row. No borders and no card: a 56-64px row with an 8px radius. Hover lifts it one step;
- * the track in the player takes the accent title, a faint accent tint and the moving bars.
- * Colours come from the page or bar palette (--ink-*), with fallbacks when the row stands alone.
+ * A track, in two shapes. The row (search results, the dock's Tracks list): a line of its own with a
+ * 1px rule under it. The card (the grouped library): a square cover in a 1px frame, the title under
+ * it, and the whole card is one button. The track in the player is inverted (text colour as fill).
+ * Colours come from the tokens in styles.css, so light and dark follow the app theme.
  */
 :host {
   display: block;
   min-width: 0;
 }
 
+/* Row */
 .row {
   display: grid;
   grid-template-columns: 40px 48px minmax(0, 1fr) minmax(0, 140px);
   align-items: center;
   column-gap: 12px;
   min-height: 60px;
-  padding: 6px 12px 6px 8px;
-  border-radius: 8px;
-  color: var(--ink-text, #ece5d2);
-  font-size: 14px;
-  transition: background-color 120ms ease-out;
+  padding: 6px 8px;
+  border-bottom: var(--border-width) solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .row:hover {
-  background: var(--ink-lift, #1e2723);
+  background: var(--color-surface-2);
 }
 
+/* Keyboard selection: a heavier frame inside the row. */
 .row.selected {
-  box-shadow: inset 0 0 0 2px var(--ink-text, #ece5d2);
+  outline: var(--border-width-strong) solid var(--color-border-strong);
+  outline-offset: -2px;
 }
 
-.row.current {
-  background: color-mix(in srgb, var(--ink-accent, #d9a548) 9%, transparent);
+/* The track in the player: inverted. */
+.row.current,
+.row.current:hover {
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 
 /* Lead: the index sits where the play button appears on hover; the bars replace the index while playing. */
@@ -47,8 +54,8 @@
 }
 
 .idx {
-  color: var(--ink-muted, #9ba596);
-  font-size: 13px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -57,19 +64,33 @@
   visibility: hidden;
 }
 
+.row.current .idx {
+  color: inherit;
+}
+
 .play {
   display: inline-grid;
   place-items: center;
   width: 36px;
   height: 36px;
   padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: var(--ink-text, #ece5d2);
-  color: var(--ink-on-text, #0e1311);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
   cursor: pointer;
   opacity: 0;
-  transition: opacity 120ms ease-out, transform 120ms ease-out;
+  transition: opacity var(--transition-fast), background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.play:hover {
+  background: var(--color-surface-2);
+}
+
+.play.on,
+.play.on:hover {
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 
 .row:hover .play,
@@ -79,46 +100,27 @@
   opacity: 1;
 }
 
-.play.on {
-  background: var(--ink-accent, #d9a548);
-  color: var(--ink-on-accent, #0e1311);
-}
-
-.play:hover {
-  transform: scale(1.06);
-}
-
-.play:focus-visible {
-  outline: 2px solid var(--ink-text, #ece5d2);
-  outline-offset: 2px;
-}
-
-/* Hovering a row or having the track in the player hides the bars only on hover. */
 .row:hover .eq {
   visibility: hidden;
-}
-
-.row:hover .play {
-  opacity: 1;
 }
 
 .row.current:not(:has(.eq)) .play {
   opacity: 1;
 }
 
+/* Bars: the playing indicator. Their colour is the text colour, so they invert with the row. */
 .eq {
   display: inline-flex;
   align-items: flex-end;
   gap: 2px;
   height: 14px;
-  color: var(--ink-accent, #d9a548);
+  color: currentColor;
 }
 
 .eq span {
   display: block;
   width: 3px;
   height: 100%;
-  border-radius: 1px;
   background: currentColor;
   transform-origin: bottom;
 }
@@ -140,7 +142,6 @@
   50% { transform: scaleY(1); }
 }
 
-/* Body: title 15/600, then the sheet, then the match (only while searching). */
 .body {
   display: flex;
   flex-direction: column;
@@ -150,16 +151,12 @@
 
 .title {
   min-width: 0;
-  font-size: 15px;
+  font-size: var(--font-size-sm);
   font-weight: 600;
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.row.current .title {
-  color: var(--ink-accent, #d9a548);
 }
 
 .sub {
@@ -168,8 +165,14 @@
   align-items: baseline;
   gap: 2px 8px;
   min-width: 0;
-  color: var(--ink-muted, #9ba596);
-  font-size: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+.row.current .sub,
+.row.current .mood,
+.row.current .snippet {
+  color: inherit;
 }
 
 .sheet {
@@ -182,14 +185,8 @@
 }
 
 .sheet:hover {
-  color: var(--ink-text, #ece5d2);
   text-decoration: underline;
-}
-
-.sheet:focus-visible {
-  outline: 2px solid var(--ink-text, #ece5d2);
-  outline-offset: 2px;
-  border-radius: 2px;
+  text-underline-offset: 2px;
 }
 
 .preferred {
@@ -198,15 +195,18 @@
 
 .snippet {
   margin: 2px 0 0;
-  color: var(--ink-muted, #9ba596);
-  font-size: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
+/* The matched words: bold and underlined, never coloured. */
 .hit {
+  color: inherit;
   font-weight: 700;
-  color: var(--ink-accent, #d9a548);
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 .mood {
@@ -214,8 +214,8 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--ink-muted, #9ba596);
-  font-size: 12px;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
 }
 
 @media (max-width: 899px) {
@@ -228,17 +228,127 @@
   }
 }
 
+/* Card */
+.card-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+  min-width: 0;
+  padding: var(--space-1);
+  color: var(--color-text);
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.card-item:hover {
+  background: var(--color-surface-2);
+}
+
+.card-item.current,
+.card-item.current:hover {
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+.cover {
+  position: relative;
+}
+
+/* The cover keeps its colours; its frame comes from the artwork square. */
+.cover-art {
+  width: 100%;
+}
+
+/* The playing marker in the corner of the cover: the bars while it plays, else the play icon. */
+.badge {
+  position: absolute;
+  top: var(--space-1);
+  left: var(--space-1);
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 var(--space-0-5);
+  border: var(--border-width) solid var(--color-border-strong);
+  background: var(--color-bg);
+  color: var(--color-text);
+  pointer-events: none;
+}
+
+/* Not playing: the marker shows only on hover or focus, so the cover stays clean. */
+.badge.hint {
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.card-item:hover .badge.hint,
+.card-item:focus-within .badge.hint {
+  opacity: 1;
+}
+
+.card-name {
+  min-width: 0;
+  padding: 0 var(--space-0-5);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  min-width: 0;
+  padding: 0 var(--space-0-5);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  pointer-events: none;
+}
+
+.card-item.current .card-sub,
+.card-item.current .mood {
+  color: inherit;
+}
+
+.card-sub .sheet {
+  position: relative;
+  z-index: 1;
+  pointer-events: auto;
+  color: inherit;
+}
+
+/* The whole card is the button: it covers the card and carries the focus ring. */
+.hit-area {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.hit-area:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .row,
-  .play {
+  .play,
+  .badge.hint {
     transition: none;
-  }
-
-  .play:hover {
-    transform: none;
   }
 
   .eq.is-moving span {
     animation: none;
   }
+}
+
+:root[data-motion="reduced"] .eq.is-moving span {
+  animation: none;
 }
