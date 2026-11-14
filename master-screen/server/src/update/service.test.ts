@@ -12,7 +12,7 @@ import { PLUGIN_MANIFEST_URL } from './source.js';
 import { UPDATE_TEXTS } from './text.js';
 
 const EN = UPDATE_TEXTS.en;
-const STATUS_KEYS = ['blockedReason', 'canApply', 'news', 'sessions', 'snoozed', 'state'];
+const STATUS_KEYS = ['blockedReason', 'canApply', 'news', 'sessions', 'snoozed', 'state', 'version'];
 const LIVE: OpenSession = { kind: 'live', id: '2026-11-14', title: 'Night in the crypt' };
 const CHAT: OpenSession = { kind: 'chat', id: 'conv-1', title: 'Chat' };
 
@@ -30,6 +30,7 @@ describe('status', () => {
     const status = await svc.check();
     assert.deepEqual(status, {
       state: 'idle',
+      version: null,
       news: null,
       snoozed: false,
       canApply: false,
@@ -38,16 +39,23 @@ describe('status', () => {
     });
   });
 
-  it('is available with the news, and never carries a version number', async () => {
+  it('is available with the news and the published version', async () => {
     const svc = service();
     const status = await svc.check();
     assert.equal(status.state, 'available');
+    assert.equal(status.version, fake.world.published);
     assert.equal(status.news, 'Something new for the master.');
     assert.equal(status.canApply, true);
     assert.equal(status.blockedReason, null);
     assert.deepEqual(status.sessions, []);
     assert.deepEqual(Object.keys(status).sort(), STATUS_KEYS);
-    assert.ok(!JSON.stringify(status).includes('1.2.0'));
+  });
+
+  it('the first status call on a fresh service awaits the first check', async () => {
+    const svc = service();
+    const status = await svc.status();
+    assert.equal(status.state, 'available');
+    assert.equal(status.version, fake.world.published);
   });
 
   it('is available without news when the news cannot be read', async () => {
@@ -72,6 +80,7 @@ describe('status', () => {
     const status = await svc.check();
     assert.deepEqual(status, {
       state: 'offline',
+      version: null,
       news: null,
       snoozed: false,
       canApply: false,

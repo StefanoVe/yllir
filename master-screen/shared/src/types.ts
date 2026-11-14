@@ -129,6 +129,8 @@ export interface OpenSession { kind: 'live' | 'chat'; id: string; title: string 
 
 export interface UpdateStatus {
   state: 'idle' | 'available' | 'offline' | 'updating' | 'restarting' | 'failed';
+  /** The newest published version when state is 'available' (or updating/restarting/failed with a known one); null otherwise. */
+  version: string | null;
   /** Plain-language news of the newer versions, in the campaign language; null when there are none. */
   news: string | null;
   /** True while the notice memory has a snooze that runs past today. */

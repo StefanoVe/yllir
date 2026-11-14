@@ -3,7 +3,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { OpenSession, UpdateStatus } from '@shared/types';
 import { UpdateService } from '../core/update';
-import { UpdateNotice, newsPreview } from './update-notice';
+import { UpdateNotice, newsGroups } from './update-notice';
 
 const SESSIONS: OpenSession[] = [
   { kind: 'live', id: 'l1', title: 'Tavolo del martedì' },
@@ -11,18 +11,33 @@ const SESSIONS: OpenSession[] = [
 ];
 
 function status(partial: Partial<UpdateStatus> = {}): UpdateStatus {
-  return { state: 'available', news: 'Better search.\nThe search finds more.\n\n- New cards\n- Fixed the map', snoozed: false, canApply: true, blockedReason: null, sessions: [], ...partial };
+  return {
+    state: 'available',
+    version: '0.68.0',
+    news: 'Better search.\nThe search finds more.\n\n- New cards\n- Fixed the map',
+    snoozed: false,
+    canApply: true,
+    blockedReason: null,
+    sessions: [],
+    ...partial,
+  };
 }
 
-describe('newsPreview', () => {
-  it('keeps the first two lines of text, without list marks, as one plain line', () => {
-    expect(newsPreview('Better search.\nThe search finds more.\n\n- New cards')).toBe('Better search. The search finds more.');
-    expect(newsPreview('- First\n- Second\n- Third')).toBe('First Second');
+describe('newsGroups', () => {
+  it('turns each non-empty line into a paragraph and "- " or "* " lines into list items', () => {
+    expect(newsGroups('Better search.\nThe search finds more.\n\n- New cards\n* Fixed the map\n- ')).toEqual([
+      { list: false, items: ['Better search.', 'The search finds more.'] },
+      { list: true, items: ['New cards', 'Fixed the map'] },
+    ]);
+  });
+
+  it('keeps html-looking text as plain text', () => {
+    expect(newsGroups('<b>bold</b>')).toEqual([{ list: false, items: ['<b>bold</b>'] }]);
   });
 
   it('is empty when there is no news', () => {
-    expect(newsPreview(null)).toBe('');
-    expect(newsPreview('  \n ')).toBe('');
+    expect(newsGroups(null)).toEqual([]);
+    expect(newsGroups('  \n - \n ')).toEqual([]);
   });
 });
 
@@ -68,58 +83,107 @@ describe('UpdateNotice', () => {
     return fixture.nativeElement as HTMLElement;
   }
 
+  function refresh(): void {
+    fixture.detectChanges();
+  }
+
+  function pill(root: HTMLElement): HTMLButtonElement | null {
+    return root.querySelector<HTMLButtonElement>('.tip-pill');
+  }
+
+  function panel(root: HTMLElement): HTMLElement | null {
+    return root.querySelector<HTMLElement>('.tip-panel');
+  }
+
   function card(root: HTMLElement): HTMLElement | null {
-    return root.querySelector<HTMLElement>('.notice');
+    return root.querySelector<HTMLElement>('.notice:not(.tip)');
   }
 
   function button(root: HTMLElement, label: string): HTMLButtonElement | undefined {
     return Array.from(root.querySelectorAll<HTMLButtonElement>('button')).find((item) => item.textContent?.trim() === label);
   }
 
-  function refresh(): void {
-    fixture.detectChanges();
-  }
-
-  it('shows the card when an update is ready and not postponed', () => {
+  it('shows the pill with the version and the panel closed', () => {
     const root = render();
-    expect(card(root)).not.toBeNull();
-    expect(card(root)?.querySelector('h2')?.textContent?.trim()).toBe('Update available');
-    expect(card(root)?.textContent).toContain('Better search. The search finds more.');
+    expect(pill(root)?.textContent?.trim()).toBe('New version 0.68.0 available');
+    expect(pill(root)?.getAttribute('aria-expanded')).toBe('false');
+    expect(pill(root)?.getAttribute('aria-controls')).toBe('update-notice-panel');
+    expect(panel(root)?.id).toBe('update-notice-panel');
+    expect(root.querySelector('.tip')?.classList.contains('open')).toBe(false);
   });
 
-  it('stays hidden once the master said later, and when nothing is ready', () => {
-    fake.status.set(status({ snoozed: true }));
-    expect(card(render())).toBeNull();
+  it('falls back to the old title when the version is not known', () => {
+    fake.status.set(status({ version: null }));
+    expect(pill(render())?.textContent?.trim()).toBe('Update available');
+  });
 
-    fake.status.set(status({ state: 'idle', news: null }));
+  it('puts the changelog and both buttons in the panel, and opens it on click', () => {
+    const root = render();
+    const body = panel(root);
+    expect(body?.querySelector('.news')?.textContent).toContain('Better search.');
+    expect([...body!.querySelectorAll('.news-line')].map((p) => p.textContent?.trim())).toEqual([
+      'Better search.',
+      'The search finds more.',
+    ]);
+    expect([...body!.querySelectorAll('.news-list li')].map((li) => li.textContent?.trim())).toEqual(['New cards', 'Fixed the map']);
+    expect(button(root, 'Update')).toBeDefined();
+    expect(button(root, 'Later')).toBeDefined();
+
+    pill(root)?.click();
     refresh();
-    expect(card(fixture.nativeElement as HTMLElement)).toBeNull();
+    expect(root.querySelector('.tip')?.classList.contains('open')).toBe(true);
+    expect(pill(root)?.getAttribute('aria-expanded')).toBe('true');
   });
 
-  it('Update without open sessions asks the service to apply, with no list', () => {
+  it('shows a short sentence when there is no news', () => {
+    fake.status.set(status({ news: null }));
     const root = render();
-    button(root, 'Update')?.click();
-    expect(fake.requestApply).toHaveBeenCalledTimes(1);
-    expect(card(root)?.querySelector('.notice-sessions')).toBeNull();
+    expect(panel(root)?.textContent).toContain('No details for this version.');
+    expect(panel(root)?.querySelector('.news-line')).toBeNull();
   });
 
-  it('with open sessions the card switches to the list, and the API is not called until Close the sessions and update', () => {
-    fake.status.set(status({ sessions: SESSIONS }));
+  it('shows the action error in the panel as an alert', () => {
+    fake.actionError.set('The server refused the update.');
+    const root = render();
+    expect(panel(root)?.querySelector('[role="alert"]')?.textContent).toContain('The server refused the update.');
+  });
+
+  it('Escape closes the open panel and does not postpone the update', () => {
+    const root = render();
+    pill(root)?.click();
+    refresh();
+    pill(root)?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    refresh();
+    expect(root.querySelector('.tip')?.classList.contains('open')).toBe(false);
+    expect(root.querySelector('.tip')?.classList.contains('dismissed')).toBe(true);
+    expect(pill(root)?.getAttribute('aria-expanded')).toBe('false');
+    expect(fake.snooze).not.toHaveBeenCalled();
+  });
+
+  it('Update calls requestApply, and the list is shown when open sessions would close', () => {
     const root = render();
     button(root, 'Update')?.click();
     expect(fake.requestApply).toHaveBeenCalledTimes(1);
     expect(fake.apply).not.toHaveBeenCalled();
 
-    // The service turns the confirmation on; the card follows.
+    fake.status.set(status({ sessions: SESSIONS }));
     fake.confirming.set(true);
     refresh();
     expect(card(root)?.getAttribute('role')).toBe('dialog');
+    expect(pill(root)).toBeNull();
     expect(card(root)?.textContent).toContain('The update will close these sessions:');
     expect([...root.querySelectorAll('.notice-sessions li')].map((li) => li.textContent)).toEqual(['Tavolo del martedì', 'Chat']);
     expect(fake.apply).not.toHaveBeenCalled();
 
     button(root, 'Close the sessions and update')?.click();
     expect(fake.apply).toHaveBeenCalledWith(true);
+  });
+
+  it('Later calls snooze', () => {
+    const root = render();
+    button(root, 'Later')?.click();
+    expect(fake.snooze).toHaveBeenCalledTimes(1);
+    expect(fake.requestApply).not.toHaveBeenCalled();
   });
 
   it('Cancel in the confirmation goes back without calling the API', () => {
@@ -131,23 +195,34 @@ describe('UpdateNotice', () => {
     expect(fake.apply).not.toHaveBeenCalled();
   });
 
-  it('Escape means later, and from the confirmation it goes back', () => {
-    const root = render();
-    card(root)?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    expect(fake.snooze).toHaveBeenCalledTimes(1);
-
+  it('Escape in the confirmation goes back, and does not postpone', () => {
     fake.status.set(status({ sessions: SESSIONS }));
     fake.confirming.set(true);
-    refresh();
+    const root = render();
     card(root)?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     expect(fake.cancelApply).toHaveBeenCalledTimes(1);
-    expect(fake.snooze).toHaveBeenCalledTimes(1);
+    expect(fake.snooze).not.toHaveBeenCalled();
+  });
+
+  it('stays hidden once the master said later, and when nothing is ready', () => {
+    fake.status.set(status({ snoozed: true }));
+    expect(render().querySelector('.notice')).toBeNull();
+
+    fake.status.set(status({ state: 'idle', news: null, version: null }));
+    refresh();
+    expect(fixture.nativeElement.querySelector('.notice')).toBeNull();
+  });
+
+  it('keeps the card out of the page when the state is offline', () => {
+    fake.status.set(status({ state: 'offline', news: null }));
+    expect(render().querySelector('.notice')).toBeNull();
   });
 
   it('shows the progress line while updating, and the reopen notice when the service raises it', () => {
     fake.status.set(status({ state: 'updating' }));
     const root = render();
     expect(root.querySelector('[role="status"]')?.textContent).toContain('Updating, it takes a few seconds');
+    expect(pill(root)).toBeNull();
     expect(button(root, 'Update')).toBeUndefined();
 
     fake.status.set(status({ state: 'restarting' }));
@@ -164,10 +239,5 @@ describe('UpdateNotice', () => {
     button(root, 'Try again')?.click();
     expect(fake.retry).toHaveBeenCalledTimes(1);
     expect(fake.apply).not.toHaveBeenCalled();
-  });
-
-  it('keeps the card out of the page when the state is offline', () => {
-    fake.status.set(status({ state: 'offline', news: null }));
-    expect(card(render())).toBeNull();
   });
 });

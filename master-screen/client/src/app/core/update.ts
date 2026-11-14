@@ -125,6 +125,7 @@ export class UpdateService {
       const current = this.status();
       this.applyStatus({
         state: 'updating',
+        version: current?.version ?? null,
         news: current?.news ?? null,
         snoozed: false,
         canApply: false,

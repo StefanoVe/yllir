@@ -2,6 +2,8 @@
 export const updateIt = {
   'update.section': 'Aggiornamento',
   'update.title': 'Aggiornamento disponibile',
+  'update.pill': 'Nuova versione {version} disponibile',
+  'update.noDetails': 'Nessun dettaglio per questa versione.',
   'update.upToDate': 'Tutto è aggiornato',
   'update.available': 'È pronto un aggiornamento di Yllir.',
   'update.news': 'Novità',

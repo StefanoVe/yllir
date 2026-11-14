@@ -61,7 +61,7 @@ describe('update routes', () => {
     const server = await serve(new UpdateService(fake.deps));
     const before = await call(server, 'GET', '/update');
     assert.equal(before.status, 200, before.text);
-    assert.equal((before.json as UpdateStatus).state, 'idle');
+    assert.equal((before.json as UpdateStatus).state, 'available', 'the first status awaits the first check');
 
     const checked = await call(server, 'POST', '/update/check');
     assert.equal(checked.status, 200, checked.text);
@@ -69,7 +69,8 @@ describe('update routes', () => {
     assert.equal(status.state, 'available');
     assert.equal(status.canApply, true);
     assert.equal(status.news, 'Something new for the master.');
-    assert.deepEqual(Object.keys(status).sort(), ['blockedReason', 'canApply', 'news', 'sessions', 'snoozed', 'state']);
+    assert.deepEqual(Object.keys(status).sort(), ['blockedReason', 'canApply', 'news', 'sessions', 'snoozed', 'state', 'version']);
+    assert.equal(status.version, fake.world.published);
   });
 
   it('POST snooze answers the status with snoozed true', async () => {

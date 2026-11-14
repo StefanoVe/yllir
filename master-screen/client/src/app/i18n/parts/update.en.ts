@@ -2,6 +2,8 @@
 export const updateEn = {
   'update.section': 'Update',
   'update.title': 'Update available',
+  'update.pill': 'New version {version} available',
+  'update.noDetails': 'No details for this version.',
   'update.upToDate': 'Everything is up to date',
   'update.available': 'An update for Yllir is ready.',
   'update.news': "What's new",

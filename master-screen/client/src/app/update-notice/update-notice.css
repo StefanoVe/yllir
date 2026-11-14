@@ -23,6 +23,111 @@
   to { opacity: 1; transform: none; }
 }
 
+/* The compact form while an update is offered: a pill, and a panel that opens below it. The pill and the
+   panel share one box, so the pointer can move from one to the other without the panel closing. */
+.notice.tip {
+  width: auto;
+  padding: 0;
+  background: none;
+  box-shadow: none;
+  animation: notice-in var(--transition-base) both;
+}
+
+.tip-pill {
+  -webkit-tap-highlight-color: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  max-width: min(340px, calc(100vw - 2 * var(--space-2)));
+  margin: 0;
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-2), 0 0 0 1px var(--color-border);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.tip-pill lucide-angular {
+  flex: none;
+  color: var(--color-accent);
+}
+
+@media (hover: hover) {
+  .tip-pill:hover {
+    background: var(--color-selection);
+  }
+}
+
+.tip-pill:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+/* The panel hangs below the pill. Its top padding is part of the hover area, so there is no gap to lose it in. */
+.tip-panel {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  width: min(360px, calc(100vw - 2 * var(--space-2)));
+  box-sizing: border-box;
+  padding-top: var(--space-1);
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity var(--transition-fast), visibility var(--transition-fast);
+}
+
+.tip.open .tip-panel,
+.tip:not(.dismissed):focus-within .tip-panel {
+  visibility: visible;
+  opacity: 1;
+}
+
+@media (hover: hover) {
+  .tip:not(.dismissed):hover .tip-panel {
+    visibility: visible;
+    opacity: 1;
+  }
+}
+
+.tip-card {
+  box-sizing: border-box;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2), 0 0 0 1px var(--color-border);
+}
+
+.news {
+  max-height: 40vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.news-line,
+.news-list {
+  margin: 0 0 var(--space-1);
+}
+
+.news-list {
+  padding-left: var(--space-2);
+}
+
+.news > :last-child {
+  margin-bottom: 0;
+}
+
 .notice-title {
   margin: 0 0 var(--space-0-5);
   font-size: var(--font-size-md);
@@ -47,14 +152,6 @@
   color: var(--color-text-muted);
 }
 
-/* The news: three lines at most, the rest is shown in Settings. */
-.notice-text.clamp {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
 .notice-sessions {
   margin: var(--space-1) 0 0;
   padding: 0 0 0 var(--space-2);
@@ -69,6 +166,10 @@
   margin: 0;
   color: var(--color-danger);
   font-size: var(--font-size-sm);
+}
+
+.notice-error + .news {
+  margin-top: var(--space-1);
 }
 
 .notice-progress {
@@ -128,7 +229,13 @@
 
 @media (prefers-reduced-motion: reduce) {
   .notice,
+  .notice.tip,
   .spin {
     animation: none;
+  }
+
+  .tip-panel,
+  .tip-pill {
+    transition: opacity var(--transition-fast), visibility var(--transition-fast);
   }
 }

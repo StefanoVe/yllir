@@ -70,7 +70,9 @@ export class UpdateService {
 
   /** The current status. When the last check is over an hour old, a check starts in the background. */
   async status(): Promise<UpdateStatus> {
-    if (this.snapshot === null || this.deps.now() - this.snapshot.checkedAt >= CHECK_INTERVAL_MS) {
+    if (this.snapshot === null) {
+      await this.refresh(false);
+    } else if (this.deps.now() - this.snapshot.checkedAt >= CHECK_INTERVAL_MS) {
       void this.refresh(false);
     }
     return this.compose();
@@ -170,9 +172,18 @@ export class UpdateService {
 
   private async compose(): Promise<UpdateStatus> {
     const snoozed = isSnoozed(readNotice(this.deps.campaignRoot), this.deps.today());
-    const idle: UpdateStatus = { state: 'idle', news: null, snoozed, canApply: false, blockedReason: null, sessions: [] };
-    if (this.phase === 'updating' || this.phase === 'restarting') return { ...idle, state: this.phase };
-    if (this.phase === 'failed') return { ...idle, state: 'failed' };
+    const idle: UpdateStatus = {
+      state: 'idle',
+      version: null,
+      news: null,
+      snoozed,
+      canApply: false,
+      blockedReason: null,
+      sessions: [],
+    };
+    const known = this.snapshot?.published ?? null;
+    if (this.phase === 'updating' || this.phase === 'restarting') return { ...idle, state: this.phase, version: known };
+    if (this.phase === 'failed') return { ...idle, state: 'failed', version: known };
     const snap = this.snapshot;
     if (snap === null) return idle;
     if (snap.published === null) {
@@ -182,6 +193,7 @@ export class UpdateService {
     if (compareVersions(snap.published, installed) !== 1) return idle;
     return {
       state: 'available',
+      version: snap.published,
       news: snap.news,
       snoozed,
       canApply: true,

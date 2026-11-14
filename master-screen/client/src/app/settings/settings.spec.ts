@@ -14,9 +14,10 @@ import { Settings, SETTINGS_COLLAPSED_KEY, checkSummary, parseNews, sectionMatch
 
 const EMPTY_CHECKS: ChecksResponse = { brokenLinks: [], sketches: [], exclusions: [], checkedAt: '2026-11-13T10:30:00Z' };
 const SESSIONS: OpenSession[] = [{ kind: 'live', id: 'l1', title: 'Tavolo del martedì' }, { kind: 'chat', id: 'c1', title: 'Chat' }];
-const UPDATE_IDLE: UpdateStatus = { state: 'idle', news: null, snoozed: false, canApply: true, blockedReason: null, sessions: [] };
+const UPDATE_IDLE: UpdateStatus = { state: 'idle', version: null, news: null, snoozed: false, canApply: true, blockedReason: null, sessions: [] };
 const UPDATE_AVAILABLE: UpdateStatus = {
   state: 'available',
+  version: '0.68.0',
   news: 'Better search.\nThe search finds more.\n\n- New cards\n- Fixed the map',
   snoozed: false,
   canApply: true,

@@ -8,7 +8,7 @@ function json(status: number, body: unknown): Response {
 }
 
 function status(partial: Partial<UpdateStatus> = {}): UpdateStatus {
-  return { state: 'idle', news: null, snoozed: false, canApply: true, blockedReason: null, sessions: [], ...partial };
+  return { state: 'idle', version: null, news: null, snoozed: false, canApply: true, blockedReason: null, sessions: [], ...partial };
 }
 
 /** A fake server: `route` answers each call by method and path. Throwing from it simulates a dropped connection. */
