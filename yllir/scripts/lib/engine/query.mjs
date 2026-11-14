@@ -9,13 +9,14 @@ import { priceReport, priceProposal } from '../economy/economy.mjs';
 import { unreachableNodes, forgottenCharacters } from '../plot/doctor.mjs';
 import { loadAdapter, pluginRootFromHere } from '../adapter.mjs';
 import { parseYamlLite } from '../yaml-lite.mjs';
+import { planLinks } from '../links/link-plan.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 
 // `encounters [sessionId]` is asynchronous (adapter loaders): it is run by
 // runEncounters in encounters.mjs, which the engine calls for that name.
 const USAGE =
-  'usage: find <text> | at <placeId> | where <id> | related <id> | timeline [from] [to] | sketches | errors | prices | price-proposal <systemValue> | unreachable | forgotten | encounters [sessionId]';
+  'usage: find <text> | at <placeId> | where <id> | related <id> | timeline [from] [to] | sketches | errors | prices | price-proposal <systemValue> | unreachable | forgotten | missing-links | encounters [sessionId]';
 
 // name -> allowed argument counts
 const QUERIES = {
@@ -30,6 +31,7 @@ const QUERIES = {
   'price-proposal': { min: 1, max: 1 },
   unreachable: { min: 0, max: 0 },
   forgotten: { min: 0, max: 0 },
+  'missing-links': { min: 0, max: 0 },
 };
 
 // Queries that read the campaign files directly, without the world index.
@@ -50,6 +52,35 @@ const ROOT_HANDLERS = {
   },
   forgotten(root) {
     return { results: forgottenCharacters(root) };
+  },
+  // Every mention that is still not linked, whatever the reason: nothing is filtered by
+  // autoOutcomes. Read-only: planLinks writes nothing.
+  'missing-links'(root) {
+    const plan = planLinks(root);
+    return {
+      results: plan.proposals.map((p) => ({
+        file: p.file,
+        line: p.line,
+        col: p.col,
+        text: p.text,
+        subject: p.subject,
+        sheet: p.sheet,
+        in_master: p.in_master,
+      })),
+      review: plan.review.map((entry) => {
+        const mapped = {
+          file: entry.file,
+          line: entry.line,
+          col: entry.col,
+          text: entry.text,
+          state: entry.state,
+          subject: entry.subject,
+        };
+        if (entry.candidates !== undefined) mapped.candidates = entry.candidates;
+        return mapped;
+      }),
+      errors: plan.errors,
+    };
   },
 };
 

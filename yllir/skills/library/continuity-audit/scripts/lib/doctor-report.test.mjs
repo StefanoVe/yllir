@@ -10,7 +10,7 @@ import { stripExitLine } from '../../../../../scripts/lib/cli-exit.mjs';
 
 const CLI = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'doctor-report.mjs');
 
-const ALL_RAN = { errors: 'ran', sketches: 'ran', unreachable: 'ran', forgotten: 'ran', prices: 'ran' };
+const ALL_RAN = { errors: 'ran', sketches: 'ran', unreachable: 'ran', forgotten: 'ran', 'missing-links': 'ran', prices: 'ran' };
 
 function coverage(extra = {}) {
   return { queries: { ...ALL_RAN }, read: ['Cronaca/2026-10-01.md'], ...extra };
@@ -49,6 +49,22 @@ test('prices may be missing without an economy document, other queries may not',
   assert.equal(ok.valid, true);
   const bad = validateDoctor({ coverage: coverage({ queries: { ...ALL_RAN, errors: 'missing' } }), problems: [] });
   assert.equal(bad.valid, false);
+});
+
+test('a coverage without missing-links is rejected', () => {
+  const { 'missing-links': _omitted, ...withoutLinks } = ALL_RAN;
+  const result = validateDoctor({ coverage: coverage({ queries: withoutLinks }), problems: [problem()] });
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /coverage\.queries\.missing-links must be ran, missing or failed/);
+});
+
+test('missing-links cannot be missing', () => {
+  const result = validateDoctor({
+    coverage: coverage({ queries: { ...ALL_RAN, 'missing-links': 'missing' } }),
+    problems: [problem()],
+  });
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join('\n'), /coverage\.queries\.missing-links cannot be missing/);
 });
 
 test('each problem needs a severity, a kind, documents, evidence and a solution with a type', () => {

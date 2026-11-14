@@ -6,7 +6,7 @@
 const SEVERITIES = ['high', 'medium', 'low'];
 const KINDS = ['structural', 'narrative'];
 const SOLUTION_TYPES = ['mechanical', 'narrative'];
-const QUERIES = ['errors', 'sketches', 'unreachable', 'forgotten', 'prices'];
+const QUERIES = ['errors', 'sketches', 'unreachable', 'forgotten', 'missing-links', 'prices'];
 const QUERY_STATES = ['ran', 'missing', 'failed'];
 const CHECK_RE = /^doctor\.[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -64,7 +64,7 @@ export function validateDoctor(input) {
     errors.push('coverage must be a mapping with queries and read');
   } else {
     if (!isMapping(coverage.queries)) {
-      errors.push('coverage.queries must be a mapping with errors, sketches, unreachable, forgotten and prices');
+      errors.push('coverage.queries must be a mapping with errors, sketches, unreachable, forgotten, missing-links and prices');
     } else {
       for (const name of QUERIES) {
         const state = coverage.queries[name];

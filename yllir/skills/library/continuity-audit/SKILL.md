@@ -100,19 +100,21 @@ Add `--coverage-review .campaign/state/audit/coverage-review.json` only when Ste
 
 **Step 8 — Doctor.** Every full check runs this step, after Step 7 exits 0 or 1. It adds the doctor section to the same report. It never corrects anything.
 
-8a. **Engine queries.** Run each of these five commands exactly as written, one command each, from the campaign root:
+8a. **Engine queries.** Run each of these six commands exactly as written, one command each, from the campaign root:
 - `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . errors`
 - `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . sketches`
 - `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . unreachable`
 - `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . forgotten`
+- `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . missing-links`
 - `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . prices`
 
-Read the JSON each one prints: its `results` list. For `prices`, also read `economy`: when it is `missing`, there is no price check, so the prices state is `missing` and you say nothing about prices. For each query write its state in the coverage: `ran` when it printed its results, `failed` when the command failed, `missing` only for prices as above.
+Read the JSON each one prints: its `results` list. For `missing-links`, also read `review` and `errors`. For `prices`, also read `economy`: when it is `missing`, there is no price check, so the prices state is `missing` and you say nothing about prices. For each query write its state in the coverage: `ran` when it printed its results, `failed` when the command failed, `missing` only for prices as above. `missing-links` has state `ran` or `failed` like the others.
 
 8b. **Structural problems**, kind `structural`. Each result becomes one problem:
 - `errors`: each entry. Severity high when it breaks a link, an id or metadata the engine needs; medium otherwise; low for layout only.
 - `unreachable`: each entry. Severity high for an event or session that can never be played; the solution is mechanical when a dependency id is misspelled, narrative otherwise.
 - `prices`: `out-of-range` and `unknown-currency` entries are medium, one problem each. All `unmatched` entries are minor: put them in ONE problem, severity low, titled with their count, with all their files as documents.
+- `missing-links`: each result is a mention of a subject that is not linked yet. Group the results by document: ONE problem per document, kind structural, severity low, titled with the document and the count, listing the mentions (text and line) in the description, never master-only text. The solution is mechanical: the links are added through the write cycle (one yes applies them). Entries of `review` (homonyms, links that point elsewhere) go in ONE more problem, severity low, kind structural, with a narrative solution: the master decides which subject each mention means. Check value of these problems: `doctor.error`.
 
 8c. **Narrative problems**, kind `narrative`. You judge them:
 - Forgotten characters: each `forgotten` entry is a problem. Severity medium for a character with a sheet that is not a sketch; low when `sketch: true`.
@@ -129,7 +131,7 @@ Read the JSON each one prints: its `results` list. For `prices`, also read `econ
 ```
 {
   "coverage": {
-    "queries": { "errors": "ran", "sketches": "ran", "unreachable": "ran", "forgotten": "ran", "prices": "ran" },
+    "queries": { "errors": "ran", "sketches": "ran", "unreachable": "ran", "forgotten": "ran", "missing-links": "ran", "prices": "ran" },
     "read": ["<title of each chronicle page or session read>"]
   },
   "problems": [

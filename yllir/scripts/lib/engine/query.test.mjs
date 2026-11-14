@@ -409,6 +409,58 @@ test('forgotten lists a character that no plot or chronicle document mentions', 
   assert.equal(schizzo.file, 'Personaggi/schizzo.md');
 });
 
+// missing-links: a character sheet with a bare mention in a place document.
+const ALDRIC_SHEET = page(
+  ['id: aldric-vane', 'kind: character', 'provenance: master', 'status: alive'],
+  '# Aldric Vane\n\nUn mercante.\n',
+);
+const TAVERN_BARE = page(
+  ['id: taverna', 'kind: place', 'provenance: master'],
+  '# Taverna\n\nAldric Vane entra nella taverna.\n',
+);
+const TAVERN_LINKED = page(
+  ['id: taverna', 'kind: place', 'provenance: master'],
+  '# Taverna\n\n[Aldric Vane](../Personaggi/aldric.md) entra nella taverna.\n',
+);
+
+test('missing-links lists a bare mention of a subject with its file, line and subject', (t) => {
+  const root = makeCampaign(t, {
+    'Personaggi/aldric.md': ALDRIC_SHEET,
+    'Mondo/taverna.md': TAVERN_BARE,
+  });
+  const result = runQuery(root, 'missing-links');
+  assert.equal(result.error, undefined);
+  const entry = result.results.find((item) => item.file === 'Mondo/taverna.md');
+  assert.ok(entry, JSON.stringify(result.results));
+  assert.equal(entry.line, 8);
+  assert.equal(entry.subject, 'aldric-vane');
+  assert.equal(entry.text, 'Aldric Vane');
+  assert.equal(entry.sheet, 'Personaggi/aldric.md');
+  assert.equal(entry.in_master, false);
+  assert.equal(Object.hasOwn(entry, 'before'), false);
+  assert.equal(Object.hasOwn(entry, 'after'), false);
+  assert.deepEqual(Object.keys(result).sort(), ['args', 'errors', 'query', 'results', 'review']);
+  assert.ok(Array.isArray(result.review));
+  assert.ok(Array.isArray(result.errors));
+});
+
+test('missing-links does not list a mention already written as a link', (t) => {
+  const root = makeCampaign(t, {
+    'Personaggi/aldric.md': ALDRIC_SHEET,
+    'Mondo/taverna.md': TAVERN_LINKED,
+  });
+  const result = runQuery(root, 'missing-links');
+  assert.equal(result.results.some((item) => item.file === 'Mondo/taverna.md'), false, JSON.stringify(result.results));
+});
+
+test('missing-links lists nothing for a subject that is never mentioned bare', (t) => {
+  // The base world has its own bare alias ("Il lago"), so only the new subject is checked.
+  const root = makeCampaign(t, { 'Personaggi/aldric.md': ALDRIC_SHEET });
+  const result = runQuery(root, 'missing-links');
+  assert.equal(result.error, undefined);
+  assert.deepEqual(result.results.filter((item) => item.subject === 'aldric-vane'), []);
+});
+
 test('usage names the three new queries and encounters', (t) => {
   const result = runQuery(makeCampaign(t), 'nosuch');
   for (const name of ['prices', 'unreachable', 'forgotten', 'encounters']) {
