@@ -7,7 +7,16 @@ import type { DocResponse, DocSummary } from '@shared/types';
 import { DocumentModal } from '../cockpit/modals/document-modal';
 import { DocumentsService } from '../cockpit/support/documents.service';
 import { ApiService } from '../core/api.service';
-import { DocumentsPage, categoryChips, groupDocuments, humanizeCategory } from './documents';
+import { Router } from '@angular/router';
+import {
+  DocumentsPage,
+  categoryChips,
+  groupDocuments,
+  humanizeCategory,
+  pickNeighbour,
+  pushRecent,
+  splitMatch,
+} from './documents';
 
 const flush = (ms = 0) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -58,6 +67,113 @@ describe('groupDocuments', () => {
   });
 });
 
+describe('splitMatch', () => {
+  const hits = (parts: { text: string; hit: boolean }[]) => parts.filter((part) => part.hit).map((part) => part.text);
+
+  it('marks the matching part of the text, ignoring case', () => {
+    expect(splitMatch('Rhea of the Vale', 'RHE')).toEqual([
+      { text: 'Rhe', hit: true },
+      { text: 'a of the Vale', hit: false },
+    ]);
+  });
+
+  it('ignores accents on both sides and keeps the original characters', () => {
+    expect(splitMatch('Perché tower', 'perche')).toEqual([
+      { text: 'Perché', hit: true },
+      { text: ' tower', hit: false },
+    ]);
+    expect(splitMatch('Perche tower', 'Perché')).toEqual([
+      { text: 'Perche', hit: true },
+      { text: ' tower', hit: false },
+    ]);
+  });
+
+  it('maps the match back over decomposed characters, whose folded text is shorter', () => {
+    const decomposed = 'Cafe\u0301 bar';
+    const parts = splitMatch(decomposed, 'cafe');
+    expect(parts.map((part) => part.text).join('')).toBe(decomposed);
+    expect(hits(parts)).toEqual(['Cafe\u0301']);
+  });
+
+  it('returns the whole text as a non-hit when nothing matches or the filter is empty', () => {
+    expect(splitMatch('Rhea', 'zed')).toEqual([{ text: 'Rhea', hit: false }]);
+    expect(splitMatch('Rhea', '')).toEqual([{ text: 'Rhea', hit: false }]);
+    expect(splitMatch('Rhea', '   ')).toEqual([{ text: 'Rhea', hit: false }]);
+    expect(splitMatch('', 'rhe')).toEqual([{ text: '', hit: false }]);
+  });
+
+  it('keeps the text intact when the match is at the start or the end', () => {
+    expect(splitMatch('Rhea', 'rhea')).toEqual([{ text: 'Rhea', hit: true }]);
+    expect(splitMatch('Old Rhea', 'rhea')).toEqual([
+      { text: 'Old ', hit: false },
+      { text: 'Rhea', hit: true },
+    ]);
+  });
+});
+
+describe('pickNeighbour', () => {
+  // Three columns in the first row, two in the second: indices 0-2 on top, 3-4 below.
+  const grid = [
+    { left: 0, top: 0 },
+    { left: 100, top: 0 },
+    { left: 200, top: 0 },
+    { left: 0, top: 100 },
+    { left: 100, top: 100 },
+  ];
+
+  it('moves left and right through the list and stops at the ends', () => {
+    expect(pickNeighbour(grid, 1, 'ArrowRight')).toBe(2);
+    expect(pickNeighbour(grid, 1, 'ArrowLeft')).toBe(0);
+    expect(pickNeighbour(grid, 4, 'ArrowRight')).toBe(4);
+    expect(pickNeighbour(grid, 0, 'ArrowLeft')).toBe(0);
+  });
+
+  it('moves down to the nearest card of the next row by horizontal distance', () => {
+    expect(pickNeighbour(grid, 1, 'ArrowDown')).toBe(4);
+    expect(pickNeighbour(grid, 2, 'ArrowDown')).toBe(4);
+    expect(pickNeighbour(grid, 0, 'ArrowDown')).toBe(3);
+  });
+
+  it('moves up to the nearest card of the row above', () => {
+    expect(pickNeighbour(grid, 4, 'ArrowUp')).toBe(1);
+    expect(pickNeighbour(grid, 3, 'ArrowUp')).toBe(0);
+  });
+
+  it('stays put when there is no row in that direction', () => {
+    expect(pickNeighbour(grid, 4, 'ArrowDown')).toBe(4);
+    expect(pickNeighbour(grid, 0, 'ArrowUp')).toBe(0);
+  });
+
+  it('goes to the first and last card with Home and End', () => {
+    expect(pickNeighbour(grid, 3, 'Home')).toBe(0);
+    expect(pickNeighbour(grid, 1, 'End')).toBe(4);
+  });
+
+  it('is a plain next and previous in a single column (list view)', () => {
+    const list = [0, 1, 2].map((index) => ({ left: 0, top: index * 44 }));
+    expect(pickNeighbour(list, 0, 'ArrowDown')).toBe(1);
+    expect(pickNeighbour(list, 2, 'ArrowUp')).toBe(1);
+  });
+
+  it('returns the current index when there are no cards', () => {
+    expect(pickNeighbour([], 0, 'ArrowDown')).toBe(0);
+    expect(pickNeighbour(grid, -1, 'ArrowRight')).toBe(-1);
+  });
+});
+
+describe('pushRecent', () => {
+  it('puts the path at the front without duplicates', () => {
+    expect(pushRecent(['a', 'b'], 'b')).toEqual(['b', 'a']);
+    expect(pushRecent(['a', 'b'], 'c')).toEqual(['c', 'a', 'b']);
+  });
+
+  it('keeps at most six paths by default and the number given otherwise', () => {
+    const full = ['1', '2', '3', '4', '5', '6'];
+    expect(pushRecent(full, 'x')).toEqual(['x', '1', '2', '3', '4', '5']);
+    expect(pushRecent(['a', 'b', 'c'], 'd', 2)).toEqual(['d', 'a']);
+  });
+});
+
 describe('DocumentsPage', () => {
   let api: { docs: ReturnType<typeof vi.fn> };
   let documents: { detail: ReturnType<typeof vi.fn> };
@@ -65,6 +181,7 @@ describe('DocumentsPage', () => {
   let el: HTMLElement;
 
   beforeEach(() => {
+    localStorage.clear();
     api = { docs: vi.fn(async () => ({ docs })) };
     documents = {
       detail: vi.fn(async (path: string) => ({ path, title: path, blocks: [], masterOnly: false }) as unknown as DocResponse),
@@ -82,6 +199,8 @@ describe('DocumentsPage', () => {
 
   afterEach(() => {
     fixture?.destroy();
+    vi.restoreAllMocks();
+    localStorage.clear();
   });
 
   async function create(): Promise<void> {
@@ -275,5 +394,238 @@ describe('DocumentsPage', () => {
     fixture.detectChanges();
     expect(api.docs).toHaveBeenCalledTimes(2);
     expect(rowTitles()).toHaveLength(5);
+  });
+
+  function cardTitle(button: Element): string {
+    return button.querySelector('.doc-title')?.textContent?.trim() ?? '';
+  }
+
+  function groupToggle(title: string): HTMLButtonElement {
+    return [...el.querySelectorAll<HTMLButtonElement>('button.group-toggle')].find((button) =>
+      button.textContent?.includes(title),
+    )!;
+  }
+
+  function viewButton(label: string): HTMLButtonElement {
+    return el.querySelector<HTMLButtonElement>(`.view-toggle button[aria-label="${label}"]`)!;
+  }
+
+  it('highlights the matching part of the titles while a filter is typed', async () => {
+    await create();
+    type('rhe');
+    const marks = [...el.querySelectorAll<HTMLElement>('button.doc mark.hit')];
+    expect(marks.map((mark) => mark.textContent)).toEqual(['Rhe']);
+    expect(marks[0]!.closest('button.doc')?.textContent).toContain('Rhea');
+  });
+
+  it('collapses a group from its heading, remembers it, and shows it again when expanded', async () => {
+    await create();
+    const toggle = groupToggle('Characters');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    toggle.click();
+    fixture.detectChanges();
+    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('false');
+    expect(rowTitles()).toEqual(['Perché tower', 'Seed']);
+    expect(JSON.parse(localStorage.getItem('yllir.docs.collapsed')!)).toEqual(['characters']);
+
+    await create();
+    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('false');
+    expect(rowTitles()).toEqual(['Perché tower', 'Seed']);
+
+    groupToggle('Characters').click();
+    fixture.detectChanges();
+    expect(rowTitles()).toEqual(['Aldo', 'Rhea', 'Zed', 'Perché tower', 'Seed']);
+    expect(localStorage.getItem('yllir.docs.collapsed')).toBe('[]');
+  });
+
+  it('always shows the groups expanded while a text filter is active', async () => {
+    localStorage.setItem('yllir.docs.collapsed', JSON.stringify(['characters']));
+    await create();
+    type('rhea');
+    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('true');
+    expect(rowTitles()).toEqual(['Rhea']);
+
+    groupToggle('Characters').click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.collapsed()).toEqual(['characters']);
+
+    type('');
+    expect(groupToggle('Characters').getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it('collapses and expands all groups with the toolbar buttons', async () => {
+    await create();
+    const button = (label: string) =>
+      [...el.querySelectorAll<HTMLButtonElement>('.tool-group button')].find((item) => item.textContent?.trim() === label)!;
+    button('Collapse all').click();
+    fixture.detectChanges();
+    expect(fixture.componentInstance.collapsed().sort()).toEqual(['', 'characters', 'places']);
+    expect(rowTitles()).toEqual([]);
+
+    button('Expand all').click();
+    fixture.detectChanges();
+    expect(rowTitles()).toHaveLength(5);
+  });
+
+  it('works when the browser storage is blocked or holds damaged values', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('blocked');
+    });
+    await create();
+    expect(rowTitles()).toHaveLength(5);
+    groupToggle('Characters').click();
+    fixture.detectChanges();
+    expect(rowTitles()).toEqual(['Perché tower', 'Seed']);
+  });
+
+  it('ignores damaged stored values instead of failing', async () => {
+    localStorage.setItem('yllir.docs.collapsed', '{not json');
+    localStorage.setItem('yllir.docs.view', 'sideways');
+    localStorage.setItem('yllir.docs.recent', '"oops"');
+    await create();
+    expect(rowTitles()).toHaveLength(5);
+    expect(viewButton('Grid view').getAttribute('aria-pressed')).toBe('true');
+    expect(el.querySelector('section.recent')).toBeNull();
+  });
+
+  it('switches between grid and list, and remembers the choice', async () => {
+    await create();
+    expect(viewButton('Grid view').getAttribute('aria-pressed')).toBe('true');
+    expect(viewButton('List view').getAttribute('aria-pressed')).toBe('false');
+    expect(el.querySelector('ul.docs.is-list')).toBeNull();
+
+    viewButton('List view').click();
+    fixture.detectChanges();
+    expect(viewButton('List view').getAttribute('aria-pressed')).toBe('true');
+    expect(el.querySelector('ul.docs.is-list')).not.toBeNull();
+    expect(localStorage.getItem('yllir.docs.view')).toBe('list');
+    expect(rowTitles()).toHaveLength(5);
+
+    await create();
+    expect(viewButton('List view').getAttribute('aria-pressed')).toBe('true');
+    expect(el.querySelector('ul.docs.is-list')).not.toBeNull();
+  });
+
+  it('shows the recently opened documents first, and only while nothing narrows the list', async () => {
+    await create();
+    const rhea = [...el.querySelectorAll<HTMLButtonElement>('button.doc')].find((row) => row.textContent?.includes('Rhea'))!;
+    rhea.click();
+    fixture.detectChanges();
+    await flush();
+    fixture.componentInstance.opened.set(null);
+    fixture.detectChanges();
+
+    expect(JSON.parse(localStorage.getItem('yllir.docs.recent')!)).toEqual(['characters/rhea.md']);
+    const recent = el.querySelector<HTMLElement>('section.recent')!;
+    expect(recent.querySelector('h2')?.textContent).toContain('Recently opened');
+    expect([...recent.querySelectorAll('button.doc')].map(cardTitle)).toEqual(['Rhea']);
+
+    type('zed');
+    expect(el.querySelector('section.recent')).toBeNull();
+    type('');
+    expect(el.querySelector('section.recent')).not.toBeNull();
+    chip('places').click();
+    fixture.detectChanges();
+    expect(el.querySelector('section.recent')).toBeNull();
+  });
+
+  it('lists only the recent documents that still exist in the index', async () => {
+    localStorage.setItem('yllir.docs.recent', JSON.stringify(['gone/old.md', 'seed.md']));
+    await create();
+    const recent = el.querySelector<HTMLElement>('section.recent')!;
+    expect([...recent.querySelectorAll('button.doc')].map(cardTitle)).toEqual(['Seed']);
+  });
+
+  it('keeps the filter and the category in the URL, replaced in place, and restores them on load', async () => {
+    await create();
+    const router = TestBed.inject(Router);
+    const navigate = vi.spyOn(router, 'navigate');
+    type('perche');
+    chip('places').click();
+    fixture.detectChanges();
+    expect(navigate).toHaveBeenLastCalledWith(
+      [],
+      expect.objectContaining({
+        queryParams: { q: 'perche', cat: 'places' },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      }),
+    );
+
+    fixture.destroy();
+    await router.navigateByUrl('/?q=rhea&cat=characters');
+    await create();
+    expect(fixture.componentInstance.filter()).toBe('rhea');
+    expect(fixture.componentInstance.category()).toBe('characters');
+    expect(rowTitles()).toEqual(['Rhea']);
+  });
+
+  it('does not throw when the URL cannot be updated (no routes in the test router)', async () => {
+    await create();
+    expect(() => {
+      type('rhea');
+      fixture.componentInstance.clearFilters();
+      fixture.detectChanges();
+    }).not.toThrow();
+    await flush();
+    expect(rowTitles()).toHaveLength(5);
+  });
+
+  it('shows the "/" key hint only while the filter is empty and not focused', async () => {
+    await create();
+    const input = el.querySelector<HTMLInputElement>('input.field')!;
+    expect(el.querySelector('kbd.kbd')?.textContent).toBe('/');
+
+    input.dispatchEvent(new Event('focus'));
+    fixture.detectChanges();
+    expect(el.querySelector('kbd.kbd')).toBeNull();
+
+    input.dispatchEvent(new Event('blur'));
+    type('x');
+    expect(el.querySelector('kbd.kbd')).toBeNull();
+  });
+
+  it('moves the focus between cards with the arrow keys, Home and End', async () => {
+    await create();
+    const cards = [...el.querySelectorAll<HTMLButtonElement>('button.doc')];
+    cards[0]!.focus();
+
+    const right = new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true });
+    cards[0]!.dispatchEvent(right);
+    expect(right.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(cards[1]);
+
+    cards[1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(cards[cards.length - 1]);
+
+    cards[cards.length - 1]!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    expect(document.activeElement).toBe(cards[0]);
+  });
+
+  it('leaves keys alone that are not navigation keys', async () => {
+    await create();
+    const card = el.querySelector<HTMLButtonElement>('button.doc')!;
+    card.focus();
+    const other = new KeyboardEvent('keydown', { key: 'a', bubbles: true, cancelable: true });
+    card.dispatchEvent(other);
+    expect(other.defaultPrevented).toBe(false);
+  });
+
+  it('moves from the search field into the list with ArrowDown and leaves the caret alone otherwise', async () => {
+    await create();
+    const input = el.querySelector<HTMLInputElement>('input.field')!;
+    input.focus();
+    const left = new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true, cancelable: true });
+    input.dispatchEvent(left);
+    expect(left.defaultPrevented).toBe(false);
+    expect(document.activeElement).toBe(input);
+
+    const down = new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true });
+    input.dispatchEvent(down);
+    expect(down.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(el.querySelector('button.doc'));
   });
 });

@@ -1,95 +1,176 @@
+/*
+ * The documents explorer, a notebook page: black on white (white on black in the dark theme), flat,
+ * square, thin lines. Colours come from the tokens in styles.css; no shadows, no fades, no
+ * accent colours. The hand font is for the page title only.
+ */
 :host {
   display: block;
+  box-sizing: border-box;
   max-width: 1200px;
   margin: 0 auto;
+  padding: var(--space-3);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Sticky toolbar: title, filter and count stay in view while the list scrolls. */
+/* Sticky header: title and count, then the search with the view toggle, then the category chips. */
 .toolbar {
   position: sticky;
   top: 0;
   z-index: 1;
-  padding: var(--space-2) 0 var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-1) 0 var(--space-2);
   background: var(--color-bg);
 }
 
-.toolbar-row {
+.title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--font-family-hand);
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  line-height: var(--line-height-tight);
+}
+
+.count {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.tools-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1) var(--space-2);
 }
 
-h1 {
-  flex: none;
-  margin: 0;
-}
-
+/* Search: a text field with only a bottom line; the icon sits on that line. */
 .search {
   position: relative;
-  flex: 1 1 280px;
+  flex: 1 1 260px;
+  min-width: 0;
   max-width: 480px;
 }
 
 .search-icon {
   position: absolute;
+  left: 0;
   top: 50%;
-  left: 12px;
-  translate: 0 -50%;
+  transform: translateY(-50%);
   color: var(--color-text-muted);
   pointer-events: none;
 }
 
-/* Icon-side padding is 2px smaller than the text padding, so the icon optically sits at the same inset. */
-.field {
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 44px 10px 38px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
+.search .field {
+  padding-left: var(--space-4);
+  padding-right: var(--space-4);
   font-size: var(--font-size-base);
-  transition-property: border-color;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
 }
 
-/* The clear button is a circle inside the field: the field's own clear control is hidden. */
-.field::-webkit-search-cancel-button {
+/* The clear control is a square inside the field, the native one is hidden. */
+.search .field::-webkit-search-cancel-button {
   display: none;
 }
 
 .icon-btn {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  translate: 0 -50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
   width: 32px;
   height: 32px;
   padding: 0;
-  border: 0;
-  border-radius: var(--radius-pill);
+  border: var(--border-width) solid transparent;
+  border-radius: 0;
   background: transparent;
-  color: var(--color-text-muted);
-  transition-property: background-color, color, scale;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
-.count {
-  flex: none;
-  margin-left: auto;
-  padding: 2px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
+.search .icon-btn {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  font-variant-numeric: tabular-nums;
+}
+
+.icon-btn[aria-pressed="true"] {
+  border-color: var(--color-border-strong);
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+/* The `/` hint: a bordered key on the right of the empty field, out of the way of the clear control. */
+.hint {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 0 6px;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg);
+  color: var(--color-text-muted);
+  font-family: var(--font-family-mono);
+  font-size: var(--font-size-xs);
+  line-height: 20px;
+  text-align: center;
+}
+
+.tool-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+/* Quiet text buttons: underlined, no frame. */
+.btn-text {
+  padding: 4px 2px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-xs);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.view-toggle {
+  display: inline-flex;
+  flex: none;
+  gap: 0;
+  margin-left: auto;
+}
+
+.view-toggle .icon-btn {
+  border-color: var(--color-border-strong);
+}
+
+.view-toggle .icon-btn + .icon-btn {
+  border-left-width: 0;
 }
 
 /* Category chips: wrap onto new lines, never scroll sideways. */
@@ -97,31 +178,12 @@ h1 {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-1);
-  margin-bottom: var(--space-1);
 }
 
 .chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 6px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--color-text);
+  -webkit-tap-highlight-color: transparent;
   font: inherit;
   font-size: var(--font-size-sm);
-  line-height: 1.2;
-  -webkit-tap-highlight-color: transparent;
-  transition-property: background-color, border-color, scale;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
-}
-
-.chip[aria-pressed="true"] {
-  background: var(--color-accent-soft);
-  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
 }
 
 .chip-count {
@@ -129,31 +191,61 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+.chip[aria-pressed="true"] .chip-count {
+  color: inherit;
+}
+
 .group {
   margin-top: var(--space-3);
 }
 
+/* Group heading: a button with a chevron, the title in the body font and a rule underneath. */
 .group-title {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-1);
-  margin: 0 0 var(--space-1);
-  color: var(--color-text-muted);
+  margin: 0 0 var(--space-2);
+  font-family: var(--font-family);
   font-size: var(--font-size-base);
   font-weight: 600;
-  overflow-wrap: anywhere;
+  line-height: var(--line-height-tight);
+}
+
+.group-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  min-width: 0;
+  padding: var(--space-1) 0;
+  border: 0;
+  border-bottom: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.group-toggle lucide-angular {
+  flex: none;
 }
 
 .group-count {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
   font-weight: 400;
   font-variant-numeric: tabular-nums;
 }
 
-/* Rows fill the width in as many columns as fit: one column on phones. */
+.group.is-collapsed .group-title {
+  margin-bottom: 0;
+}
+
+/* Cards: a square frame in a grid, at least 220px wide each. */
 .docs {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: var(--space-1);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -163,53 +255,143 @@ h1 {
   min-width: 0;
 }
 
-/* Row radius 12 = avatar radius 6 + padding 6. */
 .doc {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: var(--space-1);
+  box-sizing: border-box;
   width: 100%;
-  min-height: 44px;
-  padding: 6px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: var(--color-surface);
+  min-height: 120px;
+  padding: var(--space-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-bg);
   color: var(--color-text);
   font: inherit;
   text-align: left;
+  cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition-property: background-color, border-color, scale;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
+  transition: border-color var(--transition-fast);
 }
 
-.avatar {
-  flex: none;
+/* Master-only: a dashed frame, like the master-only block in the sheets. */
+.doc.is-master {
+  border-style: dashed;
+  border-color: var(--color-border-strong);
+}
+
+/* The head row: the initial on the left, the flags on the right. In list view it dissolves into the row. */
+.doc-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.doc-mark {
+  font-family: var(--font-family-hand);
+  font-size: var(--font-size-xl);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.doc-flags {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
-  background: var(--color-surface-2);
+  gap: 4px;
+  margin-left: auto;
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
+}
+
+.lock,
+.block-flag {
+  display: inline-flex;
+  color: var(--color-text-muted);
 }
 
 .doc-title {
-  flex: 1 1 auto;
+  display: -webkit-box;
   min-width: 0;
   overflow: hidden;
   font-weight: 500;
+  line-clamp: 2;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow-wrap: anywhere;
+}
+
+/* Match highlight: bold and underlined, the colour never changes. */
+.hit {
+  background: none;
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.doc-path {
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.lock {
-  flex: none;
-  display: inline-flex;
-  color: var(--color-text-muted);
+/* Loading: flat blocks in the shape of the cards. */
+.skeleton-row {
+  display: block;
+  min-height: 120px;
+  background: var(--color-surface-2);
+}
+
+.docs.is-list .skeleton-row {
+  min-height: 44px;
+}
+
+/* List view: one column of flat rows, each with a rule under it. */
+.docs.is-list {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+
+.docs.is-list .doc {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px var(--space-2);
+  min-height: 0;
+  padding: var(--space-1) 0;
+  border: 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.docs.is-list .doc-head {
+  display: contents;
+}
+
+.docs.is-list .doc-mark {
+  display: none;
+}
+
+.docs.is-list .doc-title {
+  order: 1;
+  flex: 1 1 auto;
+  -webkit-line-clamp: 1;
+}
+
+.docs.is-list .doc-path {
+  order: 2;
+  flex: 0 1 auto;
+  max-width: 50%;
+  margin-left: auto;
+  text-align: right;
+}
+
+.docs.is-list .doc-flags {
+  order: 3;
+  margin-left: 0;
 }
 
 /* Empty, no-results and error states: a quiet centred block. */
@@ -223,49 +405,68 @@ h1 {
   text-align: center;
 }
 
-.state-block lucide-angular {
-  color: var(--color-text-muted);
-}
-
 .state {
   margin: 0;
   color: var(--color-text-muted);
   text-wrap: balance;
 }
 
-.btn {
-  min-height: 40px;
-  padding: 8px 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  -webkit-tap-highlight-color: transparent;
-  transition-property: background-color, border-color, scale;
-  transition-duration: 150ms;
-  transition-timing-function: ease-out;
+.state-block .btn {
+  margin-top: var(--space-1);
 }
 
-/* Loading: placeholder rows in the same grid, same height and radius as the rows. */
-.skeleton-row {
-  display: block;
-  height: 44px;
-  border-radius: var(--radius-md);
+/* Hover only where a pointer can hover, so touch screens do not keep a stuck highlight. */
+@media (hover: hover) {
+  .doc:hover {
+    border-color: var(--color-border-strong);
+  }
+
+  .docs.is-list .doc:hover {
+    border-bottom-color: var(--color-border-strong);
+  }
+}
+
+.icon-btn:hover {
   background: var(--color-surface-2);
+}
+
+.icon-btn[aria-pressed="true"]:hover {
+  background: var(--color-text);
+}
+
+.btn-text:hover {
+  color: var(--color-text);
+}
+
+/* Phone: one column of cards, the toolbar wraps, and the `/` hint is gone. */
+@media (max-width: 519px) {
+  :host {
+    padding: var(--space-2);
+  }
+
+  .docs:not(.is-list) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .hint {
+    display: none;
+  }
+
+  .view-toggle {
+    margin-left: 0;
+  }
+}
+
+/* Touch screens have no `/` key: the hint is hidden there as well. */
+@media (hover: none) {
+  .hint {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {
   .skeleton-row {
-    animation: documents-skeleton-pulse 1.4s ease-in-out infinite;
-  }
-
-  .doc:not(:disabled):active,
-  .chip:not(:disabled):active,
-  .btn:not(:disabled):active,
-  .icon-btn:not(:disabled):active {
-    scale: 0.96;
+    animation: documents-skeleton-pulse 1400ms ease-in-out infinite;
   }
 }
 
@@ -276,36 +477,6 @@ h1 {
   }
 
   50% {
-    opacity: 0.55;
+    opacity: 0.5;
   }
-}
-
-/* Hover only where a pointer can hover, so touch screens do not keep a stuck highlight. */
-@media (hover: hover) {
-  .doc:hover {
-    background: var(--color-surface-2);
-    border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
-  }
-
-  .chip:hover:not([aria-pressed="true"]) {
-    background: var(--color-surface-2);
-  }
-
-  .btn:hover {
-    background: var(--color-surface-2);
-  }
-
-  .icon-btn:hover {
-    background: var(--color-surface-2);
-    color: var(--color-text);
-  }
-}
-
-.field:focus-visible,
-.doc:focus-visible,
-.chip:focus-visible,
-.btn:focus-visible,
-.icon-btn:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
 }
