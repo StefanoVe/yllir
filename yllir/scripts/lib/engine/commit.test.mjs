@@ -1341,6 +1341,69 @@ test('a campaign.yaml draft that removes a structure entry is refused with confi
   assert.match(error.message, /structure\[1\]/);
 });
 
+test('a campaign.yaml draft that adds workflow.auto_accept needs no review and is saved', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => { c.workflow = { auto_accept: true }; }));
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, false);
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Write without asking' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(commitCount(dir), before + 1);
+  assert.equal(parseYamlLite(readAt(dir, 'campaign.yaml')).data.workflow.auto_accept, true);
+});
+
+test('a campaign.yaml draft that changes workflow.auto_accept from true to false is saved', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => { c.workflow = { auto_accept: true }; }));
+  assert.equal((await commitBatch(dir, { files: ['campaign.yaml'], message: 'Write without asking' })).ok, true);
+
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => { c.workflow.auto_accept = false; }));
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Ask before writing again' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(parseYamlLite(readAt(dir, 'campaign.yaml')).data.workflow.auto_accept, false);
+});
+
+test('a campaign.yaml draft that sets workflow.auto_accept and changes language.main is refused with config-change-refused', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => {
+    c.workflow = { auto_accept: true };
+    c.language.main = 'en';
+  }));
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, false);
+  const error = check.errors.find((item) => item.code === 'config-change-refused');
+  assert.ok(error, JSON.stringify(check.errors));
+  assert.match(error.message, /language\.main/);
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Write without asking and change the language' });
+  assert.equal(result.ok, false);
+  assert.equal(commitCount(dir), before);
+  assert.doesNotMatch(readAt(dir, 'campaign.yaml'), /auto_accept/);
+});
+
+test('a campaign.yaml draft with a non-boolean workflow.auto_accept fails validation', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => { c.workflow = { auto_accept: 'yes' }; }));
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, false);
+  assert.ok(check.errors.some((item) => /auto_accept/.test(item.path ?? '') || /auto_accept/.test(item.message ?? '')), JSON.stringify(check.errors));
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Bad setting' });
+  assert.equal(result.ok, false);
+  assert.equal(commitCount(dir), before);
+});
+
 test('a campaign.yaml draft that is not valid YAML is refused with config-yaml', async (t) => {
   const dir = makeCampaign(t);
   writeDraft(dir, 'campaign.yaml', 'schema: 1\ncampaign: [\n');

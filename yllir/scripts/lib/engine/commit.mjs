@@ -640,7 +640,8 @@ function conflictError(file) {
 /**
  * Guard of the campaign.yaml draft. The draft must parse, and compared with the current file it may only
  * append entries: new structure entries at the end of structure, and new entries at the end of
- * audit.exclusions. Any other difference is refused with config-change-refused, naming the first differing
+ * audit.exclusions, and a change, addition or removal of workflow.auto_accept (its type is checked by the
+ * config validator). Any other difference is refused with config-change-refused, naming the first differing
  * key path. The full validation of the resulting config is done on the copy by validate.
  * @returns {{ errors: object[], structureAdded: number, pendingPaths: Set<string> }} pendingPaths: the
  *   structure[i].folder paths of the appended entries (their folders may not exist yet).
@@ -670,7 +671,7 @@ function configChange(dir, files) {
   const diff = compareConfig(current.data, draft.data);
   if (diff.at !== null) {
     return refuse(
-      `${diff.at} may not change in a batch: only new entries at the end of structure and of audit.exclusions are allowed`,
+      `${diff.at} may not change in a batch: only new entries at the end of structure and of audit.exclusions, and the value of workflow.auto_accept, are allowed`,
       diff.at,
     );
   }
@@ -682,8 +683,17 @@ function compareConfig(current, draft) {
   const none = { at: null, structureAdded: 0, pendingPaths: new Set() };
   const keys = [...new Set([...Object.keys(current), ...Object.keys(draft)])];
   for (const key of keys) {
-    if (key === 'structure' || key === 'audit') continue;
+    if (key === 'structure' || key === 'audit' || key === 'workflow') continue;
     const at = firstDifference(current[key], draft[key], key);
+    if (at !== null) return { ...none, at };
+  }
+
+  const currentWorkflow = current.workflow ?? {};
+  const draftWorkflow = draft.workflow ?? {};
+  if (!isMapping(currentWorkflow) || !isMapping(draftWorkflow)) return { ...none, at: 'workflow' };
+  const workflowKeys = [...new Set([...Object.keys(currentWorkflow), ...Object.keys(draftWorkflow)])].filter((key) => key !== 'auto_accept');
+  for (const key of workflowKeys) {
+    const at = firstDifference(currentWorkflow[key], draftWorkflow[key], `workflow.${key}`);
     if (at !== null) return { ...none, at };
   }
 
@@ -869,7 +879,7 @@ function hashDrafts(dir, files, deletes, sources) {
  * embeds (the author adding links to ambiguous mentions, or images, which add no facts).
  */
 function needsReview(dir, files, deletes, sources) {
-  // A campaign.yaml draft that only appends structure or audit exclusions (see configChange) adds no facts: it is not reviewed.
+  // A campaign.yaml draft that only appends structure or audit exclusions, or sets workflow.auto_accept (see configChange) adds no facts: it is not reviewed.
   const reviewed = files.includes(CONFIG_FILE) && configChange(dir, files).errors.length === 0
     ? files.filter((rel) => rel !== CONFIG_FILE)
     : files;
