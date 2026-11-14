@@ -110,6 +110,13 @@ export class CockpitService implements ChatSource {
     );
     this.attach(id, value);
   }
+  /** Makes the assistant start a new conversation on a session (page load or refresh). */
+  async resetAgent(id: string) {
+    await this.request(
+      `/api/cockpit/sessions/${encodeURIComponent(id)}/agent/reset`,
+      { method: "POST" },
+    );
+  }
   async delete(id: string) {
     await this.request(`/api/cockpit/sessions/${encodeURIComponent(id)}`, {
       method: "DELETE",

@@ -174,6 +174,15 @@ export function cockpitApi(deps: CockpitApiDeps) {
             ),
           }));
         }
+        if (route === "agent/reset" && request.method === "POST") {
+          // A new live game or a page refresh: the assistant starts a new conversation.
+          // The chat and the state of the session stay as they are.
+          if (deps.turns.hasRunningSession(id)) return json({ ok: true, reset: false });
+          for (const thread of [await deps.store.get(id), ...(await deps.store.threads(id))])
+            if (thread.providerSessionId)
+              await deps.store.setProviderSession(thread.id, { providerSessionId: undefined });
+          return json({ ok: true, reset: true });
+        }
         if (route === "combat/thread" && request.method === "POST") {
           const defaults = await defaultModelsOf(deps);
           return json({

@@ -65,8 +65,10 @@ export class Cockpit implements OnInit, OnDestroy {
   private async start() {
     try {
       const id = await this.api.defaultSessionId();
-      if (id) await this.api.select(id);
-      else this.api.modal.set({ kind: "sessions" });
+      if (id) {
+        await this.api.resetAgent(id).catch(() => undefined);
+        await this.api.select(id);
+      } else this.api.modal.set({ kind: "sessions" });
     } catch {
       this.loadError.set(this.i18n.t("liveAgent.sessionNotFound"));
     }
