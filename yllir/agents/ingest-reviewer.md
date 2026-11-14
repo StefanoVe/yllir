@@ -15,12 +15,14 @@ The prompt gives you:
 
 - `CAMPAIGN_ROOT`: absolute path of the campaign folder.
 - `ID`: the id of the acquired item, for example `src-1a2b3c4d`.
+- `ORIGINAL_TEXT`: optional: when present, read this file as the original text instead of the original file named by the card; it is one page, p1, and its line numbers are the line numbers of that file. Its value is a campaign-relative path of a plain-text or markdown file.
 
 ## Steps
 
 1. Read `CAMPAIGN_ROOT` joined with `campaign.yaml`, with the Read tool. Find the `structure` entry whose `type` is `sources`. Its `folder` is SOURCES. If there is no such entry, your whole answer is `[]`, and nothing else.
 2. Read `<CAMPAIGN_ROOT>/<SOURCES>/<ID>/card.md`. Use only its `original` field: the file name of the original. Do not use anything else from this file.
 3. Read the ORIGINAL, `<CAMPAIGN_ROOT>/<SOURCES>/<ID>/<original>`, with the Read tool, and do not read the transcription yet:
+   - ORIGINAL_TEXT given: read that file whole (campaign root joined with the path) and treat it as the original, page p1.
    - An image: read it once. It is one page, `p1`.
    - A PDF: read it page by page, with the `pages` parameter (for example `pages: "1"`, then `"2"`, and so on), until the last page. Page numbers are the PDF page numbers.
    - A text file: read it whole. It is one page, `p1`.

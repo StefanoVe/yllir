@@ -118,6 +118,34 @@ Le schede delle funzioni non ancora implementate conservano la forma del documen
 
 Collegamento diretto (sidestep, **Proposta**; non citato dai fatti implementati della 0.30.0): i file già completi non vengono copiati né trascritti. La skill crea un collegamento simbolico all'originale direttamente nella categoria del canone, anche quando l'originale sta fuori dal repository della campagna; in quel caso l'esito avvisa che il backup git non copre quel contenuto. Il criterio è un markdown con front matter valido (verificato da uno script) più il giudizio di un agente economico, che collega solo i documenti finiti e privi di dubbi; nel dubbio il file segue il flusso normale. L'originale collegato non viene mai modificato.
 
+### L1b. Conversione di una campagna
+
+- **Scopo:** convertire una campagna già scritta (testi txt o md, documenti docx, PDF, foto di testo) in una campagna Yllir. A differenza di [import](#l1-ingest-di-documenti), che lavora su materiale singolo e poco alla volta, questa skill lavora sull'insieme: legge tutto, propone la struttura, poi scrive.
+- **Stato:** **Deciso (2026-11-15, dall'autore):** nuova skill di libreria `convert-campaign`; l'outline va approvato prima della scrittura; formati accettati: txt, md, docx, PDF e foto di testo. Non ancora implementata.
+- **Avvio:** dal core, su richiesta del master che consegna una campagna esistente o una cartella di materiale che ne costituisce l'insieme. Non è ancora deciso se parta in autorun (vedi Domande aperte).
+- **Input → output:** file della campagna di origine → originali conservati come fonti in `Fonti/`, trascrizioni, `.campaign/drafts/outline.md` approvato, schede, seme e descrizione del mondo, sessioni passate come cronache, esito con i punti rimasti aperti.
+- **Due stadi:**
+  1. **Acquisizione.** Riusa gli script e il revisore di `import`. Ogni file riceve un tipo, anche misto (un docx può contenere sessioni e schede insieme). I docx passano dall'estrazione deterministica `convert-extract-docx.mjs`, che legge testo e struttura senza affidarli al modello. Le foto e i PDF scansionati si trascrivono a blocchi; lo stato di avanzamento sta su file, così che una trascrizione interrotta riprende dal blocco successivo.
+  2. **Conversione.** L'agente scrive `.campaign/drafts/outline.md`: l'elenco dei soggetti (luoghi, personaggi, oggetti, fazioni, sessioni, eventi) con le relazioni già decise. L'outline è mostrato al master in parole semplici; la scrittura parte solo dopo un sì esplicito. Poi: schede (con `sheet-expander` se sono più di tre), seme e descrizione del mondo, e sessioni passate come cronache fedeli alle fonti, cioè ciò che le fonti dicono e non ciò che l'agente immagina.
+- **Ciclo di scrittura:** ogni lotto passa dal motore (`commit`) e dal revisore `batch-reviewer`, sempre, senza la soglia proporzionata della scrittura ordinaria. I lotti grandi si dividono per regione o per tema, così che ogni revisione resti leggibile.
+- **Deterministico:** inventario dei file e hash dei duplicati; estrazione dei docx; stato riprendibile delle trascrizioni; indice dei soggetti, con omonimi e alias; scrittura attraverso il motore (validazione, collegamenti, indici, versione salvata).
+- **Giudizio:** tipo di ogni pezzo di testo; relazioni fra soggetti; trascrizione delle foto; che cosa diventa scheda, cronaca o domanda; redazione dell'outline.
+- **Regole:**
+  - gli originali non si modificano mai: restano in `Fonti/` come sorgenti;
+  - omonimi e contraddizioni sono domande al master, mai una risoluzione silenziosa;
+  - un'ipotesi (per esempio un sospetto di un personaggio) non diventa un'accusa nel testo pubblico;
+  - i segreti stanno solo nel blocco riservato al master;
+  - ogni dato inventato per completare la conversione è marcato `invented: yes`, così che il master lo veda.
+- **Dipendenze:** skill `import` e il suo revisore di trascrizione; `sheet-expander` e `batch-reviewer`; motore; gerarchia delle fonti ([Principi](Principi.md)); formato dei contenuti ([Formato dei contenuti](Formato%20dei%20contenuti.md)).
+- **Rischi da evitare:**
+  - un outline non approvato porta a scrivere una struttura che il master non ha visto;
+  - una cronaca che riempie le lacune delle fonti passa per canone;
+  - un docx letto solo dal modello perde tabelle e titoli: per questo l'estrazione è deterministica.
+- **Domande aperte:**
+  - limite massimo di file o di pagine per run, prima di dividere in più batch;
+  - modello per la trascrizione delle foto: la prova comparativa è già aperta in [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md);
+  - se `convert-campaign` parte da solo, come `import` (autorun), o chiede una conferma iniziale prima di leggere il materiale.
+
 ### L2. Audit di continuità
 
 - **Scopo:** individuare contraddizioni e lacune fra documenti e fonti, senza modificare nulla. Sono riportate separatamente le differenze spiegabili (tempo, prospettiva, rivelazione successiva). I documenti delle fonti esterne sono letti come canone in sola lettura e riportati a parte nel conteggio, così che un audit che non ha letto il mondo condiviso si veda.

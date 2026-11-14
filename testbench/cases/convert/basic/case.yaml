@@ -1,0 +1,22 @@
+case: convert-basic
+kind: convert
+fixture: convert-basic-input
+# The input is a folder of sources (diario-1.txt, diario-2.md, mondo.docx), copied by the runner
+# next to an empty campaign that init-campaign.mjs creates. {{INPUT_DIR}} in the prompt is replaced
+# by the absolute path of that copy.
+# Two turns in the same folder. Turn 1 is the master's request and must end on the outline question
+# with nothing saved. Turn 2 is the master's yes, after which the campaign is written in batches.
+# Photo coverage: manual for now. The fixture has no photo, so a scanned or photographed sheet is not
+# tested by this case; check it by hand with a real photo of a sheet.
+# Long and costly: several sources, an outline and the batches of documents. The run-suite does not
+# map this kind yet (run-suite.mjs has no entry for it), so run it by hand with this runner. When it is
+# mapped, it runs only with --with-world, like the world cases, and only when the convert path changes.
+runs: 1
+prompt: |
+  Ho scritto la mia campagna in questi file, puoi portarla qui? I file sono in {{INPUT_DIR}}
+reply: |
+  sì, va bene così
+# Not measured yet: two turns over three sources, so the budget is larger than for the world cases.
+limits:
+  max_minutes: 20
+  max_tool_calls: 250
