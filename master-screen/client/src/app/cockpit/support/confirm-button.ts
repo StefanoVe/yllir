@@ -6,6 +6,7 @@ import {
   signal,
 } from "@angular/core";
 import { Icon } from "./icon";
+import { TooltipDirective } from "../../core/tooltip.directive";
 
 /** How long the armed button waits for the second click before it disarms. */
 export const CONFIRM_WINDOW_MS = 4000;
@@ -17,7 +18,7 @@ export const CONFIRM_WINDOW_MS = 4000;
  */
 @Component({
   selector: "ui-confirm-button",
-  imports: [Icon],
+  imports: [Icon, TooltipDirective],
   templateUrl: "./confirm-button.html",
   styleUrl: "./confirm-button.css",
 })

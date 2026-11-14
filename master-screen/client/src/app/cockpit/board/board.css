@@ -28,7 +28,6 @@
   max-width: 100%;
   padding: 4px 8px;
   margin-left: -8px;
-  border-radius: 6px;
   color: var(--color-text);
 }
 .session-button:hover {
@@ -59,7 +58,7 @@
   height: 34px;
   color: var(--color-text-muted);
   padding: 8px;
-  border-radius: 6px;
+  border: var(--border-width) solid transparent;
 }
 .icon-button:hover {
   background: var(--color-surface-2);
@@ -79,9 +78,8 @@
   top: 40px;
   z-index: 5;
   min-width: 190px;
-  background: var(--color-surface);
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text) 35%, transparent);
-  border-radius: 8px;
+  background: var(--color-bg);
+  border: var(--border-width) solid var(--color-border-strong);
   padding: 6px;
 }
 .popover button {
@@ -95,13 +93,15 @@
   margin-left: auto;
   color: var(--color-text-muted);
 }
-/* Scene bar: one compact line above the canvas. */
+/* Scene in progress: a rectangular label with a 1px structure line, one compact row. */
 .scene {
   display: flex;
   align-items: center;
   gap: 6px 14px;
   min-width: 0;
   margin: 0 20px 10px;
+  padding: 6px 10px;
+  border: var(--border-width) solid var(--color-border-strong);
   font-size: 13px;
   color: var(--color-text-muted);
 }
@@ -135,7 +135,7 @@
 }
 .plot-link {
   padding: 2px 0;
-  color: var(--color-accent);
+  color: var(--color-text);
   text-align: left;
 }
 .plot-link:hover {
@@ -157,7 +157,7 @@ cockpit-canvas {
   display: block;
 }
 
-/* Panel toggles in the header row: labelled pills, soft tint and a faint ring when pressed. */
+/* Panel toggles in the header row: square, a thin frame, inverted when on. */
 .pill-tool {
   position: relative;
   flex: none;
@@ -166,7 +166,7 @@ cockpit-canvas {
   align-items: center;
   gap: 6px;
   padding: 0 12px;
-  border-radius: var(--radius-pill);
+  border: var(--border-width) solid var(--color-border);
   color: var(--color-text-muted);
   font-size: 13px;
   font-weight: 500;
@@ -174,12 +174,13 @@ cockpit-canvas {
 }
 .pill-tool:hover {
   color: var(--color-text);
+  border-color: var(--color-border-strong);
 }
 .pill-tool.on,
 .pill-tool.on:hover {
-  color: var(--color-accent);
-  background: var(--color-accent-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  color: var(--color-bg);
+  background: var(--color-text);
+  border-color: var(--color-text);
 }
 .badge {
   position: absolute;
@@ -188,8 +189,7 @@ cockpit-canvas {
   min-width: 17px;
   height: 17px;
   padding: 0 4px;
-  border-radius: 999px;
-  background: var(--color-accent);
+  background: var(--color-text);
   color: var(--color-bg);
   font-size: 11px;
   font-weight: 600;
@@ -198,7 +198,7 @@ cockpit-canvas {
   font-variant-numeric: tabular-nums;
 }
 
-/* Side panel sliding over the canvas from the right. */
+/* Side panel sliding over the canvas from the right. Flat: a structure line, no shadow. */
 .panel {
   position: absolute;
   top: 0;
@@ -208,9 +208,8 @@ cockpit-canvas {
   width: min(380px, 90%);
   display: flex;
   flex-direction: column;
-  background: var(--color-surface);
-  border-left: 1px solid var(--color-border);
-  box-shadow: -8px 0 24px color-mix(in srgb, var(--color-text) 35%, transparent);
+  background: var(--color-bg);
+  border-left: var(--border-width) solid var(--color-border-strong);
   animation: panel-in 0.18s ease-out;
 }
 @keyframes panel-in {
@@ -218,6 +217,7 @@ cockpit-canvas {
     transform: translateX(100%);
   }
 }
+/* Titled header: sans, medium, with a 1px line below. */
 .panel-head {
   display: flex;
   align-items: center;
@@ -226,11 +226,12 @@ cockpit-canvas {
   height: 56px;
   padding: 0 12px 0 16px;
   flex: none;
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 .panel-head h2 {
   margin: 0;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
 }
 .panel-head .close {
   width: 34px;
@@ -238,7 +239,6 @@ cockpit-canvas {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
   color: var(--color-text-muted);
 }
 .panel-head .close:hover {
@@ -252,7 +252,7 @@ cockpit-canvas {
   padding: 0 16px 24px;
 }
 
-/* Document search, centred over the canvas. */
+/* Document search, centred over the canvas: a flat box with a structure line. */
 .add-doc {
   position: absolute;
   top: 16px;
@@ -262,9 +262,8 @@ cockpit-canvas {
   width: min(440px, calc(100% - 32px));
   display: flex;
   flex-direction: column;
-  background: var(--color-surface);
-  border-radius: 10px;
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--color-text) 35%, transparent);
+  background: var(--color-bg);
+  border: var(--border-width) solid var(--color-border-strong);
   overflow: hidden;
 }
 .add-search {
@@ -291,7 +290,6 @@ cockpit-canvas {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
   color: var(--color-text-muted);
 }
 .add-search .close:hover {
@@ -312,13 +310,15 @@ cockpit-canvas {
   gap: 8px;
   min-height: 36px;
   padding: 6px 8px;
-  border-radius: 6px;
   text-align: left;
   color: var(--color-text);
   font-size: 13px;
 }
-.add-results button.active {
-  background: var(--color-surface-2);
+/* The highlighted result is inverted, like a chip that is on. */
+.add-results button.active,
+.add-results button.active small {
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 .add-title {
   min-width: 0;
@@ -342,14 +342,15 @@ cockpit-canvas {
   font-size: 13px;
 }
 
+/* Errors: a thin danger frame, no tint. */
 .error-pill {
   display: flex;
   align-items: center;
   gap: 6px;
   padding: 5px 8px;
-  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface));
+  border: var(--border-width) solid var(--color-danger);
+  background: transparent;
   color: var(--color-danger);
-  border-radius: 6px;
   font-size: 12px;
   margin: 8px 20px;
 }
@@ -413,13 +414,14 @@ cockpit-canvas {
   color: var(--color-text-muted);
   line-height: 1.5;
 }
+/* The one primary action: a square, filled with the text colour. */
 .board-empty .primary-button {
   display: inline-flex;
   align-items: center;
   gap: 8px;
   height: 40px;
   padding: 0 18px;
-  border-radius: 999px;
+  border: var(--border-width) solid var(--color-text);
   background: var(--color-text);
   color: var(--color-bg);
   font-weight: 600;

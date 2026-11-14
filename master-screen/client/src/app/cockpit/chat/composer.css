@@ -3,24 +3,20 @@
   box-sizing: border-box;
   width: 100%;
   padding: 12px;
-  background: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
+  background: var(--color-bg);
+  border-top: var(--border-width) solid var(--color-border);
 }
-/* One rounded field: the text, the model choice and the send button share a row. */
+/* One row: the text field, the model choice and the send button. */
 .composer {
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
   display: flex;
   align-items: flex-end;
-  gap: 6px;
-  padding: 4px 4px 4px 6px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-surface);
+  gap: 8px;
 }
-.composer:focus-within {
-  border-color: var(--color-focus);
-}
+/* The field is a bottom line only. On focus the line thickens and the padding gives the same
+   amount back, so the text does not move. */
 .composer textarea {
   resize: none;
   box-sizing: border-box;
@@ -28,65 +24,44 @@
   max-height: 144px;
   flex: 1;
   min-width: 0;
-  background: transparent;
+  padding: 9px 0 8px;
   border: 0;
-  border-radius: 8px;
-  padding: 9px 8px;
+  border-bottom: var(--border-width) solid var(--color-border-strong);
+  background: transparent;
   color: var(--color-text);
   font: inherit;
+  font-size: var(--font-size-base);
   line-height: 1.35;
-  outline: none;
   overflow: auto;
+  transition: border-bottom-width var(--transition-fast);
 }
-.composer textarea:focus-visible {
+.composer textarea:focus {
   outline: none;
+  border-bottom-width: var(--border-width-strong);
+  padding-bottom: 7px;
 }
-.model {
+.composer .model {
   flex: 0 0 auto;
   box-sizing: border-box;
-  height: 32px;
-  max-width: 96px;
-  border: 0;
-  border-radius: 6px;
+  height: 36px;
+  max-width: 110px;
   padding: 0 6px;
-  margin-bottom: 4px;
+  border: var(--border-width) solid var(--color-border);
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
   font-size: 13px;
   cursor: pointer;
 }
-.model:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 1px;
-}
-.model:disabled {
-  opacity: 0.5;
+.composer .model:disabled {
+  opacity: 0.55;
   cursor: default;
 }
-.send {
+/* Icon-only send button: the shared primary button, square and 36px. */
+.composer .send {
   flex: 0 0 auto;
-  width: 32px;
-  height: 32px;
-  min-width: 32px;
-  margin-bottom: 4px;
-  border-radius: 50%;
-  border: 0;
-  background: var(--color-accent);
-  color: var(--color-accent-contrast);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.send:hover {
-  background: var(--color-accent-hover);
-}
-.send:focus-visible {
-  outline: 2px solid var(--color-focus);
-  outline-offset: 2px;
-}
-.send:disabled {
-  opacity: 0.35;
-  cursor: default;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
 }

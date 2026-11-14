@@ -93,7 +93,8 @@
             type="button"
             class="ghost icon-only"
             [attr.aria-label]="i18n.t('combat.copy.duplicateOf', { name: row.name })"
-            [attr.title]="i18n.t('combat.copy.duplicateOf', { name: row.name })"
+            [msTooltip]="i18n.t('combat.copy.duplicateOf', { name: row.name })"
+            msTooltipPosition="top"
             [disabled]="!row.checked"
             (click)="duplicate(row.cardId)"
           ><ui-icon name="copy" [size]="16" /></button>

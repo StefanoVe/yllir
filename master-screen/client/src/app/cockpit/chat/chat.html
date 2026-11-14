@@ -16,7 +16,7 @@
         name="warning"
         [size]="14"
       />{{s.turns.find(t=>t.id===m.turnId)?.error||m.text}}<button
-        [title]="i18n.t('liveAgent.chat.retry')"
+        [msTooltip]="i18n.t('liveAgent.chat.retry')"
         [attr.aria-label]="i18n.t('liveAgent.chat.retry')"
         (click)="retry(m.role==='dm'?m.text:s.messages.find(dm=>dm.role==='dm'&&dm.turnId===m.turnId)?.text||'')"
       >
@@ -57,7 +57,7 @@
   }}@else if(placeholder()){<p class="muted empty">{{ placeholder() }}</p>
   }@if(newCount()){<button
     class="jump-bottom"
-    [title]="i18n.t('liveAgent.chat.jumpBottom')"
+    [msTooltip]="i18n.t('liveAgent.chat.jumpBottom')"
     [attr.aria-label]="i18n.t('liveAgent.chat.jumpBottomAria', { n: newCount() })"
     (click)="scrollEnd(messageList)"
   >
@@ -67,7 +67,7 @@
 @if(api.chatError()){
 <div class="error-pill network-error">
   <ui-icon name="warning" [size]="14" />{{api.chatError()}}<button
-    [title]="i18n.t('liveAgent.close')"
+    [msTooltip]="i18n.t('liveAgent.close')"
     [attr.aria-label]="i18n.t('liveAgent.close')"
     (click)="api.chatError.set('')"
   >

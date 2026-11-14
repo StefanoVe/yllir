@@ -15,6 +15,7 @@ import { I18n } from "../../i18n";
 import { BattleApi } from "./battle-api";
 import { CombatantChip } from "./combatant-chip";
 import { ConfirmButton } from "../support/confirm-button";
+import { TooltipDirective } from "../../core/tooltip.directive";
 import {
   type Translate,
   conditionLabel,
@@ -53,7 +54,7 @@ export function parseRounds(raw: string): number | null {
  */
 @Component({
   selector: "cockpit-combatant-row",
-  imports: [Icon, CombatantChip, ConfirmButton],
+  imports: [Icon, CombatantChip, ConfirmButton, TooltipDirective],
   templateUrl: "./combatant-row.html",
   styleUrl: "./combatant-row.css",
 })
@@ -61,6 +62,8 @@ export class CombatantRow {
   readonly i18n = inject(I18n);
   private readonly api = inject(CockpitService);
   private readonly battle = inject(BattleApi);
+  /** Ten segments for the hit point bar. */
+  readonly ticks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
   combatant = input.required<Combatant>();
   active = input(false);
   /** Conditions and durations of the game system, loaded once by the overlay. */

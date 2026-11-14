@@ -28,6 +28,7 @@
   padding: 56px 64px var(--space-2);
 }
 
+/* Flat button: square, one thin border, no shadow. */
 .find-map {
   flex: none;
   transition: background-color var(--transition-fast);
@@ -37,20 +38,22 @@
   gap: var(--space-1);
   min-height: 40px;
   padding: var(--space-0-5) var(--space-2);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
+  border-radius: 0;
+  border: var(--border-width) solid var(--color-border-strong);
   background: var(--color-surface);
   color: var(--color-text);
-  box-shadow: var(--shadow-1);
+  box-shadow: none;
 }
 
 .find-map:hover {
-  background: var(--color-surface-2);
+  background: var(--color-accent-soft);
 }
 
 .alert {
   flex: none;
   margin: 0;
+  padding: var(--space-0-5) var(--space-1);
+  border: var(--border-width) solid var(--color-danger);
   color: var(--color-danger);
 }
 
@@ -78,20 +81,21 @@
 }
 
 /* The box keeps the image's proportions; the image fills it. Until the image has loaded the
-   ratio is the grid's, or 4:3 when there is no grid. The frame is a shadow, so it adds no size.
-   The largest box of that ratio that fits the map area: the container units read .map-scroll. */
+   ratio is the grid's, or 4:3 when there is no grid. The frame is drawn inside the box, so it adds
+   no size. The largest box of that ratio that fits the map area: the container units read .map-scroll. */
 .map {
   position: relative;
   width: min(100cqw, calc(100cqh * var(--map-ratio, 1.3333)));
   max-width: 100%;
   aspect-ratio: var(--map-ratio, 1.3333);
-  border-radius: var(--radius-md);
-  box-shadow: 0 0 0 1px var(--color-border);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
   background: var(--color-surface-2);
   user-select: none;
   touch-action: none;
 }
 
+/* The map image keeps its colours. */
 .map-image {
   position: absolute;
   inset: 0;
@@ -101,15 +105,20 @@
   pointer-events: none;
 }
 
+/* Grid: one stroked path in the subtle border colour, drawn over the image at low emphasis. */
 .grid {
-  --grid-line: color-mix(in srgb, var(--color-text) 30%, transparent);
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
   pointer-events: none;
-  background-image:
-    linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
-  background-size: calc(100% / var(--cols)) calc(100% / var(--rows));
+}
+
+.grid path {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 1px;
 }
 
 .placed {
@@ -118,11 +127,25 @@
   z-index: 2;
 }
 
+/* The token whose turn it is: a second line, 2px outside the token's own 2px border. */
+.placed.current,
+.tray-chip.current {
+  outline: var(--border-width-strong) solid var(--color-border-strong);
+  outline-offset: 2px;
+}
+
+/* The selected token (keyboard focus on it): the focus ring, which wins over the turn ring. */
+.placed:has(:focus-visible),
+.tray-chip:has(:focus-visible) {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
 .dragging {
   visibility: hidden;
 }
 
-/* Chips not yet on the map: a small floating strip at the bottom centre of the board. */
+/* Chips not yet on the map: a small strip at the bottom centre of the board, flat. */
 .tray {
   position: absolute;
   left: 50%;
@@ -134,17 +157,17 @@
   gap: var(--space-1);
   max-width: calc(100% - 2 * var(--space-2));
   padding: var(--space-0-5) var(--space-1);
-  border-radius: 14px;
-  border: 1px solid color-mix(in srgb, white 10%, transparent);
-  background: color-mix(in srgb, var(--color-surface, #15171c) 80%, transparent);
-  backdrop-filter: blur(12px);
-  box-shadow: 0 8px 32px rgb(0 0 0 / 0.35);
+  border-radius: 0;
+  border: var(--border-width) solid var(--color-border-strong);
+  background: var(--color-surface);
+  box-shadow: none;
 }
 
 .tray h3 {
   flex: none;
   margin: 0;
   font-size: var(--font-size-sm);
+  font-weight: 500;
   color: var(--color-text-muted);
   white-space: nowrap;
 }
@@ -158,6 +181,7 @@
   overflow: auto;
 }
 
+/* Drag preview: a square token, the same frame as the map tokens, with a side mark. */
 .ghost {
   position: fixed;
   z-index: 70;
@@ -168,31 +192,37 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  border: 2px solid var(--color-surface);
-  box-shadow: var(--shadow-2);
+  border-radius: 0;
+  border: var(--border-width-strong) solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: none;
   font-weight: 700;
+  font-size: var(--font-size-sm);
+  font-variant-numeric: tabular-nums;
   opacity: 0.85;
 }
 
 .ghost.over {
-  outline: 3px solid var(--color-focus);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
   opacity: 1;
 }
 
-.ghost[data-side="pc"] {
-  background: var(--color-accent);
-  color: var(--color-accent-contrast);
+/* Allies: a filled square mark. Enemies: an empty square mark. Never colour. */
+.ghost::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 10px;
+  height: 10px;
+  background: var(--color-text);
+  border: var(--border-width) solid var(--color-text);
 }
 
-.ghost[data-side="enemy"] {
-  background: var(--color-danger);
-  color: var(--color-danger-contrast);
-}
-
-.ghost[data-side="ally"] {
-  background: color-mix(in srgb, var(--color-accent) 55%, var(--color-surface));
-  color: var(--color-text);
+.ghost[data-side="enemy"]::before {
+  background: var(--color-surface);
 }
 
 .list {
@@ -210,11 +240,15 @@
 }
 
 .list li + li {
-  border-top: 1px solid var(--color-border);
+  border-top: var(--border-width) solid var(--color-border);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .find-map {
     transition: none;
   }
+}
+
+:root[data-motion="reduced"] .find-map {
+  transition: none;
 }

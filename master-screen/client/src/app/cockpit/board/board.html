@@ -3,7 +3,7 @@
   <div class="session-switch">
     <button
       class="session-button"
-      [title]="i18n.t('liveAgent.sessionsTitle')"
+      [msTooltip]="i18n.t('liveAgent.sessionsTitle')"
       aria-haspopup="dialog"
       (click)="openSessions.emit()"
     >
@@ -17,7 +17,7 @@
       type="button"
       class="pill-tool"
       [class.on]="panel() === 'ledger'"
-      [title]="i18n.t('liveAgent.ledger.title')"
+      [msTooltip]="i18n.t('liveAgent.ledger.title')"
       [attr.aria-label]="i18n.t('liveAgent.ledger.title')"
       [attr.aria-pressed]="panel() === 'ledger'"
       (click)="togglePanel('ledger')"
@@ -30,7 +30,7 @@
       type="button"
       class="pill-tool"
       [class.on]="panel() === 'combat'"
-      [title]="i18n.t('liveAgent.combat.title')"
+      [msTooltip]="i18n.t('liveAgent.combat.title')"
       [attr.aria-label]="i18n.t('liveAgent.combat.title')"
       [attr.aria-pressed]="panel() === 'combat'"
       (click)="togglePanel('combat')"
@@ -40,7 +40,7 @@
     </button>}
     <button
       class="icon-button"
-      [title]="i18n.t('liveAgent.undoTitle', { label: api.lastGroup()?.actions?.map(a=>a.label)?.join(', ') || i18n.t('liveAgent.noAction') })"
+      [msTooltip]="i18n.t('liveAgent.undoTitle', { label: api.lastGroup()?.actions?.map(a=>a.label)?.join(', ') || i18n.t('liveAgent.noAction') })"
       [attr.aria-label]="i18n.t('liveAgent.undoLast')"
       [disabled]="!api.lastGroup()"
       (click)="undo()"
@@ -65,7 +65,7 @@
     ><ui-icon name="users" [size]="14" />{{s.state.party.join(' · ')}}</span
   >} @if(s.state.position.source;as source){<button
     class="plot-link"
-    [title]="i18n.t('liveAgent.openPlot')"
+    [msTooltip]="i18n.t('liveAgent.openPlot')"
     [attr.aria-label]="i18n.t('liveAgent.openPlot')"
     (click)="openSource()(source)"
   >
@@ -98,7 +98,7 @@
       <h2>{{open === 'ledger' ? i18n.t('liveAgent.ledger.title') : i18n.t('liveAgent.combat.title')}}</h2>
       <button
         class="close"
-        [title]="i18n.t('liveAgent.close')"
+        [msTooltip]="i18n.t('liveAgent.close')"
         [attr.aria-label]="i18n.t('liveAgent.close')"
         (click)="panel.set(null)"
       >
@@ -129,7 +129,7 @@
       />
       <button
         class="close"
-        [title]="i18n.t('liveAgent.close')"
+        [msTooltip]="i18n.t('liveAgent.close')"
         [attr.aria-label]="i18n.t('liveAgent.close')"
         (click)="closeAddDoc()"
       >
@@ -141,7 +141,7 @@
       <li role="option" [attr.aria-selected]="i === addIndex()">
         <button
           [class.active]="i === addIndex()"
-          [title]="kindLabel(docKind(doc.path))"
+          [msTooltip]="kindLabel(docKind(doc.path))"
           (mouseenter)="addIndex.set(i)"
           (click)="chooseDoc(doc)"
         >
@@ -159,7 +159,7 @@
 </div>
 @if(error()){
 <div class="error-pill" role="alert">
-  {{error()}}<button [title]="i18n.t('liveAgent.close')" [attr.aria-label]="i18n.t('liveAgent.close')" (click)="error.set('')">
+  {{error()}}<button [msTooltip]="i18n.t('liveAgent.close')"[attr.aria-label]="i18n.t('liveAgent.close')" (click)="error.set('')">
     <ui-icon name="x" [size]="14" />
   </button>
 </div>

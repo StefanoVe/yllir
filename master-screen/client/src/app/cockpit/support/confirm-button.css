@@ -2,7 +2,8 @@
   display: inline-block;
 }
 
-/* Styles of the button live here: the consumer's component styles do not reach this view. */
+/* Styles of the button live here: the consumer's component styles do not reach this view.
+   The look is the secondary .btn: square, 1px frame, text colour. Confirming (armed) is inverted. */
 .icon-button {
   width: 40px;
   height: 40px;
@@ -11,25 +12,25 @@
   justify-content: center;
   gap: var(--space-0-5);
   padding: 0;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text);
   font: inherit;
   cursor: pointer;
 }
 
 .icon-button:hover:not(:disabled) {
-  background: var(--color-surface-2);
+  background: var(--color-accent-soft);
 }
 
 .icon-button:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
   cursor: default;
 }
 
 .icon-button:focus-visible {
-  outline: 3px solid var(--color-focus);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -37,9 +38,16 @@
   width: auto;
   min-width: 40px;
   padding: 0 var(--space-1);
-  border-color: var(--color-danger);
-  color: var(--color-danger);
-  font-weight: 600;
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--color-bg);
+  font-weight: 500;
+}
+
+.icon-button.armed:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  color: var(--color-bg);
 }
 
 .confirm-text {

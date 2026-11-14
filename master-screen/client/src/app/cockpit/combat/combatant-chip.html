@@ -17,7 +17,11 @@
   <span class="initials" aria-hidden="true">{{ initials() }}</span>
   }
   @if (!isPc() && hp() !== null) {
-  <span class="hp" aria-hidden="true"><span class="hp-fill" [style.width.%]="hp()"></span></span>
+  <span class="hp" aria-hidden="true">
+    @for (t of ticks; track t) {
+    <span class="seg" [class.on]="(hp() ?? 0) > $index * 20"></span>
+    }
+  </span>
   }
 </button>
 @if (open()) {

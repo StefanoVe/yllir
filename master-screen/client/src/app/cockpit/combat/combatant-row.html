@@ -6,7 +6,13 @@
     <cockpit-combatant-chip [combatant]="combatant()" [active]="active()" />
     }
     <div class="identity head">
-      <span class="row-name">{{ combatant().name }}</span>
+      <span class="name-line">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="row-name">{{ combatant().name }}</span>
+        @if (defeated()) {
+        <ui-icon class="down" name="x" [size]="14" aria-hidden="true" />
+        }
+      </span>
       <span class="row-meta">
         {{ i18n.t("combat.stats.initiative") }} {{ combatant().initiative ?? "—" }}@if (!isPc() && pills().length) {
         · {{ i18n.t("combat.row.conditions", { n: pills().length }) }}
@@ -26,12 +32,14 @@
       <span class="hp unknown">{{ i18n.t("combat.amount.short") }} —</span>
       }
       @for (pill of pills(); track pill.id) {
-      <span class="pill" [attr.title]="pill.text">
+      <span class="pill" [msTooltip]="pill.text" msTooltipPosition="top">
         <span class="pill-text">{{ pill.text }}</span>
         <button
           type="button"
           class="pill-remove"
           [attr.aria-label]="i18n.t('combat.condition.remove', { label: pill.label })"
+          [msTooltip]="i18n.t('combat.condition.remove', { label: pill.label })"
+          msTooltipPosition="top"
           (click)="removeCondition(pill.id)"
         >
           <ui-icon name="x" [size]="12" />
@@ -59,7 +67,8 @@
         type="button"
         class="icon-button"
         [disabled]="!canChangeHp()"
-        [attr.title]="i18n.t('combat.damage')"
+        [msTooltip]="i18n.t('combat.damage')"
+        msTooltipPosition="top"
         [attr.aria-label]="i18n.t('combat.damage')"
         (click)="damage()"
       >
@@ -69,7 +78,8 @@
         type="button"
         class="icon-button"
         [disabled]="!canChangeHp()"
-        [attr.title]="i18n.t('combat.heal')"
+        [msTooltip]="i18n.t('combat.heal')"
+        msTooltipPosition="top"
         [attr.aria-label]="i18n.t('combat.heal')"
         (click)="heal()"
       >
@@ -188,7 +198,9 @@
   </div>
   @if (hpPct() !== null) {
   <span class="hp-bar" [class.low]="low()" aria-hidden="true">
-    <span class="hp-fill" [style.width.%]="hpPct()"></span>
+    @for (t of ticks; track t) {
+    <span class="seg" [class.on]="(hpPct() ?? 0) > $index * 10"></span>
+    }
   </span>
   }
   }

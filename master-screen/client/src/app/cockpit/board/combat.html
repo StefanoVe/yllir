@@ -5,8 +5,8 @@
     <div class="spacer"></div>
     <button
       class="icon-button"
-      [title]="i18n.t('liveAgent.combat.next')"
-[attr.aria-label]="i18n.t('liveAgent.combat.next')"
+      [msTooltip]="i18n.t('liveAgent.combat.next')"
+      [attr.aria-label]="i18n.t('liveAgent.combat.next')"
       (click)="next()"
     >
       <ui-icon name="right" [size]="16" /></button
@@ -23,7 +23,7 @@
       <tr>
         <th>{{ i18n.t("liveAgent.combat.creature") }}</th>
         <th class="numeric">{{ i18n.t("liveAgent.combat.initiativeShort") }}</th>
-        <th class="numeric">{{ i18n.t("liveAgent.combat.hpShort") }}</th>
+        <th class="numeric hp">{{ i18n.t("liveAgent.combat.hpShort") }}</th>
         @if(hasConditions()){
         <th class="wide">{{ i18n.t("liveAgent.combat.conditions") }}</th>
         } @if(hasPhases()){
@@ -33,26 +33,34 @@
     </thead>
     <tbody>
       @for(p of combat().participants;track p.id){
-      <tr [class.current]="combat().activeId===p.id">
+      <tr [class.current]="combat().activeId===p.id" [class.down]="isDown(p)">
         <td class="name">
-          {{p.name}}@if(p.conditions.length||p.phase){<span class="row-meta"
-            >@for(c of p.conditions;track c){<span class="condition-chip"
-              >{{c}}</span
+          <i
+            class="mark"
+            [class.enemy]="p.kind==='enemy'"
+            aria-hidden="true"
+          ></i><span class="name-text">{{p.name}}</span>@if(isDown(p)){<ui-icon
+            class="down-icon"
+            name="x"
+            [size]="13"
+          />}@if(p.conditions.length||p.phase){<span class="row-meta"
+            >@for(c of conditionTags(p);track c.label){<span class="condition-chip"
+              >{{c.label}}@if(c.duration){<small> {{c.duration}}</small>}</span
             >}@if(p.phase){<span>{{p.phase}}</span>}</span
           >}
         </td>
         <td class="numeric">{{p.initiative??'—'}}</td>
-        <td class="numeric">
-          @if(p.hp===undefined&&p.maxHp===undefined){<span class="unknown"
-            >—</span
-          >}@else{{{p.hp??'—'}}/{{p.maxHp??'—'}}}@if(p.tempHp){<small>
-            +{{p.tempHp}}</small
-          >}
+        <td class="numeric hp">
+          @if(p.hp===undefined&&p.maxHp===undefined){<span class="unknown">—</span>}@else{<span class="hp-row"
+            >@if(hpSegments(p).length){<span class="hp-bar" aria-hidden="true"
+              >@for(on of hpSegments(p);track $index){<i [class.on]="on"></i>}@for(t of tempSegments(p);track $index){<i class="temp"></i>}</span
+            >}<span class="hp-numbers">{{p.hp??'—'}}/{{p.maxHp??'—'}}</span
+          ></span>}@if(p.tempHp){<small> +{{p.tempHp}}</small>}
         </td>
         @if(hasConditions()){
         <td class="wide">
-          @for(c of p.conditions;track c){<span class="condition-chip"
-            >{{c}}</span
+          @for(c of conditionTags(p);track c.label){<span class="condition-chip"
+            >{{c.label}}@if(c.duration){<small> {{c.duration}}</small>}</span
           >}
         </td>
         } @if(hasPhases()){

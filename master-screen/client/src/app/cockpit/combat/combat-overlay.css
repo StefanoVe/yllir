@@ -1,34 +1,15 @@
 /*
- * Combat overlay. Without a combat: the header and the initiative step, as before. With one:
- * the battle map fills the whole overlay, under a thin translucent header, and the initiative
- * band, the turn card, the chat drawer and the music player float over it. A rail of toggles
- * opens and folds them. The floating layer fades out after four seconds without activity
- * (combat-hud.service.ts); under 900 px the turn and the chat are bottom sheets instead.
- *
- * Brief rules not followed exactly, and why:
- * - Initiative strip tiles show initials only, never portraits: a portrait needs the stats of
- *   every combatant, which the overlay does not load (the brief forbids new server calls here).
- * - The end-combat, defeated and remove buttons are ui-confirm-button components. Their look
- *   lives in support/confirm-button.css, outside this folder, so they keep their bordered 40 px
- *   style instead of the quiet 36 px icon button. Only the armed state is danger, as briefed.
- * - Map chips and the chip fallback in rows keep the 44 px token size of the chip component.
- * - The turn panel's "Out of turn" block is a <details> that is open on wide screens only.
- * - The newest-notice list opens as a popover under the header, not as a row of its own.
- * - The initiative step (before the fight starts) has its own stylesheet (initiative-step.css)
- *   and the overlay shows no panels until a combat is active.
- * - Row actions keep their full text as visually hidden text (so screen readers and the text
- *   check still see it), with the same text in a title tooltip.
+ * Combat overlay, notebook look: a full-screen flat layer. Without a combat: the header and the
+ * initiative step. With one: the battle map fills the layer under a flat header, and the
+ * initiative table (left), the turn card (right), the chat drawer and the music player float over
+ * it as flat panels. The rail of toggles opens and folds them; the floating layer fades out after
+ * a few seconds without activity (combat-hud.service.ts). Under 900 px the turn and the chat are
+ * bottom sheets. Square corners, 1 px lines, no shadows, no blur, no gradients, no accent colour.
  */
 
-/* Local tokens of the combat screen. Same dark switch as styles.css. */
 .overlay {
-  --combat-warn: #b45309;
-  --combat-ally: #0f766e;
-  --combat-track: color-mix(in srgb, var(--color-text) 10%, transparent);
-  /* Header height, initiative band height (fixed), and the top of the floating panels under them. */
   --bar-h: 48px;
-  --band-h: 64px;
-  --turn-top: calc(var(--bar-h) + 8px);
+  --turn-top: calc(var(--bar-h) + 12px);
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -36,57 +17,50 @@
   flex-direction: column;
   background: var(--color-bg);
   color: var(--color-text);
+  font-family: var(--font-family);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .overlay {
-    --combat-warn: #f59e0b;
-    --combat-ally: #2dd4bf;
-  }
-}
-
-:root[data-theme="dark"] .overlay {
-  --combat-warn: #f59e0b;
-  --combat-ally: #2dd4bf;
+/* Icons keep the 1.5 stroke of the notebook look (the icon component draws at 2 by default). */
+.overlay ::ng-deep svg {
+  stroke-width: 1.5px;
 }
 
 :host {
   display: block;
 }
 
-/* Header: one row, 48 px. With a combat it floats over the map (see .overlay.battle). */
+/* Header: one row, 48 px. With a combat it sits on top of the map. */
 .bar {
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  height: 48px;
-  min-height: 48px;
+  height: var(--bar-h);
+  min-height: var(--bar-h);
   box-sizing: border-box;
   padding: 0 var(--space-2);
   background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  color: var(--color-text-muted);
+  border-bottom: var(--border-width) solid var(--color-border);
+  color: var(--color-text);
 }
 
-/* With a combat the header is translucent and sits on top of the map. */
 .overlay.battle .bar {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   z-index: 5;
-  background: color-mix(in srgb, var(--color-surface) 80%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom-color: transparent;
+  background: var(--color-surface);
 }
 
+/* The title of a page: the hand font, as in the other pages. */
 .bar .title {
   min-width: 0;
   margin: 0;
   color: var(--color-text);
-  font-size: var(--font-size-base);
-  font-weight: 600;
+  font-family: var(--font-family-hand);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -97,9 +71,8 @@
   align-items: center;
   height: 24px;
   padding: 0 var(--space-1);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
+  border: var(--border-width) solid var(--color-border-strong);
+  color: var(--color-text);
   font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -116,86 +89,98 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: var(--radius-sm);
-  border: 0;
+  border: var(--border-width) solid transparent;
+  border-radius: 0;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .icon-button:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
+  background: var(--color-accent-soft);
+  border-color: var(--color-border-strong);
 }
 
-.icon-button:focus-visible,
-.rail-button:focus-visible,
-.next-turn:focus-visible,
-.notice-toggle:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
+.icon-button[aria-pressed="true"] {
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 
-/* The one primary action of the screen. */
+/* The one primary action of the screen: a filled square. */
 .next-turn {
   min-height: 36px;
   display: inline-flex;
   align-items: center;
   gap: var(--space-0-5);
   padding: 0 var(--space-2) 0 var(--space-1);
-  border-radius: var(--radius-sm);
-  border: 0;
-  background: var(--color-accent);
-  color: var(--color-accent-contrast);
+  border: var(--border-width) solid var(--color-text);
+  border-radius: 0;
+  background: var(--color-text);
+  color: var(--color-bg);
   font-size: var(--font-size-sm);
-  font-weight: 600;
+  font-weight: 500;
   white-space: nowrap;
-  transition: background-color var(--transition-fast);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .next-turn:hover:not(:disabled) {
   background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
 }
 
 .next-turn:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
 }
 
-/* Newest notice: a quiet one-line pill. The list opens below it. */
+/*
+ * Automatic notice: a temporary-notice box, bottom right of the screen. A 1 px border with a 4 px
+ * bottom edge in the structure colour; the defeated and unconscious notices use the danger colour.
+ */
 .notice-strip {
-  position: relative;
-  min-width: 0;
-  flex: 0 1 auto;
-  max-width: min(360px, 40%);
+  position: fixed;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  z-index: 6;
+  width: min(360px, calc(100vw - 2 * var(--space-2)));
 }
 
 .notice-toggle {
   display: flex;
   align-items: center;
-  gap: var(--space-0-5);
+  gap: var(--space-1);
   width: 100%;
   min-width: 0;
-  height: 28px;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface-2);
-  color: var(--color-text-muted);
+  min-height: 40px;
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-bottom-width: 4px;
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
   font-size: var(--font-size-sm);
   text-align: left;
   transition: background-color var(--transition-fast);
 }
 
+.notice-toggle[data-kind="defeated"],
+.notice-toggle[data-kind="unconscious"] {
+  border-color: var(--color-danger);
+}
+
 .notice-toggle:hover {
-  color: var(--color-text);
+  background: var(--color-accent-soft);
 }
 
 .dot {
   flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-text-muted);
+  width: 8px;
+  height: 8px;
+  background: var(--color-text);
+}
+
+.notice-toggle[data-kind="defeated"] .dot,
+.notice-toggle[data-kind="unconscious"] .dot {
+  background: var(--color-danger);
 }
 
 .notice-text {
@@ -208,19 +193,18 @@
 
 .notice-list {
   position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
+  bottom: calc(100% + 6px);
+  right: 0;
   z-index: 5;
-  width: min(420px, 90vw);
+  width: 100%;
   max-height: 30vh;
   overflow: auto;
   margin: 0;
-  padding: var(--space-1) var(--space-2) var(--space-1) var(--space-2);
+  padding: var(--space-1) var(--space-2);
   list-style: none;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
   color: var(--color-text);
   font-size: var(--font-size-sm);
 }
@@ -241,92 +225,70 @@
   border: 0;
 }
 
-/* Initiative band: one row of tiles in initiative order, scrolling sideways when they do not fit.
-   Its height is --band-h; the turn card starts under it (.overlay.band-open). */
-.strip {
-  top: calc(var(--bar-h) + 8px);
-  left: 64px;
-  z-index: 2;
-  box-sizing: border-box;
-  height: var(--band-h);
-  max-width: calc(100% - 120px);
-  padding: var(--space-1);
-  overflow-x: auto;
-  overflow-y: hidden;
+/* Every floating panel: a flat square surface with a 1 px structure line. */
+.panel-card {
+  position: absolute;
+  pointer-events: auto;
+  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  box-shadow: none;
+  color: var(--color-text);
 }
 
-/* With the turn card open on wide screens, the band stops before it: 64 px rail, 340 px card,
-   12 px right margin and a 16 px gap. */
-@media (min-width: 900px) {
-  .overlay.turn-open .strip {
-    max-width: calc(100% - 64px - 340px - 12px - 16px);
-  }
+/* Initiative table: rows separated by 1 px lines, the current creature inverted, on the left. */
+.strip {
+  top: calc(var(--bar-h) + 12px);
+  bottom: 76px;
+  left: 68px;
+  z-index: 2;
+  width: min(300px, calc(100% - 96px));
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .strip-list {
-  height: 100%;
   margin: 0;
   padding: 0;
   list-style: none;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: var(--space-1);
 }
 
 .tile {
-  position: relative;
-  overflow: hidden;
-  display: flex;
+  display: grid;
+  grid-template-columns: 36px 10px minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-1);
-  flex: 0 0 180px;
-  min-width: 128px;
-  max-width: 220px;
-  height: 44px;
-  padding: 0 var(--space-1) 0 var(--space-0-5);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  font-size: var(--font-size-sm);
-  transition: background-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-.tile.active {
-  border-color: transparent;
-  background: var(--color-accent-soft);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-accent) 45%, transparent);
-}
-
-.tile-avatar {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: 2px solid var(--color-border);
-  background: var(--color-surface-2);
+  column-gap: var(--space-1);
+  row-gap: var(--space-0-5);
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: var(--border-width) solid var(--color-border);
   color: var(--color-text);
-  font-size: var(--font-size-xs);
-  font-weight: 600;
+  font-size: var(--font-size-sm);
 }
 
-.tile[data-side="pc"] .tile-avatar {
-  border-color: var(--color-accent);
+.tile:last-child {
+  border-bottom: 0;
 }
 
-.tile[data-side="enemy"] .tile-avatar {
-  border-color: var(--color-danger);
+.tile-init {
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
 }
 
-.tile[data-side="ally"] .tile-avatar {
-  border-color: var(--combat-ally);
+/* Allies and player characters: filled square. Enemies: empty square. */
+.tile-mark {
+  width: 10px;
+  height: 10px;
+  border: var(--border-width) solid currentColor;
+  background: currentColor;
+}
+
+.tile[data-side="enemy"] .tile-mark {
+  background: transparent;
 }
 
 .tile-name {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -334,10 +296,14 @@
   font-weight: 500;
 }
 
-.tile-init {
-  flex: none;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
+/* The current creature: the inverted row. */
+.tile.active {
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+.tile.active .tile-init {
+  color: inherit;
 }
 
 .tile.defeated .tile-name {
@@ -345,45 +311,46 @@
   text-decoration: line-through;
 }
 
-.tile.defeated .tile-avatar {
-  filter: grayscale(1);
-  opacity: 0.6;
+.tile.active.defeated .tile-name {
+  color: inherit;
 }
 
+/* Segmented hit points: ten segments, 1 px gaps, the numbers beside them. */
 .tile-hp {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  background: var(--combat-track);
+  grid-column: 2 / 4;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
 }
 
-.tile-hp-fill {
-  display: block;
-  height: 100%;
-  background: var(--color-accent);
-  transition: width var(--transition-fast);
+.tile-segs {
+  display: flex;
+  flex: 1;
+  gap: 1px;
+  min-width: 0;
 }
 
-.tile[data-side="enemy"] .tile-hp-fill {
+.tile-seg {
+  flex: 1;
+  height: 6px;
+  border: var(--border-width) solid currentColor;
+}
+
+.tile-seg.on {
+  background: currentColor;
+}
+
+.tile-hp.low .tile-seg.on {
   background: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
-.tile[data-side="ally"] .tile-hp-fill {
-  background: var(--combat-ally);
+.tile-hp-text {
+  flex: none;
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
 }
 
-.tile-hp-fill.low {
-  background: var(--combat-warn);
-}
-
-.tile.defeated .tile-hp-fill {
-  width: 0 !important;
-}
-
-/* Stage: the area under the header. With a combat it holds the map and the floating layer;
-   before a combat, the initiative step scrolls in the body. */
 .stage {
   position: relative;
   flex: 1;
@@ -415,19 +382,19 @@
 
 .floating-alert {
   position: absolute;
-  top: 56px;
+  top: calc(var(--bar-h) + 8px);
   left: 50%;
   z-index: 6;
   transform: translateX(-50%);
   max-width: calc(100% - 2 * var(--space-2));
   margin: 0;
   padding: var(--space-0-5) var(--space-2);
-  border-radius: var(--radius-sm);
+  border: var(--border-width) solid var(--color-danger);
   background: var(--color-surface);
-  box-shadow: var(--shadow-2);
+  box-shadow: none;
 }
 
-/* The floating layer over the map. It fades out (hud-hidden) when the HUD is idle or hidden by hand. */
+/* The floating layer; it fades out (hud-hidden) when the HUD is idle or hidden by hand. */
 .hud {
   position: absolute;
   inset: 0;
@@ -442,22 +409,9 @@
   pointer-events: none;
 }
 
-/* Every floating panel: a translucent card. */
-.panel-card {
-  position: absolute;
-  pointer-events: auto;
-  background: color-mix(in srgb, var(--color-surface, #15171c) 80%, transparent);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid color-mix(in srgb, white 10%, transparent);
-  border-radius: 14px;
-  box-shadow: 0 8px 32px rgb(0 0 0 / 0.35);
-  color: var(--color-text);
-}
-
-/* Toggle rail: a column of 40 px icon buttons under the header, at the top left. */
+/* Rail of toggles: a column of square buttons, top left. */
 .rail {
-  top: 56px;
+  top: calc(var(--bar-h) + 8px);
   left: 12px;
   z-index: 2;
   display: flex;
@@ -473,24 +427,26 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 0;
-  border-radius: 10px;
+  border: var(--border-width) solid transparent;
+  border-radius: 0;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   transition: background-color var(--transition-fast), color var(--transition-fast);
 }
 
 .rail-button:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
-}
-
-.rail-button[aria-pressed="true"] {
+  border-color: var(--color-border-strong);
   background: var(--color-accent-soft);
-  color: var(--color-text);
 }
 
-/* Turn card: at the right, under the header, and under the band when the band is open. */
+/* The active toggle: inverted inside a filled square. */
+.rail-button[aria-pressed="true"] {
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--color-bg);
+}
+
+/* Turn card: at the right, under the header. */
 .turn-card {
   top: var(--turn-top);
   right: 12px;
@@ -500,13 +456,9 @@
   overflow: auto;
 }
 
-.overlay.band-open {
-  --turn-top: calc(var(--bar-h) + var(--band-h) + 16px);
-}
-
 /* Chat drawer: the full height at the right. */
 .chat-drawer {
-  top: 56px;
+  top: calc(var(--bar-h) + 8px);
   right: 12px;
   bottom: 12px;
   z-index: 3;
@@ -523,7 +475,7 @@
   gap: var(--space-1);
   min-height: 44px;
   padding: var(--space-0-5) var(--space-1) var(--space-0-5) var(--space-2);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 
 .drawer-title {
@@ -532,7 +484,8 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
 }
 
 .chat {
@@ -548,8 +501,8 @@
   overflow: hidden;
 }
 
-/* Under 900 px: no auto-hide; the turn and the chat are bottom sheets, full width and at most
-   60 % of the height, scrolling inside. */
+/* Under 900 px: no auto-hide; the turn and the chat are bottom sheets, full width, at most 60 % of
+   the height, scrolling inside. */
 @media (max-width: 899px) {
   .turn-card,
   .chat-drawer {
@@ -560,11 +513,22 @@
     width: auto;
     max-height: 60vh;
     z-index: 5;
-    border-radius: 14px 14px 0 0;
+    border-bottom: 0;
   }
 
   .chat-drawer {
     height: 60vh;
+  }
+
+  .strip {
+    bottom: 12px;
+  }
+}
+
+/* Wide screens: the initiative table stops before the turn card. */
+@media (min-width: 900px) {
+  .overlay.turn-open .strip {
+    width: min(300px, calc(100% - 68px - 340px - 12px - 16px));
   }
 }
 
@@ -590,8 +554,6 @@
   .rail-button,
   .next-turn,
   .notice-toggle,
-  .tile,
-  .tile-hp-fill,
   .hud {
     transition: none;
   }

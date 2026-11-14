@@ -2,6 +2,7 @@ import { Component, computed, inject, OnDestroy, signal } from "@angular/core";
 import { Icon } from "../support/icon";
 import { ChatSource, type ChatThreadView } from "./chat-source";
 import { I18n, type TranslationKey } from "../../i18n";
+import { TooltipDirective } from "../../core/tooltip.directive";
 import type { Turn } from "@shared/cockpit-types";
 export function activeTurn(session: ChatThreadView | null): Turn | null {
   return (
@@ -40,7 +41,7 @@ export function turnLabel(turn: Turn, translate: (key: TranslationKey) => string
 @Component({
   selector: "cockpit-turn-status",
   standalone: true,
-  imports: [Icon],
+  imports: [Icon, TooltipDirective],
   templateUrl: "./turn-status.html",
   styleUrl: "./turn-status.css",
 })

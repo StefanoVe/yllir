@@ -22,8 +22,8 @@
     }
   </select
   ><button
-    class="send"
-    [title]="i18n.t('liveAgent.composer.send')"
+    class="btn btn-primary send"
+    [msTooltip]="i18n.t('liveAgent.composer.send')"
     [attr.aria-label]="i18n.t('liveAgent.composer.send')"
     [disabled]="!draft().trim()"
   >

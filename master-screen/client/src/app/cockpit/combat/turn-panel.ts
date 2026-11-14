@@ -90,6 +90,8 @@ const COST_KEYS: Record<CardAction["cost"], TranslationKey> = {
 export class TurnPanel {
   readonly i18n = inject(I18n);
   private readonly battle = inject(BattleApi);
+  /** Ten segments for the hit point bar of the creature whose turn it is. */
+  readonly ticks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
   combatants = input.required<Combatant[]>();
   activeId = input<string | null>(null);
   /** Combatants whose sheet is being interpreted into an action card right now. */

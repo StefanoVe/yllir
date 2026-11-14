@@ -2,7 +2,7 @@
   type="button"
   [class]="buttonClass() + (armed() ? ' armed' : '')"
   [disabled]="disabled()"
-  [attr.title]="label()"
+  [msTooltip]="armed() ? confirmLabel() : label()"
   [attr.aria-label]="armed() ? confirmLabel() : label()"
   [attr.aria-pressed]="armed() ? 'true' : 'false'"
   (click)="onClick()"

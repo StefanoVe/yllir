@@ -23,7 +23,9 @@
     </div>
     @if (n.hpPct !== null) {
     <span class="hp-bar" [class.low]="n.low" aria-hidden="true">
-      <span class="hp-fill" [style.width.%]="n.hpPct"></span>
+      @for (t of ticks; track t) {
+      <span class="seg" [class.on]="n.hpPct > $index * 10"></span>
+      }
     </span>
     }
     @if (!n.pc) {

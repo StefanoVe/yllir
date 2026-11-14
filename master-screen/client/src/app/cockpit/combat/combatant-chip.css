@@ -1,150 +1,117 @@
+/*
+ * Combatant token, notebook look: a square with a 2 px structure border and the portrait inside
+ * (in colour; the frame is the only structure). The token of the current turn has a double border:
+ * the 2 px border plus an outline 2 px away. Hit points: a five-segment bar along the bottom.
+ * Tooltip with the stats: a flat square box, 1 px border.
+ */
+
 :host {
   position: relative;
-  display: inline-flex;
-}
-
-.token {
-  --ring: var(--color-border);
-  position: relative;
-  width: 44px;
-  height: 44px;
-  padding: 0;
-  border-radius: 50%;
-  border: 2px solid var(--ring);
-  box-shadow: var(--shadow-1);
-  transition: box-shadow var(--transition-fast), filter var(--transition-fast);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: var(--font-size-sm);
-  line-height: 1;
-  cursor: grab;
-  touch-action: none;
-  user-select: none;
-}
-
-.portrait {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  pointer-events: none;
-}
-
-/* Side: the fill and the ring (2 px) in the side's hue. */
-.token[data-side="pc"] {
-  --ring: var(--color-accent);
-  background: var(--color-accent);
-  color: var(--color-accent-contrast);
-}
-
-.token[data-side="enemy"] {
-  --ring: var(--color-danger);
-  background: var(--color-danger);
-  color: var(--color-danger-contrast);
-}
-
-.token[data-side="ally"] {
-  --ring: var(--combat-ally);
-  background: color-mix(in srgb, var(--combat-ally) 55%, var(--color-surface));
+  display: inline-block;
+  font-family: var(--font-family);
   color: var(--color-text);
 }
 
-.token:hover {
-  filter: brightness(1.06);
+.token {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  overflow: visible;
+  border: var(--border-width-strong) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  cursor: default;
 }
 
-/* The active chip glows softly in the accent. */
+/* The current turn: a double border. */
 .token.active {
-  box-shadow:
-    var(--shadow-1),
-    0 0 0 3px color-mix(in srgb, var(--color-accent) 30%, transparent),
-    0 0 14px 2px color-mix(in srgb, var(--color-accent) 30%, transparent);
-}
-
-.token:focus-visible {
-  outline: 3px solid var(--color-focus);
+  outline: var(--border-width-strong) solid var(--color-border-strong);
   outline-offset: 2px;
 }
 
-/* Defeated: greyscale at half opacity. */
 .token.defeated {
-  filter: grayscale(1);
-  opacity: 0.5;
+  opacity: 0.45;
 }
 
-.token.defeated:hover {
-  filter: grayscale(1);
+.portrait {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .token {
-    transition: none;
-  }
+.initials {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
 .hp {
   position: absolute;
-  left: 15%;
-  right: 15%;
-  bottom: 4px;
+  left: 3px;
+  right: 3px;
+  bottom: 3px;
+  display: flex;
+  gap: 1px;
+}
+
+.hp .seg {
+  flex: 1;
   height: 4px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, currentColor 30%, transparent);
-  overflow: hidden;
+  border: var(--border-width) solid var(--color-border-strong);
+  background: var(--color-surface);
 }
 
-.hp-fill {
-  display: block;
-  height: 100%;
-  background: currentColor;
+.hp .seg.on {
+  background: var(--color-border-strong);
 }
 
+/* Stats tooltip: a flat square box. */
 .tooltip {
   position: absolute;
   top: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
   z-index: 10;
-  width: min(260px, 70vw);
-  max-height: 50vh;
-  overflow: auto;
-  padding: var(--space-1);
+  min-width: 200px;
+  max-width: 280px;
+  padding: var(--space-1) var(--space-1);
   background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  box-shadow: none;
   color: var(--color-text);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-2);
   font-size: var(--font-size-sm);
-  font-weight: 400;
-  line-height: 1.4;
-  text-align: left;
-  white-space: normal;
-}
-
-.tooltip p,
-.tooltip h4,
-.tooltip dl {
-  margin: 0 0 var(--space-0-5);
 }
 
 .tip-name {
-  font-weight: 700;
+  margin: 0;
+  font-weight: 600;
+}
+
+.tooltip .muted {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
 }
 
 .tooltip h4 {
-  margin-top: var(--space-1);
-  font-size: var(--font-size-sm);
+  margin: var(--space-1) 0 var(--space-0-5);
+  font-size: var(--font-size-xs);
+  font-weight: 500;
+  color: var(--color-text-muted);
 }
 
 .tooltip dl {
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 2px var(--space-1);
+  margin: var(--space-0-5) 0 0;
 }
 
 .tooltip dt {
@@ -153,17 +120,26 @@
 
 .tooltip dd {
   margin: 0;
+  font-variant-numeric: tabular-nums;
 }
 
-.actions {
+.tooltip .actions {
   margin: 0;
-  padding-left: var(--space-2);
+  padding: 0;
+  list-style: none;
 }
 
-.actions li + li {
-  margin-top: var(--space-0-5);
+.tooltip .actions li {
+  padding: 2px 0;
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 
-.muted {
-  color: var(--color-text-muted);
+.tooltip .actions li:last-child {
+  border-bottom: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .token {
+    transition: none;
+  }
 }

@@ -5,7 +5,6 @@
   aria-modal="true"
   aria-labelledby="combat-overlay-title"
   [class.battle]="!!combat()"
-  [class.band-open]="hud.initiative() && order().length > 0"
   [class.turn-open]="hud.turn()"
 >
   <header class="bar">
@@ -19,8 +18,10 @@
       <button
         type="button"
         class="notice-toggle"
+        [attr.data-kind]="n.kind"
         [attr.aria-expanded]="noticesOpen()"
-        [attr.title]="noticeLine(n)"
+        [msTooltip]="noticeLine(n)"
+        msTooltipPosition="top"
         (click)="noticesOpen.set(!noticesOpen())"
       >
         <span class="dot" aria-hidden="true"></span>
@@ -43,8 +44,9 @@
       type="button"
       class="next-turn"
       [disabled]="!nextId()"
-      [attr.title]="i18n.t('combat.next')"
       [attr.aria-label]="i18n.t('combat.next')"
+      [msTooltip]="i18n.t('combat.next')"
+      msTooltipPosition="bottom"
       (click)="nextTurn()"
     >
       <ui-icon name="chevron" [size]="16" />
@@ -61,8 +63,9 @@
       type="button"
       class="icon-button"
       [attr.aria-pressed]="hud.hidden()"
-      [attr.title]="i18n.t(hud.hidden() ? 'combat.hud.show' : 'combat.hud.hide')"
       [attr.aria-label]="i18n.t(hud.hidden() ? 'combat.hud.show' : 'combat.hud.hide')"
+      [msTooltip]="i18n.t(hud.hidden() ? 'combat.hud.show' : 'combat.hud.hide')"
+      msTooltipPosition="bottom"
       (click)="hud.toggleHidden()"
     >
       <ui-icon [name]="hud.hidden() ? 'eye' : 'hide'" [size]="18" />
@@ -71,8 +74,9 @@
     <button
       type="button"
       class="icon-button"
-      [attr.title]="i18n.t('combat.close')"
       [attr.aria-label]="i18n.t('combat.close')"
+      [msTooltip]="i18n.t('combat.close')"
+      msTooltipPosition="bottom"
       (click)="close()"
     >
       <ui-icon name="x" [size]="18" />
@@ -109,7 +113,8 @@
           class="rail-button"
           [attr.aria-pressed]="hud.initiative()"
           [attr.aria-label]="i18n.t('combat.hud.initiative')"
-          [attr.title]="i18n.t('combat.hud.initiative')"
+          [msTooltip]="i18n.t('combat.hud.initiative')"
+          msTooltipPosition="right"
           (click)="hud.toggle('initiative')"
         >
           <ui-icon name="listOrdered" [size]="18" />
@@ -119,7 +124,8 @@
           class="rail-button"
           [attr.aria-pressed]="hud.turn()"
           [attr.aria-label]="i18n.t('combat.hud.turn')"
-          [attr.title]="i18n.t('combat.hud.turn')"
+          [msTooltip]="i18n.t('combat.hud.turn')"
+          msTooltipPosition="right"
           (click)="hud.toggle('turn')"
         >
           <ui-icon name="crosshair" [size]="18" />
@@ -129,7 +135,8 @@
           class="rail-button"
           [attr.aria-pressed]="hud.chat()"
           [attr.aria-label]="i18n.t('combat.hud.chat')"
-          [attr.title]="i18n.t('combat.hud.chat')"
+          [msTooltip]="i18n.t('combat.hud.chat')"
+          msTooltipPosition="right"
           (click)="hud.toggle('chat')"
         >
           <ui-icon name="message" [size]="18" />
@@ -139,7 +146,8 @@
           class="rail-button"
           [attr.aria-pressed]="hud.music()"
           [attr.aria-label]="i18n.t('combat.hud.music')"
-          [attr.title]="i18n.t('combat.hud.music')"
+          [msTooltip]="i18n.t('combat.hud.music')"
+          msTooltipPosition="right"
           (click)="hud.toggle('music')"
         >
           <ui-icon name="music" [size]="18" />
@@ -163,12 +171,17 @@
             [class.defeated]="p.kind !== 'pc' && p.hp === 0"
             [attr.data-side]="p.kind"
           >
-            <span class="tile-avatar" aria-hidden="true">{{ initials(p.name) }}</span>
-            <span class="tile-name" [attr.title]="p.name">{{ p.name }}</span>
             <span class="tile-init">{{ p.initiative ?? "—" }}</span>
+            <span class="tile-mark" aria-hidden="true"></span>
+            <span class="tile-name" [attr.title]="p.name">{{ p.name }}</span>
             @if (p.kind !== "pc" && hpPct(p) !== null) {
-            <span class="tile-hp" aria-hidden="true">
-              <span class="tile-hp-fill" [class.low]="hpLow(p)" [style.width.%]="hpPct(p)"></span>
+            <span class="tile-hp" [class.low]="hpLow(p)">
+              <span class="tile-segs" aria-hidden="true">
+                @for (t of ticks; track t) {
+                <span class="tile-seg" [class.on]="(hpPct(p) ?? 0) > $index * 10"></span>
+                }
+              </span>
+              <span class="tile-hp-text">{{ p.hp }}/{{ p.maxHp }}</span>
             </span>
             }
           </li>
@@ -210,8 +223,9 @@
           <button
             type="button"
             class="icon-button"
-            [attr.title]="i18n.t('combat.chat.collapse')"
             [attr.aria-label]="i18n.t('combat.chat.collapse')"
+            [msTooltip]="i18n.t('combat.chat.collapse')"
+            msTooltipPosition="bottom"
             (click)="hud.setChat(false)"
           >
             <ui-icon name="x" [size]="16" />

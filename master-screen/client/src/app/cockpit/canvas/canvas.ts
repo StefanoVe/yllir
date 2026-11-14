@@ -43,6 +43,8 @@ import {
 } from "./geometry";
 import type { CardText, Detail, Point, Size, View } from "./geometry";
 import { capitalizeParts } from "./labels";
+import { tiltCss, tornEdgePolygon } from "./paper-edge";
+import { TooltipDirective } from "../../core/tooltip.directive";
 import {
   CanvasPointer,
   hasImageFiles,
@@ -125,7 +127,7 @@ function fieldValue(event: Event): string {
 @Component({
   selector: "cockpit-canvas",
   standalone: true,
-  imports: [Icon],
+  imports: [Icon, TooltipDirective],
   templateUrl: "./canvas.html",
   styleUrl: "./canvas.css",
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -216,6 +218,9 @@ export class CockpitCanvas {
   });
   readonly detail = computed<Detail>(() => detailLevel(this.zoom()));
   protected readonly capitalizeParts = capitalizeParts;
+  /** Torn-edge clip and fixed tilt of a card, both derived from its id. */
+  protected readonly tornEdge = tornEdgePolygon;
+  protected readonly tiltCss = tiltCss;
   readonly textScale = computed(() => textScale(this.zoom()));
   readonly arrowSize = computed(() => 12 / this.zoom());
   readonly strokeWidth = computed(() => 2 / this.zoom());

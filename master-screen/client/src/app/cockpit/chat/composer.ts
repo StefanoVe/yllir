@@ -2,6 +2,7 @@ import { Component, computed, inject, output, signal } from "@angular/core";
 import { I18n, type TranslationKey } from "../../i18n";
 import { FormsModule } from "@angular/forms";
 import { Icon } from "../support/icon";
+import { TooltipDirective } from "../../core/tooltip.directive";
 import {
   CockpitService,
   modelChoiceOf,
@@ -13,7 +14,7 @@ export function isSubmitKey(event: KeyboardEvent) {
 @Component({
   selector: "cockpit-composer",
   standalone: true,
-  imports: [FormsModule, Icon],
+  imports: [FormsModule, Icon, TooltipDirective],
   templateUrl: "./composer.html",
   styleUrl: "./composer.css",
 })

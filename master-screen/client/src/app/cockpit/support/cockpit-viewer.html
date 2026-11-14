@@ -11,7 +11,7 @@
       class="icon-button"
       (click)="viewer.imageFit.set(false); viewer.zoom.update((z) => z + 0.25)"
       [attr.aria-label]="i18n.t('liveAgent.viewer.zoomIn')"
-      [title]="i18n.t('liveAgent.viewer.zoomIn')"
+      [msTooltip]="i18n.t('liveAgent.viewer.zoomIn')"
     >
       <ui-icon name="plus" />
     </button>
@@ -19,7 +19,7 @@
       class="icon-button"
       (click)="viewer.imageFit.set(false); viewer.zoom.update((z) => Math.max(0.25, z - 0.25))"
       [attr.aria-label]="i18n.t('liveAgent.viewer.zoomOut')"
-      [title]="i18n.t('liveAgent.viewer.zoomOut')"
+      [msTooltip]="i18n.t('liveAgent.viewer.zoomOut')"
     >
       <ui-icon name="minus" />
     </button>
@@ -27,7 +27,7 @@
       class="icon-button"
       (click)="viewer.toggleFullscreen()"
       [attr.aria-label]="i18n.t('liveAgent.viewer.fullscreen')"
-      [title]="i18n.t('liveAgent.viewer.fullscreen')"
+      [msTooltip]="i18n.t('liveAgent.viewer.fullscreen')"
     >
       <ui-icon name="maximize" />
     </button>
@@ -35,7 +35,7 @@
       class="icon-button"
       (click)="viewer.closeImage()"
       [attr.aria-label]="i18n.t('liveAgent.viewer.closeImage')"
-      [title]="i18n.t('liveAgent.viewer.closeImageTitle')"
+      [msTooltip]="i18n.t('liveAgent.viewer.closeImageTitle')"
     >
       <ui-icon name="x" />
     </button>
@@ -59,7 +59,7 @@
   (click)="viewer.closePdf()"
 >
   <div class="viewer-controls" (click)="$event.stopPropagation()">
-    <a class="outline-button" [href]="viewer.pdfLink()" target="_blank" rel="noopener noreferrer">{{ i18n.t('liveAgent.viewer.openPdf') }}</a>
+    <a class="btn btn-secondary" [href]="viewer.pdfLink()" target="_blank" rel="noopener noreferrer">{{ i18n.t('liveAgent.viewer.openPdf') }}</a>
     <button class="icon-button" [attr.aria-label]="i18n.t('liveAgent.viewer.closePdf')" (click)="viewer.closePdf()">
       <ui-icon name="x" />
     </button>

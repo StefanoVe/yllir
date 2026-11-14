@@ -19,6 +19,7 @@ import { CombatantChip } from "./combatant-chip";
 import { CombatantRow } from "./combatant-row";
 import {
   type Cell,
+  type Grid,
   byInitiative,
   cellAt,
   gridOf,
@@ -36,6 +37,17 @@ interface Drag {
 }
 
 let nextBoardId = 0;
+
+/**
+ * The inner grid lines of a map as one SVG path, in a viewBox of one unit per cell. The lines
+ * sit on the cell borders; the outer frame is the map's own border, so it is not drawn.
+ */
+export function gridLinesOf(grid: Grid): { viewBox: string; d: string } {
+  const parts: string[] = [];
+  for (let x = 1; x < grid.cols; x++) parts.push(`M${x} 0V${grid.rows}`);
+  for (let y = 1; y < grid.rows; y++) parts.push(`M0 ${y}H${grid.cols}`);
+  return { viewBox: `0 0 ${grid.cols} ${grid.rows}`, d: parts.join(" ") };
+}
 
 /**
  * The battle view: the battle map with a grid and draggable chips, filling its host, or the
@@ -70,6 +82,11 @@ export class BattleBoard {
 
   readonly hasMap = computed(() => !!this.battle()?.map?.ref && this.showMaps());
   readonly grid = computed(() => gridOf(this.battle()?.map));
+  /** The grid lines as one path in a viewBox of cells; null when the map has no grid. */
+  readonly gridLines = computed(() => {
+    const g = this.grid();
+    return g ? gridLinesOf(g) : null;
+  });
   /**
    * The aspect ratio the map box takes: the image's own once it has loaded, else the grid's
    * columns over rows. Empty means no ratio is known yet, and the stylesheet's fallback applies.

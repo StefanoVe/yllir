@@ -1,13 +1,14 @@
 import { Component, HostListener, inject } from '@angular/core';
 import { I18n } from '../../i18n';
 import { Icon } from './icon';
+import { TooltipDirective } from '../../core/tooltip.directive';
 import { OverlayService } from './overlay.service';
 import { ViewerService } from './viewer.service';
 
 /** The lightbox for images and the PDF hand-off, drawn above the cockpit. */
 @Component({
   selector: 'cockpit-viewer',
-  imports: [Icon],
+  imports: [Icon, TooltipDirective],
   templateUrl: './cockpit-viewer.html',
   styleUrl: './cockpit-viewer.css',
 })

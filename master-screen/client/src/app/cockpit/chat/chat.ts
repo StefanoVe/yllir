@@ -16,6 +16,7 @@ import { MODULE_KINDS, LEDGER_ICONS } from "../board/module-kinds";
 import { TurnStatus } from "./turn-status";
 import { Composer } from "./composer";
 import { I18n } from "../../i18n";
+import { TooltipDirective } from "../../core/tooltip.directive";
 export function renderMessageMarkdown(text: string) {
   const escape = (v: string) =>
     v
@@ -44,7 +45,7 @@ export function renderMessageMarkdown(text: string) {
 @Component({
   selector: "cockpit-chat",
   standalone: true,
-  imports: [Icon, TurnStatus, Composer],
+  imports: [Icon, TurnStatus, Composer, TooltipDirective],
   templateUrl: "./chat.html",
   styleUrl: "./chat.css",
 })

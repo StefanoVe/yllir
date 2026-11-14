@@ -4,8 +4,7 @@
 }
 .combat {
   margin-top: 16px;
-  background: var(--color-surface);
-  border-radius: 8px;
+  background: var(--color-bg);
   padding: 12px 16px;
 }
 .combat header {
@@ -15,8 +14,8 @@
   margin-bottom: 8px;
 }
 .combat h2 {
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
   margin: 0;
 }
 .combat header span {
@@ -32,6 +31,11 @@
   width: 34px;
   height: 34px;
   color: var(--color-text-muted);
+  border: var(--border-width) solid transparent;
+}
+.icon-button:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-strong);
 }
 .combat table {
   width: 100%;
@@ -47,7 +51,7 @@
 .combat th,
 .combat td {
   padding: 7px 8px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 .combat th.numeric,
 .combat td.numeric {
@@ -56,27 +60,108 @@
   width: 64px;
   white-space: nowrap;
 }
+/* Hit points: the segmented bar and the numbers share the cell. */
+.combat th.hp,
+.combat td.hp {
+  width: 104px;
+  text-align: right;
+}
 .combat tbody tr:last-child td {
   border-bottom: 0;
 }
-.combat tr.current td:first-child {
-  border-left: 2px solid var(--color-accent);
+/* The creature whose turn it is: the inverted row. */
+.combat tr.current td {
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 .combat tr.current td.name {
   font-weight: 600;
-  color: var(--color-text);
 }
 .combat td small {
   color: var(--color-text-muted);
 }
+.combat tr.current td small {
+  color: inherit;
+}
+/* Allies (filled square) and enemies (empty square) are told apart by shape, never by colour. */
+.mark {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  vertical-align: middle;
+  background: var(--color-text);
+  border: var(--border-width) solid var(--color-text);
+}
+.mark.enemy {
+  background: transparent;
+}
+.combat tr.current .mark {
+  background: var(--color-bg);
+  border-color: var(--color-bg);
+}
+.combat tr.current .mark.enemy {
+  background: transparent;
+}
+/* Down: struck-through name and a cross. */
+.combat tr.down .name-text {
+  text-decoration: line-through;
+}
+.down-icon {
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.hp-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.hp-numbers {
+  font-variant-numeric: tabular-nums;
+}
+.hp-bar {
+  display: inline-flex;
+  gap: 1px;
+}
+.hp-bar i {
+  width: 4px;
+  height: 10px;
+  background: var(--color-border);
+}
+.hp-bar i.on {
+  background: var(--color-text);
+}
+/* Temporary hit points: outlined extra segments, not a colour. */
+.hp-bar i.temp {
+  background: transparent;
+  border: var(--border-width) dashed var(--color-text);
+}
+.combat tr.current .hp-bar i {
+  background: var(--color-bg);
+  opacity: 0.35;
+}
+.combat tr.current .hp-bar i.on {
+  opacity: 1;
+}
+.combat tr.current .hp-bar i.temp {
+  background: transparent;
+  border-color: var(--color-bg);
+  opacity: 1;
+}
+/* Conditions: rectangles with a thin frame in the row's text colour, the duration after the name. */
 .condition-chip {
-  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface));
-  color: var(--color-danger);
-  padding: 3px 6px;
-  border-radius: 4px;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 1px 6px;
   margin-right: 4px;
-  font-size: 11px;
+  border: var(--border-width) solid currentColor;
+  background: transparent;
+  font-size: 12px;
   white-space: nowrap;
+}
+.condition-chip small {
+  font-size: 11px;
 }
 /* Second line of a row: shown on the phone only. */
 .combat .row-meta {
@@ -99,6 +184,9 @@
     font-size: 12px;
     font-weight: 400;
     color: var(--color-text-muted);
+  }
+  .combat tr.current .row-meta {
+    color: inherit;
   }
   .combat .icon-button {
     width: 44px;

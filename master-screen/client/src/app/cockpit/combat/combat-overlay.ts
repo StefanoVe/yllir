@@ -35,6 +35,7 @@ import { InitiativeStep } from "./initiative-step";
 import { BattleBoard } from "./battle-board";
 import { TurnPanel } from "./turn-panel";
 import { CombatHud } from "./combat-hud.service";
+import { TooltipDirective } from "../../core/tooltip.directive";
 
 /** True when the focus is in a field that takes typed text, where the H key must not hide the panels. */
 function isTyping(target: EventTarget | null): boolean {
@@ -54,7 +55,7 @@ function isTyping(target: EventTarget | null): boolean {
  */
 @Component({
   selector: "cockpit-combat-overlay",
-  imports: [Icon, ConfirmButton, Chat, InitiativeStep, BattleBoard, TurnPanel, MusicMini],
+  imports: [Icon, ConfirmButton, Chat, InitiativeStep, BattleBoard, TurnPanel, MusicMini, TooltipDirective],
   templateUrl: "./combat-overlay.html",
   styleUrl: "./combat-overlay.css",
   providers: [
@@ -69,6 +70,8 @@ export class CombatOverlay implements OnDestroy {
   readonly combatChat = inject(CombatChatService);
   readonly i18n = inject(I18n);
   readonly prefs = inject(BattleMapPrefs);
+  /** Ten segments for the hit point bar of an initiative row. */
+  readonly ticks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
   private readonly battleApi = inject(BattleApi);
   private readonly overlay = inject(OverlayService);
   /** The combat thread being created, so that a second caller waits for it instead of creating another. */

@@ -1,56 +1,105 @@
+/*
+ * Combatant row, notebook look: one line per creature under a 1 px rule, the current one inverted.
+ * The mark next to the name is the shape of its side (filled square: ally or player character,
+ * empty square: enemy). Hit points are a segmented bar with the numbers. Condition tags are
+ * rectangles with their duration. Actions are flat square buttons with a tooltip.
+ */
+
 :host {
   display: block;
-  min-width: 0;
+  font-family: var(--font-family);
+  color: var(--color-text);
 }
 
-/* List mode: hairline-separated rows, no tinted block. The active row gets the soft tint and ring. */
 .row {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: var(--space-0-5);
-  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-0-5);
-  min-width: 0;
-  border-radius: var(--radius-sm);
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-1);
+  border-bottom: var(--border-width) solid var(--color-border);
+  color: var(--color-text);
 }
 
+/* The current creature: the inverted row. */
 .row.active {
-  background: var(--color-accent-soft);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 35%, transparent);
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 
-.row.defeated .identity {
-  opacity: 0.6;
+.row.active .muted,
+.row.active .row-meta,
+.row.active .hp,
+.row.active .line dt,
+.row.active .line dd {
+  color: inherit;
 }
 
 .main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+}
+
+.row-portrait {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border: var(--border-width-strong) solid currentColor;
+  border-radius: 0;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 140px;
+}
+
+.name-line {
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-1);
   min-width: 0;
 }
 
-.identity {
-  flex: 1 1 9rem;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+/* Filled square for allies and player characters, empty square for enemies. */
+.mark {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: var(--border-width) solid currentColor;
+  background: currentColor;
+}
+
+.row[data-side="enemy"] .mark {
+  background: transparent;
 }
 
 .row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--font-size-base);
-  font-weight: 500;
-  overflow-wrap: anywhere;
+  font-weight: 600;
 }
 
-.defeated .row-name {
+/* Down: the name struck through, with a cross. */
+.row.defeated .row-name {
   text-decoration: line-through;
+}
+
+.down {
+  flex: none;
 }
 
 .row-meta {
   color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
   font-variant-numeric: tabular-nums;
 }
 
@@ -58,201 +107,146 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: flex-end;
   gap: var(--space-0-5) var(--space-1);
-  flex: 0 1 auto;
-  min-width: 0;
-  margin-left: auto;
+  font-size: var(--font-size-sm);
 }
 
 .hp {
-  font-size: var(--font-size-base);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
 }
 
 .hp-now {
-  font-weight: 500;
+  font-weight: 600;
 }
 
-/* Hit points not known yet: the placeholder stands where the value would be. */
+.sep {
+  padding: 0 2px;
+}
+
 .hp.unknown {
   color: var(--color-text-muted);
 }
 
-.sep {
-  margin: 0 0.1em;
-  color: var(--color-text-muted);
-}
-
+/* A temporary hit point count: an outlined extra box, not a colour. */
 .temp {
-  color: var(--color-text-muted);
+  display: inline-block;
+  margin-left: var(--space-0-5);
+  padding: 0 var(--space-0-5);
+  border: var(--border-width) dashed currentColor;
+  font-size: var(--font-size-xs);
 }
 
-/* Condition pill: pale tint of the warn hue, label and duration, x to remove. */
+/* Condition tags: rectangles with the duration in their text. */
 .pill {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  max-width: 100%;
-  height: 24px;
-  padding: 0 2px 0 var(--space-1);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--combat-warn) 14%, transparent);
-  color: var(--color-text);
+  padding: 0 2px 0 var(--space-0-5);
+  border: var(--border-width) solid currentColor;
+  border-radius: 0;
   font-size: var(--font-size-xs);
+  line-height: 1.6;
 }
 
 .pill-text {
-  min-width: 0;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .pill-remove {
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: none;
-  width: 20px;
-  height: 20px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 0;
   background: transparent;
-  color: var(--color-text-muted);
-  transition: background-color var(--transition-fast), color var(--transition-fast);
+  color: inherit;
 }
 
 .pill-remove:hover {
-  background: color-mix(in srgb, var(--combat-warn) 22%, transparent);
-  color: var(--color-text);
-}
-
-.pill-remove:focus-visible,
-.text-button:focus-visible,
-.icon-button:focus-visible,
-.amount:focus-visible,
-.select:focus-visible,
-.rounds:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
+  background: var(--color-accent-soft);
 }
 
 .phase {
-  font-size: var(--font-size-sm);
-  font-style: italic;
-  overflow-wrap: anywhere;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+  font-style: normal;
 }
 
-.row-portrait {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid var(--color-accent);
-  background: var(--color-surface-2);
+.row.active .phase {
+  color: inherit;
 }
 
-/* Quick controls, grouped at the right end of the main line. */
+/* Quick actions: amount field, damage, heal, defeat, remove. */
 .controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-0-5);
-  flex: none;
 }
 
 .amount {
-  width: 3.5rem;
-  height: 36px;
-  padding: 0 var(--space-0-5);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
+  width: 72px;
+  min-height: 32px;
+  padding: 4px 4px;
+  border: 0;
+  border-bottom: var(--border-width) solid currentColor;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
   font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
-  text-align: center;
+}
+
+.amount:focus {
+  border-bottom-width: var(--border-width-strong);
+  padding-bottom: 3px;
 }
 
 .icon-button {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  transition: background-color var(--transition-fast);
+  border: var(--border-width) solid currentColor;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
 }
 
 .icon-button:hover:not(:disabled) {
-  background: var(--color-surface-2);
+  background: var(--color-accent-soft);
+  color: var(--color-text);
 }
 
 .icon-button:disabled {
-  opacity: 0.45;
+  opacity: 0.55;
 }
 
-/* Hit-point bar along the bottom edge of the row: 3 px, warn when low. */
-.hp-bar {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 3px;
-  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-  background: var(--combat-track);
-  overflow: hidden;
-}
-
-.hp-fill {
-  display: block;
-  height: 100%;
-  background: var(--color-accent);
-  transition: width var(--transition-fast);
-}
-
-.row[data-side="enemy"] .hp-fill {
-  background: var(--color-danger);
-}
-
-.row[data-side="ally"] .hp-fill {
-  background: var(--combat-ally);
-}
-
-.hp-bar.low .hp-fill {
-  background: var(--combat-warn);
-}
-
-/* Lighter second block: stats, attacks and the condition picker. */
+/* Detail: stats and attacks, lighter, under the main line. */
 .detail {
   display: flex;
   flex-direction: column;
-  gap: var(--space-0-5);
-  padding: 0 0 0 calc(40px + var(--space-1));
-  min-width: 0;
+  gap: var(--space-1);
+  padding-left: var(--space-2);
   font-size: var(--font-size-sm);
-  color: var(--color-text-muted);
 }
 
 .lines {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-1);
   margin: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-0-5) var(--space-2);
-  font-size: var(--font-size-sm);
 }
 
 .line {
-  display: inline-flex;
-  gap: var(--space-0-5);
-  min-width: 0;
+  display: contents;
 }
 
 .line dt {
@@ -261,124 +255,28 @@
 
 .line dd {
   margin: 0;
-  color: var(--color-text);
   font-variant-numeric: tabular-nums;
 }
 
-h4 {
+.detail h4 {
   margin: var(--space-0-5) 0 0;
+  color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   font-weight: 500;
-  color: var(--color-text-muted);
 }
 
-/* Attacks and actions as small pills; the full text is in the tooltip and in the visually hidden text. */
 .actions {
   margin: 0;
   padding: 0;
   list-style: none;
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-0-5);
 }
 
 .action {
-  max-width: 100%;
-  padding: 2px var(--space-1);
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  font-size: var(--font-size-xs);
-  overflow-wrap: anywhere;
+  padding: 2px 0;
 }
 
 .action-name {
-  font-weight: 500;
-}
-
-/* "+ Condition": a small quiet button; it opens the picker below it, inline. */
-.add-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-0-5);
-  min-width: 0;
-  margin-top: var(--space-0-5);
-}
-
-.add-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-0-5);
-  min-height: 28px;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-pill);
-  border: 1px dashed var(--color-border);
-  background: transparent;
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  transition: background-color var(--transition-fast), color var(--transition-fast);
-}
-
-.add-toggle:hover {
-  background: var(--color-surface-2);
-  color: var(--color-text);
-}
-
-.add-toggle[aria-expanded="true"] {
-  border-style: solid;
-  color: var(--color-text);
-}
-
-.add-toggle:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
-}
-
-.add-condition {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-  max-width: 100%;
-}
-
-.select,
-.rounds,
-.text-button {
-  min-height: 36px;
-  padding: 0 var(--space-1);
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  max-width: 100%;
-}
-
-.select {
-  min-width: 0;
-  flex: 1 1 9rem;
-}
-
-.rounds {
-  width: 4.5rem;
-}
-
-.text-button {
-  font-weight: 500;
-  transition: background-color var(--transition-fast);
-}
-
-.text-button:hover:not(:disabled) {
-  background: var(--color-surface-2);
-}
-
-.text-button:disabled {
-  opacity: 0.45;
+  font-weight: 600;
 }
 
 .muted {
@@ -387,29 +285,105 @@ h4 {
   font-size: var(--font-size-sm);
 }
 
+/* Add a condition: a folded control, then the pickers. */
+.add-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-0-5);
+}
+
+.add-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-0-5);
+  min-height: 32px;
+  padding: 0 var(--space-1);
+  border: var(--border-width) solid currentColor;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.add-toggle:hover {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.add-condition {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.select,
+.rounds {
+  min-height: 32px;
+  padding: 4px 6px;
+  border: var(--border-width) solid currentColor;
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+}
+
+.rounds {
+  width: 64px;
+  font-variant-numeric: tabular-nums;
+}
+
+.text-button {
+  min-height: 32px;
+  padding: 4px var(--space-1);
+  border: var(--border-width) solid currentColor;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.text-button:hover:not(:disabled) {
+  background: var(--color-accent-soft);
+  color: var(--color-text);
+}
+
+.text-button:disabled {
+  opacity: 0.55;
+}
+
 .alert {
   margin: 0;
   color: var(--color-danger);
+  font-size: var(--font-size-sm);
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-  border: 0;
+/* Segmented hit points: ten segments, 1 px gaps. */
+.hp-bar {
+  display: flex;
+  gap: 1px;
+  width: 100%;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .pill-remove,
-  .icon-button,
-  .hp-fill,
-  .add-toggle,
-  .text-button {
-    transition: none;
+.hp-bar .seg {
+  flex: 1;
+  height: 8px;
+  border: var(--border-width) solid currentColor;
+}
+
+.hp-bar .seg.on {
+  background: currentColor;
+}
+
+.hp-bar.low .seg.on {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+@media (max-width: 479px) {
+  .detail {
+    padding-left: 0;
   }
 }

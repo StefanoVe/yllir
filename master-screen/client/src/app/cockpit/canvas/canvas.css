@@ -3,9 +3,9 @@
   position: relative;
   overflow: hidden;
   height: 100%;
-  /* The five card colours; they sit on the dark surface and stay muted. */
 }
 
+/* Card colours: tokens only, so they stay black, white, grey or the one muted red. */
 [data-color="red"] {
   --tone: var(--color-danger);
 }
@@ -30,9 +30,7 @@
   touch-action: none;
   cursor: grab;
   outline-offset: -2px;
-  background-color: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
-  background-image: radial-gradient(circle, color-mix(in srgb, var(--color-border) 70%, transparent) 1px, transparent 1.5px);
-  background-size: 24px 24px;
+  background: var(--color-bg);
 }
 
 .surface.dragging {
@@ -58,25 +56,19 @@
 .frame {
   position: absolute;
   box-sizing: border-box;
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
   pointer-events: none;
 }
 
 .frame[data-color] {
   border-top: 3px solid var(--tone);
-  background: color-mix(
-    in srgb,
-    var(--tone) 7%,
-    color-mix(in srgb, var(--color-surface) 55%, transparent)
-  );
 }
 
 .frame.highlighted {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-focus);
   outline-offset: 4px;
-  box-shadow: 0 0 28px color-mix(in srgb, var(--color-accent) 22%, transparent);
 }
 
 .frame-title {
@@ -90,10 +82,11 @@
   padding: 0 16px;
   pointer-events: auto;
   cursor: grab;
-  font-size: calc(15px * var(--k));
-  font-weight: 600;
+  font-family: var(--font-family-hand);
+  font-size: calc(22px * var(--k));
+  font-weight: 700;
   color: var(--color-text);
-  border-radius: 14px 14px 0 0;
+  border-radius: 0;
 }
 
 .frame-title span {
@@ -104,7 +97,8 @@
 }
 
 .frame-title.selected {
-  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 /* ───────────────────────────── Links ───────────────────────────── */
@@ -130,69 +124,112 @@
   position: absolute;
   transform: translate(-50%, -50%);
   padding: 2px 8px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface-2);
-  color: var(--color-text-muted);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
   font-size: calc(12px * var(--k));
   white-space: nowrap;
   pointer-events: none;
 }
 
-/* ───────────────────────────── Cards ───────────────────────────── */
+/* ───────────────────────────── Cards: torn paper ─────────────────────────────
+   .card is the layout box and the click target. .paper is the torn piece: clipped by the
+   polygon from paper-edge.ts (inline), tilted by --tilt. The outline is four 1px hard
+   drop-shadows on the PARENT, so it follows the torn edge (clip-path would cut a border). */
 
 .card {
   position: absolute;
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
+  color: var(--color-text);
+  cursor: default;
+  user-select: none;
+  filter:
+    drop-shadow(1px 0 0 var(--color-border-strong))
+    drop-shadow(-1px 0 0 var(--color-border-strong))
+    drop-shadow(0 1px 0 var(--color-border-strong))
+    drop-shadow(0 -1px 0 var(--color-border-strong));
+}
+
+.paper {
+  position: absolute;
+  inset: 0;
   display: flex;
   flex-direction: column;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+  /* Container for the safe margin: its size is the card size, so cq units match the edge. */
+  container-type: size;
   background: var(--color-surface);
-  color: var(--color-text);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--color-text) 35%, transparent);
-  cursor: default;
-  user-select: none;
+  transform: rotate(var(--tilt, 0deg));
+  transform-origin: 50% 50%;
 }
 
-.card[data-color] {
-  border-left: 3px solid var(--tone);
+/* Text and controls live here: at least 8px inside the torn edge (the edge moves 2.5% at most). */
+.paper-body {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: calc(8px + 2.5cqh) calc(8px + 2.5cqw);
+  overflow: hidden;
+}
+
+.paper-body.over-image {
+  position: absolute;
+  inset: 0;
+  justify-content: flex-end;
+}
+
+/* No tilt while a card is selected or dragged, and none when motion is reduced. */
+.card.selected .paper,
+.card.highlighted .paper {
+  transform: none;
+}
+
+:root[data-motion="reduced"] .paper {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .paper {
+    transform: none;
+  }
 }
 
 .card.selected {
-  outline: 1px solid var(--color-accent);
-  outline-offset: 1px;
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
 }
 
 .card.highlighted {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
-  box-shadow:
-    0 0 0 6px color-mix(in srgb, var(--color-accent) 18%, transparent),
-    0 1px 2px color-mix(in srgb, var(--color-text) 35%, transparent);
+  outline: 2px solid var(--color-focus);
+  outline-offset: 4px;
 }
 
 .card.missing {
-  border-style: dashed;
   opacity: 0.55;
 }
 
-.card.note {
-  background: color-mix(in srgb, var(--color-danger) 18%, var(--color-surface));
+.card.linking {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: 3px;
 }
 
 .card-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
+  flex: none;
   min-width: 0;
-  padding: 10px 12px;
 }
 
-/* Title: up to two lines, then an ellipsis. The full name stays in the title attribute. */
+/* Title: up to two lines, in the hand font. The full name stays in the title attribute. */
 .card-title {
   flex: 1;
   min-width: 0;
@@ -200,26 +237,34 @@
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  line-height: 1.25;
+  line-height: 1.1;
   overflow-wrap: anywhere;
-  font-size: calc(14px * var(--k));
-  font-weight: 600;
+  font-family: var(--font-family-hand);
+  font-size: calc(22px * var(--k));
+  font-weight: 700;
 }
 
 .card-head ui-icon {
   color: var(--color-text-muted);
 }
 
-/* Kind icon: a tinted chip that grows with the text, readable when zoomed out. */
+/* Kind icon: a square with a 1px frame. A coloured card inverts it with its tone. */
 .card-head .kind {
   display: grid;
   place-items: center;
   flex-shrink: 0;
   width: calc(24px * var(--k));
   height: calc(24px * var(--k));
-  border-radius: calc(7px * var(--k));
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+}
+
+.card[data-color] .card-head .kind {
+  background: var(--tone);
+  border-color: var(--tone);
+  color: var(--color-bg);
 }
 
 .card-head .kind ::ng-deep svg {
@@ -234,7 +279,7 @@
 }
 
 .card-head .pin {
-  color: var(--color-accent);
+  color: var(--color-text);
 }
 
 .card-head .warn {
@@ -246,9 +291,10 @@
   width: 24px;
   height: 24px;
   padding: 0;
-  border-radius: 50%;
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
 }
 
 .card-body {
@@ -257,7 +303,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 0 12px 10px;
+  margin-top: 6px;
   overflow: auto;
   overscroll-behavior: contain;
 }
@@ -267,10 +313,10 @@
   flex: none;
   display: flex;
   justify-content: flex-end;
-  padding: 0 12px 10px;
+  margin-top: 6px;
 }
 
-/* The fight button: a danger-tinted button with the swords only. */
+/* The fight button: the secondary button look, swords only. Inverted when hovered. */
 .card-foot .fight {
   flex: none;
   width: 100px;
@@ -279,22 +325,28 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  border-radius: 8px;
-  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface));
-  color: var(--color-danger);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
 }
 
 .card-foot .fight:hover {
-  background: color-mix(in srgb, var(--color-danger) 24%, var(--color-surface));
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 
+/* Square thumbnail, the portrait in colour, with a 1px frame. */
 .thumb {
-  flex: 0 1 40%;
-  min-height: 0;
+  flex: none;
   width: 100%;
-  object-fit: contain;
-  background: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
-  border-radius: 8px;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  min-height: 0;
+  object-fit: cover;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-surface-2);
 }
 
 .subtitle {
@@ -333,9 +385,9 @@
 
 .stats li {
   padding: 2px 7px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface-2);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text-muted);
   font-size: calc(11px * var(--k));
 }
@@ -350,7 +402,6 @@
   flex: 1;
   min-height: 0;
   margin: 0;
-  padding: 10px 12px;
   box-sizing: border-box;
   overflow: auto;
   overscroll-behavior: contain;
@@ -371,7 +422,7 @@
 }
 
 .note-text::-webkit-scrollbar-thumb {
-  border-radius: 3px;
+  border-radius: 0;
   background: transparent;
 }
 
@@ -379,8 +430,8 @@
   background: var(--scrollbar-thumb);
 }
 
-/* Map and image cards: the picture is the card, the title sits on a band. */
-.card.image-card .card-image {
+/* Map and image cards: the picture fills the torn piece, the title sits on a square label. */
+.card-image {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -390,21 +441,16 @@
 }
 
 .card.image-card .card-head {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(
-    transparent,
-    color-mix(in srgb, var(--color-bg) 88%, transparent)
-  );
+  padding: 4px 6px;
+  border: var(--border-width) solid var(--color-border-strong);
+  background: var(--color-bg);
 }
 
 /* ───────────────────────────── Interactions ───────────────────────────── */
 
 /* Selected frame, and the frame a dragged card would drop into. */
 .frame.selected {
-  outline: 1px solid var(--color-accent);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -418,17 +464,17 @@
   height: 32px;
   box-sizing: border-box;
   padding: 0 10px;
-  border: 1px solid var(--color-accent);
-  border-radius: 8px;
-  background: var(--color-surface-2);
+  border: var(--border-width-strong) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg);
   color: var(--color-text);
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
+  font-family: var(--font-family-hand);
+  font-size: 18px;
+  font-weight: 700;
   outline: none;
 }
 
-/* Corner grip for resizing. Shown on hover or selection only. */
+/* Corner grip for resizing: a square corner drawn with two 2px sides. Shown on hover or selection. */
 .resize-handle {
   position: absolute;
   right: 0;
@@ -439,38 +485,25 @@
   opacity: 0;
   pointer-events: none;
   cursor: nwse-resize;
-  background: linear-gradient(
-    135deg,
-    transparent 50%,
-    var(--color-text-muted) 50%,
-    var(--color-text-muted) 58%,
-    transparent 58%,
-    transparent 74%,
-    var(--color-text-muted) 74%,
-    var(--color-text-muted) 82%,
-    transparent 82%
-  );
+  border-right: var(--border-width-strong) solid var(--color-text);
+  border-bottom: var(--border-width-strong) solid var(--color-text);
 }
 
 .card:hover > .resize-handle,
 .card.selected > .resize-handle,
 .frame.selected > .resize-handle {
-  opacity: 0.8;
+  opacity: 1;
   pointer-events: auto;
-}
-
-.card.linking {
-  outline: 2px dashed var(--color-accent);
-  outline-offset: 3px;
 }
 
 /* The note editor takes the note's own typography. */
 .note-editor {
   display: block;
+  flex: 1;
   width: 100%;
-  height: 100%;
+  min-height: 0;
   margin: 0;
-  padding: 10px 12px;
+  padding: 0;
   box-sizing: border-box;
   border: 0;
   background: transparent;
@@ -504,9 +537,9 @@
   position: absolute;
   z-index: 2;
   box-sizing: border-box;
-  border: 1px dashed var(--color-accent);
-  border-radius: 4px;
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  border: var(--border-width) dashed var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
   pointer-events: none;
 }
 
@@ -518,10 +551,10 @@
   margin: 0;
   padding: 4px 12px;
   transform: translateX(-50%);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface);
-  color: var(--color-text-muted);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
   font-size: 13px;
   white-space: nowrap;
   pointer-events: none;
@@ -536,10 +569,10 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 2px dashed var(--color-accent);
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
-  color: var(--color-accent);
+  border: var(--border-width-strong) dashed var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
   pointer-events: none;
 }
 
@@ -548,7 +581,7 @@
   font-size: 14px;
 }
 
-/* Floating action bar above the selection. */
+/* Floating action bar above the selection: a square strip with a 1px frame. */
 .context-bar {
   position: absolute;
   z-index: 6;
@@ -557,10 +590,9 @@
   gap: 2px;
   padding: 4px;
   transform: translate(-50%, -100%);
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-text) 35%, transparent);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg);
   white-space: nowrap;
 }
 
@@ -568,12 +600,12 @@
   width: 30px;
   height: 30px;
   padding: 0;
-  border-radius: 999px;
+  border-radius: 0;
 }
 
 .context-bar button.active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 
 .context-bar button:disabled {
@@ -591,7 +623,8 @@
   width: 18px;
   height: 18px;
   padding: 0;
-  border-radius: 50%;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
   background: var(--tone);
 }
 
@@ -620,16 +653,19 @@
 
 /* ───────────────────────────── Pulse ───────────────────────────── */
 
+/* A new or changed piece: a 2px outline that opens and fades. */
 .pulse {
   animation: pulse 1.6s ease-out 1;
 }
 
 @keyframes pulse {
   0% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 70%, transparent);
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
   }
   100% {
-    box-shadow: 0 0 0 16px transparent;
+    outline: 2px solid transparent;
+    outline-offset: 14px;
   }
 }
 
@@ -650,10 +686,11 @@
 }
 
 .empty-title {
-  margin: 6px 0 0;
+  margin: 0;
   color: var(--color-text);
-  font-size: 18px;
-  font-weight: 600;
+  font-family: var(--font-family-hand);
+  font-size: 28px;
+  font-weight: 700;
 }
 
 .empty-hint {
@@ -670,25 +707,26 @@
   bottom: 14px;
   z-index: 5;
   display: flex;
+  flex-wrap: wrap;
+  max-width: calc(100% - 28px);
   align-items: center;
   gap: 2px;
   padding: 4px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-surface);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-text) 35%, transparent);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg);
 }
 
 .toolbar button {
   width: 32px;
   height: 32px;
   padding: 0;
-  border-radius: 999px;
+  border-radius: 0;
 }
 
 .toolbar button.active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 
 .toolbar .zoom-value {
@@ -704,7 +742,7 @@
   width: 1px;
   height: 18px;
   margin: 0 4px;
-  background: var(--color-border);
+  background: var(--color-border-strong);
 }
 
 /* ───────────────────────────── Minimap ───────────────────────────── */
@@ -717,26 +755,23 @@
   width: 180px;
   height: 120px;
   overflow: hidden;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--color-surface) 90%, transparent);
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--color-text) 35%, transparent);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg);
   cursor: pointer;
   touch-action: none;
 }
 
 .mini-item {
   position: absolute;
-  border-radius: 2px;
+  border-radius: 0;
   background: var(--color-text-muted);
-  opacity: 0.8;
 }
 
 .mini-item.frame {
-  border: 1px solid var(--color-text-muted);
-  border-radius: 3px;
+  border: var(--border-width) solid var(--color-text-muted);
+  border-radius: 0;
   background: none;
-  opacity: 0.6;
 }
 
 .mini-item[data-color] {
@@ -751,9 +786,9 @@
 .mini-view {
   position: absolute;
   box-sizing: border-box;
-  border: 1px solid var(--color-accent);
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  border: var(--border-width-strong) solid var(--color-focus);
+  border-radius: 0;
+  background: transparent;
   pointer-events: none;
 }
 
@@ -787,8 +822,8 @@
 }
 
 /* Item cards: the printed card, whole, no overlay. */
-.card.art-card {
-  background: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
+.card.art-card .paper {
+  background: var(--color-bg);
 }
 
 .card.art-card .card-image {

@@ -150,93 +150,102 @@
         [style.height.px]="card.h"
         (dblclick)="activate(card)"
       >
-        @if (isImageCard(card)) {
-        <img
-          class="card-image"
-          [src]="card.content.image"
-          alt=""
-          loading="lazy"
-          draggable="false"
-        />
-        } @if (card.kind !== "note") {
-        <header class="card-head">
-          <ui-icon
-            class="kind"
-            [name]="kindIcon(card)"
-            [size]="16"
-            [attr.title]="kindLabel(card)"
-          />
-          <span class="card-title" [title]="card.content.title"
-            >{{ card.content.title }}</span
-          >
-          @if (card.pinned) {
-          <ui-icon class="pin" name="pin" [size]="14" />
-          } @if (card.content.missing) {
-          <ui-icon
-            class="warn"
-            name="warning"
-            [size]="14"
-            [attr.title]="i18n.t('liveAgent.canvas.sourceMissing')"
-          />
-          } @if (musicOn() && card.kind === "music") {
-          <button
-            type="button"
-            class="play"
-            [attr.title]="i18n.t('liveAgent.canvas.play')"
-            [attr.aria-label]="i18n.t('liveAgent.canvas.play')"
-            (click)="playCard(card, $event)"
-          >
-            <ui-icon name="play" [size]="12" />
-          </button>
-          }
-        </header>
-        } @if (card.kind === "note") { @if (isEditingNote(card)) {
-        <textarea
-          #editor
-          class="note-text note-editor"
-          [attr.aria-label]="i18n.t('liveAgent.canvas.noteText')"
-          [value]="noteText(card)"
-          (blur)="onEditBlur($event)"
-          (keydown)="onEditKey($event)"
-        ></textarea>
-        } @else {
-        <div class="note-text">{{ card.content.summary || card.content.title }}</div>
-        } } @else if (!isImageCard(card) && detail() !== "icon") {
-        <div class="card-body">
-          @if (card.content.image) {
+        <div
+          class="paper"
+          [style.clip-path]="tornEdge(card.id)"
+          [style.--tilt]="tiltCss(card.id)"
+        >
+          @if (isImageCard(card)) {
           <img
-            class="thumb"
+            class="card-image"
             [src]="card.content.image"
             alt=""
             loading="lazy"
             draggable="false"
           />
-          } @if (card.content.subtitle) {
-          <p class="subtitle">{{ capitalizeParts(card.content.subtitle) }}</p>
-          } @if (card.content.summary) {
-          <p class="summary" [style.--lines]="cardSummaryLines(card)">{{ card.content.summary }}</p>
-          } @if (detail() === "full" && card.content.stats?.length) {
-          <ul class="stats">
-            @for (stat of card.content.stats; track $index) {
-            <li>{{ stat.label }}<b>{{ stat.value }}</b></li>
-            }
-          </ul>
           }
+          <div class="paper-body" [class.over-image]="isImageCard(card)">
+          @if (card.kind !== "note") {
+          <header class="card-head">
+            <ui-icon
+              class="kind"
+              [name]="kindIcon(card)"
+              [size]="16"
+              [attr.title]="kindLabel(card)"
+            />
+            <span class="card-title" [title]="card.content.title"
+              >{{ card.content.title }}</span
+            >
+            @if (card.pinned) {
+            <ui-icon class="pin" name="pin" [size]="14" />
+            } @if (card.content.missing) {
+            <ui-icon
+              class="warn"
+              name="warning"
+              [size]="14"
+              [attr.title]="i18n.t('liveAgent.canvas.sourceMissing')"
+            />
+            } @if (musicOn() && card.kind === "music") {
+            <button
+              type="button"
+              class="play"
+              [msTooltip]="i18n.t('liveAgent.canvas.play')"
+              [attr.aria-label]="i18n.t('liveAgent.canvas.play')"
+              (click)="playCard(card, $event)"
+            >
+              <ui-icon name="play" [size]="12" />
+            </button>
+            }
+          </header>
+          } @if (card.kind === "note") { @if (isEditingNote(card)) {
+          <textarea
+            #editor
+            class="note-text note-editor"
+            [attr.aria-label]="i18n.t('liveAgent.canvas.noteText')"
+            [value]="noteText(card)"
+            (blur)="onEditBlur($event)"
+            (keydown)="onEditKey($event)"
+          ></textarea>
+          } @else {
+          <div class="note-text">{{ card.content.summary || card.content.title }}</div>
+          } } @else if (!isImageCard(card) && detail() !== "icon") {
+          <div class="card-body">
+            @if (card.content.image) {
+            <img
+              class="thumb"
+              [src]="card.content.image"
+              alt=""
+              loading="lazy"
+              draggable="false"
+            />
+            } @if (card.content.subtitle) {
+            <p class="subtitle">{{ capitalizeParts(card.content.subtitle) }}</p>
+            } @if (card.content.summary) {
+            <p class="summary" [style.--lines]="cardSummaryLines(card)">{{ card.content.summary }}</p>
+            } @if (detail() === "full" && card.content.stats?.length) {
+            <ul class="stats">
+              @for (stat of card.content.stats; track $index) {
+              <li>{{ stat.label }}<b>{{ stat.value }}</b></li>
+              }
+            </ul>
+            }
+          </div>
+          } @if (card.kind !== "note" && canFight(card)) {
+          <footer class="card-foot">
+            <button
+              type="button"
+              class="fight"
+              [msTooltip]="i18n.t('combat.fight')"
+              [attr.aria-label]="i18n.t('combat.fight')"
+              (click)="fight(card, $event)"
+              (dblclick)="$event.stopPropagation()"
+            >
+              <ui-icon name="swords" [size]="20" />
+            </button>
+          </footer>
+          }
+          </div>
         </div>
-        } @if (card.kind !== "note" && canFight(card)) {
-        <footer class="card-foot">
-          <button
-            type="button"
-            class="fight"
-            [attr.title]="i18n.t('combat.fight')"
-            [attr.aria-label]="i18n.t('combat.fight')"
-            (click)="fight(card, $event)"
-            (dblclick)="$event.stopPropagation()"
-          >
-            <ui-icon name="swords" [size]="20" />
-          </button>
-        </footer>
-        }
         <span class="resize-handle" aria-hidden="true"></span>
       </article>
       }
@@ -254,7 +263,6 @@
   ></div>
   } @if (isEmpty()) {
   <div class="empty" role="status">
-    <ui-icon name="board" [size]="34" />
     <p class="empty-title">{{ i18n.t('liveAgent.canvas.emptyTitle') }}</p>
     <p class="empty-hint">
       {{ i18n.t('liveAgent.canvas.emptyHint') }}
@@ -282,13 +290,13 @@
   [style.top.px]="bar.top"
 >
   @if (bar.card; as card) { @if (card.kind !== "note") {
-  <button type="button" [attr.title]="i18n.t('liveAgent.open')" [attr.aria-label]="i18n.t('liveAgent.open')" (click)="openCard(card)">
+  <button type="button" [msTooltip]="i18n.t('liveAgent.open')" [attr.aria-label]="i18n.t('liveAgent.open')" (click)="openCard(card)">
     <ui-icon name="external" [size]="16" />
   </button>
   } @if (card.content.image) {
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.fullscreenKey')"
+    [msTooltip]="i18n.t('liveAgent.canvas.fullscreenKey')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.fullscreen')"
     (click)="fullscreenCard(card)"
   >
@@ -297,7 +305,7 @@
   } }
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.highlight')"
+    [msTooltip]="i18n.t('liveAgent.canvas.highlight')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.highlight')"
     [class.active]="bar.highlighted"
     [disabled]="bar.multi"
@@ -308,7 +316,7 @@
   @if (bar.card; as card) {
   <button
     type="button"
-    [title]="card.pinned ? 'Sblocca' : 'Fissa'"
+    [msTooltip]="card.pinned ? 'Sblocca' : 'Fissa'"
     [attr.aria-label]="card.pinned ? 'Sblocca' : 'Fissa'"
     (click)="pinSelection()"
   >
@@ -317,7 +325,7 @@
   }
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.color')"
+    [msTooltip]="i18n.t('liveAgent.canvas.color')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.color')"
     [class.active]="colorOpen()"
     [attr.aria-expanded]="colorOpen()"
@@ -332,7 +340,7 @@
       type="button"
       class="swatch"
       [attr.data-color]="color"
-      [title]="colorLabel(color)"
+      [msTooltip]="colorLabel(color)"
       [attr.aria-label]="colorLabel(color)"
       (click)="setColor(color)"
     ></button>
@@ -340,7 +348,7 @@
     <button
       type="button"
       class="swatch-none"
-      [attr.title]="i18n.t('liveAgent.canvas.noColor')"
+      [msTooltip]="i18n.t('liveAgent.canvas.noColor')"
       [attr.aria-label]="i18n.t('liveAgent.canvas.noColor')"
       (click)="setColor(null)"
     >
@@ -350,7 +358,7 @@
   } @if (!bar.multi) {
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.link')"
+    [msTooltip]="i18n.t('liveAgent.canvas.link')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.link')"
     (click)="connectSelection()"
   >
@@ -359,7 +367,7 @@
   }
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.delete')"
+    [msTooltip]="i18n.t('liveAgent.canvas.delete')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.delete')"
     (click)="removeSelected()"
   >
@@ -371,7 +379,7 @@
 <nav class="toolbar" [attr.aria-label]="i18n.t('liveAgent.canvas.tools')">
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.zoomOut')"
+    [msTooltip]="i18n.t('liveAgent.canvas.zoomOut')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.zoomOut')"
     (click)="zoomOut()"
   >
@@ -380,7 +388,7 @@
   <button
     type="button"
     class="zoom-value"
-    [attr.title]="i18n.t('liveAgent.canvas.zoomReset')"
+    [msTooltip]="i18n.t('liveAgent.canvas.zoomReset')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.zoomReset')"
     (click)="resetZoom()"
   >
@@ -388,7 +396,7 @@
   </button>
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.zoomIn')"
+    [msTooltip]="i18n.t('liveAgent.canvas.zoomIn')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.zoomIn')"
     (click)="zoomIn()"
   >
@@ -396,7 +404,7 @@
   </button>
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.fitAll')"
+    [msTooltip]="i18n.t('liveAgent.canvas.fitAll')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.fitAll')"
     (click)="fitAll()"
   >
@@ -404,7 +412,7 @@
   </button>
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.goHighlight')"
+    [msTooltip]="i18n.t('liveAgent.canvas.goHighlight')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.goHighlight')"
     [disabled]="!board().highlightId"
     (click)="goToHighlight()"
@@ -414,7 +422,7 @@
   <span class="sep" aria-hidden="true"></span>
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.addSheet')"
+    [msTooltip]="i18n.t('liveAgent.canvas.addSheet')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.addSheet')"
     (click)="addDocument()"
   >
@@ -422,7 +430,7 @@
   </button>
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.addNote')"
+    [msTooltip]="i18n.t('liveAgent.canvas.addNote')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.addNote')"
     (click)="addNote()"
   >
@@ -430,7 +438,7 @@
   </button>
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.arrange')"
+    [msTooltip]="i18n.t('liveAgent.canvas.arrange')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.arrange')"
     (click)="arrange()"
   >
@@ -438,7 +446,7 @@
   </button>
   <button
     type="button"
-    [attr.title]="i18n.t('liveAgent.canvas.minimap')"
+    [msTooltip]="i18n.t('liveAgent.canvas.minimap')"
     [attr.aria-label]="i18n.t('liveAgent.canvas.minimap')"
     [class.active]="minimapOpen()"
     [attr.aria-pressed]="minimapOpen()"

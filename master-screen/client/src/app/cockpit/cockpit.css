@@ -5,30 +5,32 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
-  border-radius: var(--radius-sm);
+  border-radius: 0;
 }
 :host ::ng-deep button:disabled {
   opacity: 0.35;
   cursor: default;
 }
 :host ::ng-deep button:hover:not(:disabled) {
-  background: var(--color-surface-2);
+  background: var(--color-accent-soft);
 }
 :host ::ng-deep button:focus-visible,
 :host ::ng-deep a:focus-visible,
 :host ::ng-deep input:focus-visible,
 :host ::ng-deep [tabindex]:focus-visible {
   outline: 2px solid var(--color-focus);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
+/* Text fields of the cockpit: a bottom line only, as in the rest of the master screen. */
 :host ::ng-deep input,
 :host ::ng-deep select {
   font: inherit;
   color: inherit;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-1) var(--space-1);
+  background: transparent;
+  border: 0;
+  border-bottom: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  padding: var(--space-1) 0;
 }
 
 :host {
@@ -39,34 +41,28 @@
   min-width: 0;
   flex: 1;
 }
+/* Split frame: the canvas on the left, the table chat on the right, one 1px line between them. */
 .cockpit {
   height: 100%;
   min-height: 0;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 8px minmax(
+  grid-template-columns: minmax(0, 1fr) 12px minmax(
       320px,
       var(--chat-width, 384px)
     );
-  background: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
+  background: var(--color-bg);
   color: var(--color-text);
   position: relative;
 }
-/* Both panes share one surface: same background, border and radius, set apart from the page. */
+/* Both panes are flat: no card, no border, no radius, no shadow. */
 .board-pane,
 .chat-pane {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: color-mix(in srgb, var(--color-bg) 62%, var(--color-surface));
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-.board-pane {
-  margin: 8px 0 8px 8px;
-}
-.chat-pane {
-  margin: 8px 8px 8px 0;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 .splitter {
   cursor: col-resize;
@@ -74,18 +70,16 @@
   position: relative;
   z-index: 1;
 }
+/* The visible line is 1px; the hit area around it is the full 12px column. */
 .splitter:after {
   content: "";
   position: absolute;
-  top: 8px;
-  bottom: 8px;
-  left: 3px;
-  width: 1px;
-  background: var(--color-border);
-}
-.splitter:focus-visible {
-  outline: none;
-  background: var(--color-surface-2);
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: var(--border-width);
+  background: var(--color-border-strong);
+  transform: translateX(-50%);
 }
 .pane-tabs,
 .pane-turn,
@@ -95,9 +89,11 @@
 .load-error {
   margin: 0;
   padding: 8px 20px;
-  font-size: 13px;
+  font-size: var(--font-size-sm);
   color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface));
+  background: var(--color-bg);
+  border: var(--border-width) solid var(--color-danger);
+  border-radius: 0;
 }
 /* Below 1100px one region at a time: tabs on top, in the flow (the app has its own
    bottom bars on the phone, so nothing here is fixed to the bottom). */
@@ -120,14 +116,21 @@
     justify-content: center;
     gap: 8px;
     height: 40px;
-    border-radius: 8px;
-    color: var(--color-text-muted);
+    border: var(--border-width) solid var(--color-border-strong);
+    border-radius: 0;
+    background: transparent;
+    color: var(--color-text);
     font-weight: 500;
   }
   .pane-tabs button.selected {
-    background: var(--color-surface);
-    color: var(--color-text);
+    background: var(--color-text);
+    color: var(--color-bg);
   }
+  .pane-tabs button.selected:hover:not(:disabled) {
+    background: var(--color-accent-hover);
+    color: var(--color-bg);
+  }
+  /* The unread dot: a status dot, the one round shape allowed. */
   .pane-tabs i {
     width: 7px;
     height: 7px;
@@ -145,7 +148,6 @@
   .chat-pane {
     flex: 1;
     min-height: 0;
-    margin: 0 8px 8px;
   }
   .chat-pane,
   .splitter {
@@ -166,6 +168,6 @@
     left: 50%;
     transform: translateX(-50%);
     z-index: 3;
-    border-radius: 6px;
+    border-radius: 0;
   }
 }

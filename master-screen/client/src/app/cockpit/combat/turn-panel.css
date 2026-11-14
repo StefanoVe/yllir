@@ -1,76 +1,105 @@
+/*
+ * Turn panel, notebook look: flat sections, 1 px lines, square portraits with a 1 px frame,
+ * hit points as a segmented bar with the numbers, condition-like chips as rectangles. The
+ * "reading" indicator is a stepped square, still under reduced motion.
+ */
+
 :host {
   display: block;
-  min-width: 0;
+  font-family: var(--font-family);
+  color: var(--color-text);
 }
 
 .panel {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  min-width: 0;
-  font-size: var(--font-size-sm);
-  line-height: 1.4;
 }
 
-/* Cards are not surfaces of their own: the floating turn card behind them is translucent, and the
-   panel's text sits on it. Sections are separated by hairlines only. */
 .card {
-  min-width: 0;
   padding: var(--space-2);
-  border: 0;
-  background: transparent;
-  box-shadow: none;
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 
-.title {
-  margin: 0;
-  color: var(--color-text);
-  font-size: var(--font-size-base);
-  font-weight: 500;
-  overflow-wrap: anywhere;
+.card:last-child {
+  border-bottom: 0;
+}
+
+.now {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
 }
 
 .now-head {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
+  gap: var(--space-2);
 }
 
-.now-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0-5);
-}
-
+/* Portraits keep their colours; the frame is the structure line. */
 .avatar {
   flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  width: 48px;
+  height: 48px;
   object-fit: cover;
-  border: 2px solid var(--color-accent);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
   background: var(--color-surface-2);
-  color: var(--color-text);
+}
+
+.avatar.sm {
+  width: 32px;
+  height: 32px;
+}
+
+.avatar.initials {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  color: var(--color-text);
   font-size: var(--font-size-sm);
   font-weight: 600;
 }
 
-.avatar.sm {
-  width: 24px;
-  height: 24px;
+.now-text {
+  min-width: 0;
+  flex: 1;
+}
+
+/* Section titles: sans, medium, with a 1 px line under them. */
+.title,
+summary.title {
+  margin: 0;
+  padding-bottom: var(--space-0-5);
+  border-bottom: var(--border-width) solid var(--color-border);
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: var(--line-height-tight);
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 var(--space-0-5);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  color: var(--color-text);
   font-size: var(--font-size-xs);
-  border-width: 1px;
+  font-weight: 500;
 }
 
 .hp {
-  margin: 0;
+  margin: var(--space-0-5) 0 0;
   color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
   font-variant-numeric: tabular-nums;
 }
 
@@ -80,263 +109,195 @@
 }
 
 .sep {
-  margin: 0 0.15em;
+  padding: 0 2px;
 }
 
-/* Hit-point bar: 3 px track, fill in the side's hue, warn when low. */
+/* Segmented hit points: ten segments, 1 px gaps. The filled ones take the text colour. */
 .hp-bar {
-  display: block;
-  height: 3px;
-  margin-top: var(--space-1);
-  border-radius: var(--radius-pill);
-  background: var(--combat-track);
-  overflow: hidden;
-}
-
-.hp-fill {
-  display: block;
-  height: 100%;
-  background: var(--color-accent);
-}
-
-.hp-bar.low .hp-fill {
-  background: var(--combat-warn);
-}
-
-h4,
-h5 {
-  margin: var(--space-2) 0 var(--space-0-5);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-xs);
-  font-weight: 500;
-  overflow-wrap: anywhere;
-}
-
-.group-label {
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--color-border);
-}
-
-.now .group-label:first-of-type {
-  border-top: 0;
-  padding-top: 0;
-}
-
-.actions {
-  margin: 0;
-  padding: 0;
-  list-style: none;
   display: flex;
-  flex-direction: column;
-  overflow-wrap: anywhere;
+  gap: 1px;
+  margin: var(--space-1) 0 0;
 }
 
-.action {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--space-1) 0;
-  border-top: 1px solid var(--color-border);
+.hp-bar .seg {
+  flex: 1;
+  height: 8px;
+  border: var(--border-width) solid var(--color-border-strong);
 }
 
-.action:first-child {
-  border-top: 0;
+.hp-bar .seg.on {
+  background: var(--color-text);
 }
 
-.action-name {
-  font-weight: 500;
-  color: var(--color-text);
+.hp-bar.low .seg.on {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
 }
 
-.action-text {
-  color: var(--color-text-muted);
-  font-size: var(--font-size-sm);
-}
-
-/* Out of turn: a card with a native disclosure (open on wide screens, folded on narrow). */
-.others {
-  margin-top: var(--space-2);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
-}
-
-.others > summary {
-  cursor: pointer;
-  list-style-position: outside;
-}
-
-.others > summary:focus-visible {
-  outline: 3px solid var(--color-focus);
-  outline-offset: 2px;
-  border-radius: var(--radius-sm);
-}
-
-.others-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin-top: var(--space-1);
-}
-
-.other {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0-5);
-  min-width: 0;
-}
-
-.other-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-}
-
-.other-name {
-  margin: 0;
-  color: var(--color-text);
-  font-size: var(--font-size-sm);
-  font-weight: 500;
-}
-
-.muted {
-  margin: 0;
-  color: var(--color-text-muted);
-}
-
-/* "basic" badge: the actions are the parser's, read without the agent's interpretation. */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  margin-left: var(--space-0-5);
-  padding: 0 6px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  color: var(--color-text-muted);
-  font-size: 11px;
-  font-weight: 500;
-  line-height: 1.6;
-  vertical-align: middle;
-}
-
-/* "Reading the sheet": a pulsing dot while the card is written. */
+/* The turn status: a stepped square, still under reduced motion. */
 .reading {
   display: flex;
   align-items: center;
-  gap: var(--space-0-5);
-  margin: var(--space-1) 0 0;
+  gap: var(--space-1);
+  margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
 
 .pulse {
   flex: none;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-accent);
-  animation: turn-pulse 1.2s ease-in-out infinite;
+  width: 8px;
+  height: 8px;
+  background: var(--color-text);
+  animation: step 1s steps(2, jump-none) infinite;
 }
 
-@keyframes turn-pulse {
-  0%,
-  100% {
-    opacity: 0.3;
-    transform: scale(0.8);
-  }
-  50% {
+@keyframes step {
+  from {
     opacity: 1;
-    transform: scale(1.1);
+  }
+  to {
+    opacity: 0.15;
   }
 }
 
-/* Action card: name and chips on one line (wrapping), then the trigger and the effect. */
-.action-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px 6px;
-  min-width: 0;
-}
-
-/* Chips: to-hit and save take the accent, damage the warm tone; the others are neutral. */
-.chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: color-mix(in srgb, currentColor 10%, transparent);
-  color: var(--color-text-muted);
-  font-size: 12px;
-  line-height: 1.4;
-  white-space: nowrap;
-  font-variant-numeric: tabular-nums;
-}
-
-.chip.hit,
-.chip.save {
-  color: var(--color-accent);
-}
-
-.chip.dmg {
-  color: var(--combat-warn);
-}
-
-.trigger {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-style: italic;
-}
-
-.effect {
+.muted {
   margin: 0;
   color: var(--color-text-muted);
   font-size: var(--font-size-sm);
 }
 
-/* Traits of the active creature: a compact disclosure under its actions. */
-.traits {
-  margin-top: var(--space-2);
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--color-border);
+.card-foot {
+  margin-top: var(--space-1);
 }
 
-.traits > summary {
-  cursor: pointer;
+/* Group labels of the action card. */
+h4.group-label,
+h5.group-label {
+  margin: var(--space-1) 0 var(--space-0-5);
   color: var(--color-text-muted);
   font-size: var(--font-size-xs);
   font-weight: 500;
 }
 
-.trait-list {
-  margin: var(--space-0-5) 0 0;
+.actions {
+  margin: 0;
   padding: 0;
   list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-0-5);
-  color: var(--color-text-muted);
+}
+
+.action {
+  padding: var(--space-1) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
   font-size: var(--font-size-sm);
 }
 
-.trait-list b {
-  color: var(--color-text);
-  font-weight: 500;
+.action:last-child {
+  border-bottom: 0;
 }
 
-/* Footer of the Now card: a one-line note under its actions, used for "nothing out of turn". */
-.card-foot {
-  margin-top: var(--space-2);
-  padding-top: var(--space-1);
-  border-top: 1px solid var(--color-border);
+.action-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-0-5);
+}
+
+.action-name {
+  font-weight: 600;
+}
+
+/* Rule chips (to hit, damage, save, range): rectangles with a 1 px border. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px var(--space-0-5);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+.trigger,
+.effect,
+.action-text {
+  margin: var(--space-0-5) 0 0;
+  color: var(--color-text);
+}
+
+.trigger {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-xs);
+}
+
+/* Out of turn: a block folded by default on narrow screens. */
+.others {
+  padding: 0;
+}
+
+.others > summary {
+  cursor: pointer;
+  padding: var(--space-2) var(--space-2) var(--space-0-5);
+  list-style: none;
+}
+
+.others > summary::-webkit-details-marker {
+  display: none;
+}
+
+.others-body {
+  padding: var(--space-1) var(--space-2) var(--space-2);
+}
+
+.other {
+  padding: var(--space-1) 0;
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+
+.other:last-child {
+  border-bottom: 0;
+}
+
+.other-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.other-name {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+h5.group-label {
+  font-size: var(--font-size-xs);
+}
+
+details.traits {
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+}
+
+details.traits > summary {
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+
+.trait-list {
+  margin: var(--space-0-5) 0 0;
+  padding-left: var(--space-2);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .others > summary {
-    transition: none;
-  }
-
   .pulse {
     animation: none;
   }
+}
+
+:root[data-motion="reduced"] .pulse {
+  animation: none;
 }

@@ -31,6 +31,7 @@ import { MusicPlayerService } from "../../music/music-player.service";
 import { MusicApiService } from "../../music/music-api.service";
 import { StatusService } from "../../core/status.service";
 import { I18n, type TranslationKey } from "../../i18n";
+import { TooltipDirective } from "../../core/tooltip.directive";
 
 type Panel = "ledger" | "combat" | null;
 
@@ -53,7 +54,7 @@ function normalizeText(text: string) {
 
 @Component({
   selector: "cockpit-board",
-  imports: [Icon, CockpitCanvas, Ledger, CombatView],
+  imports: [Icon, CockpitCanvas, Ledger, CombatView, TooltipDirective],
   templateUrl: "./board.html",
   styleUrl: "./board.css",
 })

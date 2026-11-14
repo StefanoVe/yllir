@@ -29,6 +29,8 @@ let nextId = 0;
 export class CombatantChip {
   readonly i18n = inject(I18n);
   private readonly battle = inject(BattleApi);
+  /** Five segments for the small hit point bar of a token. */
+  readonly ticks = [0, 1, 2, 3, 4];
   combatant = input.required<Combatant>();
   active = input(false);
   readonly tooltipId = `combat-tip-${nextId++}`;

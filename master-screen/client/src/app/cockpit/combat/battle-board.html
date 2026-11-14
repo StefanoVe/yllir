@@ -18,13 +18,16 @@
         [attr.title]="i18n.t('combat.map.keys')"
       >
         <img class="map-image" [src]="mapUrl()" alt="" draggable="false" (load)="onMapLoad($event)" />
-        @if (grid(); as g) {
-        <div class="grid" aria-hidden="true" [style.--cols]="g.cols" [style.--rows]="g.rows"></div>
+        @if (gridLines(); as lines) {
+        <svg class="grid" aria-hidden="true" focusable="false" preserveAspectRatio="none" [attr.viewBox]="lines.viewBox">
+          <path [attr.d]="lines.d" vector-effect="non-scaling-stroke" />
+        </svg>
         }
         @for (c of placed(); track c.id) {
         <cockpit-combatant-chip
           class="placed"
           [class.dragging]="drag()?.id === c.id"
+          [class.current]="activeId() === c.id"
           [combatant]="c"
           [active]="activeId() === c.id"
           [style.left.%]="percent(positions()[c.id]!).left"
@@ -47,6 +50,7 @@
         <cockpit-combatant-chip
           class="tray-chip"
           [class.dragging]="drag()?.id === c.id"
+          [class.current]="activeId() === c.id"
           [combatant]="c"
           [active]="activeId() === c.id"
           (pointerdown)="pointerDown($event, c)"
