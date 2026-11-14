@@ -1,20 +1,25 @@
-/* Artwork square. The size comes from the host: 48px in rows, 56px in the bar, full width in the card. */
+/*
+ * Artwork square. Cover art stays in colour (it is content): a square frame with a 1px structure
+ * border, no radius, no shadow. The size comes from the host: 48px in rows, 56px in the bar, full
+ * width in the card.
+ */
 :host {
   position: relative;
   display: block;
+  box-sizing: border-box;
   flex: 0 0 auto;
   width: 48px;
   height: 48px;
   overflow: hidden;
-  border-radius: 6px;
-  background: #1e2723;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-surface-2);
 }
 
 :host(.is-large) {
   width: 100%;
   height: auto;
   aspect-ratio: 1;
-  border-radius: 12px;
 }
 
 .tone,
@@ -48,11 +53,17 @@
   margin: auto;
   width: fit-content;
   height: fit-content;
-  color: rgb(236 229 210 / 0.55);
+  /* The ink is computed in music-art.ts from the fallback tone, so it stays legible in both themes. */
+  color: var(--note-ink, #ffffff);
+  opacity: 0.85;
 }
 
 @media (prefers-reduced-motion: reduce) {
   .thumb {
     transition: none;
   }
+}
+
+:host-context([data-motion='reduced']) .thumb {
+  transition: none;
 }

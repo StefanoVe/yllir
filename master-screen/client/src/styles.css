@@ -1,43 +1,60 @@
-/* Design tokens. Light by default; dark follows the system unless the master overrides it
-   with data-theme on <html> (set by ThemeService). Keep the two dark blocks in sync.
-   Names are stable: other views already use them, so rename only with an alias. */
+/* Bundled fonts (offline): Inter variable for text, Caveat 600 and 700 for hand-written titles. */
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource/caveat/latin-600.css";
+@import "@fontsource/caveat/latin-700.css";
+
+/* Design tokens. Notebook look: black on white (light), white on black (dark). Flat, square,
+   thin borders, no shadows, no gradients, no accent colour. Dark follows the system unless the
+   master overrides it with data-theme on <html> (set by ThemeService). The three colour blocks
+   below must keep the same token list. Names are stable: other views use them. */
 :root {
   color-scheme: light;
 
-  /* Surfaces and text. Text on bg/surface/surface-2 is at least AA (4.5:1). */
-  --color-bg: #f5f6f8;
+  /* Surfaces and text. */
+  --color-bg: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-2: #edf0f5;
-  --color-border: #cfd5df;
-  --color-text: #1c2430;
-  --color-text-muted: #525c6e;
+  --color-surface-2: #f2f2f2;
+  --color-border: #c4c4c4;
+  --color-border-strong: #111111;
+  --color-text: #111111;
+  --color-text-muted: #595959;
 
-  /* Accent: base for fills and links, hover and active are one step darker. */
-  --color-accent: #3566c9;
-  --color-accent-hover: #2b57ad;
-  --color-accent-active: #224790;
+  /* Accent: the text colour itself. Hover and active are one step lighter. */
+  --color-accent: #111111;
+  --color-accent-hover: #333333;
+  --color-accent-active: #4d4d4d;
   --color-accent-contrast: #ffffff;
-  --color-accent-soft: #e4ebfa;
-  --color-focus: #2563eb;
-  --color-danger: #b42318;
-  --color-selection: #c9d9f7;
+  --color-accent-soft: #f2f2f2;
+  --color-focus: #111111;
+  --color-danger: #a33a32;
+  --color-selection: #d9d9d9;
   --color-danger-contrast: #ffffff;
 
-  /* Diff colours (added and removed lines), readable on the surfaces above. */
-  --color-diff-add: #1a7f37;
-  --color-diff-del: #b42318;
-  --color-diff-add-bg: rgb(46 160 67 / 0.16);
-  --color-diff-del-bg: rgb(207 34 46 / 0.12);
+  /* Diff colours: no colour of their own, the change is read from the text. */
+  --color-diff-add: #111111;
+  --color-diff-del: #111111;
+  --color-diff-add-bg: transparent;
+  --color-diff-del-bg: transparent;
 
-  /* Layered soft shadows: a hairline plus a diffuse one. */
-  --shadow-1: 0 1px 2px rgb(16 24 40 / 0.06), 0 1px 1px rgb(16 24 40 / 0.04);
-  --shadow-2: 0 2px 4px rgb(16 24 40 / 0.05), 0 8px 24px rgb(16 24 40 / 0.12);
+  /* Notebook paper: ruled lines and the margin line of .notebook-page. */
+  --color-rule: #efdcd9;
+  --color-margin: #c98a84;
 
-  /* Radii: 8 for controls, 12 for panels, 16 for large surfaces. */
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-pill: 999px;
+  /* Scrollbar. */
+  --scrollbar-thumb: #b3b3b3;
+  --scrollbar-track: transparent;
+
+  /* No shadows, no radii: the look is flat and square. */
+  --shadow-1: none;
+  --shadow-2: none;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-pill: 0;
+
+  /* Borders. */
+  --border-width: 1px;
+  --border-width-strong: 2px;
 
   /* Spacing scale on a 4px grid, with the original 8px steps kept as names. */
   --space-0-5: 4px;
@@ -48,8 +65,9 @@
   --space-5: 40px;
   --space-6: 48px;
 
-  /* Type scale: 16px base, system font stack. */
-  --font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Type scale: 16px base. Hand font only for titles of pages, nodes and modals, never long text. */
+  --font-family: "Inter Variable", system-ui, sans-serif;
+  --font-family-hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
   --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-size-base: 16px;
   --font-size-xs: 0.75rem;
@@ -59,78 +77,86 @@
   --font-size-xl: 1.75rem;
   --line-height: 1.5;
   --line-height-tight: 1.25;
+  --line-pitch: 28px;
 
-  --rail-width: 68px;
+  --rail-width: 56px;
   --rail-mobile-height: 64px;
   --transition-fast: 120ms ease-out;
   --transition-base: 160ms ease-out;
-
-  --scrollbar-thumb: #b8c0cc;
-  --scrollbar-track: transparent;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
 
-    --color-bg: #13161b;
-    --color-surface: #1b1f27;
-    --color-surface-2: #252b35;
-    --color-border: #3b4452;
-    --color-text: #e6eaf1;
-    --color-text-muted: #b1bac9;
+    --color-bg: #000000;
+    --color-surface: #000000;
+    --color-surface-2: #141414;
+    --color-border: #3a3a3a;
+    --color-border-strong: #f5f5f5;
+    --color-text: #f5f5f5;
+    --color-text-muted: #b3b3b3;
 
-    --color-accent: #7aa2f7;
-    --color-accent-hover: #93b4fa;
-    --color-accent-active: #a9c4fb;
-    --color-accent-contrast: #0c1424;
-    --color-accent-soft: #263552;
-    --color-focus: #8ab4ff;
-    --color-danger: #ff8a80;
-    --color-selection: #3a4f7a;
-    --color-danger-contrast: #0c1424;
+    --color-accent: #f5f5f5;
+    --color-accent-hover: #d9d9d9;
+    --color-accent-active: #bfbfbf;
+    --color-accent-contrast: #000000;
+    --color-accent-soft: #141414;
+    --color-focus: #f5f5f5;
+    --color-danger: #e0827a;
+    --color-selection: #3a3a3a;
+    --color-danger-contrast: #000000;
 
-    --color-diff-add: #7ee787;
-    --color-diff-del: #ff8a80;
-    --color-diff-add-bg: rgb(46 160 67 / 0.22);
-    --color-diff-del-bg: rgb(248 81 73 / 0.16);
+    --color-diff-add: #f5f5f5;
+    --color-diff-del: #f5f5f5;
+    --color-diff-add-bg: transparent;
+    --color-diff-del-bg: transparent;
 
-    --shadow-1: 0 1px 2px rgb(0 0 0 / 0.45);
-    --shadow-2: 0 2px 4px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.45);
+    --color-rule: #3a2523;
+    --color-margin: #85403a;
 
-    --scrollbar-thumb: #4a5361;
+    --scrollbar-thumb: #4d4d4d;
+    --scrollbar-track: transparent;
+
+    --shadow-1: none;
+    --shadow-2: none;
   }
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --color-bg: #13161b;
-  --color-surface: #1b1f27;
-  --color-surface-2: #252b35;
-  --color-border: #3b4452;
-  --color-text: #e6eaf1;
-  --color-text-muted: #b1bac9;
+  --color-bg: #000000;
+  --color-surface: #000000;
+  --color-surface-2: #141414;
+  --color-border: #3a3a3a;
+  --color-border-strong: #f5f5f5;
+  --color-text: #f5f5f5;
+  --color-text-muted: #b3b3b3;
 
-  --color-accent: #7aa2f7;
-  --color-accent-hover: #93b4fa;
-  --color-accent-active: #a9c4fb;
-  --color-accent-contrast: #0c1424;
-  --color-accent-soft: #263552;
-  --color-focus: #8ab4ff;
-  --color-danger: #ff8a80;
-  --color-selection: #3a4f7a;
-  --color-danger-contrast: #0c1424;
+  --color-accent: #f5f5f5;
+  --color-accent-hover: #d9d9d9;
+  --color-accent-active: #bfbfbf;
+  --color-accent-contrast: #000000;
+  --color-accent-soft: #141414;
+  --color-focus: #f5f5f5;
+  --color-danger: #e0827a;
+  --color-selection: #3a3a3a;
+  --color-danger-contrast: #000000;
 
-  --color-diff-add: #7ee787;
-  --color-diff-del: #ff8a80;
-  --color-diff-add-bg: rgb(46 160 67 / 0.22);
-  --color-diff-del-bg: rgb(248 81 73 / 0.16);
+  --color-diff-add: #f5f5f5;
+  --color-diff-del: #f5f5f5;
+  --color-diff-add-bg: transparent;
+  --color-diff-del-bg: transparent;
 
-  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.45);
-  --shadow-2: 0 2px 4px rgb(0 0 0 / 0.3), 0 8px 24px rgb(0 0 0 / 0.45);
+  --color-rule: #3a2523;
+  --color-margin: #85403a;
 
-  --scrollbar-thumb: #4a5361;
+  --scrollbar-thumb: #4d4d4d;
+  --scrollbar-track: transparent;
+
+  --shadow-1: none;
+  --shadow-2: none;
 }
 
 /* Compact density (set on <html> from the settings): tighter spacing, same scale names. */
@@ -166,9 +192,10 @@ html {
   background: var(--scrollbar-track);
 }
 
+/* Square thumb, no pill. */
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
-  border-radius: var(--radius-pill);
+  border-radius: 0;
   border: 3px solid transparent;
   background-clip: padding-box;
 }
@@ -210,13 +237,15 @@ h3 {
   font-size: var(--font-size-md);
 }
 
+/* Links look like text: underlined, the colour changes only on hover and press. */
 a {
-  color: var(--color-accent);
+  color: var(--color-text);
+  text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 a:visited {
-  color: var(--color-accent);
+  color: var(--color-text);
 }
 
 a:hover {
@@ -232,7 +261,7 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Base controls: one radius, one focus ring, calm transitions. Views may still set their own look. */
+/* Base controls: square, one focus ring, calm transitions. Views may still set their own look. */
 button,
 input,
 select,
@@ -243,7 +272,7 @@ textarea {
 
 button {
   cursor: pointer;
-  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast);
+  transition: background-color var(--transition-fast), color var(--transition-fast), border-color var(--transition-fast);
 }
 
 /* Icons: centre them in their box instead of sitting on the text baseline. */
@@ -286,19 +315,143 @@ button:disabled {
 input,
 select,
 textarea {
-  border-radius: var(--radius-sm);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-}
-
-input:focus-visible,
-select:focus-visible,
-textarea:focus-visible {
-  border-color: var(--color-focus);
+  border-radius: 0;
+  transition: border-color var(--transition-fast);
 }
 
 :focus-visible {
   outline: 2px solid var(--color-focus);
   outline-offset: 2px;
+}
+
+/* Shared utilities. Single-class selectors: a view that sets its own look still wins. */
+
+/* Buttons: square, thin border. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  line-height: 1.2;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.btn:hover {
+  background: var(--color-accent-soft);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn-primary {
+  background: var(--color-text);
+  border-color: var(--color-text);
+  color: var(--color-bg);
+}
+
+.btn-primary:hover {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+}
+
+.btn-secondary {
+  background: transparent;
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
+.btn-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.btn-link:hover {
+  background: none;
+  color: var(--color-accent-hover);
+}
+
+/* Text field: only a bottom line. On focus the line gets thicker; the padding shrinks by the same
+   amount so the text does not move. */
+.field {
+  width: 100%;
+  padding: 6px 0;
+  border: 0;
+  border-bottom: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  transition: border-bottom-width var(--transition-fast);
+}
+
+.field:focus {
+  border-bottom-width: var(--border-width-strong);
+  padding-bottom: 5px;
+}
+
+/* Chips: rectangle with a thin border; the active one is inverted. */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background-color var(--transition-fast), color var(--transition-fast);
+}
+
+.chip:hover {
+  background: var(--color-accent-soft);
+}
+
+.chip.active,
+.chip[aria-pressed="true"] {
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+/* Notebook page: ruled lines and a margin line, both hard-stop gradients drawn in the background.
+   Removed under reduced motion and compact density. */
+.notebook-page {
+  padding-left: 72px;
+  line-height: var(--line-pitch);
+  background-image:
+    linear-gradient(to right, transparent 55px, var(--color-margin) 55px, var(--color-margin) 56px, transparent 56px),
+    repeating-linear-gradient(to bottom, transparent 0, transparent calc(var(--line-pitch) - 1px), var(--color-rule) calc(var(--line-pitch) - 1px), var(--color-rule) var(--line-pitch));
+}
+
+:root[data-motion="reduced"] .notebook-page,
+:root[data-density="compact"] .notebook-page {
+  background-image: none;
+}
+
+/* Master-only block: a dashed frame. The lock icon is the markup's job. */
+.master-only {
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width) dashed var(--color-border-strong);
+  border-radius: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

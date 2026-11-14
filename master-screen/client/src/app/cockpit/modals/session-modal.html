@@ -9,7 +9,8 @@
     <div class="modal-title"><h2>{{ i18n.t("liveAgent.sessionTitle") }}</h2></div>
     <button
       class="icon-button"
-      [title]="i18n.t('liveAgent.closeEsc')"
+      [msTooltip]="i18n.t('liveAgent.closeEsc')"
+      msTooltipPosition="bottom"
       [attr.aria-label]="i18n.t('liveAgent.close')"
       (click)="dismiss()"
     >
@@ -19,6 +20,7 @@
   <form class="session-create" (submit)="$event.preventDefault(); create()">
     <input
       #titleInput
+      class="field"
       name="title"
       [(ngModel)]="title"
       [placeholder]="i18n.t('liveAgent.newSessionTitle')"
@@ -27,7 +29,7 @@
       (keydown.enter)="$event.preventDefault(); create()"
     />
     <button
-      class="primary-button"
+      class="btn btn-primary"
       type="submit"
       [disabled]="!title.trim() || busy()"
     >
@@ -48,7 +50,7 @@
       <button
         class="icon-button"
         [class.danger]="confirmDelete() === item.id"
-        [title]="
+        [msTooltip]="
             confirmDelete() === item.id
               ? i18n.t('liveAgent.deleteAgain')
               : i18n.t('liveAgent.deleteSession')

@@ -1,4 +1,4 @@
-/* Shared by the cockpit modals. Z-index from the --z-* scale in styles.css: the scrim sits at --z-modal, the dialog one step above it, so the map lightbox, the Spotlight and the image viewer stay on top. */
+/* Shared by the cockpit modals. Z-index from the --z-* scale in styles.css: the scrim sits at --z-modal, the dialog one step above it, so the map lightbox, the Spotlight and the image viewer stay on top. Notebook look: flat scrim, square dialog, thin structure line, no shadow. */
 .cockpit-scrim {
   position: fixed;
   inset: 0;
@@ -17,8 +17,9 @@
   max-height: min(86vh, 980px);
   background: var(--color-surface);
   color: var(--color-text);
-  border-radius: 10px;
-  box-shadow: 0 24px 64px color-mix(in srgb, var(--color-text) 50%, transparent);
+  border: var(--border-width-strong) solid var(--color-border-strong);
+  border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
 }
 .cockpit-modal .modal-head {
@@ -27,7 +28,7 @@
   gap: 4px;
   min-height: 60px;
   padding: 10px 12px 10px 20px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: var(--border-width) solid var(--color-border);
 }
 .cockpit-modal .modal-title {
   flex: 1;
@@ -35,9 +36,10 @@
 }
 .cockpit-modal .modal-title h2 {
   margin: 0;
-  font-size: 18px;
+  font-family: var(--font-family-hand);
+  font-size: 26px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -55,7 +57,9 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  border-radius: 6px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text-muted);
 }
 .cockpit-modal .icon-button:hover {
@@ -67,6 +71,10 @@
   cursor: default;
   background: none;
   color: var(--color-text-muted);
+}
+/* Lucide icons in the modals: thinner stroke than the shared Icon default (1.7). */
+.cockpit-modal ui-icon svg {
+  stroke-width: 1.5;
 }
 .cockpit-modal .sheet-position {
   flex: none;
@@ -93,7 +101,6 @@
     width: 100vw;
     max-height: none;
     height: 100dvh;
-    border-radius: 0;
   }
   .cockpit-modal .modal-body {
     padding: 4px 16px 24px;

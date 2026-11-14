@@ -1,12 +1,14 @@
 /* Document reader popup (DocumentModal). Every selector is scoped to .document-modal, and the
-   shared look stays in modal.css, which is loaded first. Colors and spacing come from the tokens in styles.css only. */
+   shared look stays in modal.css, which is loaded first. The page is a notebook page: the global
+   .notebook-page class draws the ruled lines and the margin, and the rules below set the text on
+   them. Colors and spacing come from the tokens in styles.css only. */
 
-/* Override the shared size for the reader only: a fixed height, so the popup does not jump while loading. */
+/* Size: a fixed height, so the popup does not jump while loading. Square, no shadow (from modal.css). */
 .document-modal {
   width: min(1120px, calc(100vw - 48px));
   height: min(90vh, 1000px);
   max-height: none;
-  border-radius: var(--radius-lg);
+  border-radius: 0;
 }
 
 /* Opening animation. The scrim is the sibling before the dialog, so it is matched from the dialog's side. */
@@ -69,6 +71,7 @@
   gap: 8px;
   min-width: 0;
 }
+/* Document title: the hand font, as every page title of the notebook look. */
 .document-modal .modal-title h2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -77,16 +80,18 @@
   margin: 0;
   overflow: hidden;
   white-space: normal;
-  font-size: 20px;
-  font-weight: 650;
-  line-height: 1.25;
+  font-family: var(--font-family-hand);
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1.1;
 }
 .document-modal .master-pill {
   flex: none;
   padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
+  border: var(--border-width) dashed var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
   font-size: var(--font-size-xs);
   font-weight: 600;
   white-space: nowrap;
@@ -104,7 +109,7 @@
   flex: none;
 }
 
-/* One button system: 36px square (44px on narrow screens), borderless, radius 10px. */
+/* Icon buttons: 36px square, no border, hover on the soft surface. */
 .document-modal .back-button,
 .document-modal .icon-button {
   display: inline-flex;
@@ -116,7 +121,7 @@
   height: 36px;
   padding: 0;
   border: 0;
-  border-radius: 10px;
+  border-radius: 0;
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
@@ -130,71 +135,45 @@
 .document-modal .icon-button:disabled {
   background: transparent;
 }
-.document-modal .back-button:not(:disabled):active,
-.document-modal .icon-button:not(:disabled):active {
-  background: color-mix(in srgb, var(--color-surface-2) 92%, var(--color-text) 8%);
-}
 @media (hover: hover) {
   .document-modal .icon-button:not(:disabled):hover {
     background: var(--color-surface-2);
     color: var(--color-text);
   }
 }
-@media (prefers-reduced-motion: no-preference) {
-  .document-modal .back-button,
-  .document-modal .icon-button {
-    transition-property: background-color, color, transform;
-  }
-  .document-modal .back-button:not(:disabled):active,
-  .document-modal .icon-button:not(:disabled):active {
-    transform: scale(0.96);
-  }
-}
 
-/* Back: the same button with its label, on a filled surface. */
+/* Back: the same height with its label, bordered like a secondary button. */
 .document-modal .back-button {
   width: auto;
   gap: 6px;
-  padding: 0 14px 0 10px;
-  background: var(--color-surface-2);
+  padding: 0 14px;
+  border: var(--border-width) solid var(--color-border-strong);
   color: var(--color-text);
+  font-family: var(--font-family);
   font-size: var(--font-size-sm);
-  font-weight: 600;
-}
-.document-modal .back-button:not(:disabled):active {
-  background: color-mix(in srgb, var(--color-surface-2) 92%, var(--color-text) 8%);
+  font-weight: 500;
 }
 @media (hover: hover) {
   .document-modal .back-button:hover {
-    background: color-mix(in srgb, var(--color-surface-2) 92%, var(--color-text) 8%);
+    background: var(--color-surface-2);
   }
 }
 
-/* Sheet navigator: a borderless track with the prev, position and next controls inside. */
+/* Sheet navigator: the prev, position and next controls side by side, no frame of their own. */
 .document-modal .segmented {
   display: inline-flex;
   align-items: center;
   flex: none;
   gap: 0;
   height: 36px;
-  padding: 2px;
-  border-radius: 10px;
-  background: var(--color-surface-2);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 .document-modal .segmented .icon-button {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-}
-.document-modal .segmented .icon-button:not(:disabled):active {
-  background: color-mix(in srgb, var(--color-surface) 92%, var(--color-text) 8%);
-}
-@media (hover: hover) {
-  .document-modal .segmented .icon-button:not(:disabled):hover {
-    background: var(--color-surface);
-    color: var(--color-text);
-    box-shadow: var(--shadow-1);
-  }
+  width: 36px;
+  height: 36px;
 }
 .document-modal .sheet-position {
   min-width: 48px;
@@ -211,17 +190,6 @@
   display: none;
 }
 
-/* Close: the same button, with the danger tint on hover and press. */
-.document-modal .close-button:not(:disabled):active {
-  background: color-mix(in srgb, var(--color-danger) 20%, transparent);
-  color: var(--color-danger);
-}
-@media (hover: hover) {
-  .document-modal .close-button:not(:disabled):hover {
-    background: color-mix(in srgb, var(--color-danger) 12%, transparent);
-    color: var(--color-danger);
-  }
-}
 .document-modal .reading-progress {
   position: absolute;
   left: 0;
@@ -239,31 +207,42 @@
   }
 }
 
-/* Body: one scroll container with the document column and, when wide, the outline rail. */
+/* Body: one scroll container with the document page and, when wide, the index column.
+   .notebook-page is the global paper (lines and margin). Its lines scroll with the text. */
 .document-modal .modal-body {
   padding: 0;
+}
+.document-modal .notebook-page {
+  padding-left: 72px;
+  background-attachment: local;
 }
 .document-modal .doc-layout {
   display: block;
 }
+/* Top padding is one line pitch, so the first line of text sits on a ruled line. */
 .document-modal .doc-main {
   box-sizing: content-box;
   max-width: 72ch;
   margin: 0 auto;
-  padding: 28px 40px 8px;
+  padding: var(--line-pitch) 40px var(--space-1);
 }
+/* Master-only notice: dashed frame and lock icon, on the lines. */
 .document-modal .master-banner {
-  margin: 0 0 var(--space-2);
-  padding: 10px 14px;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, var(--color-border));
-  border-radius: var(--radius-md);
-  background: var(--color-accent-soft);
-  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 var(--line-pitch);
+  padding: 0 12px;
+  line-height: var(--line-pitch);
   font-size: var(--font-size-sm);
+}
+.document-modal .master-banner lucide-angular {
+  color: var(--color-text);
 }
 .document-modal .doc-outline {
   display: none;
 }
+/* Wide screens: the index sits in the right-hand margin column, beside the page. */
 @media (min-width: 1000px) {
   .document-modal .doc-layout.has-outline {
     display: grid;
@@ -278,17 +257,18 @@
     max-height: calc(90vh - 120px);
     box-sizing: border-box;
     overflow-y: auto;
-    padding: 28px 16px 24px 0;
+    padding: var(--line-pitch) 16px var(--line-pitch) 0;
+    border-left: var(--border-width) solid var(--color-border);
   }
 }
 .document-modal .outline-title {
   margin: 0 0 8px;
   padding-left: 12px;
-  font-size: var(--font-size-xs);
+  font-family: var(--font-family-hand);
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  line-height: var(--line-pitch);
+  color: var(--color-text);
 }
 .document-modal .doc-outline ul {
   margin: 0;
@@ -298,15 +278,15 @@
 .document-modal .outline-link {
   display: block;
   width: 100%;
-  padding: 5px 10px 5px 12px;
+  padding: 0 10px 0 12px;
   border: 0;
-  border-left: 2px solid transparent;
-  border-radius: 0 6px 6px 0;
+  border-left: var(--border-width-strong) solid transparent;
+  border-radius: 0;
   background: none;
   color: var(--color-text-muted);
   font: inherit;
   font-size: var(--font-size-sm);
-  line-height: 1.35;
+  line-height: var(--line-pitch);
   text-align: left;
   cursor: pointer;
 }
@@ -318,49 +298,49 @@
   padding-left: 24px;
 }
 .document-modal .outline-link.active {
-  border-left-color: var(--color-accent);
-  color: var(--color-accent);
+  border-left-color: var(--color-text);
+  color: var(--color-text);
   font-weight: 600;
 }
 
-/* Backlinks footer. */
+/* Backlinks footer: the "mentioned in" notes at the foot of the page. */
 .document-modal .backlinks {
-  margin-top: var(--space-4);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
+  margin-top: var(--line-pitch);
+  padding-top: var(--line-pitch);
+  border-top: var(--border-width) solid var(--color-border);
 }
 .document-modal .backlinks-title {
-  margin: 0 0 var(--space-1);
-  font-size: var(--font-size-xs);
+  margin: 0 0 4px;
+  font-family: var(--font-family-hand);
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
+  line-height: var(--line-pitch);
+  color: var(--color-text);
 }
 .document-modal .backlink-list {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 8px;
 }
 .document-modal .backlink-chip {
   max-width: 100%;
   padding: 4px 10px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text);
   font: inherit;
   font-size: var(--font-size-sm);
+  line-height: 1.2;
   text-align: left;
   overflow-wrap: anywhere;
   cursor: pointer;
 }
 .document-modal .backlink-chip:hover {
   background: var(--color-surface-2);
-  border-color: var(--color-accent);
 }
 
-/* Loading skeleton: shimmer only when motion is allowed. */
+/* Loading skeleton: flat grey blocks. They pulse only when motion is allowed. */
 .document-modal .doc-skeleton {
   display: grid;
   gap: 12px;
@@ -369,7 +349,7 @@
 .document-modal .skeleton-bar {
   display: block;
   height: 12px;
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--color-surface-2);
 }
 .document-modal .skeleton-title {
@@ -385,16 +365,18 @@
 .document-modal .skel-6 { width: 54%; }
 @media (prefers-reduced-motion: no-preference) {
   .document-modal .skeleton-bar {
-    background: linear-gradient(90deg, var(--color-surface-2) 25%, var(--color-border) 50%, var(--color-surface-2) 75%) 0 0 / 200% 100%;
-    animation: document-shimmer 1.4s ease-in-out infinite;
+    animation: document-pulse 1.4s ease-in-out infinite;
   }
 }
-@keyframes document-shimmer {
+@keyframes document-pulse {
   from {
-    background-position: 100% 0;
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
   to {
-    background-position: -100% 0;
+    opacity: 1;
   }
 }
 
@@ -425,7 +407,7 @@
   flex: none;
   gap: 8px;
   padding: 6px 16px;
-  border-top: 1px solid var(--color-border);
+  border-top: var(--border-width) solid var(--color-border);
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
 }
@@ -437,10 +419,9 @@
   height: 18px;
   margin-right: 2px;
   padding: 0 4px;
-  border: 1px solid var(--color-border);
-  border-bottom-width: 2px;
-  border-radius: 4px;
-  background: var(--color-surface-2);
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text);
   font-family: inherit;
   font-size: 11px;
@@ -450,6 +431,109 @@
   .document-modal .modal-hint {
     display: flex;
   }
+}
+
+/* The document itself, as text on the notebook lines. Every value is a multiple of the
+   line pitch, so the text, the headings and the blocks stay on the rules. The rules come
+   from .notebook-page; the blocks are server HTML, styled from here through ms-doc-body. */
+.document-modal .notebook-page ms-doc-body {
+  font-size: 1.0625rem;
+}
+.document-modal ms-doc-body .block {
+  margin-bottom: var(--line-pitch);
+}
+.document-modal ms-doc-body .block-body {
+  line-height: var(--line-pitch);
+  overflow-x: auto;
+}
+.document-modal ms-doc-body .block-body :is(h1, h2, h3, h4) {
+  margin: calc(var(--line-pitch) * 2) 0 var(--line-pitch);
+  padding: 0;
+  border: 0;
+  font-family: var(--font-family-hand);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: var(--line-pitch);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--color-text);
+}
+.document-modal ms-doc-body .block-body :is(p, ul, ol, blockquote, pre, table, figure) {
+  margin: 0 0 var(--line-pitch);
+}
+.document-modal ms-doc-body .block-body li + li {
+  margin-top: 0;
+}
+.document-modal ms-doc-body .block-body blockquote {
+  padding: 0 12px;
+  border-left: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: none;
+  font-style: italic;
+}
+.document-modal ms-doc-body .block-body code {
+  padding: 0 4px;
+  border-radius: 0;
+  background: var(--color-surface-2);
+}
+.document-modal ms-doc-body .block-body pre {
+  line-height: var(--line-pitch);
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface);
+}
+.document-modal ms-doc-body .block-body pre code {
+  padding: 0;
+  background: transparent;
+}
+.document-modal ms-doc-body .block-body table {
+  width: 100%;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 0;
+}
+.document-modal ms-doc-body .block-body thead th {
+  background: none;
+  font-weight: 600;
+}
+.document-modal ms-doc-body .block-body tbody tr:nth-child(even) {
+  background: none;
+}
+.document-modal ms-doc-body .block-body th,
+.document-modal ms-doc-body .block-body td {
+  padding: 0 12px;
+  line-height: var(--line-pitch);
+  border-bottom: var(--border-width) solid var(--color-border);
+}
+/* Images: in colour, in a square frame with a thin border. */
+.document-modal ms-doc-body .block-body img {
+  display: block;
+  margin: var(--line-pitch) auto;
+  padding: 0;
+  border: var(--border-width) solid var(--color-border);
+  border-radius: 0;
+  box-shadow: none;
+}
+.document-modal ms-doc-body .block-body figcaption {
+  margin: 0;
+  line-height: var(--line-pitch);
+}
+.document-modal ms-doc-body .block-body hr {
+  margin: var(--line-pitch) 0;
+}
+/* Master-only blocks: dashed frame, no tint. */
+.document-modal ms-doc-body .block-master {
+  padding: 0 12px;
+  border: var(--border-width) dashed var(--color-border-strong);
+  border-radius: 0;
+  background: none;
+}
+.document-modal ms-doc-body .master-mark {
+  top: 4px;
+  right: 8px;
+  padding: 0 4px;
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 /* Narrow screens: full screen, larger hit areas, smaller gutters. */
@@ -463,7 +547,7 @@
     padding: 12px 12px 12px 16px;
   }
   .document-modal .doc-main {
-    padding: 28px 16px 8px;
+    padding: var(--line-pitch) 16px var(--space-1);
   }
   .document-modal .icon-button {
     width: 44px;
@@ -478,7 +562,7 @@
     display: none;
   }
   .document-modal .segmented {
-    height: 48px;
+    height: 44px;
   }
   .document-modal .segmented .icon-button {
     width: 44px;

@@ -16,13 +16,15 @@ import { ThemeService } from '../core/theme.service';
 import { UpdateAlign } from '../update-align/update-align';
 import { UpdateNotice } from '../update-notice/update-notice';
 import { ViewModeService } from '../core/view-mode.service';
+import { TooltipDirective } from '../core/tooltip.directive';
+import { type TooltipPosition } from '../core/tooltip.service';
 import { I18n, type TranslationKey } from '../i18n';
 import { Palette, PaletteController } from '../search/palette';
 import { applyTextScale, readTextScale } from './text-scale';
 
 @Component({
   selector: 'ms-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock, UpdateAlign, UpdateNotice],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock, UpdateAlign, UpdateNotice, TooltipDirective],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })
@@ -76,7 +78,17 @@ export class Shell {
   );
   private readonly campaignName = computed(() => this.status.campaign()?.name ?? '');
 
+  /** Phones (the bottom bar, same breakpoint as shell.css) show tooltips above the icon; desktop shows them to the right. */
+  private readonly mobileQuery: MediaQueryList | null =
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(max-width: 719px)') : null;
+  readonly tooltipSide = signal<TooltipPosition>(this.mobileQuery?.matches ? 'top' : 'right');
+
   constructor() {
+    if (this.mobileQuery) {
+      const onChange = (event: MediaQueryListEvent) => this.tooltipSide.set(event.matches ? 'top' : 'right');
+      this.mobileQuery.addEventListener?.('change', onChange);
+      inject(DestroyRef).onDestroy(() => this.mobileQuery?.removeEventListener?.('change', onChange));
+    }
     // Saved text size: applied once the campaign is known, and again whenever it changes.
     effect(() => applyTextScale(readTextScale(this.prefs)));
     // The page title follows the route. A document sets its own title once it has loaded.

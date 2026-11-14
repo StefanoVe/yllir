@@ -123,9 +123,9 @@ describe('Shell encyclopedia and print entries', () => {
     const encyclopedia = fixture.nativeElement.querySelector('a[href="/encyclopedia"]') as HTMLAnchorElement | null;
     const print = fixture.nativeElement.querySelector('a[href="/print"]') as HTMLAnchorElement | null;
     expect(encyclopedia?.getAttribute('aria-label')).toBe('Encyclopedia');
-    expect(encyclopedia?.getAttribute('title')).toBe('Encyclopedia');
+    expect(encyclopedia?.hasAttribute('title')).toBe(false);
     expect(print?.getAttribute('aria-label')).toBe('Print');
-    expect(print?.getAttribute('title')).toBe('Print');
+    expect(print?.hasAttribute('title')).toBe(false);
   });
 
   it('hides each icon when its own module is off', () => {
@@ -160,7 +160,7 @@ describe('Shell documents entry', () => {
     expect(hrefs.indexOf('/docs')).toBe(hrefs.indexOf('/live') + 1);
     const docs = fixture.nativeElement.querySelector('a[href="/docs"]') as HTMLAnchorElement;
     expect(docs.getAttribute('aria-label')).toBe('Documents');
-    expect(docs.getAttribute('title')).toBe('Documents');
+    expect(docs.hasAttribute('title')).toBe(false);
   });
 });
 

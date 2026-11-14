@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { ChevronDown, LucideAngularModule, Music, Pause, Play, SkipForward, Volume2, VolumeX } from 'lucide-angular';
 import type { MusicTrack } from '@shared/types';
 import { StatusService } from '../core/status.service';
+import { TooltipDirective } from '../core/tooltip.directive';
 import { I18n, type TranslationKey } from '../i18n';
 import { MusicArt } from './music-art';
 import { MusicPlayerService, type MusicUiState } from './music-player.service';
@@ -37,7 +38,7 @@ function writeExpanded(expanded: boolean): void {
  */
 @Component({
   selector: 'ms-music-mini',
-  imports: [LucideAngularModule, MusicArt, MusicSlider],
+  imports: [LucideAngularModule, MusicArt, MusicSlider, TooltipDirective],
   templateUrl: './music-mini.html',
   styleUrl: './music-mini.css',
 })

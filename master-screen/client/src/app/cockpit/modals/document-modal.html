@@ -35,7 +35,8 @@
         <button
           type="button"
           class="icon-button"
-          [title]="i18n.t('liveAgent.previousSheet')"
+          [msTooltip]="i18n.t('liveAgent.previousSheet')"
+          msTooltipPosition="bottom"
           [attr.aria-label]="i18n.t('liveAgent.previousSheet')"
           [disabled]="!nav.prev"
           (click)="step(-1)"
@@ -50,7 +51,8 @@
         <button
           type="button"
           class="icon-button"
-          [title]="i18n.t('liveAgent.nextSheet')"
+          [msTooltip]="i18n.t('liveAgent.nextSheet')"
+          msTooltipPosition="bottom"
           [attr.aria-label]="i18n.t('liveAgent.nextSheet')"
           [disabled]="!nav.next"
           (click)="step(1)"
@@ -63,7 +65,8 @@
       <button
         type="button"
         class="icon-button"
-        [title]="i18n.t('liveAgent.openInReader')"
+        [msTooltip]="i18n.t('liveAgent.openInReader')"
+        msTooltipPosition="bottom"
         [attr.aria-label]="i18n.t('liveAgent.openInReaderAria')"
         (click)="openInReader()"
       >
@@ -73,7 +76,8 @@
         #closeButton
         type="button"
         class="icon-button close-button"
-        [title]="i18n.t('liveAgent.closeEsc')"
+        [msTooltip]="i18n.t('liveAgent.closeEsc')"
+        msTooltipPosition="bottom"
         [attr.aria-label]="i18n.t('liveAgent.close')"
         (click)="dismiss()"
       >
@@ -89,7 +93,7 @@
   </header>
   <div
     #body
-    class="modal-body document-content"
+    class="modal-body document-content notebook-page"
     [attr.aria-busy]="loading() ? 'true' : null"
     (click)="click($event)"
     (scroll)="onScroll()"
@@ -104,7 +108,10 @@
         </div>
         } @else if (doc(); as d) {
         @if (d.masterOnly) {
-        <p class="master-banner">{{ i18n.t("liveAgent.masterOnlyDoc") }}</p>
+        <p class="master-banner master-only">
+          <lucide-angular [img]="icons.lock" [size]="16" [strokeWidth]="1.5" aria-hidden="true" />
+          <span>{{ i18n.t("liveAgent.masterOnlyDoc") }}</span>
+        </p>
         }
         <article [class.item-document]="d.path.startsWith('Items/')">
           <ms-doc-body [blocks]="d.blocks" />

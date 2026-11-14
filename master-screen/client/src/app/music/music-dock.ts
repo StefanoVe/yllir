@@ -19,6 +19,7 @@ import {
 } from 'lucide-angular';
 import type { MusicTrack } from '@shared/types';
 import { docUrl } from '../core/doc-nav.service';
+import { TooltipDirective } from '../core/tooltip.directive';
 import { StatusService } from '../core/status.service';
 import { I18n, type TranslationKey } from '../i18n';
 import { MusicApiService, MusicSearch } from './music-api.service';
@@ -38,7 +39,7 @@ import { MusicSlider } from './music-slider';
  */
 @Component({
   selector: 'ms-music-dock',
-  imports: [LucideAngularModule, RouterLink, MusicResult, MusicArt, MusicSlider],
+  imports: [LucideAngularModule, RouterLink, MusicResult, MusicArt, MusicSlider, TooltipDirective],
   templateUrl: './music-dock.html',
   styleUrl: './music-dock.css',
 })

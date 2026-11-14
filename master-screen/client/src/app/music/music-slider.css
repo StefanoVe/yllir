@@ -1,6 +1,7 @@
 /*
- * Slider. The rail is 4px and grows to 6px on hover; the native range input sits over it and is
- * transparent, except for the thumb, which shows on hover and focus only.
+ * Slider: flat. A 2px track, the played or set part in the text colour, and a 10px square thumb
+ * with a 2px page-coloured outline. The native range input sits over the track, so the hit area is
+ * the whole 18px host and the keyboard keeps working.
  */
 :host {
   position: relative;
@@ -15,43 +16,26 @@
   left: 0;
   right: 0;
   top: 50%;
-  height: 4px;
+  height: 2px;
   transform: translateY(-50%);
-  border-radius: 999px;
-  background: rgb(236 229 210 / 0.16);
-  transition: height 120ms ease-out;
-  overflow: hidden;
-}
-
-:host(:hover) .rail {
-  height: 6px;
+  border-radius: 0;
+  background: var(--color-border);
+  overflow: visible;
 }
 
 .fill {
   display: block;
   height: 100%;
-  background: var(--ink-accent, #d9a548);
+  background: var(--color-text);
 }
 
 .rail.animated .fill {
   transition: width 250ms linear;
 }
 
-/* Tick rail (the seek line of the bar): ticks on a 5px pitch, the played part in the accent. */
+/* Tick rail (the seek line of the bar): the same flat track; the tick marks are not drawn. */
 .rail.ticks {
-  height: 14px;
-  border-radius: 0;
-  background: repeating-linear-gradient(90deg, rgb(155 165 150 / 0.55) 0 2px, transparent 2px 5px);
-  overflow: visible;
-}
-
-:host(:hover) .rail.ticks {
-  height: 16px;
-}
-
-.rail.ticks .fill {
-  overflow: hidden;
-  background: repeating-linear-gradient(90deg, var(--ink-accent, #d9a548) 0 2px, transparent 2px 5px);
+  height: 2px;
 }
 
 .range {
@@ -71,7 +55,7 @@
 }
 
 .range:focus-visible {
-  outline: 2px solid var(--ink-text, #ece5d2);
+  outline: 2px solid var(--color-focus);
   outline-offset: 2px;
 }
 
@@ -87,45 +71,36 @@
 .range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 4px;
-  height: 16px;
-  margin-top: 1px;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
   border: 0;
-  border-radius: 2px;
-  background: var(--ink-text, #ece5d2);
-  opacity: 0;
-  transition: opacity 120ms ease-out;
+  border-radius: 0;
+  background: var(--color-text);
+  outline: 2px solid var(--color-bg);
+  outline-offset: 0;
 }
 
 .range::-moz-range-thumb {
-  width: 4px;
-  height: 16px;
+  width: 10px;
+  height: 10px;
   border: 0;
-  border-radius: 2px;
-  background: var(--ink-text, #ece5d2);
-  opacity: 0;
-  transition: opacity 120ms ease-out;
-}
-
-.range:hover::-webkit-slider-thumb,
-.range:focus-visible::-webkit-slider-thumb {
-  opacity: 1;
-}
-
-.range:hover::-moz-range-thumb,
-.range:focus-visible::-moz-range-thumb {
-  opacity: 1;
+  border-radius: 0;
+  background: var(--color-text);
+  outline: 2px solid var(--color-bg);
+  outline-offset: 0;
 }
 
 :host(.is-disabled) {
-  opacity: 0.5;
+  opacity: 0.55;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rail,
-  .rail.animated .fill,
-  .range::-webkit-slider-thumb,
-  .range::-moz-range-thumb {
+  .rail.animated .fill {
     transition: none;
   }
+}
+
+:host-context([data-motion='reduced']) .rail.animated .fill {
+  transition: none;
 }

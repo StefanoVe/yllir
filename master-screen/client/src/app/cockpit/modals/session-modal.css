@@ -1,32 +1,20 @@
+/* Sessions popup (SessionModal): a flat form and a ruled list. The shared frame is in modal.css; the
+   buttons and the text field come from the global .btn, .btn-primary and .field classes. */
 .session-modal {
   width: min(560px, calc(100vw - 32px));
 }
 .session-create {
   display: flex;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 16px;
   padding: 16px 20px;
 }
-.session-create input {
+.session-create .field {
   flex: 1;
   min-width: 0;
-  height: 38px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 6px;
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  font: inherit;
 }
-.primary-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 38px;
-  padding: 0 14px;
-  border-radius: 999px;
-  background: var(--color-text);
-  color: var(--color-bg);
-  font-weight: 600;
+.session-create .btn {
+  flex: none;
 }
 .session-error {
   margin: 0;
@@ -35,7 +23,7 @@
 .session-list {
   list-style: none;
   margin: 0;
-  padding: 0 12px 12px;
+  padding: 0 20px 12px;
   overflow: auto;
 }
 .session-list li {
@@ -44,13 +32,15 @@
   gap: 8px;
   min-height: 56px;
   padding: 0 4px 0 0;
-  border-radius: 8px;
+  border-radius: 0;
 }
 .session-list li + li {
-  border-top: 1px solid var(--color-border);
+  border-top: var(--border-width) solid var(--color-border);
 }
+/* The open session is the inverted row: filled with the text colour, text in the page colour. */
 .session-list li.current {
-  background: var(--color-surface-2);
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 .session-open {
   flex: 1;
@@ -61,6 +51,7 @@
   align-items: flex-start;
   gap: 2px;
   padding: 8px;
+  color: inherit;
   text-align: left;
 }
 .session-open strong,
@@ -83,9 +74,25 @@
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
+.session-list li.current .session-open span,
+.session-list li.current small {
+  color: inherit;
+}
+.session-list li.current .icon-button {
+  color: inherit;
+}
+.session-list li.current .icon-button:hover {
+  background: var(--color-accent-active);
+  color: var(--color-bg);
+}
+/* Delete, second click: a thin danger frame, no tint. */
 .session-list .icon-button.danger {
   color: var(--color-danger);
-  background: color-mix(in srgb, var(--color-danger) 14%, var(--color-surface));
+  outline: var(--border-width) solid var(--color-danger);
+  outline-offset: -1px;
+}
+.session-list li.current .icon-button.danger {
+  color: var(--color-danger);
 }
 .session-empty {
   padding: 12px 8px;

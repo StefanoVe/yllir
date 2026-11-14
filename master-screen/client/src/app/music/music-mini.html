@@ -1,12 +1,12 @@
 @if (visible()) {
   @if (!expanded()) {
     <button type="button" class="round" [attr.aria-expanded]="false"
-            [attr.aria-label]="label('music.mini.label')" [attr.title]="label('music.mini.label')"
+            [attr.aria-label]="label('music.mini.label')" [msTooltip]="label('music.mini.label')" msTooltipPosition="top"
             (click)="setExpanded(true)">
       @if (player.current(); as track) {
         <ms-music-art class="round-art" [track]="track" />
       } @else {
-        <lucide-angular class="round-note" [img]="icons.Music" [size]="20" aria-hidden="true" />
+        <lucide-angular [strokeWidth]="1.5" class="round-note" [img]="icons.Music" [size]="20" aria-hidden="true" />
       }
       @if (playing()) {
         <span class="eq" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -30,21 +30,21 @@
 
         <div class="actions">
           <button type="button" class="btn play" [disabled]="!canPlay()" [attr.aria-label]="playPauseLabel()"
-                  [attr.title]="playPauseLabel()" (click)="player.toggle()">
-            <lucide-angular [img]="busy() ? icons.Pause : icons.Play" [size]="18" aria-hidden="true" />
+                  [msTooltip]="playPauseLabel()" msTooltipPosition="top" (click)="player.toggle()">
+            <lucide-angular [strokeWidth]="1.5" [img]="busy() ? icons.Pause : icons.Play" [size]="16" aria-hidden="true" />
           </button>
           <button type="button" class="btn" [disabled]="!canPlay() || !player.hasNext()"
-                  [attr.aria-label]="label('music.next')" [attr.title]="label('music.next')" (click)="player.next()">
-            <lucide-angular [img]="icons.SkipForward" [size]="18" aria-hidden="true" />
+                  [attr.aria-label]="label('music.next')" [msTooltip]="label('music.next')" msTooltipPosition="top" (click)="player.next()">
+            <lucide-angular [strokeWidth]="1.5" [img]="icons.SkipForward" [size]="16" aria-hidden="true" />
           </button>
           <button type="button" class="btn" [class.on]="volumeOpen()" [attr.aria-expanded]="volumeOpen()"
-                  [attr.aria-controls]="volumeOpen() ? 'music-mini-volume' : null" [attr.aria-label]="volumeLabel()" [attr.title]="volumeLabel()"
+                  [attr.aria-controls]="volumeOpen() ? 'music-mini-volume' : null" [attr.aria-label]="volumeLabel()" [msTooltip]="volumeLabel()" msTooltipPosition="top"
                   (click)="toggleVolume()">
-            <lucide-angular [img]="volumeIcon()" [size]="18" aria-hidden="true" />
+            <lucide-angular [strokeWidth]="1.5" [img]="volumeIcon()" [size]="16" aria-hidden="true" />
           </button>
           <button type="button" class="btn" [attr.aria-label]="label('music.mini.collapse')"
-                  [attr.title]="label('music.mini.collapse')" (click)="setExpanded(false)">
-            <lucide-angular [img]="icons.ChevronDown" [size]="18" aria-hidden="true" />
+                  [msTooltip]="label('music.mini.collapse')" msTooltipPosition="top" (click)="setExpanded(false)">
+            <lucide-angular [strokeWidth]="1.5" [img]="icons.ChevronDown" [size]="16" aria-hidden="true" />
           </button>
         </div>
       </div>

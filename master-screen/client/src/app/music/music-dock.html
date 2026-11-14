@@ -15,8 +15,8 @@
                 }
               </button>
               <button type="button" class="dismiss" [attr.aria-label]="label('music.dismiss')"
-                      [attr.title]="label('music.dismiss')" (click)="api.dismiss(item.id)">
-                <lucide-angular [img]="icons.X" [size]="14" aria-hidden="true" />
+                      [msTooltip]="label('music.dismiss')" msTooltipPosition="top" (click)="api.dismiss(item.id)">
+                <lucide-angular [strokeWidth]="1.5" [img]="icons.X" [size]="20" aria-hidden="true" />
               </button>
             </li>
           }
@@ -29,7 +29,7 @@
       <section class="now" [attr.aria-label]="label('music.playerLabel')">
         @if (!player.available()) {
           <p class="line">
-            <lucide-angular [img]="icons.Music" [size]="16" aria-hidden="true" />
+            <lucide-angular [strokeWidth]="1.5" [img]="icons.Music" [size]="16" aria-hidden="true" />
             <span>{{ label('music.dock.unavailable') }}</span>
             <a class="link" routerLink="/music">{{ label('music.dock.open') }}</a>
           </p>
@@ -41,7 +41,7 @@
               <p class="meta is-error"><span>{{ message }}</span></p>
             </div>
             <button type="button" class="pill-btn retry" (click)="player.retry()">
-              <lucide-angular [img]="icons.RotateCw" [size]="14" aria-hidden="true" />
+              <lucide-angular [strokeWidth]="1.5" [img]="icons.RotateCw" [size]="16" aria-hidden="true" />
               <span>{{ label('music.retry') }}</span>
             </button>
           </div>
@@ -74,25 +74,25 @@
         <!-- Controls: previous, play, next, and on desktop loop and fade-out. -->
         <div class="controls">
           <button type="button" class="icon-btn wide-only" [class.on]="player.loop()" [attr.aria-pressed]="player.loop()"
-                  [disabled]="!player.current()" [attr.aria-label]="label('music.loop')" [attr.title]="label('music.loop')"
+                  [disabled]="!player.current()" [attr.aria-label]="label('music.loop')" [msTooltip]="label('music.loop')" msTooltipPosition="top"
                   (click)="player.toggleLoop()">
-            <lucide-angular [img]="icons.Repeat" [size]="16" aria-hidden="true" />
+            <lucide-angular [strokeWidth]="1.5" [img]="icons.Repeat" [size]="20" aria-hidden="true" />
           </button>
           <button type="button" class="icon-btn" [disabled]="!canPlay() || !player.hasPrevious()"
-                  [attr.aria-label]="label('music.previous')" [attr.title]="label('music.previous')" (click)="player.previous()">
-            <lucide-angular [img]="icons.SkipBack" [size]="18" aria-hidden="true" />
+                  [attr.aria-label]="label('music.previous')" [msTooltip]="label('music.previous')" msTooltipPosition="top" (click)="player.previous()">
+            <lucide-angular [strokeWidth]="1.5" [img]="icons.SkipBack" [size]="20" aria-hidden="true" />
           </button>
           <button type="button" class="play-btn" [disabled]="!canPlay()" [attr.aria-label]="playPauseLabel()"
-                  [attr.title]="playPauseLabel()" (click)="player.toggle()">
-            <lucide-angular [img]="isBusyNow() ? icons.Pause : icons.Play" [size]="18" aria-hidden="true" />
+                  [msTooltip]="playPauseLabel()" msTooltipPosition="top" (click)="player.toggle()">
+            <lucide-angular [strokeWidth]="1.5" [img]="isBusyNow() ? icons.Pause : icons.Play" [size]="20" aria-hidden="true" />
           </button>
           <button type="button" class="icon-btn" [disabled]="!canPlay() || !player.hasNext()"
-                  [attr.aria-label]="label('music.next')" [attr.title]="label('music.next')" (click)="player.next()">
-            <lucide-angular [img]="icons.SkipForward" [size]="18" aria-hidden="true" />
+                  [attr.aria-label]="label('music.next')" [msTooltip]="label('music.next')" msTooltipPosition="top" (click)="player.next()">
+            <lucide-angular [strokeWidth]="1.5" [img]="icons.SkipForward" [size]="20" aria-hidden="true" />
           </button>
           <button type="button" class="icon-btn wide-only" [disabled]="player.state() !== 'playing'"
-                  [attr.aria-label]="label('music.fadeOut')" [attr.title]="label('music.fadeOut')" (click)="player.fadeOut()">
-            <lucide-angular [img]="icons.Sunset" [size]="16" aria-hidden="true" />
+                  [attr.aria-label]="label('music.fadeOut')" [msTooltip]="label('music.fadeOut')" msTooltipPosition="top" (click)="player.fadeOut()">
+            <lucide-angular [strokeWidth]="1.5" [img]="icons.Sunset" [size]="20" aria-hidden="true" />
           </button>
         </div>
 
@@ -111,31 +111,31 @@
       <div class="side">
         <div class="volume" [class.open]="volumeOpen()">
           <button type="button" class="icon-btn mute" [attr.aria-expanded]="volumeOpen()"
-                  [attr.aria-label]="volumeLabel()" [attr.title]="volumeLabel()" (click)="toggleVolumePanel()">
-            <lucide-angular [img]="volumeIcon()" [size]="16" aria-hidden="true" />
+                  [attr.aria-label]="volumeLabel()" [msTooltip]="volumeLabel()" msTooltipPosition="top" (click)="toggleVolumePanel()">
+            <lucide-angular [strokeWidth]="1.5" [img]="volumeIcon()" [size]="20" aria-hidden="true" />
           </button>
           <ms-music-slider class="volume-range" [value]="player.volume()" [max]="100" [label]="label('music.volume')"
                            [valueText]="volumeLabel()" (moved)="onVolume($event)" />
           <button type="button" class="icon-btn phone-only" [class.on]="player.loop()" [attr.aria-pressed]="player.loop()"
-                  [attr.aria-label]="label('music.loop')" [attr.title]="label('music.loop')" (click)="player.toggleLoop()">
-            <lucide-angular [img]="icons.Repeat" [size]="16" aria-hidden="true" />
+                  [attr.aria-label]="label('music.loop')" [msTooltip]="label('music.loop')" msTooltipPosition="top" (click)="player.toggleLoop()">
+            <lucide-angular [strokeWidth]="1.5" [img]="icons.Repeat" [size]="20" aria-hidden="true" />
           </button>
           <button type="button" class="icon-btn phone-only" [disabled]="player.state() !== 'playing'"
-                  [attr.aria-label]="label('music.fadeOut')" [attr.title]="label('music.fadeOut')" (click)="player.fadeOut()">
-            <lucide-angular [img]="icons.Sunset" [size]="16" aria-hidden="true" />
+                  [attr.aria-label]="label('music.fadeOut')" [msTooltip]="label('music.fadeOut')" msTooltipPosition="top" (click)="player.fadeOut()">
+            <lucide-angular [strokeWidth]="1.5" [img]="icons.Sunset" [size]="20" aria-hidden="true" />
           </button>
         </div>
 
         <button type="button" class="icon-btn" [disabled]="!player.current()" [attr.aria-label]="label('music.stop')"
-                [attr.title]="label('music.stop')" (click)="player.stop()">
-          <lucide-angular [img]="icons.Square" [size]="13" aria-hidden="true" />
+                [msTooltip]="label('music.stop')" msTooltipPosition="top" (click)="player.stop()">
+          <lucide-angular [strokeWidth]="1.5" [img]="icons.Square" [size]="20" aria-hidden="true" />
         </button>
 
         <div class="browse-wrap">
           <button #browseButton type="button" class="browse-btn" aria-haspopup="dialog"
                   [attr.aria-expanded]="browseOpen()" [attr.aria-label]="label('music.dock.browseAria')"
                   [attr.title]="label('music.dock.browseAria')" (click)="toggleBrowse()">
-            <lucide-angular [img]="icons.ListMusic" [size]="16" aria-hidden="true" />
+            <lucide-angular [strokeWidth]="1.5" [img]="icons.ListMusic" [size]="16" aria-hidden="true" />
             <span>{{ label('music.dock.browse') }}</span>
           </button>
 

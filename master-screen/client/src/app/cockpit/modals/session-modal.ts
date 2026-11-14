@@ -13,11 +13,12 @@ import { FormsModule } from "@angular/forms";
 import { Icon } from "../support/icon";
 import { CockpitService } from "../cockpit.service";
 import { I18n } from "../../i18n";
+import { TooltipDirective } from "../../core/tooltip.directive";
 
 /** Open, create and delete live sessions. Opening one loads it into the cockpit. */
 @Component({
   selector: "cockpit-session-modal",
-  imports: [Icon, FormsModule],
+  imports: [Icon, FormsModule, TooltipDirective],
   templateUrl: "./session-modal.html",
   styleUrls: ["./modal.css", "./session-modal.css"],
   encapsulation: ViewEncapsulation.None,

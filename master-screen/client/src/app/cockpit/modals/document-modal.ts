@@ -14,11 +14,13 @@ import {
   viewChild,
 } from "@angular/core";
 import { Router } from "@angular/router";
+import { Lock, LucideAngularModule } from "lucide-angular";
 import { Icon } from "../support/icon";
 import { DocumentsService } from "../support/documents.service";
 import { ViewerService } from "../support/viewer.service";
 import { OverlayService } from "../support/overlay.service";
 import { DocBody } from "../../reader/doc-body";
+import { TooltipDirective } from "../../core/tooltip.directive";
 import type { DocResponse } from "@shared/types";
 import type { SourceRef } from "@shared/cockpit-types";
 import { docUrl, parseDocHref } from "../../core/doc-nav.service";
@@ -42,7 +44,7 @@ function prefersReducedMotion(): boolean {
  */
 @Component({
   selector: "cockpit-document-modal",
-  imports: [Icon, DocBody],
+  imports: [Icon, DocBody, LucideAngularModule, TooltipDirective],
   templateUrl: "./document-modal.html",
   styleUrls: ["./modal.css", "./document-modal.css"],
   // The document body is rendered by the reader's DocBody, whose styles are global.
@@ -54,6 +56,7 @@ export class DocumentModal implements OnInit {
   siblings = input<SourceRef[]>([]);
   close = output<void>();
   readonly i18n = inject(I18n);
+  readonly icons = { lock: Lock };
   private documents = inject(DocumentsService);
   private viewer = inject(ViewerService);
   private overlay = inject(OverlayService);

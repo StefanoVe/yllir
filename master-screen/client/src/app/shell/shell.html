@@ -1,55 +1,55 @@
 <div class="shell">
   <nav class="rail" [attr.aria-label]="label('shell.mainNav')">
     <a class="rail-item" routerLink="/plot" routerLinkActive="active" ariaCurrentWhenActive="page"
-       [attr.aria-label]="i18n.t('nav.plot')" [title]="i18n.t('nav.plot')">
-      <lucide-angular [img]="icons.GitBranch" [size]="20" aria-hidden="true" />
+       [attr.aria-label]="i18n.t('nav.plot')" [msTooltip]="i18n.t('nav.plot')" [msTooltipPosition]="tooltipSide()">
+      <lucide-angular [img]="icons.GitBranch" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
     </a>
     <a class="rail-item" routerLink="/live" routerLinkActive="active" ariaCurrentWhenActive="page"
-       [attr.aria-label]="i18n.t('nav.liveTable')" [title]="i18n.t('nav.liveTable')">
-      <lucide-angular [img]="icons.Dices" [size]="20" aria-hidden="true" />
+       [attr.aria-label]="i18n.t('nav.liveTable')" [msTooltip]="i18n.t('nav.liveTable')" [msTooltipPosition]="tooltipSide()">
+      <lucide-angular [img]="icons.Dices" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
     </a>
     @if (showDocs()) {
       <a class="rail-item" routerLink="/docs" routerLinkActive="active" ariaCurrentWhenActive="page"
-         [attr.aria-label]="i18n.t('nav.documents')" [title]="i18n.t('nav.documents')">
-        <lucide-angular [img]="icons.Library" [size]="20" aria-hidden="true" />
+         [attr.aria-label]="i18n.t('nav.documents')" [msTooltip]="i18n.t('nav.documents')" [msTooltipPosition]="tooltipSide()">
+        <lucide-angular [img]="icons.Library" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
       </a>
     }
     @if (showMusic()) {
       <a class="rail-item" routerLink="/music" routerLinkActive="active" ariaCurrentWhenActive="page"
-         [attr.aria-label]="i18n.t('nav.music')" [title]="i18n.t('nav.music')">
-        <lucide-angular [img]="icons.Music" [size]="20" aria-hidden="true" />
+         [attr.aria-label]="i18n.t('nav.music')" [msTooltip]="i18n.t('nav.music')" [msTooltipPosition]="tooltipSide()">
+        <lucide-angular [img]="icons.Music" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
       </a>
     }
     @if (showEncyclopedia()) {
       <a class="rail-item" routerLink="/encyclopedia" routerLinkActive="active" ariaCurrentWhenActive="page"
-         [attr.aria-label]="i18n.t('nav.encyclopedia')" [title]="i18n.t('nav.encyclopedia')">
-        <lucide-angular [img]="icons.BookOpen" [size]="20" aria-hidden="true" />
+         [attr.aria-label]="i18n.t('nav.encyclopedia')" [msTooltip]="i18n.t('nav.encyclopedia')" [msTooltipPosition]="tooltipSide()">
+        <lucide-angular [img]="icons.BookOpen" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
       </a>
     }
     @if (showPrint()) {
       <a class="rail-item" routerLink="/print" routerLinkActive="active" ariaCurrentWhenActive="page"
-         [attr.aria-label]="i18n.t('nav.print')" [title]="i18n.t('nav.print')">
-        <lucide-angular [img]="icons.Printer" [size]="20" aria-hidden="true" />
+         [attr.aria-label]="i18n.t('nav.print')" [msTooltip]="i18n.t('nav.print')" [msTooltipPosition]="tooltipSide()">
+        <lucide-angular [img]="icons.Printer" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
       </a>
     }
     <button type="button" class="rail-item rail-sep" aria-haspopup="dialog" [class.active]="palette.open()"
-            [attr.aria-label]="i18n.t('nav.search')" [title]="i18n.t('nav.search')" (click)="palette.show()">
-      <lucide-angular [img]="icons.Search" [size]="20" aria-hidden="true" />
+            [attr.aria-label]="i18n.t('nav.search')" [msTooltip]="i18n.t('nav.search')" [msTooltipPosition]="tooltipSide()" (click)="palette.show()">
+      <lucide-angular [img]="icons.Search" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
     </button>
     <button type="button" class="rail-item rail-sep rail-bottom" [class.active]="viewMode.viewMode() === 'public'"
             [attr.aria-pressed]="viewMode.viewMode() === 'public'"
-            [attr.aria-label]="previewLabel()" [title]="previewLabel()"
+            [attr.aria-label]="previewLabel()" [msTooltip]="previewLabel()" [msTooltipPosition]="tooltipSide()"
             (click)="viewMode.toggle()">
-      <lucide-angular [img]="viewMode.viewMode() === 'public' ? icons.EyeOff : icons.Eye" [size]="20" aria-hidden="true" />
+      <lucide-angular [img]="viewMode.viewMode() === 'public' ? icons.EyeOff : icons.Eye" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
     </button>
     <button type="button" class="rail-item"
-            [attr.aria-label]="themeLabel()" [title]="themeLabel()"
+            [attr.aria-label]="themeLabel()" [msTooltip]="themeLabel()" [msTooltipPosition]="tooltipSide()"
             (click)="theme.cycle()">
-      <lucide-angular [img]="icons.SunMoon" [size]="20" aria-hidden="true" />
+      <lucide-angular [img]="icons.SunMoon" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
     </button>
     <a class="rail-item" routerLink="/settings" routerLinkActive="active" ariaCurrentWhenActive="page"
-       [attr.aria-label]="settingsLabel()" [title]="settingsLabel()">
-      <lucide-angular [img]="icons.Settings" [size]="20" aria-hidden="true" />
+       [attr.aria-label]="settingsLabel()" [msTooltip]="settingsLabel()" [msTooltipPosition]="tooltipSide()">
+      <lucide-angular [img]="icons.Settings" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
       @if (showUpdateNotice()) {
         <span class="rail-dot" aria-hidden="true"></span>
       }
@@ -59,13 +59,13 @@
   <main class="main" id="main" tabindex="-1" [class.has-dock]="dockVisible()">
     @if (viewMode.viewMode() === 'public') {
       <p class="preview-banner" role="status">
-        <lucide-angular [img]="icons.EyeOff" [size]="16" aria-hidden="true" />
+        <lucide-angular [img]="icons.EyeOff" [size]="16" [strokeWidth]="1.5" aria-hidden="true" />
         <span>{{ label('shell.previewBanner') }}</span>
       </p>
     }
     @if (showOffline()) {
       <p class="offline" role="status">
-        <lucide-angular [img]="icons.WifiOff" [size]="16" aria-hidden="true" />
+        <lucide-angular [img]="icons.WifiOff" [size]="16" [strokeWidth]="1.5" aria-hidden="true" />
         <span>{{ i18n.t('shell.offline') }}</span>
       </p>
     }
