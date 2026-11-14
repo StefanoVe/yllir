@@ -40,6 +40,18 @@
   --color-rule: #efdcd9;
   --color-margin: #c98a84;
 
+  /* Card colour labels: content, so they keep their hues in the monochrome UI. Ink = text on the colour. */
+  --card-red: #b3342b;
+  --card-amber: #c98a1a;
+  --card-green: #2f7d3b;
+  --card-blue: #2f5fbf;
+  --card-violet: #7a3fb0;
+  --card-red-ink: #ffffff;
+  --card-amber-ink: #111111;
+  --card-green-ink: #ffffff;
+  --card-blue-ink: #ffffff;
+  --card-violet-ink: #ffffff;
+
   /* Scrollbar. */
   --scrollbar-thumb: #b3b3b3;
   --scrollbar-track: transparent;
@@ -115,6 +127,17 @@
     --color-rule: #3a2523;
     --color-margin: #85403a;
 
+    --card-red: #ff8a80;
+    --card-amber: #f2b84b;
+    --card-green: #6fcf7f;
+    --card-blue: #7fa8ff;
+    --card-violet: #c39bff;
+    --card-red-ink: #000000;
+    --card-amber-ink: #000000;
+    --card-green-ink: #000000;
+    --card-blue-ink: #000000;
+    --card-violet-ink: #000000;
+
     --scrollbar-thumb: #4d4d4d;
     --scrollbar-track: transparent;
 
@@ -151,6 +174,17 @@
 
   --color-rule: #3a2523;
   --color-margin: #85403a;
+
+  --card-red: #ff8a80;
+  --card-amber: #f2b84b;
+  --card-green: #6fcf7f;
+  --card-blue: #7fa8ff;
+  --card-violet: #c39bff;
+  --card-red-ink: #000000;
+  --card-amber-ink: #000000;
+  --card-green-ink: #000000;
+  --card-blue-ink: #000000;
+  --card-violet-ink: #000000;
 
   --scrollbar-thumb: #4d4d4d;
   --scrollbar-track: transparent;

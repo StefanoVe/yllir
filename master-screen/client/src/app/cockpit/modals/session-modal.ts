@@ -84,6 +84,12 @@ export class SessionModal implements OnInit {
     }
   }
 
+  /** The scene under the title. Empty when the scene is not defined: the "not set" placeholder is no scene. */
+  sceneOf(location: string | null | undefined): string {
+    const scene = (location ?? "").trim();
+    return scene && scene !== this.i18n.t("liveAgent.noLocation") ? scene : "";
+  }
+
   updated(iso: string) {
     const date = new Date(iso);
     const locale = this.i18n.language() === "it" ? "it" : "en";

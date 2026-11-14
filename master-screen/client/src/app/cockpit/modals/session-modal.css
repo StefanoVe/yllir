@@ -1,6 +1,8 @@
-/* Sessions dialog (SessionModal): the frame comes from modal.css. The header and the new-session
-   row stay fixed; only the list scrolls. Buttons and the text field come from the global .btn,
-   .btn-primary and .field classes. Flat: rules, inversion for the open session, no colour but danger. */
+/* Sessions dialog (SessionModal): an index page of the notebook. The frame comes from modal.css;
+   the body is the global .notebook-page, so its ruled lines and margin set the rhythm. Every
+   vertical size in the body is a multiple of --line-pitch (28px), so text sits on the lines.
+   Colours come from the tokens only; the one exception is --color-danger for errors. */
+
 .cockpit-modal.session-modal {
   width: min(560px, calc(100vw - 32px));
   max-height: 80vh;
@@ -10,162 +12,196 @@
   font-weight: 600;
 }
 
-/* New session: one row, field and button both 40px high. */
-.session-create {
+/* Body: the notebook page. Lines scroll with the text. The left padding is the margin column
+   (56px) plus a gap, so content starts at 72px, as in the global .notebook-page. */
+.cockpit-modal.session-modal .session-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--line-pitch) 20px var(--line-pitch) 72px;
+  background-attachment: local;
+  container-type: inline-size;
+}
+
+/* New session: the first entry, two ruled lines high (56px). The field is boxed so the lines do
+   not show through it; the button is always visibly a button. */
+.cockpit-modal.session-modal .session-create {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   flex: none;
   gap: 12px;
-  padding: 16px 20px;
-  border-bottom: var(--border-width) solid var(--color-border);
+  height: 56px;
 }
-.session-create .field {
+.cockpit-modal.session-modal .session-create .field {
   flex: 1;
   min-width: 0;
   height: 40px;
   box-sizing: border-box;
+  padding: 0 12px;
+  border: var(--border-width) solid var(--color-border-strong);
+  background: var(--color-bg);
 }
-.session-create .btn {
+.cockpit-modal.session-modal .session-create .field:focus {
+  border-width: var(--border-width);
+  padding: 0 12px;
+}
+.cockpit-modal.session-modal .session-create .btn {
   flex: none;
   height: 40px;
   padding: 0 14px;
 }
-/* Empty title: outlined, muted text, not faded. */
-.session-create .btn:disabled {
-  background: transparent;
-  border-color: var(--color-border-strong);
+/* Empty title: a filled grey button with muted text and a thin frame, not faded. */
+.cockpit-modal.session-modal .session-create .btn:disabled {
+  background: var(--color-surface-2);
+  border-color: var(--color-border);
   color: var(--color-text-muted);
   opacity: 1;
+  cursor: not-allowed;
 }
 
-.session-error {
+/* Error: a boxed line above the list, two ruled lines high. */
+.cockpit-modal.session-modal .session-error {
   flex: none;
-  margin: 12px 20px 0;
-  padding: 8px 12px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-height: 56px;
+  margin: 0;
+  padding: 0 12px;
   border: var(--border-width) solid var(--color-danger);
+  background: var(--color-bg);
   color: var(--color-danger);
   font-size: 13px;
+  line-height: var(--line-pitch);
 }
 
-.session-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 0 20px 20px;
-  container-type: inline-size;
-}
-.session-list {
+/* List: index entries. The list reaches into the margin column (left edge at 4px, so a focus
+   ring is not clipped); each entry pads its own text back to the 72px content line. */
+.cockpit-modal.session-modal .session-list {
   list-style: none;
-  margin: 0;
+  margin: 0 0 0 -68px;
   padding: 0;
 }
-.session-list li {
+.cockpit-modal.session-modal .session-list li {
   display: flex;
-  align-items: stretch;
-  min-height: 60px;
-  border-radius: 0;
-}
-.session-list li + li {
-  border-top: var(--border-width) solid var(--color-border);
-}
-.session-list li:not(.current):hover {
-  background: var(--color-surface-2);
-}
-/* The open session: inverted row. */
-.session-list li.current {
-  background: var(--color-text);
-  color: var(--color-bg);
+  align-items: flex-start;
+  min-width: 0;
 }
 
-.session-open {
-  flex: 1;
+/* One entry is one open button. Line 1: title, dotted leader, time. Line 2 (only with a scene):
+   the scene. Grid rows are 28px, so an entry is 28px or 56px. */
+.cockpit-modal.session-modal .session-open {
+  position: relative;
+  flex: 1 1 auto;
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  column-gap: 12px;
-  padding: 10px 12px;
+  grid-template-columns: minmax(0, auto) minmax(24px, 1fr) auto;
+  grid-template-rows: var(--line-pitch) auto;
+  grid-template-areas:
+    "name leader date"
+    "scene scene scene";
+  align-items: baseline;
+  column-gap: 8px;
+  padding: 0 0 0 68px;
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: inherit;
+  color: var(--color-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.session-open:focus-visible,
-.session-delete:focus-visible {
+/* Margin square: filled for the open session, an empty frame for the others. */
+.cockpit-modal.session-modal .session-open::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 18px;
+  box-sizing: border-box;
+  width: 12px;
+  height: 12px;
+  border: var(--border-width) solid var(--color-border-strong);
+  background: transparent;
+}
+.cockpit-modal.session-modal .session-list li.current .session-open::before {
+  background: var(--color-text);
+}
+.cockpit-modal.session-modal .session-open:focus-visible {
   outline: 2px solid var(--color-focus);
-  outline-offset: -2px;
+  outline-offset: 2px;
 }
-.session-list li.current .session-open:focus-visible,
-.session-list li.current .session-delete:focus-visible {
-  outline-color: var(--color-bg);
+.cockpit-modal.session-modal .session-open:hover .session-name {
+  text-decoration-line: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
 }
-.session-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-.session-title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-.session-title ui-icon {
-  display: inline-flex;
-  flex: none;
-}
-.session-title strong {
+
+.cockpit-modal.session-modal .session-name {
+  grid-area: name;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 16px;
   font-weight: 500;
+  line-height: var(--line-pitch);
 }
-.session-place {
+.cockpit-modal.session-modal .session-list li.current .session-name {
+  font-weight: 700;
+}
+/* Dotted leader from the title to the time, sitting on the text baseline. */
+.cockpit-modal.session-modal .session-leader {
+  grid-area: leader;
+  min-width: 24px;
+  border-bottom: var(--border-width-strong) dotted var(--color-border-strong);
+}
+.cockpit-modal.session-modal .session-date {
+  grid-area: date;
+  font-size: 12px;
+  line-height: var(--line-pitch);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.cockpit-modal.session-modal .session-scene {
+  grid-area: scene;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 12px;
+  line-height: var(--line-pitch);
   color: var(--color-text-muted);
-}
-.session-date {
-  font-size: 12px;
-  color: var(--color-text-muted);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-.session-list li.current .session-place,
-.session-list li.current .session-date {
-  color: inherit;
-}
-/* Narrow dialog (320px phones): the date drops under the place. */
-@container (max-width: 380px) {
-  .session-open {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: 4px;
-  }
 }
 
-/* Delete: outside the row's main button (no nested buttons). */
+/* Delete: outside the open button (no nested buttons). 32px, aligned with line 1. Hidden until
+   the entry is hovered or focused; always visible on touch and for the open session. */
 .cockpit-modal .session-list .session-delete {
   flex: none;
-  align-self: center;
   width: 32px;
   height: 32px;
-  margin-right: 8px;
+  margin: -2px 0 0 8px;
+  padding: 0;
+  opacity: 0;
+  color: var(--color-text-muted);
+}
+.cockpit-modal .session-list .session-delete:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+.cockpit-modal .session-list li:hover .session-delete,
+.cockpit-modal .session-list li:focus-within .session-delete,
+.cockpit-modal .session-list li.current .session-delete,
+.cockpit-modal .session-list .session-delete.danger {
+  opacity: 1;
 }
 .cockpit-modal .session-list li.current .session-delete {
-  color: var(--color-bg);
+  color: var(--color-text);
 }
-.cockpit-modal .session-list li.current .session-delete:hover {
-  background: var(--color-accent-active);
-  color: var(--color-bg);
+@media (hover: none) {
+  .cockpit-modal .session-list .session-delete {
+    opacity: 1;
+  }
 }
 /* Delete, second click: a thin danger frame, no tint. */
 .cockpit-modal .session-list .session-delete.danger {
@@ -173,12 +209,11 @@
   outline: var(--border-width) solid var(--color-danger);
   outline-offset: -1px;
 }
-.cockpit-modal .session-list li.current .session-delete.danger {
-  color: var(--color-danger);
-}
 
-/* Loading: three flat grey rows, a slow fade that stops under reduced motion. */
-.session-skeleton {
+/* Loading: three 28px bars, one ruled line each. The soft pulse stops under reduced motion. */
+.cockpit-modal.session-modal .session-skeleton {
+  height: var(--line-pitch);
+  margin-left: 68px;
   background: var(--color-surface-2);
   animation: session-pulse 1.4s ease-in-out infinite;
 }
@@ -188,23 +223,42 @@
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .session-skeleton {
+  .cockpit-modal.session-modal .session-skeleton {
     animation: none;
   }
 }
-:root[data-motion="reduced"] .session-skeleton {
+:root[data-motion="reduced"] .cockpit-modal.session-modal .session-skeleton {
   animation: none;
 }
 
-/* Empty: one line in the hand font, centred. */
-.session-list li.session-empty {
+/* Empty: one line in the hand font, on the first ruled line below the new-session entry. */
+.cockpit-modal.session-modal .session-list li.session-empty {
   display: block;
   min-height: 0;
-  padding: 32px;
-  text-align: center;
+  padding: 0 0 0 68px;
   font-family: var(--font-family-hand);
   font-size: 24px;
-  color: var(--color-text-muted);
+  line-height: var(--line-pitch);
+  color: var(--color-text);
+}
+
+/* Narrow container (phones, 320px): the time drops under the title, the leader goes. */
+@container (max-width: 380px) {
+  .cockpit-modal.session-modal .session-open {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "name"
+      "date";
+  }
+  .cockpit-modal.session-modal .session-open.has-scene {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name name"
+      "scene date";
+  }
+  .cockpit-modal.session-modal .session-leader {
+    display: none;
+  }
 }
 
 @media (max-width: 759px) {
@@ -213,13 +267,7 @@
     max-height: none;
     height: 100dvh;
   }
-  .session-create {
-    padding: 12px 16px;
-  }
-  .session-error {
-    margin: 12px 16px 0;
-  }
-  .session-body {
-    padding: 0 16px 24px;
+  .cockpit-modal.session-modal .session-body {
+    padding: var(--line-pitch) 16px var(--line-pitch) 72px;
   }
 }

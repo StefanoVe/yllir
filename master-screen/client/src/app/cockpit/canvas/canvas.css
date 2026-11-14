@@ -5,21 +5,26 @@
   height: 100%;
 }
 
-/* Card colours: tokens only, so they stay black, white, grey or the one muted red. */
+/* Card colours: fixed content hues (styles.css --card-*), kept in both themes. --tone-ink is the text on them. */
 [data-color="red"] {
-  --tone: var(--color-danger);
+  --tone: var(--card-red);
+  --tone-ink: var(--card-red-ink);
 }
 [data-color="amber"] {
-  --tone: color-mix(in srgb, var(--color-danger) 45%, var(--color-text-muted));
+  --tone: var(--card-amber);
+  --tone-ink: var(--card-amber-ink);
 }
 [data-color="green"] {
-  --tone: var(--color-diff-add);
+  --tone: var(--card-green);
+  --tone-ink: var(--card-green-ink);
 }
 [data-color="blue"] {
-  --tone: var(--color-accent);
+  --tone: var(--card-blue);
+  --tone-ink: var(--card-blue-ink);
 }
 [data-color="violet"] {
-  --tone: color-mix(in srgb, var(--color-accent) 55%, var(--color-danger));
+  --tone: var(--card-violet);
+  --tone-ink: var(--card-violet-ink);
 }
 
 /* ───────────────────────────── Viewport ───────────────────────────── */
@@ -90,6 +95,12 @@
   font-weight: 600;
   line-height: 1.2;
   border-radius: 0;
+}
+
+/* A coloured frame: its label tab takes the tone. The border stays monochrome. */
+.frame[data-color] .frame-title {
+  background: var(--tone);
+  color: var(--tone-ink);
 }
 
 .frame-title span {
@@ -188,6 +199,11 @@
   stroke-width: 2px;
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
+}
+
+/* A coloured card: a light tint of its tone on the paper (the dark stroke stays). */
+.card[data-color]:not(.art-card) .paper-outline polygon {
+  fill: color-mix(in srgb, var(--tone) 14%, var(--color-surface));
 }
 
 .paper {
@@ -303,7 +319,7 @@
 .card[data-color] .card-head .kind {
   background: var(--tone);
   border-color: var(--tone);
-  color: var(--color-bg);
+  color: var(--tone-ink);
 }
 
 .card-head .kind ::ng-deep svg {
@@ -823,6 +839,7 @@
 
 .mini-item.frame[data-color] {
   background: none;
+  border-color: var(--tone);
 }
 
 .mini-view {

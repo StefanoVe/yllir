@@ -17,29 +17,29 @@
       <ui-icon name="x" [size]="18" />
     </button>
   </header>
-  <form class="session-create" (submit)="$event.preventDefault(); create()">
-    <input
-      #titleInput
-      class="field"
-      name="title"
-      [(ngModel)]="title"
-      [placeholder]="i18n.t('liveAgent.newSessionTitle')"
-      [attr.aria-label]="i18n.t('liveAgent.newSessionTitle')"
-      autocomplete="off"
-      (keydown.enter)="$event.preventDefault(); create()"
-    />
-    <button
-      class="btn btn-primary"
-      type="submit"
-      [disabled]="!title.trim() || busy()"
-    >
-      <ui-icon name="plus" [size]="16" />{{ i18n.t("liveAgent.create") }}
-    </button>
-  </form>
-  @if (error()) {
-  <p class="session-error" role="alert">{{ error() }}</p>
-  }
-  <div class="session-body">
+  <div class="session-body notebook-page">
+    <form class="session-create" (submit)="$event.preventDefault(); create()">
+      <input
+        #titleInput
+        class="field"
+        name="title"
+        [(ngModel)]="title"
+        [placeholder]="i18n.t('liveAgent.newSessionTitle')"
+        [attr.aria-label]="i18n.t('liveAgent.newSessionTitle')"
+        autocomplete="off"
+        (keydown.enter)="$event.preventDefault(); create()"
+      />
+      <button
+        class="btn btn-primary"
+        type="submit"
+        [disabled]="!title.trim() || busy()"
+      >
+        <ui-icon name="plus" [size]="16" />{{ i18n.t("liveAgent.create") }}
+      </button>
+    </form>
+    @if (error()) {
+    <p class="session-error" role="alert">{{ error() }}</p>
+    }
     <ul
       class="session-list"
       [attr.aria-busy]="loading()"
@@ -52,23 +52,21 @@
       } @else {
         @for (item of api.sessions(); track item.id) {
         @let current = item.id === api.session()?.id;
+        @let scene = sceneOf(item.location);
         <li [class.current]="current">
           <button
             type="button"
             class="session-open"
+            [class.has-scene]="scene !== ''"
             [attr.aria-current]="current ? 'true' : null"
             (click)="open(item.id)"
           >
-            <span class="session-text">
-              <span class="session-title">
-                @if (current) {
-                <ui-icon name="check" [size]="16" />
-                }
-                <strong>{{ item.title }}</strong>
-              </span>
-              <span class="session-place">{{ item.location || i18n.t("liveAgent.noLocation") }}</span>
-            </span>
-            <small class="session-date">{{ updated(item.updatedAt) }}</small>
+            <span class="session-name">{{ item.title }}</span>
+            <span class="session-leader" aria-hidden="true"></span>
+            <span class="session-date">{{ updated(item.updatedAt) }}</span>
+            @if (scene) {
+            <span class="session-scene">{{ scene }}</span>
+            }
           </button>
           <button
             class="icon-button session-delete"
@@ -85,10 +83,7 @@
               "
             (click)="remove(item.id)"
           >
-            <ui-icon
-              [name]="confirmDelete() === item.id ? 'check' : 'trash'"
-              [size]="16"
-            />
+            <ui-icon name="trash" [size]="16" />
           </button>
         </li>
         } @empty {
