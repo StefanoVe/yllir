@@ -116,7 +116,13 @@ const fieldDescriptions: Record<string, string> = {
   cards:
     "Per board_place: voci delle carte da mostrare (1–40), ciascuna con kind, path ed eventualmente anchor, trackId per la musica, text per le note, e facoltativi frame, near, pinned, color e reason. Per board_frame: ID delle carte da inserire nel riquadro.",
   frame:
-    "ID del riquadro che contiene la carta, oppure null per toglierla da ogni riquadro.",
+    "ID del riquadro: quello che contiene la carta (board_place, board_move: null per toglierla da ogni riquadro), oppure quello da riordinare (board_arrange) o da rinominare o ricolorare (board_frame con id).",
+  items:
+    "Elementi da posizionare in una sola chiamata (1–30): ciascuno con id e almeno una tra x, y, w, h.",
+  x: "Coordinata x della scrivania, a sinistra del modulo.",
+  y: "Coordinata y della scrivania, in alto del modulo.",
+  w: "Larghezza in pixel della scrivania, maggiore di zero.",
+  h: "Altezza in pixel della scrivania, maggiore di zero.",
   links:
     "Collegamenti da aggiungere in una sola chiamata (1–30): ciascuno con from, to ed eventuale label.",
   after:
@@ -186,6 +192,7 @@ export const COCKPIT_TOOL_NAMES = [
   "board_link",
   "board_arrange",
   "board_move",
+  "board_position",
   "get_board",
   "scene_set",
   "ledger_note",
@@ -1280,10 +1287,11 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
   tools.push(
     tool(
       "board_frame",
-      "Usalo per creare un riquadro che raggruppa carte, per esempio una scena o un luogo. Con cards ci mette subito le carte indicate (anche già sulla plancia). Con after e before collega il riquadro in sequenza: after sono le carte o i riquadri che lo precedono, before quelli che lo seguono; «il gruppo X tra A e B» si fa in una sola chiamata. La scrivania viene riordinata automaticamente alla fine del turno. Restituisce id e titolo del riquadro.",
+      "Usalo per creare un riquadro che raggruppa carte, per esempio una scena o un luogo, oppure, con id, per rinominare o ricolorare un riquadro esistente (title e/o color; il titolo è obbligatorio solo per creare). Creando: con cards ci mette subito le carte indicate (anche già sulla plancia); con after e before collega il riquadro in sequenza: after sono le carte o i riquadri che lo precedono, before quelli che lo seguono; «il gruppo X tra A e B» si fa in una sola chiamata. Con id cards, after e before funzionano allo stesso modo. Nulla viene riordinato automaticamente: le carte restano accanto a ciò a cui si riferiscono o nel loro riquadro. Se un riquadro appare affollato usa board_arrange con frame; per una posizione esatta usa board_position. Restituisce id e titolo del riquadro.",
       z
         .object({
-          title: z.string().min(1).max(200),
+          id: z.string().min(1).max(200).optional(),
+          title: z.string().min(1).max(200).optional(),
           color: cardColorSchema.optional(),
           near: z.string().min(1).max(200).optional(),
           cards: z.array(z.string().min(1).max(200)).max(40).optional(),
@@ -1292,18 +1300,36 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
         })
         .strict(),
       async (args, context) => {
-        const frame = await apply(
-          deps,
-          {
-            type: "frame.add",
-            frame: {
-              title: String(args.title),
-              ...(args.color ? { color: args.color as CardColor } : {}),
-              ...(args.near ? { near: String(args.near) } : {}),
+        let frameId: string;
+        if (args.id !== undefined) {
+          frameId = String(args.id);
+          const patch: { title?: string; color?: CardColor } = {};
+          if (args.title !== undefined) patch.title = String(args.title);
+          if (args.color !== undefined) patch.color = args.color as CardColor;
+          if (Object.keys(patch).length)
+            await apply(
+              deps,
+              { type: "frame.update", id: frameId, patch },
+              context,
+            );
+        } else {
+          if (args.title === undefined)
+            throw new Error("Serve title per creare un riquadro");
+          const frame = await apply(
+            deps,
+            {
+              type: "frame.add",
+              frame: {
+                title: String(args.title),
+                ...(args.color ? { color: args.color as CardColor } : {}),
+                ...(args.near ? { near: String(args.near) } : {}),
+              },
             },
-          },
-          context,
-        );
+            context,
+          );
+          frameId = frame.id;
+        }
+        const frame = { id: frameId };
         const errors: string[] = [];
         for (const id of (args.cards as string[] | undefined) ?? []) {
           try {
@@ -1343,17 +1369,20 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
         }
         return {
           id: frame.id,
-          title: String(args.title),
+          ...(args.title !== undefined ? { title: String(args.title) } : {}),
           ...(errors.length ? { errors } : {}),
         };
       },
-      (args) => `Riquadro · ${String(args.title)}`,
+      (args) =>
+        args.title !== undefined
+          ? `Riquadro · ${String(args.title)}`
+          : "Aggiorna riquadro",
     ),
   );
   tools.push(
     tool(
       "board_link",
-      "Usalo per collegare due carte o riquadri con una freccia, per esempio un ramo di Plot o un NPC e la sua scena: passa from e to, oppure links con più collegamenti in una sola chiamata (1–30). Non devi posizionare nulla: la scrivania viene riordinata automaticamente alla fine del turno. Restituisce il riepilogo del collegamento; con links, un esito per ciascuno.",
+      "Usalo per collegare due carte o riquadri con una freccia, per esempio un ramo di Plot o un NPC e la sua scena: passa from e to, oppure links con più collegamenti in una sola chiamata (1–30). Non devi posizionare nulla: nulla viene riordinato automaticamente, e la carta collegata resta accanto a ciò a cui si riferisce. Una freccia si toglie con board_remove (gli id delle frecce sono in get_board). Restituisce il riepilogo del collegamento; con links, un esito per ciascuno.",
       z
         .object({
           from: z.string().min(1).max(200).optional(),
@@ -1428,16 +1457,98 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
   tools.push(
     tool(
       "board_arrange",
-      "Riordina esplicitamente riquadri e carte, solo quando il master lo chiede (per esempio «riordina»). Non serve dopo le modifiche strutturali: la scrivania viene già riordinata automaticamente alla fine del turno. Restituisce il riepilogo dell'azione.",
-      z.object({}).strict(),
-      (_args, context) => apply(deps, { type: "board.arrange" }, context),
-      () => "Riordina scrivania",
+      "Riordina la scrivania. Senza frame riordina l'intera scrivania: usalo SOLO quando il master chiede esplicitamente di riordinare tutto (per esempio «riordina»). Con frame riordina solo le carte di quel riquadro: il riquadro viene ridimensionato per contenerle, il resto non cambia e il riquadro si sposta solo se collide con altro. Usalo con frame dopo aver aggiunto più carte a un riquadro che appare affollato. Restituisce il riepilogo dell'azione.",
+      z
+        .object({
+          frame: z.string().min(1).max(200).optional(),
+        })
+        .strict(),
+      async (args, context) => {
+        if (args.frame !== undefined) {
+          const frameId = String(args.frame);
+          const { state } = await deps.store.get(context.sessionId);
+          if (!state.board.frames.some((frame) => frame.id === frameId))
+            throw new Error(`Riquadro non trovato: ${frameId}`);
+          return apply(
+            deps,
+            { type: "board.arrange", frameId },
+            context,
+          );
+        }
+        return apply(deps, { type: "board.arrange" }, context);
+      },
+      (args) =>
+        args.frame !== undefined ? "Riordina riquadro" : "Riordina scrivania",
+    ),
+  );
+  tools.push(
+    tool(
+      "board_position",
+      "Posiziona o ridimensiona carte o riquadri a coordinate esatte della scrivania, per esempio per mettere un riquadro accanto a un altro o per allargare una carta. Passa items (1–30), ciascuno con id e almeno una tra x, y, w, h. Le coordinate si leggono in get_board (x, y, w, h di ogni carta e riquadro). Spostare un riquadro sposta anche le sue carte; le dimensioni vengono limitate in modo che un riquadro contenga ancora le sue carte. Restituisce per ogni id il riepilogo o l'errore.",
+      z
+        .object({
+          items: z
+            .array(
+              z
+                .object({
+                  id: z.string().min(1).max(200),
+                  x: z.number().finite().optional(),
+                  y: z.number().finite().optional(),
+                  w: z.number().positive().finite().optional(),
+                  h: z.number().positive().finite().optional(),
+                })
+                .strict()
+                .refine(
+                  (item) =>
+                    item.x !== undefined ||
+                    item.y !== undefined ||
+                    item.w !== undefined ||
+                    item.h !== undefined,
+                  "Ogni elemento richiede almeno una tra x, y, w, h",
+                ),
+            )
+            .min(1)
+            .max(30),
+        })
+        .strict(),
+      async (args, context) => {
+        const results: unknown[] = [];
+        for (const item of args.items as {
+          id: string;
+          x?: number;
+          y?: number;
+          w?: number;
+          h?: number;
+        }[]) {
+          const { id, x, y, w, h } = item;
+          try {
+            results.push(
+              await apply(
+                deps,
+                {
+                  type: "board.position",
+                  id,
+                  ...(x !== undefined ? { x } : {}),
+                  ...(y !== undefined ? { y } : {}),
+                  ...(w !== undefined ? { w } : {}),
+                  ...(h !== undefined ? { h } : {}),
+                },
+                context,
+              ),
+            );
+          } catch (e) {
+            results.push({ id, error: errorText(e) });
+          }
+        }
+        return results;
+      },
+      () => "Posiziona",
     ),
   );
   tools.push(
     tool(
       "get_board",
-      "Di solito il digest basta; usalo dopo molte modifiche nello stesso turno per controllare lo stato aggiornato, o per trovare id e provenienza (source: percorso, mappa, trackId o nota) di una carta. Restituisce posizione, gruppo, carte, riquadri, collegamenti, evidenza, registro e combattimento.",
+      "Di solito il digest basta; usalo dopo molte modifiche nello stesso turno per controllare lo stato aggiornato, o per trovare id e provenienza (source: percorso, mappa, trackId o nota) di una carta. Restituisce posizione, gruppo, carte e riquadri (con x, y, w, h sulla scrivania), collegamenti, evidenza, registro e combattimento.",
       z.object({}).strict(),
       async (_args, context) => {
         const { state } = await deps.live.hydrate(
@@ -1452,12 +1563,20 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
             kind: module.kind,
             title: deps.resolve(module).title,
             source: sourceOf(module.ref),
+            x: module.x,
+            y: module.y,
+            w: module.w,
+            h: module.h,
             ...(module.frameId ? { frameId: module.frameId } : {}),
             ...(module.pinned ? { pinned: true } : {}),
           })),
           frames: board.frames.map((frame) => ({
             id: frame.id,
             title: frame.title,
+            x: frame.x,
+            y: frame.y,
+            w: frame.w,
+            h: frame.h,
           })),
           links: board.links.map((link) => ({
             id: link.id,

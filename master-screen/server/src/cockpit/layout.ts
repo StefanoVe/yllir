@@ -168,6 +168,43 @@ export function arrange(board: Board): Board {
   return applyLayout(board, layouts, positions);
 }
 
+/**
+ * Re-flows only the cards of one frame: they get new positions inside it, the frame
+ * keeps its x,y and is resized to fit them. If the new size overlaps another frame or
+ * a loose card, the frame (with its cards) moves to the first free spot near its old
+ * position. Other cards and frames are not touched.
+ */
+export function arrangeFrame(board: Board, frameId: string): Board {
+  const frame = findFrame(board, frameId);
+  if (!frame) return board;
+  const { frame: sized, slots } = layoutFrame(board, frame);
+  const modules = board.modules.map((card) => {
+    if (card.frameId !== frameId) return card;
+    const slot = slots.get(card.id) ?? { x: 0, y: 0 };
+    return {
+      ...card,
+      x: Math.round(frame.x + slot.x),
+      y: Math.round(frame.y + slot.y),
+    };
+  });
+  const resized: Board = {
+    ...board,
+    frames: board.frames.map((f) => (f.id === frameId ? sized : f)),
+    modules,
+  };
+  const obstacles: Rect[] = [
+    ...board.frames.filter((f) => f.id !== frameId),
+    ...modules.filter((m) => !frameExists(board, m.frameId)),
+  ];
+  const rect: Rect = { x: sized.x, y: sized.y, w: sized.w, h: sized.h };
+  if (!obstacles.some((o) => overlaps(rect, o, GAP))) return resized;
+  const size = { w: sized.w, h: sized.h };
+  const spot =
+    firstFreeAmong(nearCandidates(rect, size), obstacles, size) ??
+    placeRightOfBoard(resized, size);
+  return moveFrame(resized, frameId, spot.x, spot.y);
+}
+
 // ───────────────────────────── helpers ─────────────────────────────
 
 function findFrame(board: Board, id: string): Frame | undefined {
@@ -279,7 +316,14 @@ function firstFree(
   board: Board,
   size: Size,
 ): { x: number; y: number } | undefined {
-  const obstacles: Rect[] = [...board.frames, ...board.modules];
+  return firstFreeAmong(candidates, [...board.frames, ...board.modules], size);
+}
+
+function firstFreeAmong(
+  candidates: { x: number; y: number }[],
+  obstacles: Rect[],
+  size: Size,
+): { x: number; y: number } | undefined {
   for (const c of candidates) {
     const rect = { x: c.x, y: c.y, w: size.w, h: size.h };
     if (!obstacles.some((o) => overlaps(rect, o, GAP))) {

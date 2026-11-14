@@ -290,8 +290,23 @@ export type CockpitAction =
   | { type: "frame.remove"; id: string; withCards: boolean }
   | { type: "link.add"; from: string; to: string; label?: string }
   | { type: "link.remove"; id: string }
-  /** Re-run the automatic layout of the whole board (frames in link order, cards in grids). */
-  | { type: "board.arrange" }
+  /**
+   * Re-run the automatic layout of the whole board (frames in link order, cards in grids).
+   * With `frameId`, only the cards of that frame are re-flowed and the frame is resized.
+   */
+  | { type: "board.arrange"; frameId?: string }
+  /**
+   * Places or resizes one card or frame where the assistant chose. Frames move with their
+   * cards; cards inside a frame make the frame grow. Overlaps are not resolved.
+   */
+  | {
+      type: "board.position";
+      id: string;
+      x?: number;
+      y?: number;
+      w?: number;
+      h?: number;
+    }
   /** Remove every unpinned card, every frame without pinned cards and dangling links. */
   | { type: "board.clear" }
   | { type: "position.set"; patch: Partial<Position> }

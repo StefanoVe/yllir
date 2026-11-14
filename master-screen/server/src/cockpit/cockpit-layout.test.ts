@@ -14,6 +14,7 @@ import {
   GAP,
   MIN_FRAME,
   arrange,
+  arrangeFrame,
   boardBounds,
   defaultSize,
   fitFrame,
@@ -440,5 +441,81 @@ describe("arrange", () => {
     expect(find("solo").y).toBeGreaterThanOrEqual(framesBottom);
     const topLevel = [...out.frames, ...out.modules.filter((m) => !m.frameId)];
     expectNoOverlaps(topLevel.map(rectOf));
+  });
+});
+
+describe("arrangeFrame", () => {
+  test("re-flows only the frame's cards and leaves other frames and loose cards untouched", () => {
+    const b = board(
+      [
+        card("a", 0, 0, 260, 180, "F"),
+        card("b", 5000, 5000, 260, 180, "F"),
+        card("g", 2100, 2100, 260, 180, "G"),
+        card("L", 3000, 0),
+      ],
+      [frame("F", 100, 100, 320, 200), frame("G", 2000, 2000, 320, 200)],
+      [link("l1", "a", "b")],
+    );
+    const out = arrangeFrame(b, "F");
+    const find = (id: string) => out.modules.find((m) => m.id === id)!;
+    expect(find("g")).toEqual(b.modules[2]!);
+    expect(find("L")).toEqual(b.modules[3]!);
+    expect(out.frames.find((f) => f.id === "G")).toEqual(b.frames[1]!);
+    const f = out.frames.find((item) => item.id === "F")!;
+    expect(f.x).toBe(100);
+    expect(f.y).toBe(100);
+    for (const id of ["a", "b"]) {
+      const c = find(id);
+      expect(c.x).toBeGreaterThanOrEqual(f.x + FRAME_PAD);
+      expect(c.y).toBeGreaterThanOrEqual(f.y + FRAME_HEADER);
+      expect(c.x + c.w).toBeLessThanOrEqual(f.x + f.w);
+      expect(c.y + c.h).toBeLessThanOrEqual(f.y + f.h);
+    }
+    expect(find("a").x).toBeLessThan(find("b").x);
+  });
+
+  test("resizes the frame to fit its re-flowed cards", () => {
+    const b = board(
+      [card("a", 0, 0, 260, 180, "F"), card("b", 0, 0, 260, 180, "F")],
+      [frame("F", 100, 100, 320, 200)],
+      [link("l1", "a", "b")],
+    );
+    const out = arrangeFrame(b, "F");
+    const f = out.frames[0]!;
+    // Two linked cards side by side: 260 + 64 (dagre ranksep inside a frame) + 260, plus padding on both sides.
+    expect(f.w).toBe(260 * 2 + 64 + FRAME_PAD * 2);
+    expect(f.h).toBe(Math.max(180 + FRAME_HEADER + FRAME_PAD, MIN_FRAME.h));
+    expect(Number.isInteger(f.w)).toBe(true);
+    expect(Number.isInteger(f.h)).toBe(true);
+  });
+
+  test("a frame whose new size would overlap another frame moves, with its cards", () => {
+    const b = board(
+      [
+        card("a", 0, 0, 260, 180, "F"),
+        card("b", 0, 0, 260, 180, "F"),
+        card("g", 420, 60, 260, 180, "G"),
+      ],
+      // F is narrow now; once its linked cards are laid out side by side it reaches G.
+      [frame("F", 0, 0, 320, 200), frame("G", 400, 0, 320, 200)],
+      [link("l1", "a", "b")],
+    );
+    const out = arrangeFrame(b, "F");
+    const f = out.frames.find((item) => item.id === "F")!;
+    const g = out.frames.find((item) => item.id === "G")!;
+    expect(g).toEqual(b.frames[1]!);
+    expect(out.modules.find((m) => m.id === "g")).toEqual(b.modules[2]!);
+    expect(f.x !== 0 || f.y !== 0).toBe(true);
+    expect(overlaps(rectOf(f), rectOf(g), GAP)).toBe(false);
+    for (const id of ["a", "b"]) {
+      const c = out.modules.find((m) => m.id === id)!;
+      expect(c.x + c.w).toBeLessThanOrEqual(f.x + f.w);
+      expect(c.y + c.h).toBeLessThanOrEqual(f.y + f.h);
+    }
+  });
+
+  test("unknown frame id returns the board unchanged", () => {
+    const b = board([card("a", 0, 0)], [frame("F", 0, 0, 320, 200)]);
+    expect(arrangeFrame(b, "nope")).toEqual(b);
   });
 });

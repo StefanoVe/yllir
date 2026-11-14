@@ -10,7 +10,12 @@ import {
   emptyState,
   parseAction,
 } from "./actions.js";
-import { MIN_FRAME, overlaps } from "./layout.js";
+import {
+  FRAME_PAD,
+  MIN_FRAME,
+  minFrameWidth,
+  overlaps,
+} from "./layout.js";
 import type {
   BoardModule,
   CockpitAction,
@@ -526,6 +531,158 @@ describe("cockpit action schema and reducer", () => {
     for (let i = 0; i < frames.length; i++)
       for (let j = i + 1; j < frames.length; j++)
         expect(overlaps(frames[i]!, frames[j]!)).toBe(false);
+  });
+
+  test("board arrange with a frame id re-flows only that frame", () => {
+    let state = emptyState();
+    state = apply(state, {
+      type: "frame.add",
+      frame: { title: "uno", x: 0, y: 0 },
+    }).state;
+    state = apply(state, {
+      type: "frame.add",
+      frame: { title: "due", x: 1500, y: 0 },
+    }).state;
+    const [f1, f2] = state.board.frames.map((frame) => frame.id);
+    state = apply(state, moduleAction("npc", "A1", { frameId: f1, x: 40, y: 80 })).state;
+    state = apply(state, moduleAction("npc", "A2", { frameId: f1, x: 900, y: 600 })).state;
+    state = apply(state, moduleAction("npc", "B1", { frameId: f2, x: 1540, y: 80 })).state;
+    state = apply(state, moduleAction("note", "loose", { x: 3000, y: 3000 })).state;
+    const before = state.board;
+    const arranged = apply(state, { type: "board.arrange", frameId: f1! });
+    expect(arranged.summary.label).toBe("Riordina riquadro");
+    expect(arranged.summary.targetId).toBe(f1);
+    const after = arranged.state.board;
+    expect(after.frames.find((f) => f.id === f2)).toEqual(
+      before.frames.find((f) => f.id === f2),
+    );
+    const outside = (b: typeof before) =>
+      b.modules.filter((m) => m.frameId !== f1);
+    expect(outside(after)).toEqual(outside(before));
+    const f = after.frames.find((item) => item.id === f1)!;
+    expect(f.x).toBe(before.frames.find((item) => item.id === f1)!.x);
+    expect(f.y).toBe(before.frames.find((item) => item.id === f1)!.y);
+    for (const c of after.modules.filter((m) => m.frameId === f1)) {
+      expect(c.x).toBeGreaterThanOrEqual(f.x + FRAME_PAD);
+      expect(c.x + c.w).toBeLessThanOrEqual(f.x + f.w);
+      expect(c.y + c.h).toBeLessThanOrEqual(f.y + f.h);
+    }
+  });
+
+  test("board arrange with an unknown frame id is refused with 404", () => {
+    expect(
+      statusOf(() =>
+        apply(emptyState(), { type: "board.arrange", frameId: "nope" }),
+      ),
+    ).toBe(404);
+  });
+
+  /** A frame at (0, 0) of 400×300 holding one note at (40, 80). */
+  function frameWithCard(title = "Scena") {
+    let state = apply(emptyState(), {
+      type: "frame.add",
+      frame: { title, x: 0, y: 0, w: 400, h: 300 },
+    }).state;
+    const frame = state.board.frames[0]!.id;
+    state = apply(state, moduleAction("note", "A", { frameId: frame, x: 40, y: 80 })).state;
+    const card = state.board.modules[0]!.id;
+    return { state, frame, card };
+  }
+
+  test("board position moves a frame and translates its cards by the same delta", () => {
+    const { state, frame, card } = frameWithCard();
+    const before = frameOf(state, frame);
+    const cardBefore = cardOf(state, card);
+    const moved = apply(state, { type: "board.position", id: frame, x: 1000, y: 500 });
+    expect(moved.summary.label).toBe("Posiziona");
+    expect(moved.summary.targetId).toBe(frame);
+    const f = frameOf(moved.state, frame);
+    expect(f.x).toBe(1000);
+    expect(f.y).toBe(500);
+    expect(f.w).toBe(before.w);
+    expect(f.h).toBe(before.h);
+    const c = cardOf(moved.state, card);
+    expect(c.x - cardBefore.x).toBe(1000 - before.x);
+    expect(c.y - cardBefore.y).toBe(500 - before.y);
+  });
+
+  test("board position resizes a frame but not below its title or its cards", () => {
+    let state = apply(emptyState(), {
+      type: "frame.add",
+      frame: { title: "Scena", x: 0, y: 0, w: 400, h: 300 },
+    }).state;
+    const frame = state.board.frames[0]!.id;
+    state = apply(state, moduleAction("note", "A", { frameId: frame, x: 200, y: 80 })).state;
+    const card = state.board.modules[0]!.id;
+    const shrunk = apply(state, { type: "board.position", id: frame, w: 10, h: 10 }).state;
+    const f = frameOf(shrunk, frame);
+    const c = cardOf(shrunk, card);
+    expect(f.w).toBeGreaterThanOrEqual(minFrameWidth("Scena"));
+    expect(f.h).toBeGreaterThanOrEqual(MIN_FRAME.h);
+    expect(c.x + c.w + FRAME_PAD).toBeLessThanOrEqual(f.x + f.w);
+    expect(c.y + c.h + FRAME_PAD).toBeLessThanOrEqual(f.y + f.h);
+    const wide = apply(state, { type: "board.position", id: frame, w: 900 }).state;
+    expect(frameOf(wide, frame).w).toBe(900);
+  });
+
+  test("board position never sizes a frame below its title width", () => {
+    const title = "Un titolo molto lungo per il riquadro di una scena";
+    const state = apply(emptyState(), {
+      type: "frame.add",
+      frame: { title, x: 0, y: 0 },
+    }).state;
+    const frame = state.board.frames[0]!.id;
+    const narrow = apply(state, { type: "board.position", id: frame, w: 50 }).state;
+    expect(frameOf(narrow, frame).w).toBe(minFrameWidth(title));
+  });
+
+  test("board position on a card rounds its coordinates and grows its frame", () => {
+    const { state, frame, card } = frameWithCard();
+    const moved = apply(state, {
+      type: "board.position",
+      id: card,
+      x: 900.4,
+      y: 600.6,
+      w: 300,
+    }).state;
+    const c = cardOf(moved, card);
+    expect(c.x).toBe(900);
+    expect(c.y).toBe(601);
+    expect(c.w).toBe(300);
+    expect(c.frameId).toBe(frame);
+    const f = frameOf(moved, frame);
+    expect(f.x + f.w).toBeGreaterThanOrEqual(c.x + c.w + FRAME_PAD);
+    expect(f.y + f.h).toBeGreaterThanOrEqual(c.y + c.h + FRAME_PAD);
+  });
+
+  test("board position without x, y, w or h is refused", () => {
+    const { state, card, frame } = frameWithCard();
+    expect(() => apply(state, { type: "board.position", id: card })).toThrow(
+      ActionError,
+    );
+    expect(() => apply(state, { type: "board.position", id: frame })).toThrow(
+      ActionError,
+    );
+  });
+
+  test("board position with an unknown id is refused with 404", () => {
+    expect(
+      statusOf(() =>
+        apply(emptyState(), { type: "board.position", id: "nope", x: 1 }),
+      ),
+    ).toBe(404);
+  });
+
+  test("board position and board arrange with frameId parse; extra keys are refused", () => {
+    expect(
+      parseAction({ type: "board.position", id: "m1", x: 10, h: 200 }),
+    ).toEqual({ type: "board.position", id: "m1", x: 10, h: 200 });
+    expect(
+      parseAction({ type: "board.arrange", frameId: "f1" }),
+    ).toEqual({ type: "board.arrange", frameId: "f1" });
+    expect(() =>
+      parseAction({ type: "board.position", id: "m1", z: 3 }),
+    ).toThrow(ActionError);
   });
 
   test("caps refuse new cards, frames and links with 409", () => {

@@ -15,10 +15,12 @@ import type {
 } from "../../../shared/src/cockpit-types.js";
 import {
   arrange,
+  arrangeFrame,
   defaultSize,
   fitFrame,
   MIN_FRAME,
   minFrameWidth,
+  moveFrame,
   placeCard,
   placeFrame,
 } from "./layout.js";
@@ -201,7 +203,19 @@ export const actionSchema = z.discriminatedUnion("type", [
     })
     .strict(),
   z.object({ type: z.literal("link.remove"), id }).strict(),
-  z.object({ type: z.literal("board.arrange") }).strict(),
+  z
+    .object({ type: z.literal("board.arrange"), frameId: id.optional() })
+    .strict(),
+  z
+    .object({
+      type: z.literal("board.position"),
+      id,
+      x: coordinateSchema.optional(),
+      y: coordinateSchema.optional(),
+      w: dimensionSchema.optional(),
+      h: dimensionSchema.optional(),
+    })
+    .strict(),
   z.object({ type: z.literal("board.clear") }).strict(),
   z
     .object({
@@ -667,9 +681,67 @@ function removeLink(state: CockpitState, linkId: string): Outcome {
 
 // ───────────────────────────── whole board ─────────────────────────────
 
-function arrangeBoard(state: CockpitState): Outcome {
-  state.board = arrange(state.board);
-  return { label: "Riordina scrivania" };
+/** Whole desk when no frame is given; otherwise only that frame's cards are re-flowed. */
+function arrangeBoard(state: CockpitState, frameId?: string): Outcome {
+  if (frameId === undefined) {
+    state.board = arrange(state.board);
+    return { label: "Riordina scrivania" };
+  }
+  frameOrThrow(state.board, frameId);
+  state.board = arrangeFrame(state.board, frameId);
+  return { label: "Riordina riquadro", targetId: frameId };
+}
+
+/**
+ * Places or resizes one card or frame at the spot the assistant chose. Frames move with
+ * their cards and never shrink below their title or their contents; a card inside a
+ * frame makes the frame grow. Overlaps are deliberately left alone.
+ */
+function positionItem(
+  state: CockpitState,
+  action: Extract<CockpitAction, { type: "board.position" }>,
+  ctx: ActionContext,
+): Outcome {
+  const { id: itemId, x, y, w, h } = action;
+  if ([x, y, w, h].every((value) => value === undefined))
+    throw new ActionError("Indica almeno una tra x, y, w e h");
+  const board = state.board;
+  const card = findCard(board, itemId);
+  const frame = card ? undefined : findFrame(board, itemId);
+  if (!card && !frame) throw new ActionError("Carta o riquadro non trovato", 404);
+  if (frame) {
+    let next = board;
+    if (x !== undefined || y !== undefined)
+      next = moveFrame(next, itemId, x ?? frame.x, y ?? frame.y);
+    if (w !== undefined || h !== undefined) {
+      const current = findFrame(next, itemId)!;
+      const resized: Frame = {
+        ...current,
+        w: Math.round(
+          Math.max(w ?? current.w, minFrameWidth(current.title)),
+        ),
+        h: Math.round(Math.max(h ?? current.h, MIN_FRAME.h)),
+      };
+      next = {
+        ...next,
+        frames: next.frames.map((f) => (f.id === itemId ? resized : f)),
+      };
+      next = fitFrame(next, itemId);
+    }
+    state.board = next;
+    findFrame(state.board, itemId)!.updatedAt = ctx.now;
+    return { label: "Posiziona", targetId: itemId };
+  }
+  const moved: BoardModule = {
+    ...card!,
+    x: x === undefined ? card!.x : Math.round(x),
+    y: y === undefined ? card!.y : Math.round(y),
+    w: w === undefined ? card!.w : Math.round(w),
+    h: h === undefined ? card!.h : Math.round(h),
+    updatedAt: ctx.now,
+  };
+  storeCard(state, moved);
+  return { label: "Posiziona", targetId: itemId };
 }
 
 /** Keeps pinned cards, the frames still holding one, and the links between survivors. */
@@ -719,7 +791,9 @@ function applyBoardAction(
     case "link.remove":
       return removeLink(state, action.id);
     case "board.arrange":
-      return arrangeBoard(state);
+      return arrangeBoard(state, action.frameId);
+    case "board.position":
+      return positionItem(state, action, ctx);
     case "board.clear":
       return clearBoard(state);
   }

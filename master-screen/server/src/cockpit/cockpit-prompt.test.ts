@@ -76,6 +76,11 @@ test("il prompt di sistema separa le richieste di plancia dal registro e spiega 
   expect(prompt).toContain("Desk and layout requests");
   expect(prompt).toContain("never remarks about the desk");
   expect(prompt).toContain("board_move");
+  expect(prompt).toContain("board_position");
+  expect(prompt).toContain("board_arrange with frame");
+  expect(prompt).toContain("board_frame (with id");
+  expect(prompt).toContain("NOT reordered automatically");
+  expect(prompt).not.toContain("Reordering is automatic");
   expect(prompt).toContain("get_board");
   expect(prompt).toContain(
     "Do not ask the master for technical references",

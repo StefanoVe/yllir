@@ -723,6 +723,104 @@ test("board_move sposta carte dentro un riquadro e fuori con null", async () => 
   await h.close();
 });
 
+test("board_position sposta un riquadro con le sue carte, dà errore per id ignoti e rifiuta un elemento senza coordinate", async () => {
+  const h = await setup(new Map());
+  const frame = h.json(
+    await h.call("board_frame", {
+      title: "Scena",
+      cards: [],
+    }),
+  );
+  const note = h.json(
+    await h.call("board_place", {
+      cards: [{ kind: "note", text: "Dentro", reason: "r", frame: frame.id }],
+    }),
+  );
+  const cardId = note[0].id as string;
+  let board = (await h.store.get(h.session.id)).state.board;
+  const before = {
+    frame: board.frames.find((item) => item.id === frame.id)!,
+    card: board.modules.find((item) => item.id === cardId)!,
+  };
+  const moved = h.json(
+    await h.call("board_position", {
+      items: [{ id: frame.id, x: before.frame.x + 400, y: before.frame.y }],
+    }),
+  );
+  expect(moved[0].error).toBeUndefined();
+  board = (await h.store.get(h.session.id)).state.board;
+  const after = {
+    frame: board.frames.find((item) => item.id === frame.id)!,
+    card: board.modules.find((item) => item.id === cardId)!,
+  };
+  expect(after.frame.x).toBe(before.frame.x + 400);
+  expect(after.card.x).toBe(before.card.x + 400);
+  expect(after.card.y).toBe(before.card.y);
+
+  const unknown = h.json(
+    await h.call("board_position", {
+      items: [
+        { id: "non-esiste", x: 10 },
+        { id: cardId, w: 300 },
+      ],
+    }),
+  );
+  expect(unknown[0].id).toBe("non-esiste");
+  expect(unknown[0].error).toBeDefined();
+  expect(unknown[1].error).toBeUndefined();
+
+  const rejected = await h.call("board_position", {
+    items: [{ id: cardId }],
+  });
+  expect(rejected.isError).toBe(true);
+  expect(rejected.content[0]!.text).toContain("almeno una tra x, y, w, h");
+  await h.close();
+});
+
+test("board_arrange con frame riordina solo quel riquadro e rifiuta un riquadro ignoto", async () => {
+  const h = await setup(new Map());
+  const frame = h.json(await h.call("board_frame", { title: "Taverna" }));
+  await h.call("board_place", {
+    cards: [{ kind: "note", text: "Uno", reason: "r", frame: frame.id }],
+  });
+  const arranged = await h.call("board_arrange", { frame: frame.id });
+  expect(arranged.isError).toBeUndefined();
+  const missing = await h.call("board_arrange", { frame: "non-esiste" });
+  expect(missing.isError).toBe(true);
+  const board = (await h.store.get(h.session.id)).state.board;
+  expect(board.frames.some((item) => item.id === frame.id)).toBe(true);
+  await h.close();
+});
+
+test("board_frame con id rinomina e ricolora un riquadro esistente; senza id il titolo è obbligatorio", async () => {
+  const h = await setup(new Map());
+  const frame = h.json(await h.call("board_frame", { title: "Vecchio" }));
+  const updated = h.json(
+    await h.call("board_frame", { id: frame.id, title: "Nuovo", color: "blue" }),
+  );
+  expect(updated.id).toBe(frame.id);
+  expect(updated.title).toBe("Nuovo");
+  let board = (await h.store.get(h.session.id)).state.board;
+  const renamed = board.frames.find((item) => item.id === frame.id)!;
+  expect(renamed.title).toBe("Nuovo");
+  expect(renamed.color).toBe("blue");
+  expect(board.frames).toHaveLength(1);
+
+  const recolored = h.json(
+    await h.call("board_frame", { id: frame.id, color: "red" }),
+  );
+  expect(recolored.id).toBe(frame.id);
+  board = (await h.store.get(h.session.id)).state.board;
+  expect(board.frames[0]!.title).toBe("Nuovo");
+  expect(board.frames[0]!.color).toBe("red");
+
+  const noTitle = await h.call("board_frame", { color: "green" });
+  expect(noTitle.isError).toBe(true);
+  expect(noTitle.content[0]!.text).toBe("Serve title per creare un riquadro");
+  expect((await h.store.get(h.session.id)).state.board.frames).toHaveLength(1);
+  await h.close();
+});
+
 test("board_place con musica senza trackId indica board_move", async () => {
   const h = await setup(new Map());
   const result = h.json(

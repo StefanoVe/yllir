@@ -30,14 +30,6 @@ import {
 const DEFAULT_IDLE_TIMEOUT_MS = 90_000;
 const DEFAULT_TURN_TIMEOUT_MS = 300_000;
 const TEXT_PERSIST_INTERVAL_MS = 500;
-/** Actions that change the structure of the board (links, frames, frame membership). */
-const STRUCTURAL_ACTIONS: ReadonlySet<ActionSummary["type"]> = new Set([
-  "link.add",
-  "link.remove",
-  "frame.add",
-  "frame.remove",
-  "module.update",
-]);
 function sameActivity(a: TurnActivity, b: TurnActivity) {
   return a.kind === b.kind && a.tool === b.tool && a.label === b.label;
 }
@@ -419,12 +411,8 @@ export class TurnManager {
         agentMessage.text = content;
       } else {
         agentMessage.status = "complete";
-        if (run.groupId && !combatThread)
-          await this.arrangeAfterStructuralChanges(
-            sessionId,
-            turnId,
-            run.groupId,
-          );
+        // New cards are already placed locally (placeCard). The whole desk is only
+        // re-flowed by board_stage or an explicit board_arrange, never after a turn.
         const actions = this.groupActions(
           await this.deps.store.get(stateSessionId),
           turnId,
@@ -526,46 +514,6 @@ export class TurnManager {
     if (sameActivity(run.activity, activity)) return;
     run.activity = activity;
     await this.setTurn(sessionId, turnId, { activity });
-  }
-  /**
-   * Re-runs the automatic layout, in the turn's own action group, once the turn
-   * changed the structure of the board: the agent never positions cards itself.
-   * Skipped when the group already ends its structural changes with an arrange.
-   * A failure is logged and never fails the turn.
-   */
-  private async arrangeAfterStructuralChanges(
-    sessionId: string,
-    turnId: string,
-    groupId: string,
-  ) {
-    try {
-      const session = await this.deps.store.get(sessionId);
-      const group = session.history.find(
-        (item) => item.id === groupId && !item.undone,
-      );
-      if (!group) return;
-      let lastStructural = -1;
-      group.actions.forEach((action, index) => {
-        if (STRUCTURAL_ACTIONS.has(action.type)) lastStructural = index;
-      });
-      if (lastStructural < 0) return;
-      if (
-        group.actions
-          .slice(lastStructural + 1)
-          .some((action) => action.type === "board.arrange")
-      )
-        return;
-      await this.deps.store.apply(sessionId, [{ type: "board.arrange" }], {
-        origin: "agent",
-        turnId,
-        groupId,
-      });
-    } catch (error) {
-      console.error(
-        "Riordino automatico della scrivania non riuscito:",
-        error instanceof Error ? error.message : String(error),
-      );
-    }
   }
   private groupActions(
     session: CockpitSession,

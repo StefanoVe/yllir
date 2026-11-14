@@ -412,9 +412,14 @@ async function seedNotes(
   return seeded.session.state.board.modules.map((module) => module.id);
 }
 
-test("un turno che collega carte chiude con il riordino automatico nello stesso gruppo", async () => {
+test("un turno che collega carte non riordina la scrivania e lascia ferme le carte", async () => {
   const h = await setup([]);
   const [first, second] = await seedNotes(h, ["A", "B"]);
+  const positionsOf = (modules: { id: string; x: number; y: number }[]) =>
+    modules.map((module) => ({ id: module.id, x: module.x, y: module.y }));
+  const before = positionsOf(
+    (await h.store.get(h.session.id)).state.board.modules,
+  );
   h.provider.steps = [
     {
       type: "callTool",
@@ -433,8 +438,41 @@ test("un turno che collega carte chiude con il riordino automatico nello stesso 
   expect(groups).toHaveLength(1);
   expect(groups[0]!.actions.map((action) => action.type)).toEqual([
     "link.add",
-    "board.arrange",
   ]);
+  expect(positionsOf(result.session.state.board.modules)).toEqual(before);
+});
+
+test("un turno che crea un riquadro non aggiunge un riordino e lascia ferme le carte", async () => {
+  const h = await setup([]);
+  const [first, second] = await seedNotes(h, ["A", "B"]);
+  const positionsOf = (modules: { id: string; x: number; y: number }[]) =>
+    modules.map((module) => ({ id: module.id, x: module.x, y: module.y }));
+  const before = positionsOf(
+    (await h.store.get(h.session.id)).state.board.modules,
+  );
+  h.provider.steps = [
+    {
+      type: "callTool",
+      name: "board_frame",
+      arguments: { title: "Scena", cards: [] },
+    },
+    { type: "event", event: { type: "text", text: "riquadro" } },
+  ];
+  const submitted = await h.turns.submit(h.session.id, "crea un riquadro");
+  const result = await waitForTurn(h.store, h.session.id, submitted.turnId, [
+    "done",
+  ]);
+  const types = result.session.history
+    .filter((group) => group.turnId === submitted.turnId)
+    .flatMap((group) => group.actions.map((action) => action.type));
+  expect(types).toContain("frame.add");
+  expect(types).not.toContain("board.arrange");
+  const untouched = before.filter((card) => card.id === first || card.id === second);
+  expect(
+    positionsOf(result.session.state.board.modules).filter((card) =>
+      untouched.some((item) => item.id === card.id),
+    ),
+  ).toEqual(untouched);
 });
 
 test("un turno che solo mette carte in scena non riordina la scrivania", async () => {
@@ -456,35 +494,6 @@ test("un turno che solo mette carte in scena non riordina la scrivania", async (
     .filter((group) => group.turnId === submitted.turnId)
     .flatMap((group) => group.actions.map((action) => action.type));
   expect(types).toEqual(["module.show"]);
-});
-
-test("se il riordino automatico fallisce il turno resta completato", async () => {
-  const h = await setup([]);
-  const [first, second] = await seedNotes(h, ["A", "B"]);
-  const original = h.store.apply.bind(h.store);
-  h.store.apply = ((id, actions, meta) => {
-    if (actions.some((action) => action.type === "board.arrange"))
-      return Promise.reject(new Error("riordino guasto"));
-    return original(id, actions, meta);
-  }) as typeof h.store.apply;
-  h.provider.steps = [
-    {
-      type: "callTool",
-      name: "board_link",
-      arguments: { from: first, to: second },
-    },
-    { type: "event", event: { type: "text", text: "collegate" } },
-  ];
-  const submitted = await h.turns.submit(h.session.id, "collega");
-  const result = await waitForTurn(h.store, h.session.id, submitted.turnId, [
-    "done",
-    "error",
-  ]);
-  expect(result.turn.status).toBe("done");
-  const types = result.session.history
-    .filter((group) => group.turnId === submitted.turnId)
-    .flatMap((group) => group.actions.map((action) => action.type));
-  expect(types).toEqual(["link.add"]);
 });
 
 test("un turno sulla chat di scontro usa gli strumenti di combattimento, il modello del thread e il digest del tavolo", async () => {
