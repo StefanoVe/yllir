@@ -22,6 +22,7 @@
     [class.animating]="animating()"
     [style.transform]="worldTransform()"
     [style.--k]="textScale()"
+    [style.--zoom]="zoom()"
   >
     <div class="frames-layer">
       @for (frame of displayFrames(); track frame.id) {

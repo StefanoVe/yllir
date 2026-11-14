@@ -21,16 +21,22 @@
 }
 .chat-head h2 {
   margin: 0;
+  color: var(--color-text);
   font-size: var(--font-size-sm);
   font-weight: 500;
   line-height: 1.2;
 }
-/* Empty thread: one quiet line, centred in the pane. */
+/* Empty thread: an instruction in a dashed box, centred in the pane, text left-aligned and fully
+   readable (not a disabled placeholder). */
 .chat-empty {
-  max-width: 32ch;
+  box-sizing: border-box;
+  max-width: min(100%, 36ch);
   margin: auto;
-  text-align: center;
-  color: var(--color-text-muted);
+  padding: 16px;
+  border: var(--border-width) dashed var(--color-border);
+  text-align: left;
+  color: var(--color-text);
+  font-size: 15px;
   line-height: 1.5;
 }
 .messages {

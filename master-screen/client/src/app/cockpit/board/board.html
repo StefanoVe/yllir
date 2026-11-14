@@ -15,7 +15,7 @@
     @if(!api.connected()){<span class="reconnect">{{ i18n.t("liveAgent.reconnecting") }}</span>}
     <button
       type="button"
-      class="pill-tool"
+      class="pill-tool btn btn-secondary"
       [class.on]="panel() === 'ledger'"
       [msTooltip]="i18n.t('liveAgent.ledger.title')"
       [attr.aria-label]="i18n.t('liveAgent.ledger.title')"
@@ -28,7 +28,7 @@
     </button>
     @if(s.state.combat){<button
       type="button"
-      class="pill-tool"
+      class="pill-tool btn btn-secondary"
       [class.on]="panel() === 'combat'"
       [msTooltip]="i18n.t('liveAgent.combat.title')"
       [attr.aria-label]="i18n.t('liveAgent.combat.title')"

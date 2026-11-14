@@ -40,28 +40,61 @@
   border-bottom-width: var(--border-width-strong);
   padding-bottom: 7px;
 }
-.composer .model {
+/* Model choice: a flat select with a 1px frame, no radius; the chevron is an icon over it. */
+.composer .model-wrap {
+  position: relative;
   flex: 0 0 auto;
-  box-sizing: border-box;
-  height: 36px;
+  display: inline-flex;
   max-width: 110px;
-  padding: 0 6px;
-  border: var(--border-width) solid var(--color-border);
-  background: transparent;
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: 13px;
+}
+.composer .model {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 100%;
+  height: 36px;
+  margin: 0;
+  padding: 0 28px 0 10px;
+  border: var(--border-width) solid var(--color-border-strong);
+  border-radius: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  font-size: var(--font-size-base);
+  line-height: 1;
   cursor: pointer;
+}
+.composer .model-chevron {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  color: var(--color-text);
+  pointer-events: none;
 }
 .composer .model:disabled {
   opacity: 0.55;
   cursor: default;
 }
-/* Icon-only send button: the shared primary button, square and 36px. */
+.composer .model:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+/* Icon-only send button: the shared primary button, square 36px. Enabled = filled, the icon in the
+   page colour. Disabled = an outlined square, not a faint filled one (no opacity fade). */
 .composer .send {
   flex: 0 0 auto;
   width: 36px;
   height: 36px;
   min-width: 36px;
   padding: 0;
+  color: var(--color-bg);
+}
+.composer .send:disabled,
+.composer .send:disabled:hover {
+  opacity: 1;
+  background: transparent;
+  border-color: var(--color-border);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
 }

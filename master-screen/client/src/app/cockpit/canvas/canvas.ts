@@ -524,7 +524,7 @@ export class CockpitCanvas {
   protected frameTitleSize(frame: { w: number; title: string }): number {
     const chars = Math.max(1, [...frame.title].length);
     const fits = (frame.w - 32) / (chars * 0.56);
-    return Math.max(12, Math.min(15 * this.textScale(), fits));
+    return Math.max(12, Math.min(28 * this.textScale(), fits));
   }
 
   protected isArtCard(card: BoardModuleView): boolean {

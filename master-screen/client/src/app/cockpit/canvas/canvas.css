@@ -30,7 +30,7 @@
   touch-action: none;
   cursor: grab;
   outline-offset: -2px;
-  background: var(--color-bg);
+  background: var(--color-surface-2);
 }
 
 .surface.dragging {
@@ -53,10 +53,16 @@
 
 /* ───────────────────────────── Frames ───────────────────────────── */
 
+/* Outline width in screen pixels: about 2px at every zoom (the world is scaled by --zoom). */
+.frame,
+.card {
+  --ol: min(8px, max(1.5px, calc(2px / var(--zoom, 1))));
+}
+
 .frame {
   position: absolute;
   box-sizing: border-box;
-  border: var(--border-width) solid var(--color-border);
+  border: var(--ol) solid var(--color-border-strong);
   border-radius: 0;
   background: transparent;
   pointer-events: none;
@@ -83,7 +89,7 @@
   pointer-events: auto;
   cursor: grab;
   font-family: var(--font-family-hand);
-  font-size: calc(22px * var(--k));
+  font-size: calc(28px * var(--k));
   font-weight: 700;
   color: var(--color-text);
   border-radius: 0;
@@ -147,10 +153,10 @@
   cursor: default;
   user-select: none;
   filter:
-    drop-shadow(1px 0 0 var(--color-border-strong))
-    drop-shadow(-1px 0 0 var(--color-border-strong))
-    drop-shadow(0 1px 0 var(--color-border-strong))
-    drop-shadow(0 -1px 0 var(--color-border-strong));
+    drop-shadow(var(--ol) 0 0 var(--color-border-strong))
+    drop-shadow(calc(-1 * var(--ol)) 0 0 var(--color-border-strong))
+    drop-shadow(0 var(--ol) 0 var(--color-border-strong))
+    drop-shadow(0 calc(-1 * var(--ol)) 0 var(--color-border-strong));
 }
 
 .paper {
@@ -213,7 +219,7 @@
 }
 
 .card.missing {
-  opacity: 0.55;
+  opacity: 0.7;
 }
 
 .card.linking {
@@ -240,8 +246,8 @@
   line-height: 1.1;
   overflow-wrap: anywhere;
   font-family: var(--font-family-hand);
-  font-size: calc(22px * var(--k));
-  font-weight: 700;
+  font-size: calc(26px * var(--k));
+  font-weight: 600;
 }
 
 .card-head ui-icon {

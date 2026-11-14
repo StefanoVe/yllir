@@ -34,7 +34,8 @@
   background: var(--color-surface-2);
 }
 .session-button h1 {
-  font-size: 20px;
+  font-family: var(--font-family-hand);
+  font-size: 30px;
   font-weight: 600;
   line-height: 1.2;
   margin: 0;
@@ -43,7 +44,7 @@
   white-space: nowrap;
 }
 .session-button ui-icon {
-  color: var(--color-text-muted);
+  color: var(--color-text);
   flex: none;
 }
 .head-actions {
@@ -53,23 +54,25 @@
   position: relative;
   flex-shrink: 0;
 }
+/* Undo: a 36px square button with a secondary (structure) frame, so it reads as a button. */
 .icon-button {
-  width: 34px;
-  height: 34px;
-  color: var(--color-text-muted);
-  padding: 8px;
-  border: var(--border-width) solid transparent;
-}
-.icon-button:hover {
-  background: var(--color-surface-2);
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: var(--border-width) solid var(--color-border-strong);
+  background: transparent;
   color: var(--color-text);
 }
+.icon-button:hover {
+  background: var(--color-accent-soft);
+}
 .icon-button:disabled {
-  opacity: 0.35;
+  opacity: 0.55;
 }
 .reconnect {
   font-size: 12px;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   margin-right: 6px;
 }
 .popover {
@@ -93,7 +96,8 @@
   margin-left: auto;
   color: var(--color-text-muted);
 }
-/* Scene in progress: a rectangular label with a 1px structure line, one compact row. */
+/* Scene in progress: a rectangular label with a 1px structure line, one compact row. Location in
+   medium weight, the rest regular, all in the text colour. */
 .scene {
   display: flex;
   align-items: center;
@@ -103,7 +107,8 @@
   padding: 6px 10px;
   border: var(--border-width) solid var(--color-border-strong);
   font-size: 13px;
-  color: var(--color-text-muted);
+  font-weight: 400;
+  color: var(--color-text);
 }
 .scene-place {
   display: inline-flex;
@@ -113,7 +118,7 @@
   color: var(--color-text);
 }
 .scene-place strong {
-  font-weight: 600;
+  font-weight: 500;
 }
 .scene-moment {
   flex: none;
@@ -157,24 +162,20 @@ cockpit-canvas {
   display: block;
 }
 
-/* Panel toggles in the header row: square, a thin frame, inverted when on. */
+/* Panel toggles in the header row: .btn .btn-secondary, with the icon; inverted when on. */
 .pill-tool {
   position: relative;
   flex: none;
-  height: 32px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 0 12px;
-  border: var(--border-width) solid var(--color-border);
-  color: var(--color-text-muted);
-  font-size: 13px;
+  height: 36px;
+  gap: 8px;
+  padding: 0 14px;
+  color: var(--color-text);
+  font-size: var(--font-size-sm);
   font-weight: 500;
   white-space: nowrap;
 }
 .pill-tool:hover {
-  color: var(--color-text);
-  border-color: var(--color-border-strong);
+  background: var(--color-accent-soft);
 }
 .pill-tool.on,
 .pill-tool.on:hover {
@@ -338,7 +339,7 @@ cockpit-canvas {
 }
 .add-empty {
   padding: 10px 8px;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   font-size: 13px;
 }
 
