@@ -111,6 +111,7 @@ print:                           # facoltativo. Impostazioni dei fogli di stampa
 
 workflow:                        # facoltativo. Modo di lavoro dei processi di scrittura.
   auto_accept: false             # facoltativo. Se falso (predefinito), prima di scrivere un documento l'assistente riassume i cambiamenti e chiede al master se può procedere. Se vero, scrive senza chiedere e racconta il risultato dopo. Decisione dell'autore, 2026-11-14.
+  auto_item_images: true         # facoltativo. Predefinito vero. Se vero, dopo la creazione di una scheda oggetto nuova parte l'illustrazione; se falso, no. Deciso, 2026-11-14.
 
 allow_model_imagination: null    # accettata e ignorata (Implementato in 0.30.0). Qualunque valore è accettato; la migrazione la toglie. Vedi sotto.
 ```
@@ -300,6 +301,7 @@ La validazione è uno script deterministico, non un giudizio dell'agente. Contro
 - le chiavi ammesse: una chiave sconosciuta è un errore. `allow_model_imagination` è ammessa con qualunque valore e ignorata;
 - le impostazioni dell'enciclopedia e della stampa (decisione dell'autore, 2026-11-12): `encyclopedia.base_url` è `http` o `https`, senza query (`?`) né frammento (`#`); `print.format`, `print.cmyk` e `print.renderer` accettano solo i valori dello schema;
 - l'impostazione del modo di lavoro (decisione dell'autore, 2026-11-14): `workflow.auto_accept` accetta solo vero o falso;
+- l'illustrazione automatica degli oggetti (Deciso, 2026-11-14): `workflow.auto_item_images` accetta solo vero o falso;
 - l'unicità degli `id` di categoria e l'esistenza delle cartelle dichiarate in `structure` (solo quelle: il validatore non controlla altro);
 - l'esistenza dell'adattatore e dei profili di stile citati;
 - la coerenza delle carte: `cards: true` ha senso solo su una categoria di tipo `oggetti`;

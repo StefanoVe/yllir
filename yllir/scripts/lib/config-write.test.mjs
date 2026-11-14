@@ -341,6 +341,14 @@ test('a top-level allow_model_imagination is written and reads back as null, tru
   }
 });
 
+test('workflow.auto_item_images is written under workflow and reads back', () => {
+  const config = parse(MINIMAL);
+  config.workflow = { auto_item_images: false };
+  const text = stringifyConfig(config);
+  assert.match(text, /^workflow:\n  auto_item_images: false$/m);
+  assert.deepEqual(parse(text), config);
+});
+
 test('workflow is written right after modules and reads back', () => {
   const config = parse(MINIMAL);
   config.modules = { print: false };

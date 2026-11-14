@@ -134,7 +134,8 @@ Le parole mostrate al master sono nel lessico della skill di ingresso (`yllir/sk
 3. **Scaletta.** Una riga per soggetto, con sette colonne: titolo, id, tipo, luogo, legami, una frase, e il numero sulla cronologia per gli eventi. Tutti i legami si decidono qui, in un solo passaggio. Una regione è di solito fra cinque e trenta righe; oltre si divide la richiesta in due passate e lo si dice in una frase. Se la scaletta aggiunge fatti per tutto il mondo (una fazione, una convenzione dei nomi, un tema), va nel seme nello stesso lotto.
 4. **Divisione.** Le righe che servono subito diventano schede complete, scritte dall'autore fino a tre, poi da un `sheet-expander` per scheda. Tutte le altre diventano abbozzi (`sketch: true`): un documento valido del canone, con nome, tipo, legami e una frase. Nessuna riga si perde. *Deciso, 2026-11-11* (Riprogettazione, sezione 5 e decisione 13).
 5. **Lotto.** Un solo lotto con tutte le bozze: controllo, eventuale revisione, scrittura.
-6. **Messaggio.** Che cosa è stato creato, con i nomi principali; che tutto è inventato, quindi cambiabile; che cosa è solo un abbozzo e sarà completato quando serve.
+6. **Illustrazioni degli oggetti** (*Deciso, 2026-11-14*): dopo il salvataggio, per ogni scheda oggetto nuova del lotto (non un annuncio) parte l'illustrazione, con `yllir:images`; al massimo cinque, le altre si fanno su richiesta. Salta se il master ha detto di non farle, o se `workflow.auto_item_images` è falso.
+7. **Messaggio.** Che cosa è stato creato, con i nomi principali; che tutto è inventato, quindi cambiabile; che cosa è solo un abbozzo e sarà completato quando serve.
 
 **Deciso, 2026-11-11** (Riprogettazione, sezione 5): la generazione avviene a passate (scaletta, espansione, coerenza) e **senza conferma**: il master non approva la scaletta. Il framework genera, dice in poche frasi che cosa ha creato, e il master corregge parlando.
 
@@ -164,7 +165,8 @@ Le parole mostrate al master sono nel lessico della skill di ingresso (`yllir/sk
 6. **Bozza.** Un solo documento, con la sua provenienza. Un documento `generated` si può cambiare liberamente; un documento `master` o `played` non si sovrascrive né si contraddice.
 7. **Conseguenze.** Il comando `query related` e `query timeline` dicono quali altri documenti dipendono dalla modifica. Quelli che la modifica rende incoerenti si correggono nello stesso lotto, cambiando solo le righe in conflitto. Un documento `master` o `played` in conflitto non si cambia: il conflitto va al master.
 8. **Scrittura.** Il ciclo di scrittura, con tutte le bozze nello stesso lotto.
-9. **Messaggio.** Che cosa è stato creato o cambiato, per nome; che cosa è inventato («L'ho inventato io: il suo passato e il suo debito»); che cosa resta a parole perché non c'è un adattatore; quali altri documenti sono cambiati per la modifica.
+9. **Illustrazione dell'oggetto** (*Deciso, 2026-11-14*): dopo il salvataggio, se la scheda è un oggetto nuovo del lotto (non un annuncio) e non ha ancora un'immagine, parte la sua illustrazione con `yllir:images`, senza altre richieste; le schede cambiate o espanse non la ricevono. Salta se il master ha detto di non farle, o se `workflow.auto_item_images` è falso.
+10. **Messaggio.** Che cosa è stato creato o cambiato, per nome; che cosa è inventato («L'ho inventato io: il suo passato e il suo debito»); che cosa resta a parole perché non c'è un adattatore; quali altri documenti sono cambiati per la modifica.
 
 **Cosa vede l'utente:** il messaggio finale, senza parole tecniche.
 
@@ -188,7 +190,8 @@ Le parole mostrate al master sono nel lessico della skill di ingresso (`yllir/sk
 4. **Piano delle scene.** Prima dei file, una riga per scena: id, che cosa accade, dove, chi c'è, quali oggetti contano e da quali scene dipende. Le dipendenze si decidono qui, in un solo passaggio: le prime scene non dipendono da nulla; una scelta fa dipendere più scene dalla stessa; una scena che riunisce più rami dipende da tutti.
 5. **Personaggi, luoghi e oggetti.** Per ogni nome usato dalle scene si cerca il soggetto con `query find`. Un soggetto esistente si riusa com'è: si può citare, mai ridefinire. Un soggetto mancante si crea nello stesso lotto. Un abbozzo che la sessione usa si espande in scheda completa, con lo stesso id.
 6. **Lotto.** Il file principale della sessione è solo uno stub (id, dipendenze, provenienza): il motore ricostruisce il corpo e l'elenco delle scene. Ogni scena è un file nella cartella `Eventi/`, con id, sessione, dipendenze, luogo e personaggi, e provenienza `generated`. Insieme, le schede nuove e il seme, solo se la sessione aggiunge qualcosa per tutto il mondo.
-7. **Messaggio.** Che cosa è pronto, che cosa è stato inventato, che cosa resta da completare.
+7. **Illustrazioni degli oggetti** (*Deciso, 2026-11-14*): dopo il salvataggio, per ogni scheda oggetto nuova della sessione (non un annuncio) parte l'illustrazione, con `yllir:images`; al massimo cinque, le altre si fanno su richiesta. Salta se il master ha detto di non farle, o se `workflow.auto_item_images` è falso.
+8. **Messaggio.** Che cosa è pronto, che cosa è stato inventato, che cosa resta da completare, e le illustrazioni avviate.
 
 **Invenzione.** Ciò che le fonti non danno si inventa: un nome, un luogo, un legame, un passato. Ogni invenzione si dichiara al master nel messaggio. Un segreto (ciò che qualcuno nasconde, la vera causa di un evento) sta solo nel blocco riservato. *Deciso, 2026-11-11* (decisione 7).
 

@@ -15,7 +15,7 @@ Run every command from the campaign root, exactly as written, with nothing added
 
 ## Step 1 — Read the request and the campaign
 
-1. Read `campaign.yaml` with the Read tool: `language.main` (the campaign language), `system.adapter`, `campaign.seed` (the seed file name), and the `structure` list. Note the folder of each category: the one of type `places` (places), `subjects` (characters and creatures), `objects` (items), `free` (historical events); factions have their own top-level category (`fazioni` / `factions`, type `subjects`).
+1. Read `campaign.yaml` with the Read tool: `language.main` (the campaign language), `system.adapter`, `campaign.seed` (the seed file name), the `structure` list, and `workflow.auto_item_images` (`false` only when written as `false`; if the key or the section is missing, it is `true`). Note the folder of each category: the one of type `places` (places), `subjects` (characters and creatures), `objects` (items), `free` (historical events); factions have their own top-level category (`fazioni` / `factions`, type `subjects`).
 2. Read the seed file named by `campaign.seed` with the Read tool. Every later choice must agree with it.
 3. Note what the master asked for: the region, the place, the people, how many, and whether a session needs some of them soon. Write it in one sentence in your notes.
 
@@ -81,12 +81,22 @@ Follow section 7 of `authoring.md` with ONE batch:
 - `--files`: every draft path written in this step (documents, sketches, `campaign.yaml` if the factions entry was added, the seed if changed), campaign-relative, without `.campaign/drafts/`. Never `outline.md`.
 - `--message`: one sentence in the campaign language, for example `Mondo: Borgo Cenere, Teodo Marr e la Gilda del sale.`
 
+## Step 6b — Item illustrations
+
+Runs only after Step 6 has saved the batch, and only when `workflow.auto_item_images` is not `false`. The full rule is in `write-document` Step 7b; this is what applies here.
+1. Take the new item sheets of this batch: `kind: item`, `template: item` (not `notice`), in the `objects` category. Sketches of items count too. A sheet that already has an image (check its folder with Glob) is left out.
+2. If the master said in this same message not to make images, take none.
+3. If more than 5 remain, keep the first 5 in the order of the outline and leave the others: they can be made on request.
+4. Run the images for the chosen sheets one after another: for each, invoke `yllir:images` with the Skill tool, with the sheet's campaign-relative path as the document, OPERATION `generate`, the illustration of the item, and no other request. Only the illustration, never the card.
+5. If the images skill asks the master something (for example the consent to an outside service), let it ask and wait for the answer before starting the next one.
+
 ## Step 7 — Tell the master
 
 Write a few sentences in the campaign language, in plain words, with no technical terms:
 1. what was created, with the main names (for example «Ho creato il Borgo Cenere, con il suo capo Teodo Marr; la Gilda del sale e il Lago Grigio sono per ora appena abbozzati»);
 2. that all of it is invented, so the master knows it can be changed («Tutto questo l'ho inventato io: se qualcosa non ti convince, dimmelo e lo cambio»);
-3. what is only a sketch and will be filled in when it is needed.
+3. what is only a sketch and will be filled in when it is needed;
+4. when illustrations were started by Step 6b, one plain sentence, for example «Ho avviato anche le illustrazioni dei nuovi oggetti». When there were more than 5 items, add one sentence saying that the others can be illustrated on request.
 
 Do not list the files. Do not ask the master to approve anything.
 

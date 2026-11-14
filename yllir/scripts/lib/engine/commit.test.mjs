@@ -1370,6 +1370,69 @@ test('a campaign.yaml draft that changes workflow.auto_accept from true to false
   assert.equal(parseYamlLite(readAt(dir, 'campaign.yaml')).data.workflow.auto_accept, false);
 });
 
+test('a campaign.yaml draft that adds workflow.auto_item_images needs no review and is saved', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => { c.workflow = { auto_item_images: false }; }));
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.equal(check.reviewRequired, false);
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Switch off item images' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(commitCount(dir), before + 1);
+  assert.equal(parseYamlLite(readAt(dir, 'campaign.yaml')).data.workflow.auto_item_images, false);
+});
+
+test('a campaign.yaml draft that changes workflow.auto_item_images from false to true is saved', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => { c.workflow = { auto_item_images: false }; }));
+  assert.equal((await commitBatch(dir, { files: ['campaign.yaml'], message: 'Switch off item images' })).ok, true);
+
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => { c.workflow.auto_item_images = true; }));
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Switch item images back on' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(parseYamlLite(readAt(dir, 'campaign.yaml')).data.workflow.auto_item_images, true);
+});
+
+test('a campaign.yaml draft with a non-boolean workflow.auto_item_images fails validation', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => { c.workflow = { auto_item_images: 'yes' }; }));
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, false);
+  assert.ok(check.errors.some((item) => /auto_item_images/.test(item.path ?? '') || /auto_item_images/.test(item.message ?? '')), JSON.stringify(check.errors));
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Bad setting' });
+  assert.equal(result.ok, false);
+  assert.equal(commitCount(dir), before);
+});
+
+test('a campaign.yaml draft that sets workflow.auto_item_images and changes language.main is refused with config-change-refused', async (t) => {
+  const dir = makeCampaign(t);
+  const before = commitCount(dir);
+  writeDraft(dir, 'campaign.yaml', configDraft(dir, (c) => {
+    c.workflow = { auto_item_images: false };
+    c.language.main = 'en';
+  }));
+
+  const check = await checkBatch(dir, { files: ['campaign.yaml'] });
+  assert.equal(check.ok, false);
+  const error = check.errors.find((item) => item.code === 'config-change-refused');
+  assert.ok(error, JSON.stringify(check.errors));
+  assert.match(error.message, /language\.main/);
+
+  const result = await commitBatch(dir, { files: ['campaign.yaml'], message: 'Switch off item images and change the language' });
+  assert.equal(result.ok, false);
+  assert.equal(commitCount(dir), before);
+  assert.doesNotMatch(readAt(dir, 'campaign.yaml'), /auto_item_images/);
+});
+
 test('a campaign.yaml draft that sets workflow.auto_accept and changes language.main is refused with config-change-refused', async (t) => {
   const dir = makeCampaign(t);
   const before = commitCount(dir);

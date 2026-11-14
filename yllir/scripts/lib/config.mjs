@@ -14,7 +14,7 @@ const FILE = 'campaign.yaml';
 const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit', 'encyclopedia', 'print', 'workflow', 'allow_model_imagination'];
 const ENCYCLOPEDIA_KEYS = ['title', 'base_url'];
 const PRINT_KEYS = ['format', 'cmyk', 'renderer'];
-const WORKFLOW_KEYS = ['auto_accept'];
+const WORKFLOW_KEYS = ['auto_accept', 'auto_item_images'];
 const PRINT_FORMATS = ['5x7', 'a4'];
 const PRINT_RENDERERS = ['auto', 'photoshop', 'node'];
 const ENCYCLOPEDIA_TITLE_MAX = 120;
@@ -361,12 +361,17 @@ function validatePrint(r, print) {
 }
 
 /**
- * workflow (optional): auto_accept true lets write-document write without asking the master to confirm the plan first.
+ * workflow (optional): auto_accept true lets write-document write without asking the master to confirm the plan first;
+ * auto_item_images false switches off the automatic illustration of every new item sheet (missing or true keeps it on).
+ * Both must be booleans when present.
  */
 function validateWorkflow(r, workflow) {
   checkUnknownKeys(r, workflow, 'workflow', WORKFLOW_KEYS);
   if (Object.hasOwn(workflow, 'auto_accept') && typeof workflow.auto_accept !== 'boolean') {
     r.error('bad-type', 'workflow.auto_accept', 'workflow.auto_accept must be true or false');
+  }
+  if (Object.hasOwn(workflow, 'auto_item_images') && typeof workflow.auto_item_images !== 'boolean') {
+    r.error('bad-type', 'workflow.auto_item_images', 'workflow.auto_item_images must be true or false');
   }
 }
 

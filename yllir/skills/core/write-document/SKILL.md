@@ -13,7 +13,7 @@ Run every command from the campaign root, exactly as written, with nothing added
 
 ## Step 1 — Settings and the request
 
-1. Read `campaign.yaml` with the Read tool: `language.main`, `system.adapter`, `campaign.seed`, and the `structure` list (the folder of each category and its type), and `workflow.auto_accept`. `workflow.auto_accept` is `true` only when written as `true`; if the key or the section is missing, it is `false`.
+1. Read `campaign.yaml` with the Read tool: `language.main`, `system.adapter`, `campaign.seed`, and the `structure` list (the folder of each category and its type), `workflow.auto_accept`, and `workflow.auto_item_images`. `workflow.auto_accept` is `true` only when written as `true`; if the key or the section is missing, it is `false`. `workflow.auto_item_images` is `false` only when written as `false`; if the key or the section is missing, it is `true`.
 2. Decide the operation from the request:
    - **create**: a new document;
    - **change**: an existing document the master names or describes;
@@ -70,6 +70,7 @@ This step runs after Steps 1 to 4 and before any file is written to `.campaign/d
 4. On a yes: go on to Step 5. On a no or a correction: change the plan with what the master said and ask again; if the master changed the subject, drop the plan. Never write after a no.
 5. The plan is not asked again for the consequences found in Step 6 that were already listed in it. A consequence that was NOT in the plan (a new conflict found while writing) goes into the Step 8 summary; a `master` or `played` conflict keeps the question rule of Step 6.
 6. When the master asks to stop being asked («da ora in poi non chiedermelo», «scrivi senza chiedere») or to be asked again («chiedimelo di nuovo»), this is a change of the campaign setting, not of a document. Read `campaign.yaml` with the Read tool, write its whole text unchanged to `.campaign/drafts/campaign.yaml` with only `workflow.auto_accept` set to `true` (or `false`), adding the `workflow:` section with that one key at the end of the file when it is missing, and save it as a batch of one by Step 7 (`--files campaign.yaml`, with a `--message` such as `Impostazione: scrittura senza conferma.`). Do not ask for a plan confirmation for this change. Tell the master in one sentence, with no technical terms, that from now on you will write without asking (or will ask first again).
+7. When the master asks not to make the item illustrations («non generare le immagini degli oggetti») or to make them again («genera di nuovo le immagini degli oggetti»), change the setting the same way as point 6, with only `workflow.auto_item_images` set to `false` (or `true`), adding the `workflow:` section when it is missing, and save it as a batch of one with the message `Impostazione: immagini degli oggetti spente.` (or `accese`). Do not change any document. Tell the master in one sentence what is now the case.
 
 ## Step 5 — Write the draft
 
@@ -122,12 +123,21 @@ If the request adds a fact for the whole world (a new faction, a convention of n
 
 Follow section 7 of `authoring.md` with ONE batch: every draft of this process, campaign-relative, without `.campaign/drafts/`, in `--files`. The `--message` is one sentence in the campaign language, for example `Ilde Varno: scheda creata.` or `Gilda del sale: membro morto, cronologia aggiornata.`
 
+## Step 7b — Item illustrations
+
+Runs only after Step 7 has saved the batch, and only when `workflow.auto_item_images` is not `false`.
+1. Take the new item sheets of this batch: `kind: item`, `template: item` (not `notice`), in the `objects` category, created in this batch. Sketches of items count too. A sheet that was only changed or expanded is not taken, and neither is a sheet that already has an image (check its folder with Glob).
+2. If the master said in this same message not to make images, take none.
+3. For each sheet taken, invoke `yllir:images` with the Skill tool: the sheet's campaign-relative path as the document, OPERATION `generate`, the illustration of the item, and no other request. Only the illustration: never the card, which is made only on request.
+4. If the images skill asks the master something (for example the consent to an outside service), let it ask and wait for the answer before going on.
+
 ## Step 8 — Tell the master
 
 In a few plain sentences, in the campaign language, with no technical terms:
 1. what was created or changed, by name;
 2. what is new that the master did not say, as invented («L'ho inventato io: il suo passato e il suo debito»);
 3. any rule value that is still in words, and why;
-4. any other document that was changed because of this change.
+4. any other document that was changed because of this change;
+5. when an illustration was started by Step 7b, one plain sentence, for example «Ho avviato anche l'illustrazione dell'oggetto: la vedrai appena pronta».
 
 If the master asked something you could not do, say so in one sentence.

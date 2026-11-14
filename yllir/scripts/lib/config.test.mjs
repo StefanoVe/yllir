@@ -593,6 +593,15 @@ test('workflow.auto_accept must be true or false', () => {
   assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}workflow:\n  auto_accept: "yes"\n`)), ['bad-type workflow.auto_accept']);
 });
 
+test('workflow with auto_item_images true or false validates with no errors', () => {
+  assert.deepEqual(errorsOf(`${MINIMAL}workflow:\n  auto_item_images: true\n`), []);
+  assert.deepEqual(errorsOf(`${MINIMAL}workflow:\n  auto_item_images: false\n`), []);
+});
+
+test('workflow.auto_item_images must be true or false', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}workflow:\n  auto_item_images: "yes"\n`)), ['bad-type workflow.auto_item_images']);
+});
+
 test('an unknown key under workflow is reported as unknown-key', () => {
   assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}workflow:\n  auto_publish: true\n`)), ['unknown-key workflow.auto_publish']);
 });

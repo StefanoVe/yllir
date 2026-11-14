@@ -20,7 +20,8 @@ You are the AUTHOR: you write the session yourself. Run commands from the campai
    - `language.main`: the CAMPAIGN LANGUAGE;
    - `system.adapter`: the SYSTEM ADAPTER, the name of the game-system adapter, or `none`;
    - the `folder` of the entry of type `plot`: the PLOT FOLDER;
-   - the `folder` of the entry of type `chronicle`: the CHRONICLE FOLDER.
+   - the `folder` of the entry of type `chronicle`: the CHRONICLE FOLDER;
+   - `workflow.auto_item_images`: `false` only when written as `false`; if the key or the section is missing, it is `true` (ITEM IMAGES).
 2. Glob `<CHRONICLE FOLDER>/*.md`. File names start with the date, so the last one in sorted order is the newest page. Read the newest pages with the Read tool and keep their `played` lists. LAST_PLAYED is the first id of the newest non-empty `played` list, or none.
 3. Glob `<PLOT FOLDER>/*/*.md`. A session main file is the file whose name equals its folder name. Read each main file and keep its `id`, its `name` (the title), its `depends_on` and its path.
 4. A session is PLAYED when its `id` is in a `played` list of a chronicle page. A session is READY when every id in its `depends_on` is PLAYED.
@@ -117,9 +118,17 @@ Every link points to a file that exists in the batch or in the campaign. Give th
 
 Output: the batch committed, with its result.
 
+**Step 5b — Item illustrations.** Runs only after the batch is committed, and only when ITEM IMAGES is not `false`. The full rule is in `write-document` Step 7b; this is what applies here.
+1. Take the new item sheets of this batch: `kind: item`, `template: item` (not `notice`), in the `objects` category, created in this batch. Sketches of items count too. A sheet that already has an image (check its folder with Glob) is left out.
+2. If the master said in this same message not to make images, take none.
+3. If more than 5 remain, keep the first 5 and leave the others: they can be made on request.
+4. Run the images one after another: for each sheet, invoke `yllir:images` with the Skill tool, with the sheet's campaign-relative path as the document, OPERATION `generate`, the illustration of the item, and no other request. Only the illustration, never the card.
+5. If the images skill asks the master something, let it ask and wait for the answer before starting the next one.
+
 **Step 6 — Tell the master.** After the commit succeeds, write a few sentences in the campaign language:
 - what the session contains: one short line per scene, in plain words;
 - what you invented, each item named (a character, a place, a relation, a fact), and labelled «Inventato dall'assistente» (English «Invented by the assistant»), so the master can say what to change;
+- when illustrations were started by Step 5b, one plain sentence, for example «Ho avviato anche le illustrazioni dei nuovi oggetti». When there were more than 5 items, one more sentence saying that the others can be illustrated on request;
 - one sentence on what happens next, for example «Dimmi cosa cambiare, o quando giocarla».
 
 If the write cycle asks the master a question, ask that question instead, and stop.
