@@ -130,14 +130,19 @@ export class CombatantChip {
     tip.style.left = "0px";
     tip.style.top = "0px";
     const t = tip.getBoundingClientRect();
+    // With left and top at 0 the box sits at the origin of its containing block. That is the
+    // viewport, unless an ancestor has a transform (the battle board centres chips with one), so
+    // the position is computed in viewport coordinates and shifted by this origin.
+    const originX = t.left;
+    const originY = t.top;
     const h = token.getBoundingClientRect();
     const spot = placeTooltip(
       { left: h.left, top: h.top, width: h.width, height: h.height },
       { width: t.width, height: t.height },
       { width: vw, height: vh },
     );
-    tip.style.left = `${spot.left}px`;
-    tip.style.top = `${spot.top}px`;
+    tip.style.left = `${spot.left - originX}px`;
+    tip.style.top = `${spot.top - originY}px`;
     tip.dataset["side"] = spot.side;
     tip.classList.add("placed");
   }
