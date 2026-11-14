@@ -1,7 +1,5 @@
-/* Bundled fonts (offline): Inter variable for text, Caveat 600 and 700 for hand-written titles. */
+/* Bundled fonts (offline): Inter variable is used for text and titles. */
 @import "@fontsource-variable/inter/wght.css";
-@import "@fontsource/caveat/latin-600.css";
-@import "@fontsource/caveat/latin-700.css";
 
 /* Design tokens. Notebook look: black on white (light), white on black (dark). Flat, square,
    thin borders, no shadows, no gradients, no accent colour. Dark follows the system unless the
@@ -77,9 +75,9 @@
   --space-5: 40px;
   --space-6: 48px;
 
-  /* Type scale: 16px base. Hand font only for titles of pages, nodes and modals, never long text. */
+  /* Type scale: 16px base. The title font is Inter, used only for titles of pages, nodes and modals, never long text. */
   --font-family: "Inter Variable", system-ui, sans-serif;
-  --font-family-hand: "Caveat", "Segoe Print", "Bradley Hand", cursive;
+  --font-family-hand: var(--font-family);
   --font-family-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --font-size-base: 16px;
   --font-size-xs: 0.75rem;
