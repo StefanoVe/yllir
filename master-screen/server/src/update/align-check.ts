@@ -12,13 +12,27 @@ export function alignScriptPath(frameworkRoot: string): string {
 }
 
 /**
- * True when the dry-run result says there is work to do: the campaign would be updated, an earlier
- * update was interrupted, or a post-update migration is pending. Throws when the result is not one.
+ * A 'would-update' result is real work only when the framework version changed (or is unknown), or when
+ * a migration is still to be run. A dry run with equal versions and only hand-edited generated files is not
+ * an update, so it does not count.
+ */
+function wouldUpdateNeeded(data: Record<string, unknown>): boolean {
+  if (typeof data.from !== 'string' || typeof data.to !== 'string' || data.from !== data.to) return true;
+  const migrations = typeof data.migrations === 'object' && data.migrations !== null ? data.migrations : {};
+  if (Object.values(migrations).some((state) => state !== 'not-needed')) return true;
+  return Array.isArray(data.pending_migrations) && data.pending_migrations.length > 0;
+}
+
+/**
+ * True when the dry-run result says there is work to do: the framework would really be updated (the
+ * versions differ, or a migration is not 'not-needed'), an earlier update was interrupted, or a
+ * post-update migration is pending. A 'would-update' with equal versions and no migration is not work.
+ * Throws when the result is not an object.
  */
 export function alignNeeded(result: unknown): boolean {
   if (typeof result !== 'object' || result === null) throw new Error('the alignment check printed no object');
   const data = result as Record<string, unknown>;
-  if (data.status === 'would-update') return true;
+  if (data.status === 'would-update' && wouldUpdateNeeded(data)) return true;
   const errors = Array.isArray(data.errors) ? data.errors : [];
   const first = errors[0] as { code?: unknown } | undefined;
   if (data.status === 'failed' && first?.code === 'interrupted-update') return true;

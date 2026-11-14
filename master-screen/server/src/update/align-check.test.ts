@@ -41,8 +41,37 @@ function fakeFramework(): { framework: string; campaign: string; answer(result: 
 
 describe('alignNeeded', () => {
   it('needs the alignment when the campaign would be updated, or an earlier update was interrupted', () => {
-    assert.equal(alignNeeded({ status: 'would-update', errors: [], pending_migrations: [] }), true);
+    assert.equal(alignNeeded({ status: 'would-update', from: '0.1.0', to: '0.2.0', errors: [], pending_migrations: [] }), true);
     assert.equal(alignNeeded({ status: 'failed', errors: [{ code: 'interrupted-update' }] }), true);
+  });
+
+  it('does not need it for a would-update with equal versions, only hand-edited files and no migration', () => {
+    const result = {
+      status: 'would-update',
+      from: '0.2.0',
+      to: '0.2.0',
+      restored_by_hand: ['CLAUDE.md'],
+      migrations: { x: 'not-needed' },
+      pending_migrations: [],
+    };
+    assert.equal(alignNeeded(result), false);
+  });
+
+  it('needs it for a would-update with equal versions when a migration is not not-needed', () => {
+    const result = {
+      status: 'would-update',
+      from: '0.2.0',
+      to: '0.2.0',
+      restored_by_hand: ['CLAUDE.md'],
+      migrations: { x: 'complete' },
+      pending_migrations: [],
+    };
+    assert.equal(alignNeeded(result), true);
+  });
+
+  it('needs it for a would-update whose versions differ, or whose version is unknown', () => {
+    assert.equal(alignNeeded({ status: 'would-update', from: '0.1.0', to: '0.2.0', migrations: { x: 'not-needed' }, pending_migrations: [] }), true);
+    assert.equal(alignNeeded({ status: 'would-update', from: null, to: '0.2.0', pending_migrations: [] }), true);
   });
 
   it('needs the alignment when a post-update migration is pending, even when up to date', () => {

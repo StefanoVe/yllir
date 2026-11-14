@@ -400,7 +400,7 @@ After the assistant is updated, the campaign is aligned: the framework's `update
 
 `AlignStatus` (`shared/src/types.ts`): `{ state: 'none' | 'needed' | 'running' | 'waiting-answer' | 'done' | 'failed', conversationId: string | null }`.
 
-- The check is the framework's `update-campaign.mjs <campaign> --dry-run` (no shell, writes nothing). It says `needed` when the result is `would-update`, or `failed` with first error `interrupted-update`, or `pending_migrations` is not empty. The answer is cached for 30 s, and never asked while a run is active.
+- The check is the framework's `update-campaign.mjs <campaign> --dry-run` (no shell, writes nothing). It says `needed` when the result is `would-update` with a different `from` and `to` or a migration that is not `not-needed` (equal versions with only hand-edited generated files is not an update), or `failed` with first error `interrupted-update`, or `pending_migrations` is not empty. The answer is cached for 30 s, and never asked while a run is active.
 - `none`: nothing to do. `needed`: the campaign must be aligned. `failed` (still needed): the last run ended with an error or was cancelled; start is allowed again as a retry.
 - `running`: a turn of the alignment conversation is queued or running (also when the master answers in it, through the existing `POST /api/chat/messages`).
 - When the turns end: nothing needed any more gives `done`; still needed after a normal end gives `waiting-answer` (the assistant asked a question); an error or a cancel gives `failed`.
