@@ -240,6 +240,26 @@ test("modalità intestazioni: il documento intero è una scena se non ci sono se
   expect(outline.edges).toEqual([]);
 });
 
+test("scena: le intestazioni di navigazione (Entry points, Exits) non diventano sezioni", () => {
+  const session = doc("Plot/Notte/Sessione.md", "# Sessione\n[A](Sessione/Scena.md)\n");
+  const scena = doc(
+    "Plot/Notte/Sessione/Scena.md",
+    "# Scena\n\n## Entry points\n\nDa nord.\n\n## Description\n\nIl molo.\n\n## Exits\n\nVerso il mare.\n",
+  );
+  const outline = sessionOutline(mapOf([session, scena]), [], session.path, categories);
+  expect(outline.scenes[0]!.sections.map((s) => s.title)).toEqual(["Description"]);
+});
+
+test("scena: se restano solo Entry points e Exits non ci sono sezioni", () => {
+  const session = doc("Plot/Notte/Sessione.md", "# Sessione\n[A](Sessione/Scena.md)\n");
+  const scena = doc(
+    "Plot/Notte/Sessione/Scena.md",
+    "# Scena\n\n## Entry points\n\nDa nord.\n\n## Exits\n\nVerso il mare.\n",
+  );
+  const outline = sessionOutline(mapOf([session, scena]), [], session.path, categories);
+  expect(outline.scenes[0]!.sections).toEqual([]);
+});
+
 test("documento mancante: errore in italiano", () => {
   expect(() => sessionOutline(new Map(), [], "Plot/Assente.md", categories)).toThrow(
     "Documento non trovato: Plot/Assente.md",

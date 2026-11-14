@@ -80,6 +80,7 @@ test("il prompt di sistema separa le richieste di plancia dal registro e spiega 
   expect(prompt).toContain("board_arrange with frame");
   expect(prompt).toContain("board_frame (with id");
   expect(prompt).toContain("NOT reordered automatically");
+  expect(prompt).toContain("navigation notes, not nodes");
   expect(prompt).not.toContain("Reordering is automatic");
   expect(prompt).toContain("get_board");
   expect(prompt).toContain(

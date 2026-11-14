@@ -276,7 +276,34 @@ function dropBackwardEdges(edges: OutlineEdge[]): OutlineEdge[] {
   );
 }
 
-/** Returns the top-level headings inside a line range (the doc title excluded), capped. */
+/** Navigation headings of scene documents (entry points, exits): they are notes, never desk nodes. */
+export const IGNORED_HEADINGS: readonly string[] = [
+  "entry point",
+  "entry points",
+  "entrypoints",
+  "entrance",
+  "entrances",
+  "exit",
+  "exits",
+  "punti di ingresso",
+  "punto di ingresso",
+  "ingresso",
+  "ingressi",
+  "entrata",
+  "entrate",
+  "uscita",
+  "uscite",
+  "punti di uscita",
+];
+const IGNORED_HEADING_SET = new Set(IGNORED_HEADINGS);
+
+/** True when a heading title is one of IGNORED_HEADINGS (case-insensitive, trailing colon ignored). */
+export function isIgnoredHeading(title: string): boolean {
+  const key = title.trim().replace(/:$/, "").trim().toLowerCase();
+  return IGNORED_HEADING_SET.has(key);
+}
+
+/** Returns the top-level headings inside a line range (the doc title and ignored headings excluded), capped. */
 function subsectionsOf(
   doc: Detail,
   from: number,
@@ -285,8 +312,12 @@ function subsectionsOf(
   const lines = doc.raw.split("\n");
   // Line 1 is the document title, not a section.
   const inside = doc.headings.filter(
-    (h) => h.line > Math.max(from, 1) && h.line < to,
+    (h) =>
+      h.line > Math.max(from, 1) &&
+      h.line < to &&
+      !isIgnoredHeading(h.title),
   );
+  if (inside.length === 0) return [];
   // Session documents use `#` for events, `##` for actions, `###` for checks: take the top level present.
   const top = Math.min(...inside.map((h) => levelOf(lines, h.line)));
   const chosen = inside.filter((h) => levelOf(lines, h.line) === top);
@@ -344,11 +375,12 @@ function subfolderLayout(
 /** Returns the `#` headings that are scenes, or the `##` headings when there are fewer than two `#` scenes. */
 function sceneHeadings(doc: Detail): Heading[] {
   const lines = doc.raw.split("\n");
-  const top = doc.headings.filter(
+  const usable = doc.headings.filter((h) => !isIgnoredHeading(h.title));
+  const top = usable.filter(
     (h) => h.line !== 1 && levelOf(lines, h.line) === 1,
   );
   if (top.length >= 2) return top;
-  const second = doc.headings.filter((h) => levelOf(lines, h.line) === 2);
+  const second = usable.filter((h) => levelOf(lines, h.line) === 2);
   return second.length ? second : top;
 }
 
