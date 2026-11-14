@@ -28,6 +28,13 @@
       }
     </span>
     }
+    @if (!n.pc && n.status === "ready" && n.lines.length) {
+    <dl class="stat-lines">
+      @for (line of n.lines; track $index) {
+      <dt>{{ line.label }}</dt><dd>{{ line.value }}</dd>
+      }
+    </dl>
+    }
     @if (!n.pc) {
     @if (n.pending && !n.hasCard) {
     <p class="reading" aria-live="polite"><span class="pulse" aria-hidden="true"></span>{{ i18n.t("combat.card.reading") }}</p>
@@ -83,6 +90,13 @@
           <span class="badge" [attr.title]="i18n.t('combat.card.basicTitle')">{{ i18n.t("combat.card.basic") }}</span>
           }
         </div>
+        @if (other.lines.length) {
+        <dl class="stat-lines">
+          @for (line of other.lines; track $index) {
+          <dt>{{ line.label }}</dt><dd>{{ line.value }}</dd>
+          }
+        </dl>
+        }
         @if (other.pending && !other.hasCard) {
         <p class="reading" aria-live="polite"><span class="pulse" aria-hidden="true"></span>{{ i18n.t("combat.card.reading") }}</p>
         }

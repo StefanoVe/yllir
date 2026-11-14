@@ -161,6 +161,23 @@ summary.title {
   }
 }
 
+.stat-lines {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px var(--space-1);
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-xs);
+}
+
+.stat-lines dt {
+  color: var(--color-text-muted);
+}
+
+.stat-lines dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
 .muted {
   margin: 0;
   color: var(--color-text-muted);

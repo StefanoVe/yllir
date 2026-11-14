@@ -2,7 +2,8 @@
  * Combatant token, notebook look: a square with a 2 px structure border and the portrait inside
  * (in colour; the frame is the only structure). The token of the current turn has a double border:
  * the 2 px border plus an outline 2 px away. Hit points: a five-segment bar along the bottom.
- * Tooltip with the stats: a flat square box, 1 px border.
+ * Tooltip with the stats: a flat square box, 1 px border, fixed to the viewport and placed by the
+ * component (see tooltip-placement.ts). Hidden until placed, so it never flashes at the corner.
  */
 
 :host {
@@ -74,12 +75,15 @@
 
 /* Stats tooltip: a flat square box. */
 .tooltip {
-  position: absolute;
-  top: calc(100% + 8px);
+  position: fixed;
+  top: 0;
   left: 0;
-  z-index: 10;
+  z-index: 1000;
+  box-sizing: border-box;
+  visibility: hidden;
   min-width: 200px;
   max-width: 280px;
+  overflow: auto;
   padding: var(--space-1) var(--space-1);
   background: var(--color-surface);
   border: var(--border-width) solid var(--color-border-strong);
@@ -87,6 +91,10 @@
   box-shadow: none;
   color: var(--color-text);
   font-size: var(--font-size-sm);
+}
+
+.tooltip.placed {
+  visibility: visible;
 }
 
 .tip-name {

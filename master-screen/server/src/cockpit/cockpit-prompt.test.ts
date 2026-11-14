@@ -213,6 +213,63 @@ test("il digest di scontro elenca condizioni e durate con etichetta e gli avvisi
   );
 });
 
+test("il digest di scontro senza luogo dice 'not set' e non scrive 'unknown'", () => {
+  const combat = {
+    title: "Imboscata nel bosco",
+    round: 1,
+    activeId: "c1",
+    participants: [{ id: "c1", name: "Ada", kind: "pc", initiative: 15, conditions: [] }],
+    notes: "",
+    notices: [],
+  } as unknown as NonNullable<CockpitState["combat"]>;
+  const table = {
+    id: "table",
+    title: "Tavolo",
+    provider: "claude",
+    model: "m",
+    createdAt: "",
+    updatedAt: "",
+    revision: 0,
+    state: { ...emptyState(), combat, position: { ...emptyState().position, location: "", moment: "Notte" } },
+    history: [],
+    messages: [],
+    turns: [],
+  } as unknown as CockpitSession;
+  const thread = { ...table, id: "thread", state: emptyState(), messages: [] } as unknown as CockpitSession;
+  const message: ChatMessage = { id: "msg-map", role: "dm", text: "Trova e imposta la mappa di battaglia del luogo attuale.", at: "", turnId: "t", status: "complete" };
+  const digest = buildCombatUserPrompt(table, thread, message);
+  expect(digest).toContain("PLACE: not set (work it out from the combat title, the enemies' sheets or the messages; do not ask) · Notte");
+  expect(digest).not.toContain("unknown");
+});
+
+test("il digest di scontro con luogo noto mantiene il formato del luogo", () => {
+  const table = {
+    id: "table",
+    title: "Tavolo",
+    provider: "claude",
+    model: "m",
+    createdAt: "",
+    updatedAt: "",
+    revision: 0,
+    state: { ...emptyState(), position: { ...emptyState().position, location: "Porto di Vel" } },
+    history: [],
+    messages: [],
+    turns: [],
+  } as unknown as CockpitSession;
+  const thread = { ...table, id: "thread", state: emptyState(), messages: [] } as unknown as CockpitSession;
+  const message: ChatMessage = { id: "msg-map", role: "dm", text: "Mappa", at: "", turnId: "t", status: "complete" };
+  const digest = buildCombatUserPrompt(table, thread, message);
+  expect(digest).toContain("PLACE: Porto di Vel ·");
+  expect(digest).not.toContain("not set");
+});
+
+test("il prompt di combattimento vieta di chiedere il luogo e descrive il ripiego senza luogo", () => {
+  const system = buildCombatSystemPrompt({ language: "it", systemName: null });
+  expect(system).toContain("Never ask the master which place to search when the PLACE is unknown or not set");
+  expect(system).toContain("call find_battle_map with no place");
+  expect(system).toContain("battle_map_set");
+});
+
 test("il prompt di sistema del combattimento nomina combat_condition; quello del tavolo no", () => {
   expect(buildCombatSystemPrompt({ language: "it", systemName: null })).toContain("combat_condition");
   expect(buildSystemPrompt({ language: "it", systemName: null })).not.toContain("combat_condition");

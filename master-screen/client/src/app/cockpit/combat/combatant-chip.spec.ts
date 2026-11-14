@@ -92,6 +92,30 @@ describe('CombatantChip', () => {
     expect(root.querySelector('.initials')?.textContent).toContain('OG');
   });
 
+  it('places the open tooltip inside the viewport, flipped above a token in the bottom right corner', async () => {
+    installServer(OGRE_STATS);
+    const rect = (left: number, top: number, width: number, height: number) =>
+      ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+    const spy = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+      if (this.classList.contains('token')) return rect(980, 730, 44, 44);
+      if (this.classList.contains('tooltip')) return rect(0, 0, 200, 100);
+      return rect(0, 0, 0, 0);
+    });
+    try {
+      const fixture = create(MIRA);
+      const root = fixture.nativeElement as HTMLElement;
+      root.querySelector<HTMLButtonElement>('button.token')!.dispatchEvent(new Event('mouseenter'));
+      await settle(fixture);
+      const tip = root.querySelector<HTMLElement>('.tooltip')!;
+      expect(tip.classList.contains('placed')).toBe(true);
+      expect(tip.dataset['side']).toBe('top');
+      expect(tip.style.top).toBe('622px');
+      expect(tip.style.left).toBe('820px');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('never fetches the stats or the image of a player character', async () => {
     const calls = installServer(OGRE_STATS);
     const fixture = create(MIRA);

@@ -1,4 +1,5 @@
 <button
+  #token
   type="button"
   class="token"
   [attr.data-side]="isPc() ? 'pc' : combatant().kind"
@@ -25,7 +26,7 @@
   }
 </button>
 @if (open()) {
-<div class="tooltip" role="tooltip" [id]="tooltipId">
+<div #tip class="tooltip" role="tooltip" [id]="tooltipId">
   <p class="tip-name">{{ combatant().name }}</p>
   <p class="muted">{{ i18n.t("combat.stats.initiative") }}: {{ combatant().initiative ?? "—" }}</p>
   @if (!isPc()) { @if (combatant().maxHp !== undefined || combatant().hp !== undefined) {

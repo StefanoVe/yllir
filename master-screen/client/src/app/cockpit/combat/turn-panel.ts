@@ -63,6 +63,8 @@ interface Read {
   cardGroups: CostGroup[];
   groups: ActionGroup<ParserAction>[];
   traits: Array<{ name: string; text: string }>;
+  /** The stat lines of the creature (AC, HP, speed…); empty while loading, and for player characters. */
+  lines: Array<{ label: string; value: string }>;
 }
 
 const COST_KEYS: Record<CardAction["cost"], TranslationKey> = {
@@ -124,6 +126,7 @@ export class TurnPanel {
         cardGroups: [] as CostGroup[],
         groups: [] as ActionGroup<ParserAction>[],
         traits: [] as Array<{ name: string; text: string }>,
+        lines: [] as Array<{ label: string; value: string }>,
       };
     return { ...face, pc: false, ...this.read(a, ["own_turn"]) };
   });
@@ -236,6 +239,7 @@ export class TurnPanel {
         })),
         groups: [],
         traits: card.traits ?? [],
+        lines: stats?.lines ?? [],
       };
     }
     const parser = (stats?.actions ?? []).filter((x) => timings.includes(x.timing));
@@ -247,6 +251,7 @@ export class TurnPanel {
       cardGroups: [],
       groups: groupActions(parser),
       traits: [],
+      lines: stats?.lines ?? [],
     };
   }
 

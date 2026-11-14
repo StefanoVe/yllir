@@ -13,7 +13,10 @@ const GOBLIN_STATS: CombatantStats = {
 };
 
 const OGRE_STATS: CombatantStats = {
-  lines: [],
+  lines: [
+    { label: 'AC', value: '11' },
+    { label: 'HP', value: '59' },
+  ],
   actions: [
     { name: 'Claw', text: '+6 to hit', group: 'attack', groupLabel: 'Attacks', timing: 'own_turn' },
     { name: 'Parry', text: 'Adds 2 to AC against one melee attack', group: 'reaction', groupLabel: 'Reactions', timing: 'others_turns' },
@@ -244,6 +247,41 @@ describe('TurnPanel', () => {
     expect(badge.getAttribute('title')).toBe('Actions read without interpretation');
     expect(root.querySelector('.now .chip')).toBeNull();
     expect(root.querySelector('.now .action-name')?.textContent).toContain('Scimitar');
+  });
+
+  it('shows the stat lines of the active creature under its hit points', async () => {
+    installServer();
+    const fixture = create([GOBLIN, OGRE], 'c-goblin');
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const lines = root.querySelector('.now .stat-lines')!;
+    const terms = [...lines.querySelectorAll('dt')].map((t) => t.textContent?.trim());
+    const values = [...lines.querySelectorAll('dd')].map((d) => d.textContent?.trim());
+    expect(terms).toEqual(['AC']);
+    expect(values).toEqual(['15']);
+  });
+
+  it('shows the stat lines of each other creature under its head', async () => {
+    installServer();
+    const fixture = create([GOBLIN, OGRE], 'c-goblin');
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    const other = root.querySelector('.other')!;
+    const values = [...other.querySelectorAll('.stat-lines dd')].map((d) => d.textContent?.trim());
+    expect(values).toEqual(['11', '59']);
+    expect(other.querySelector('.stat-lines')?.previousElementSibling?.classList.contains('other-head')).toBe(true);
+  });
+
+  it('shows no stat lines for a player character', async () => {
+    installServer();
+    const fixture = create([MIRA, GOBLIN, OGRE], 'c-mira');
+    await settle(fixture);
+    const root = fixture.nativeElement as HTMLElement;
+
+    expect(root.querySelector('.now .stat-lines')).toBeNull();
+    expect(root.querySelector('.other .stat-lines')).not.toBeNull();
   });
 
   it('shows the reading indicator while the combatant card is pending', async () => {

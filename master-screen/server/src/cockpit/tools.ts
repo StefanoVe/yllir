@@ -1815,7 +1815,7 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
   tools.push(
     tool(
       "find_battle_map",
-      "Cerca le battlemap della campagna, filtrate per luogo (titolo o percorso della scheda che le contiene). Usalo quando inizia uno scontro, con il luogo della scena. Restituisce ref, scheda, titolo e, se noti, colonne e righe della griglia.",
+      "Cerca le battlemap della campagna, filtrate per luogo (titolo o percorso della scheda che le contiene). Usalo quando inizia uno scontro, con il luogo della scena. Restituisce ref, scheda, titolo e, se noti, colonne e righe della griglia. Senza luogo restituisce tutte le battlemap della campagna: usalo quando il luogo non è noto e scegli tu la più adatta.",
       z.object({ place: z.string().max(200).optional() }).strict(),
       async (args) => {
         if (!deps.battle) throw new Error("La schermata di battaglia non è disponibile.");
