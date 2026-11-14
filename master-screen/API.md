@@ -221,18 +221,20 @@ Reading the campaign:
 - `list_maps`: the map assets of the campaign, filtered by a name or an area.
 - `find_images`: images by subject, split into the player version and the master version, plus object cards.
 - `search_music`: up to eight tracks; searching never plays anything.
-- `get_board`: the board with ids and sources, for a check after many changes in one turn.
+- `get_board`: the board with ids and sources, for a check after many changes in one turn. Frames and cards carry their `color`; each frame lists `cardIds` in slot order and `free` (where its next card would land); the top level lists `overlaps`.
 
 Board and scene:
 - `board_stage`: lays out the whole session on the board, one frame per scene; `replace` clears the board first (pinned cards stay).
-- `board_place`: puts on the board NPCs, enemies, maps, battle maps, objects, music, plot sections and notes; an existing source is updated and moved if its frame changes.
-- `board_move`: moves cards already on the board into a frame, or out of every frame.
-- `board_remove`: removes cards, frames or arrows that are clearly out of date.
+- `board_place`: puts on the board NPCs, enemies, maps, battle maps, objects, music, plot sections and notes; an existing source is updated and moved if its frame changes. Placement is automatic by default. `frame` picks the frame, `index` the slot inside it (0 = first, the others shift), `near` + `side` (`left`, `right`, `above`, `below`) the neighbour, `x`/`y` (with optional `w`/`h`) the exact spot. `newFrame` (`title`, optional `color`) creates a frame and puts the card in it; inside the same call the new frame is referred to as `@f1`, `@f2`… in `frame` or `near` of the following items, and `@1`, `@2`… still points at an earlier card. `@fN` is valid only inside one `board_place` call. The result gives `id`, `title` and `frameId` when a frame was created.
+- `board_move`: moves cards already on the board into a frame (`frame`), or out of every frame (`frame: null`). Give one of `index` (slot in the frame, with `frame`), `near` + optional `side`, or `x`/`y`, one per call.
+- `board_position`: sets exact `x`, `y`, `w`, `h` of cards or frames (`items`, 1–30). Moving a frame moves its cards too.
+- `board_reorder`: `frame` and `ids` in the wanted order, for the cards of that frame only. The listed cards take the first slots in that order; the others follow in their current order. The frame fits its cards again. Use it when only the order changes.
+- `board_remove`: removes cards, frames or arrows that are clearly out of date. A frame id removes the frame and leaves its cards outside frames; `withCards: true` also removes its unpinned cards (only when the master asks or the scene is over).
 - `board_highlight`: highlights the card or frame that matters now (the canvas centres on it).
 - `board_pin`: protects a card or frame from automatic clean-up, or makes it removable.
-- `board_frame`: creates a frame that groups cards, and can link frames in sequence (`after` and `before`).
+- `board_frame`: creates a frame that groups cards, and can link frames in sequence (`after` and `before`). On creation it takes `near` + `side`, or `x`/`y`/`w`/`h`, and `cards`. With `id` it renames or recolours the frame; `color: null` clears its colour. Position fields are rejected on an existing frame: use `board_position`.
 - `board_link`: draws arrows between cards or frames, one or many in one call.
-- `board_arrange`: reorders frames and cards, only when the master asks. The board is also reordered at the end of every turn that changed its structure.
+- `board_arrange`: reorders the whole board (without `frame`) only when the master explicitly asks, or a single frame (with `frame`). The board is never reordered at the end of a turn: the desk is re-flowed only by `board_stage` or an explicit `board_arrange`.
 - `scene_set`: updates the place, the time, the plot section and the group of characters.
 - `open_source`: opens a source in the reader, only on an explicit request.
 

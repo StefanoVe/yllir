@@ -1077,6 +1077,242 @@ test("il tavolo ha solo combat_start tra gli strumenti di combattimento, e comba
   await h.close();
 });
 
+test("board_place: x e y mettono la carta nel punto indicato, con w e h", async () => {
+  const h = await setup(new Map());
+  const placed = h.json(
+    await h.call("board_place", {
+      cards: [{ kind: "note", text: "Lettera", x: 500, y: 300, w: 200, h: 120, reason: "r" }],
+    }),
+  );
+  const card = (await h.store.get(h.session.id)).state.board.modules.find((m) => m.id === placed[0].id)!;
+  expect([card.x, card.y, card.w, card.h]).toEqual([500, 300, 200, 120]);
+  await h.close();
+});
+
+test("board_place: index mette la carta nel posto indicato del riquadro e fa scalare le altre", async () => {
+  const h = await setup(new Map());
+  const frame = h.json(await h.call("board_frame", { title: "Scena" }));
+  const first = h.json(
+    await h.call("board_place", { cards: [{ kind: "note", text: "Primo", frame: frame.id, reason: "r" }] }),
+  );
+  const second = h.json(
+    await h.call("board_place", { cards: [{ kind: "note", text: "Secondo", frame: frame.id, index: 0, reason: "r" }] }),
+  );
+  const board = (await h.store.get(h.session.id)).state.board;
+  const box = board.frames.find((f) => f.id === frame.id)!;
+  const a = board.modules.find((m) => m.id === first[0].id)!;
+  const b = board.modules.find((m) => m.id === second[0].id)!;
+  expect(b.x).toBe(box.x + 24);
+  expect(b.y).toBe(box.y + 48);
+  expect(a.y).toBe(b.y);
+  expect(a.x).toBeGreaterThan(b.x);
+  await h.close();
+});
+
+test("board_place: side mette la carta sul lato indicato di «@1»", async () => {
+  const h = await setup(new Map());
+  const placed = h.json(
+    await h.call("board_place", {
+      cards: [
+        { kind: "note", text: "Porta", reason: "r" },
+        { kind: "note", text: "Finestra", near: "@1", side: "left", reason: "r" },
+      ],
+    }),
+  );
+  const board = (await h.store.get(h.session.id)).state.board;
+  const door = board.modules.find((m) => m.id === placed[0].id)!;
+  const lamp = board.modules.find((m) => m.id === placed[1].id)!;
+  expect(lamp.x + lamp.w + 24).toBe(door.x);
+  expect(lamp.y).toBe(door.y);
+  await h.close();
+});
+
+test("board_place: newFrame crea il riquadro con la carta, «@f1» lo indica dopo e «@f2» inesistente dà errore", async () => {
+  const h = await setup(new Map());
+  const placed = h.json(
+    await h.call("board_place", {
+      cards: [
+        { kind: "note", text: "Porta", newFrame: { title: "Taverna", color: "amber" }, reason: "r" },
+        { kind: "note", text: "Fuoco", frame: "@f1", index: 1, reason: "r" },
+        { kind: "note", text: "Vicino", near: "@f1", side: "right", reason: "r" },
+        { kind: "note", text: "Errore", frame: "@f2", reason: "r" },
+      ],
+    }),
+  );
+  const board = (await h.store.get(h.session.id)).state.board;
+  expect(board.frames).toHaveLength(1);
+  const box = board.frames[0]!;
+  expect(box.title).toBe("Taverna");
+  expect(box.color).toBe("amber");
+  expect(placed[0].frameId).toBe(box.id);
+  expect(board.modules.find((m) => m.id === placed[1].id)!.frameId).toBe(box.id);
+  const near = board.modules.find((m) => m.id === placed[2].id)!;
+  expect(near.frameId).toBeUndefined();
+  expect(near.x).toBe(box.x + box.w + 24);
+  expect(placed[3].error).toContain("@f2");
+  await h.close();
+});
+
+test("board_move con index riordina la carta nel suo riquadro", async () => {
+  const h = await setup(new Map());
+  const frame = h.json(await h.call("board_frame", { title: "Musiche" }));
+  const placed = h.json(
+    await h.call("board_place", {
+      cards: [
+        { kind: "note", text: "Uno", frame: frame.id, reason: "r" },
+        { kind: "note", text: "Due", frame: frame.id, reason: "r" },
+        { kind: "note", text: "Tre", frame: frame.id, reason: "r" },
+      ],
+    }),
+  );
+  await h.call("board_move", { ids: [placed[2].id], index: 0 });
+  const board = (await h.store.get(h.session.id)).state.board;
+  const box = board.frames.find((f) => f.id === frame.id)!;
+  const third = board.modules.find((m) => m.id === placed[2].id)!;
+  expect(third.x).toBe(box.x + 24);
+  expect(third.y).toBe(box.y + 48);
+  const onlyIndex = await h.call("board_move", { ids: [placed[0].id], index: 0 });
+  expect(onlyIndex.isError).toBeFalsy();
+  await h.close();
+});
+
+test("board_move con near e side, o con x e y, sposta la carta; index con x o near è un errore", async () => {
+  const h = await setup(new Map());
+  const placed = h.json(
+    await h.call("board_place", {
+      cards: [
+        { kind: "note", text: "Mappa", reason: "r" },
+        { kind: "note", text: "Lettera", reason: "r" },
+      ],
+    }),
+  );
+  const [mapId, letterId] = [placed[0].id as string, placed[1].id as string];
+  const find = async (id: string) =>
+    (await h.store.get(h.session.id)).state.board.modules.find((m) => m.id === id)!;
+  await h.call("board_move", { ids: [letterId], near: mapId, side: "right" });
+  const map = await find(mapId);
+  const letter = await find(letterId);
+  expect(letter.x).toBe(map.x + map.w + 24);
+  expect(letter.y).toBe(map.y);
+  await h.call("board_move", { ids: [letterId], x: 700, y: 90 });
+  const moved = await find(letterId);
+  expect([moved.x, moved.y]).toEqual([700, 90]);
+  const conflict = await h.call("board_move", { ids: [letterId], index: 0, x: 1 });
+  expect(conflict.isError).toBe(true);
+  await h.close();
+});
+
+test("board_reorder rimette le carte del riquadro nell'ordine dato e rifiuta una carta di un altro posto", async () => {
+  const h = await setup(new Map());
+  expect(COCKPIT_TOOL_NAMES).toContain("board_reorder");
+  expect(TABLE_TOOL_NAMES).toContain("board_reorder");
+  const frame = h.json(await h.call("board_frame", { title: "Scena" }));
+  const placed = h.json(
+    await h.call("board_place", {
+      cards: [
+        { kind: "note", text: "A", frame: frame.id, reason: "r" },
+        { kind: "note", text: "B", frame: frame.id, reason: "r" },
+        { kind: "note", text: "C", frame: frame.id, reason: "r" },
+        { kind: "note", text: "Fuori", reason: "r" },
+      ],
+    }),
+  );
+  const [a, b, c, outside] = placed.map((p: { id: string }) => p.id);
+  const done = h.json(await h.call("board_reorder", { frame: frame.id, ids: [c, a] }));
+  expect(done.id).toBe(frame.id);
+  const board = h.json(await h.call("get_board", {}));
+  const cardIds: string[] = board.frames[0].cardIds;
+  expect(cardIds).toHaveLength(3);
+  expect(cardIds.slice(0, 2)).toEqual([c, a]);
+  expect(cardIds[2]).toBe(b);
+  const bad = await h.call("board_reorder", { frame: frame.id, ids: [outside] });
+  expect(bad.isError).toBe(true);
+  expect(bad.content[0]!.text).toContain("Il modulo non è in questo riquadro");
+  await h.close();
+});
+
+test("get_board riporta colore, cardIds, posto libero e sovrapposizioni", async () => {
+  const h = await setup(new Map());
+  const frame = h.json(await h.call("board_frame", { title: "Porto", color: "amber" }));
+  const inFrame = h.json(
+    await h.call("board_place", {
+      cards: [{ kind: "note", text: "Molo", frame: frame.id, color: "blue", reason: "r" }],
+    }),
+  );
+  h.json(
+    await h.call("board_place", {
+      cards: [
+        { kind: "note", text: "Uno", reason: "r" },
+        { kind: "note", text: "Due", reason: "r" },
+      ],
+    }),
+  );
+  const loose = (await h.store.get(h.session.id)).state.board.modules.filter((m) => !m.frameId);
+  await h.call("board_position", { items: [{ id: loose[1]!.id, x: loose[0]!.x, y: loose[0]!.y }] });
+  const board = h.json(await h.call("get_board", {}));
+  expect(board.frames[0].color).toBe("amber");
+  expect(board.cards.find((c: { id: string }) => c.id === inFrame[0].id).color).toBe("blue");
+  expect(board.frames[0].cardIds).toEqual([inFrame[0].id]);
+  expect(typeof board.frames[0].free.x).toBe("number");
+  expect(typeof board.frames[0].free.y).toBe("number");
+  expect(
+    board.overlaps.some((pair: string[]) => pair.includes(loose[0]!.id) && pair.includes(loose[1]!.id)),
+  ).toBe(true);
+  await h.close();
+});
+
+test("board_frame: color null toglie il colore, x e y creano il riquadro nel punto, side senza near è un errore", async () => {
+  const h = await setup(new Map());
+  const frame = h.json(
+    await h.call("board_frame", { title: "Ponte", color: "green", x: 900, y: 40 }),
+  );
+  let box = (await h.store.get(h.session.id)).state.board.frames.find((f) => f.id === frame.id)!;
+  expect([box.x, box.y, box.color]).toEqual([900, 40, "green"]);
+  await h.call("board_frame", { id: frame.id, color: null });
+  box = (await h.store.get(h.session.id)).state.board.frames.find((f) => f.id === frame.id)!;
+  expect(box.color).toBeUndefined();
+  const noNear = await h.call("board_frame", { title: "Lato", side: "left" });
+  expect(noNear.isError).toBe(true);
+  expect(noNear.content[0]!.text).toBe("side richiede near");
+  const moved = await h.call("board_frame", { id: frame.id, x: 1 });
+  expect(moved.isError).toBe(true);
+  expect(moved.content[0]!.text).toContain("valgono solo alla creazione");
+  await h.close();
+});
+
+test("board_remove con withCards toglie il riquadro con le sue carte; su una carta dà errore", async () => {
+  const h = await setup(new Map());
+  const frame = h.json(await h.call("board_frame", { title: "Scena" }));
+  const inside = h.json(
+    await h.call("board_place", { cards: [{ kind: "note", text: "Dentro", frame: frame.id, reason: "r" }] }),
+  );
+  const loose = h.json(
+    await h.call("board_place", { cards: [{ kind: "note", text: "Fuori", reason: "r" }] }),
+  );
+  const bad = h.json(await h.call("board_remove", { ids: [loose[0].id], withCards: true }));
+  expect(bad[0].error).toContain("withCards");
+  expect((await h.store.get(h.session.id)).state.board.modules).toHaveLength(2);
+  const removed = h.json(await h.call("board_remove", { ids: [frame.id], withCards: true }));
+  expect(removed[0].id).toBe(frame.id);
+  const board = (await h.store.get(h.session.id)).state.board;
+  expect(board.frames).toHaveLength(0);
+  expect(board.modules.map((m) => m.id)).toEqual([loose[0].id]);
+  expect(board.modules.some((m) => m.id === inside[0].id)).toBe(false);
+  await h.close();
+});
+
+test("board_remove di un riquadro senza withCards lascia le sue carte fuori dai riquadri", async () => {
+  const h = await setup(new Map());
+  const frame = h.json(await h.call("board_frame", { title: "Scena" }));
+  h.json(await h.call("board_place", { cards: [{ kind: "note", text: "Dentro", frame: frame.id, reason: "r" }] }));
+  h.json(await h.call("board_remove", { ids: [frame.id] }));
+  const board = (await h.store.get(h.session.id)).state.board;
+  expect(board.frames).toHaveLength(0);
+  expect(board.modules).toHaveLength(1);
+  expect(board.modules[0]!.frameId).toBeUndefined();
+  await h.close();
+});
+
 test("combat_card_set è solo dello strumento di carte, non della tavola", () => {
   expect(COCKPIT_TOOL_NAMES).toContain("combat_card_set");
   expect(CARD_TOOL_NAMES).toEqual(["combat_card_set"]);

@@ -12,6 +12,7 @@ import {
 } from "./actions.js";
 import {
   FRAME_PAD,
+  GAP,
   MIN_FRAME,
   minFrameWidth,
   overlaps,
@@ -761,5 +762,168 @@ describe("cockpit action schema and reducer", () => {
     );
     expect(result.state).not.toBe(state);
     expect(state.party).toEqual([]);
+  });
+});
+
+describe("cockpit slots, sides and frame reorder", () => {
+  /** Texts of the frame's cards in reading order (y, then x). */
+  const textsInFrame = (state: CockpitState, frameId: string) =>
+    state.board.modules
+      .filter((m) => m.frameId === frameId)
+      .sort((a, b) => a.y - b.y || a.x - b.x)
+      .map((m) => (m.ref.type === "note" ? m.ref.text : m.id));
+
+  function frameWithNotes(...texts: string[]) {
+    let state = apply(emptyState(), {
+      type: "frame.add",
+      frame: { title: "Scena", x: 0, y: 0, w: 800, h: 400 },
+    }).state;
+    const frameId = state.board.frames[0]!.id;
+    for (const text of texts)
+      state = apply(state, moduleAction("note", text, { frameId })).state;
+    return { state, frameId };
+  }
+
+  test("module show with index takes that slot and shifts the later cards", () => {
+    const { state, frameId } = frameWithNotes("a", "b");
+    const shown = apply(
+      state,
+      moduleAction("note", "c", { frameId, index: 0 }),
+    );
+    expect(textsInFrame(shown.state, frameId)).toEqual(["c", "a", "b"]);
+    const frame = frameOf(shown.state, frameId);
+    for (const card of shown.state.board.modules) {
+      expect(card.x).toBeGreaterThanOrEqual(frame.x + FRAME_PAD);
+      expect(card.x + card.w).toBeLessThanOrEqual(frame.x + frame.w);
+    }
+    expect(overlaps(shown.state.board)).toEqual([]);
+  });
+
+  test("module show with index on a card already in the frame moves it to that slot", () => {
+    const { state, frameId } = frameWithNotes("a", "b", "c");
+    const cardC = state.board.modules.find(
+      (m) => m.ref.type === "note" && m.ref.text === "c",
+    )!;
+    const moved = apply(
+      state,
+      moduleAction("note", "c", { id: cardC.id, frameId, index: 0 }),
+    ).state;
+    expect(textsInFrame(moved, frameId)).toEqual(["c", "a", "b"]);
+    expect(moved.board.modules).toHaveLength(3);
+  });
+
+  test("module show with side places the card on that side of its target", () => {
+    let state = apply(emptyState(), moduleAction("note", "t", { x: 500, y: 400 })).state;
+    const targetId = state.board.modules[0]!.id;
+    state = apply(
+      state,
+      moduleAction("note", "above", { near: targetId, side: "above" }),
+    ).state;
+    const above = state.board.modules.find(
+      (m) => m.ref.type === "note" && m.ref.text === "above",
+    )!;
+    expect(above.x).toBe(500);
+    expect(above.y).toBe(400 - above.h - GAP);
+    expect(overlaps(above, cardOf(state, targetId), GAP)).toBe(false);
+  });
+
+  test("side is refused when it is not one of the four sides", () => {
+    expect(() =>
+      parseAction({
+        type: "module.show",
+        module: { kind: "note", ref: { type: "note", text: "x" }, reason: "", side: "diagonal" },
+      }),
+    ).toThrow(ActionError);
+    expect(
+      parseAction({
+        type: "module.show",
+        module: { kind: "note", ref: { type: "note", text: "x" }, reason: "", side: "left", index: 2 },
+      }),
+    ).toMatchObject({ type: "module.show", module: { side: "left", index: 2 } });
+  });
+
+  test("module update with frameId and index moves the card into the frame at that slot", () => {
+    const { state, frameId } = frameWithNotes("a", "b");
+    let s = apply(state, moduleAction("note", "loose")).state;
+    const loose = s.board.modules.find(
+      (m) => m.ref.type === "note" && m.ref.text === "loose",
+    )!;
+    s = apply(s, {
+      type: "module.update",
+      id: loose.id,
+      patch: { frameId, index: 1 },
+    }).state;
+    expect(textsInFrame(s, frameId)).toEqual(["a", "loose", "b"]);
+    expect(cardOf(s, loose.id).updatedAt).toBe(ctx.now);
+  });
+
+  test("frame add with near and side places the frame beside its target", () => {
+    let state = apply(emptyState(), moduleAction("note", "t", { x: 0, y: 0 })).state;
+    const targetId = state.board.modules[0]!.id;
+    state = apply(state, {
+      type: "frame.add",
+      frame: { title: "Accanto", near: targetId, side: "right" },
+    }).state;
+    const frame = state.board.frames[0]!;
+    // A note card is 240 px wide by default.
+    expect(frame.x).toBe(240 + GAP);
+    expect(frame.y).toBe(0);
+  });
+
+  test("frame update color null clears the colour and keeps the title", () => {
+    let state = apply(emptyState(), {
+      type: "frame.add",
+      frame: { title: "Scena", color: "green" },
+    }).state;
+    const frameId = state.board.frames[0]!.id;
+    state = apply(state, {
+      type: "frame.update",
+      id: frameId,
+      patch: { color: null },
+    }).state;
+    expect(frameOf(state, frameId).title).toBe("Scena");
+    expect(frameOf(state, frameId)).not.toHaveProperty("color");
+  });
+
+  test("frame reorder re-flows the cards in the given order", () => {
+    const { state, frameId } = frameWithNotes("a", "b", "c");
+    const ids = (text: string) =>
+      state.board.modules.find((m) => m.ref.type === "note" && m.ref.text === text)!.id;
+    const reordered = apply(state, {
+      type: "frame.reorder",
+      frameId,
+      ids: [ids("c"), ids("a")],
+    });
+    expect(reordered.summary.label).toBe("Ordina carte del riquadro");
+    expect(reordered.summary.targetId).toBe(frameId);
+    expect(textsInFrame(reordered.state, frameId)).toEqual(["c", "a", "b"]);
+  });
+
+  test("frame reorder with an unknown frame is refused with 404", () => {
+    expect(
+      statusOf(() =>
+        apply(emptyState(), { type: "frame.reorder", frameId: "nope", ids: [] }),
+      ),
+    ).toBe(404);
+  });
+
+  test("frame reorder refuses a card that is not in the frame", () => {
+    let { state, frameId } = frameWithNotes("a");
+    state = apply(state, moduleAction("note", "loose")).state;
+    const loose = state.board.modules.find(
+      (m) => m.ref.type === "note" && m.ref.text === "loose",
+    )!;
+    expect(() =>
+      apply(state, { type: "frame.reorder", frameId, ids: [loose.id] }),
+    ).toThrow(ActionError);
+  });
+
+  test("frame reorder is parsed with its frame id and list of ids", () => {
+    expect(
+      parseAction({ type: "frame.reorder", frameId: "f1", ids: ["m1", "m2"] }),
+    ).toEqual({ type: "frame.reorder", frameId: "f1", ids: ["m1", "m2"] });
+    expect(() =>
+      parseAction({ type: "frame.reorder", frameId: "f1", ids: ["m1"], extra: 1 }),
+    ).toThrow(ActionError);
   });
 });

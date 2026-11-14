@@ -19,6 +19,7 @@ import type {
   ModuleInput,
   ModuleKind,
   ModuleRef,
+  NearSide,
   SourceRef,
 } from "../../../shared/src/cockpit-types.js";
 import type { CockpitStore } from "./store.js";
@@ -27,6 +28,7 @@ import type { CockpitBus } from "./bus.js";
 import { stateView, type Resolver } from "./view.js";
 import type { TrackCache } from "./resolvers.js";
 import { combatantInputSchema } from "./actions.js";
+import { freeSlot, overlaps, placeCard } from "./layout.js";
 import { cardInputSchema, type CardInput } from "./card-schema.js";
 import { sessionOutline, type OutlineRef } from "./outline.js";
 import {
@@ -114,9 +116,17 @@ const fieldDescriptions: Record<string, string> = {
   phase: "Fase dichiarata del partecipante.",
   conditions: "Condizioni dichiarate dal master.",
   cards:
-    "Per board_place: voci delle carte da mostrare (1–40), ciascuna con kind, path ed eventualmente anchor, trackId per la musica, text per le note, e facoltativi frame, near, pinned, color e reason. Per board_frame: ID delle carte da inserire nel riquadro.",
+    "Per board_place: voci delle carte da mostrare (1–40), ciascuna con kind, path ed eventualmente anchor, trackId per la musica, text per le note, e facoltativi frame, newFrame, near, side, index, x, y, w, h, pinned, color e reason. Per board_frame: ID delle carte da inserire nel riquadro.",
   frame:
-    "ID del riquadro: quello che contiene la carta (board_place, board_move: null per toglierla da ogni riquadro), oppure quello da riordinare (board_arrange) o da rinominare o ricolorare (board_frame con id).",
+    "ID del riquadro: quello che contiene la carta (board_place, board_move: null per toglierla da ogni riquadro), oppure quello da riordinare (board_reorder) o da rinominare o ricolorare (board_frame con id). In board_place puoi indicare «@f1», «@f2»… per un riquadro creato con newFrame nella stessa chiamata.",
+  newFrame:
+    "Riquadro da creare insieme alla carta: title obbligatorio, color facoltativo. La carta entra nel nuovo riquadro; non usarlo insieme a frame.",
+  index:
+    "Posizione della carta nel riquadro, a partire da 0 (0 = prima): la carta prende quel posto e le successive scalano di uno. Richiede un riquadro; ignorato senza riquadro.",
+  side:
+    "Lato di near su cui collocare l'elemento: left, right, above o below. Senza near non ha effetto.",
+  withCards:
+    "Se true, con un riquadro toglie anche le sue carte non fissate; di default le carte restano fuori dai riquadri. Non ha effetto sulle carte o sulle frecce.",
   items:
     "Elementi da posizionare in una sola chiamata (1–30): ciascuno con id e almeno una tra x, y, w, h.",
   x: "Coordinata x della scrivania, a sinistra del modulo.",
@@ -129,9 +139,10 @@ const fieldDescriptions: Record<string, string> = {
     "ID di carte o riquadri che precedono il riquadro: una freccia va da ciascuno al riquadro.",
   before:
     "ID di carte o riquadri che seguono il riquadro: una freccia va dal riquadro a ciascuno.",
-  near: "ID di una carta o di un riquadro vicino cui collocare l'elemento.",
-  color: "Colore facoltativo: red, amber, green, blue o violet.",
-  ids: "ID di carte o riquadri da rimuovere.",
+  near: "ID di una carta o di un riquadro vicino cui collocare l'elemento. In board_place puoi indicare «@1» per una carta o «@f1» per un riquadro creato nella stessa chiamata.",
+  color:
+    "Colore facoltativo: red, amber, green, blue o violet. In board_frame, con id, null toglie il colore del riquadro.",
+  ids: "ID di carte o riquadri su cui agire: da rimuovere con board_remove, oppure, con board_reorder, le carte del riquadro nell'ordine desiderato.",
   replace: "Se true, svuota prima la scrivania; le carte fissate restano.",
   from: "ID della carta o del riquadro di partenza.",
   to: "ID della carta o del riquadro di arrivo.",
@@ -192,6 +203,7 @@ export const COCKPIT_TOOL_NAMES = [
   "board_link",
   "board_arrange",
   "board_move",
+  "board_reorder",
   "board_position",
   "get_board",
   "scene_set",
@@ -452,7 +464,20 @@ const placeItemSchema = z
     trackId: z.string().max(200).optional(),
     text: z.string().max(4000).optional(),
     frame: z.string().min(1).max(200).optional(),
+    newFrame: z
+      .object({
+        title: z.string().min(1).max(200),
+        color: cardColorSchema.optional(),
+      })
+      .strict()
+      .optional(),
     near: z.string().min(1).max(200).optional(),
+    side: z.enum(["left", "right", "above", "below"]).optional(),
+    index: z.number().int().min(0).max(300).optional(),
+    x: z.number().finite().min(-1e6).max(1e6).optional(),
+    y: z.number().finite().min(-1e6).max(1e6).optional(),
+    w: z.number().finite().min(40).max(4000).optional(),
+    h: z.number().finite().min(40).max(4000).optional(),
     pinned: z.boolean().optional(),
     color: cardColorSchema.optional(),
     reason: z.string().max(300),
@@ -623,6 +648,12 @@ function moduleInputOf(deps: CockpitToolsDeps, item: PlaceItem): ModuleInput {
     reason: item.reason,
     ...(item.frame ? { frameId: item.frame } : {}),
     ...(item.near ? { near: item.near } : {}),
+    ...(item.side ? { side: item.side } : {}),
+    ...(item.index !== undefined ? { index: item.index } : {}),
+    ...(item.x !== undefined ? { x: item.x } : {}),
+    ...(item.y !== undefined ? { y: item.y } : {}),
+    ...(item.w !== undefined ? { w: item.w } : {}),
+    ...(item.h !== undefined ? { h: item.h } : {}),
     ...(item.pinned !== undefined ? { pinned: item.pinned } : {}),
     ...(item.color ? { color: item.color } : {}),
   };
@@ -778,19 +809,43 @@ async function stageGroup(
  * maps in their own frames, arrows for the branches, then automatic layout.
  * Every change goes through `apply`, so the call is one undo group.
  */
-/** «@N» in a batch points at the N-th (1-based) card placed earlier in the same call. */
+/** What a board_place call has created so far: cards (or their errors) and frames, in order. */
+interface PlaceBatch {
+  cards: ({ id: string; title?: string; frameId?: string } | { error: string })[];
+  frames: string[];
+}
+/**
+ * «@N» in a batch points at the N-th (1-based) card placed earlier in the same call, «@fN»
+ * at the N-th frame created with newFrame. Any other value is an id and passes unchanged.
+ */
 function resolveBatchRef(
   near: string | undefined,
-  placed: ({ id: string } | { error: string })[],
+  batch: PlaceBatch,
 ): string | undefined {
+  const frame = near?.match(/^@f(\d+)$/);
+  if (frame) return resolveFrameRef(near, batch);
   const match = near?.match(/^@(\d+)$/);
   if (!match) return near;
-  const target = placed[Number(match[1]) - 1];
+  const target = batch.cards[Number(match[1]) - 1];
   if (!target || !("id" in target))
     throw new Error(
       `${near} non indica una carta già messa in questa chiamata`,
     );
   return target.id;
+}
+/** «@fN» in a batch points at the N-th frame created with newFrame earlier in the same call. */
+function resolveFrameRef(
+  frame: string | undefined,
+  batch: PlaceBatch,
+): string | undefined {
+  const match = frame?.match(/^@f(\d+)$/);
+  if (!match) return frame;
+  const id = batch.frames[Number(match[1]) - 1];
+  if (!id)
+    throw new Error(
+      `${frame} non indica un riquadro creato con newFrame in questa chiamata`,
+    );
+  return id;
 }
 
 async function stageSession(
@@ -1104,27 +1159,59 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
   tools.push(
     tool(
       "board_place",
-      "Usalo per mettere sulla scrivania ciò che entra in scena: NPC, nemici, mappe, oggetti, musica, sezioni di Plot e note. Per mappe, battlemap, ritratti, illustrazioni e carte dell'archivio usa kind map o battlemap (o image) con il path restituito da find_images. Una fonte già presente viene aggiornata, e spostata se cambia frame. Le posizioni sono automatiche: frame sceglie il riquadro, near la carta o il riquadro vicino. Aggiungi con generosità: la scrivania è una vista d'insieme. Per carte già presenti da spostare usa board_move. In near puoi indicare «@1», «@2»… per una carta messa prima nella stessa chiamata (es. la versione per i giocatori accanto a quella del master). Restituisce per ogni voce id e titolo, oppure l'errore.",
+      "Usalo per mettere sulla scrivania ciò che entra in scena: NPC, nemici, mappe, oggetti, musica, sezioni di Plot e note. Per mappe, battlemap, ritratti, illustrazioni e carte dell'archivio usa kind map o battlemap (o image) con il path restituito da find_images. Una fonte già presente viene aggiornata, e spostata se cambia frame. Di norma le posizioni sono automatiche: frame sceglie il riquadro, index il posto in quel riquadro (0 = prima; le altre carte scalano), near la carta o il riquadro vicino, con side il lato. Con x e y (w e h facoltativi) la carta va esattamente lì. Con newFrame crea un riquadro nuovo e ci mette la carta: nella stessa chiamata il riquadro si indica come «@f1», «@f2»… in frame o near delle voci successive. Per il colore di un riquadro nuovo usa newFrame.color, e leggi il colore dei riquadri esistenti in get_board per restare coerente. Aggiungi con generosità: la scrivania è una vista d'insieme. Per carte già presenti da spostare usa board_move, per riordinare le carte di un riquadro board_reorder. In near puoi indicare «@1», «@2»… per una carta messa prima nella stessa chiamata (es. la versione per i giocatori accanto a quella del master). Restituisce per ogni voce id e titolo (con frameId se ha creato un riquadro), oppure l'errore.",
       z.object({ cards: z.array(placeItemSchema).min(1).max(40) }).strict(),
       async (args, context) => {
-        const results: ({ id: string; title: string } | { error: string })[] =
-          [];
+        const batch: PlaceBatch = { cards: [], frames: [] };
         for (const item of args.cards as PlaceItem[]) {
+          let created: string | undefined;
           try {
-            const near = resolveBatchRef(item.near, results);
-            const input = moduleInputOf(deps, { ...item, near });
-            results.push(
-              await apply(
+            if (item.newFrame && item.frame !== undefined)
+              throw new Error("Usa frame oppure newFrame, non entrambi");
+            const near = resolveBatchRef(item.near, batch);
+            let frame = resolveFrameRef(item.frame, batch);
+            if (item.newFrame) {
+              const made = await apply(
+                deps,
+                {
+                  type: "frame.add",
+                  frame: {
+                    title: item.newFrame.title,
+                    ...(item.newFrame.color ? { color: item.newFrame.color } : {}),
+                  },
+                },
+                context,
+              );
+              created = made.id;
+              batch.frames.push(made.id);
+              frame = made.id;
+            }
+            const input = moduleInputOf(deps, { ...item, frame, near });
+            let shown: { id: string; title: string };
+            try {
+              shown = await apply(
                 deps,
                 { type: "module.show", module: input },
                 context,
-              ),
-            );
+              );
+            } catch (e) {
+              // A frame made only for this card does not stay behind empty.
+              if (created) {
+                batch.frames.pop();
+                await apply(
+                  deps,
+                  { type: "frame.remove", id: created, withCards: false },
+                  context,
+                ).catch(() => {});
+              }
+              throw e;
+            }
+            batch.cards.push(created ? { ...shown, frameId: created } : shown);
           } catch (e) {
-            results.push({ error: errorText(e) + MOVE_HINT });
+            batch.cards.push({ error: errorText(e) + MOVE_HINT });
           }
         }
-        return results;
+        return batch.cards;
       },
       (args) => `Pone ${(args.cards as unknown[]).length} carte`,
     ),
@@ -1222,10 +1309,11 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
   tools.push(
     tool(
       "board_remove",
-      "Usalo per togliere dalla scrivania ciò che è chiaramente superato: carte, riquadri o frecce (gli id delle frecce sono in get_board). Un id di riquadro toglie il riquadro e lascia le sue carte fuori dai riquadri. Non rimuovere le carte fissate se il master non lo chiede. Restituisce il riepilogo per ogni id, oppure l'errore.",
+      "Usalo per togliere dalla scrivania ciò che è chiaramente superato: carte, riquadri o frecce (gli id delle frecce sono in get_board). Un id di riquadro toglie il riquadro e lascia le sue carte fuori dai riquadri; con withCards: true toglie anche le sue carte non fissate, da usare solo se il master lo chiede o se la scena è finita. Non rimuovere le carte fissate se il master non lo chiede. Restituisce il riepilogo per ogni id, oppure l'errore.",
       z
         .object({
           ids: z.array(z.string().min(1).max(200)).min(1).max(40),
+          withCards: z.boolean().optional(),
         })
         .strict(),
       async (args, context) => {
@@ -1234,8 +1322,19 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
         const linkIds = new Set(state.board.links.map((link) => link.id));
         const results: unknown[] = [];
         for (const id of args.ids as string[]) {
+          if (args.withCards === true && !frameIds.has(id)) {
+            results.push({
+              id,
+              error: "withCards vale solo per i riquadri: l'id non è un riquadro",
+            });
+            continue;
+          }
           const action: CockpitAction = frameIds.has(id)
-            ? { type: "frame.remove", id, withCards: false }
+            ? {
+                type: "frame.remove",
+                id,
+                withCards: args.withCards === true,
+              }
             : linkIds.has(id)
               ? { type: "link.remove", id }
               : { type: "module.remove", id };
@@ -1287,13 +1386,18 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
   tools.push(
     tool(
       "board_frame",
-      "Usalo per creare un riquadro che raggruppa carte, per esempio una scena o un luogo, oppure, con id, per rinominare o ricolorare un riquadro esistente (title e/o color; il titolo è obbligatorio solo per creare). Creando: con cards ci mette subito le carte indicate (anche già sulla plancia); con after e before collega il riquadro in sequenza: after sono le carte o i riquadri che lo precedono, before quelli che lo seguono; «il gruppo X tra A e B» si fa in una sola chiamata. Con id cards, after e before funzionano allo stesso modo. Nulla viene riordinato automaticamente: le carte restano accanto a ciò a cui si riferiscono o nel loro riquadro. Se un riquadro appare affollato usa board_arrange con frame; per una posizione esatta usa board_position. Restituisce id e titolo del riquadro.",
+      "Usalo per creare un riquadro che raggruppa carte, per esempio una scena o un luogo, oppure, con id, per rinominare o ricolorare un riquadro esistente (title e/o color; il titolo è obbligatorio solo per creare). Con color: null, con id, il riquadro torna senza colore. Creando: con near e side lo mette su un lato di una carta o di un riquadro; con x, y, w e h lo posiziona esattamente; con cards ci mette subito le carte indicate (anche già sulla plancia); con after e before collega il riquadro in sequenza: after sono le carte o i riquadri che lo precedono, before quelli che lo seguono; «il gruppo X tra A e B» si fa in una sola chiamata. Con id cards, after e before funzionano allo stesso modo. Per spostare un riquadro esistente usa board_position. Nulla viene riordinato automaticamente: le carte restano accanto a ciò a cui si riferiscono o nel loro riquadro. Se un riquadro appare affollato usa board_reorder per l'ordine delle carte o board_arrange con frame. Restituisce id e titolo del riquadro.",
       z
         .object({
           id: z.string().min(1).max(200).optional(),
           title: z.string().min(1).max(200).optional(),
-          color: cardColorSchema.optional(),
+          color: cardColorSchema.nullable().optional(),
           near: z.string().min(1).max(200).optional(),
+          side: z.enum(["left", "right", "above", "below"]).optional(),
+          x: z.number().finite().min(-1e6).max(1e6).optional(),
+          y: z.number().finite().min(-1e6).max(1e6).optional(),
+          w: z.number().finite().min(40).max(4000).optional(),
+          h: z.number().finite().min(40).max(4000).optional(),
           cards: z.array(z.string().min(1).max(200)).max(40).optional(),
           after: z.array(z.string().min(1).max(200)).max(40).optional(),
           before: z.array(z.string().min(1).max(200)).max(40).optional(),
@@ -1302,10 +1406,18 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
       async (args, context) => {
         let frameId: string;
         if (args.id !== undefined) {
+          const creationOnly = ["near", "side", "x", "y", "w", "h"].filter(
+            (key) => args[key] !== undefined,
+          );
+          if (creationOnly.length)
+            throw new Error(
+              `${creationOnly.join(", ")} valgono solo alla creazione: per spostare un riquadro esistente usa board_position`,
+            );
           frameId = String(args.id);
-          const patch: { title?: string; color?: CardColor } = {};
+          const patch: { title?: string; color?: CardColor | null } = {};
           if (args.title !== undefined) patch.title = String(args.title);
-          if (args.color !== undefined) patch.color = args.color as CardColor;
+          if (args.color !== undefined)
+            patch.color = args.color as CardColor | null;
           if (Object.keys(patch).length)
             await apply(
               deps,
@@ -1315,6 +1427,8 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
         } else {
           if (args.title === undefined)
             throw new Error("Serve title per creare un riquadro");
+          if (args.side !== undefined && args.near === undefined)
+            throw new Error("side richiede near");
           const frame = await apply(
             deps,
             {
@@ -1323,6 +1437,11 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
                 title: String(args.title),
                 ...(args.color ? { color: args.color as CardColor } : {}),
                 ...(args.near ? { near: String(args.near) } : {}),
+                ...(args.side ? { side: args.side as NearSide } : {}),
+                ...(args.x !== undefined ? { x: Number(args.x) } : {}),
+                ...(args.y !== undefined ? { y: Number(args.y) } : {}),
+                ...(args.w !== undefined ? { w: Number(args.w) } : {}),
+                ...(args.h !== undefined ? { h: Number(args.h) } : {}),
               },
             },
             context,
@@ -1420,31 +1539,105 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
   tools.push(
     tool(
       "board_move",
-      "Sposta carte già presenti dentro un riquadro esistente (o fuori da ogni riquadro con null). Per spostare non serve conoscere la fonte della carta: bastano gli id dal digest o da get_board. Restituisce per ogni id il riepilogo o l'errore.",
+      "Sposta carte già presenti dentro un riquadro esistente (o fuori da ogni riquadro con null). Con index la carta prende quel posto nel riquadro (0 = prima) e le altre scalano: per riordinare una carta in un riquadro senza spostarla di gruppo. Con near (e side) la carta va accanto a una carta o a un riquadro; con x e y va in quelle coordinate esatte. Usa una sola tra index, near e x/y. Per spostare non serve conoscere la fonte della carta: bastano gli id dal digest o da get_board. Restituisce per ogni id il riepilogo o l'errore.",
       z
         .object({
           ids: z.array(z.string().min(1).max(200)).min(1).max(40),
-          frame: z.string().min(1).max(200).nullable(),
+          frame: z.string().min(1).max(200).nullable().optional(),
+          index: z.number().int().min(0).max(300).optional(),
+          near: z.string().min(1).max(200).optional(),
+          side: z.enum(["left", "right", "above", "below"]).optional(),
+          x: z.number().finite().min(-1e6).max(1e6).optional(),
+          y: z.number().finite().min(-1e6).max(1e6).optional(),
         })
         .strict(),
       async (args, context) => {
-        const target = args.frame as string | null;
-        const { state } = await deps.store.get(context.sessionId);
+        const target = args.frame as string | null | undefined;
+        const index = args.index as number | undefined;
+        const near = args.near as string | undefined;
+        const side = args.side as NearSide | undefined;
+        const x = args.x as number | undefined;
+        const y = args.y as number | undefined;
+        const boardNow = async () =>
+          (await deps.live.hydrate(await deps.store.get(context.sessionId)))
+            .state.board;
+        const positioned = [index, near, x ?? y].filter(
+          (value) => value !== undefined,
+        );
         if (
-          target !== null &&
-          !state.board.frames.some((frame) => frame.id === target)
+          target === undefined &&
+          index === undefined &&
+          near === undefined &&
+          x === undefined &&
+          y === undefined
         )
+          throw new Error("Serve frame, index, near oppure x o y");
+        if (positioned.length > 1)
+          throw new Error("Usa una sola tra index, near e x/y");
+        if (side !== undefined && near === undefined)
+          throw new Error("side richiede near");
+        if (index !== undefined && target === null)
+          throw new Error("index richiede un riquadro: con frame null la carta ne esce");
+        const board = await boardNow();
+        if (target && !board.frames.some((frame) => frame.id === target))
           throw new Error(`Riquadro non trovato: ${target}`);
+        if (
+          near !== undefined &&
+          !board.modules.some((m) => m.id === near) &&
+          !board.frames.some((f) => f.id === near)
+        )
+          throw new Error(`Carta o riquadro non trovato: ${near}`);
         const results: unknown[] = [];
         for (const id of args.ids as string[]) {
           try {
-            results.push(
-              await apply(
+            const before = (await boardNow()).modules.find((m) => m.id === id);
+            if (!before) throw new Error(`Carta non trovata: ${id}`);
+            if (index !== undefined && target === undefined && before.frameId === undefined)
+              throw new Error("index richiede una carta dentro un riquadro: indica frame");
+            let last: unknown;
+            if (target !== undefined)
+              last = await apply(
                 deps,
-                { type: "module.update", id, patch: { frameId: target } },
+                {
+                  type: "module.update",
+                  id,
+                  patch: {
+                    frameId: target,
+                    ...(target !== null && index !== undefined ? { index } : {}),
+                  },
+                },
                 context,
-              ),
-            );
+              );
+            else if (index !== undefined)
+              last = await apply(
+                deps,
+                { type: "module.update", id, patch: { index } },
+                context,
+              );
+            if (x !== undefined || y !== undefined || near !== undefined) {
+              // Read the board again: the move above may have re-flowed the frame.
+              const now = await boardNow();
+              const card = now.modules.find((m) => m.id === id)!;
+              const spot =
+                near !== undefined
+                  ? placeCard(
+                      { ...now, modules: now.modules.filter((m) => m.id !== id) },
+                      { w: card.w, h: card.h },
+                      { near, side },
+                    )
+                  : { x: card.x, y: card.y };
+              last = await apply(
+                deps,
+                {
+                  type: "board.position",
+                  id,
+                  x: x ?? spot.x,
+                  y: y ?? spot.y,
+                },
+                context,
+              );
+            }
+            results.push(last ?? { id, error: "Nessuna modifica richiesta" });
           } catch (e) {
             results.push({ id, error: errorText(e) });
           }
@@ -1452,6 +1645,29 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
         return results;
       },
       () => "Sposta carte",
+    ),
+  );
+  tools.push(
+    tool(
+      "board_reorder",
+      "Usalo per mettere le carte di un riquadro nell'ordine che il master vuole (per esempio «prima il pg, poi il nemico»): passa frame e ids nell'ordine desiderato, con le carte del riquadro. Le carte elencate prendono i primi posti in quell'ordine; le altre seguono nel loro ordine attuale. Il riquadro si adatta alle carte. Usalo al posto di board_position quando cambia solo l'ordine. Restituisce il riepilogo dell'azione, oppure l'errore se un id non è una carta del riquadro.",
+      z
+        .object({
+          frame: z.string().min(1).max(200),
+          ids: z.array(z.string().min(1).max(200)).min(1).max(40),
+        })
+        .strict(),
+      (args, context) =>
+        apply(
+          deps,
+          {
+            type: "frame.reorder",
+            frameId: String(args.frame),
+            ids: args.ids as string[],
+          },
+          context,
+        ),
+      (args) => `Ordina ${(args.ids as unknown[]).length} carte`,
     ),
   );
   tools.push(
@@ -1548,7 +1764,7 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
   tools.push(
     tool(
       "get_board",
-      "Di solito il digest basta; usalo dopo molte modifiche nello stesso turno per controllare lo stato aggiornato, o per trovare id e provenienza (source: percorso, mappa, trackId o nota) di una carta. Restituisce posizione, gruppo, carte e riquadri (con x, y, w, h sulla scrivania), collegamenti, evidenza, registro e combattimento.",
+      "Usalo prima di posizionare o riordinare carte, per leggere il layout reale: per ogni riquadro il colore, le carte in ordine di posto (cardIds) e il primo posto libero (free); in cima, le coppie di elementi che si sovrappongono (overlaps). Di solito il digest basta; usalo dopo molte modifiche nello stesso turno per controllare lo stato aggiornato, o per trovare id e provenienza (source: percorso, mappa, trackId o nota) di una carta. Restituisce posizione, gruppo, carte e riquadri (con x, y, w, h sulla scrivania e il colore), collegamenti, evidenza, registro e combattimento.",
       z.object({}).strict(),
       async (_args, context) => {
         const { state } = await deps.live.hydrate(
@@ -1569,6 +1785,7 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
             h: module.h,
             ...(module.frameId ? { frameId: module.frameId } : {}),
             ...(module.pinned ? { pinned: true } : {}),
+            ...(module.color ? { color: module.color } : {}),
           })),
           frames: board.frames.map((frame) => ({
             id: frame.id,
@@ -1577,7 +1794,14 @@ export function createCockpitTools(deps: CockpitToolsDeps): CockpitTool[] {
             y: frame.y,
             w: frame.w,
             h: frame.h,
+            ...(frame.color ? { color: frame.color } : {}),
+            cardIds: board.modules
+              .filter((module) => module.frameId === frame.id)
+              .sort((a, b) => a.y - b.y || a.x - b.x)
+              .map((module) => module.id),
+            free: freeSlot(board, frame.id),
           })),
+          overlaps: overlaps(board),
           links: board.links.map((link) => ({
             id: link.id,
             from: link.from,

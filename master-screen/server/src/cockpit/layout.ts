@@ -8,6 +8,7 @@ import type {
   BoardModule,
   Frame,
   ModuleKind,
+  NearSide,
   Rect,
 } from "../../../shared/src/cockpit-types.js";
 
@@ -72,12 +73,21 @@ export function defaultSize(kind: ModuleKind): Size {
 }
 
 /** True when `a`, grown by `gap` on every side, intersects `b`. */
-export function overlaps(a: Rect, b: Rect, gap = 0): boolean {
+export function overlaps(a: Rect, b: Rect, gap?: number): boolean;
+/** Id pairs of cards and frames whose rectangles intersect. A card inside its own frame does not count. */
+export function overlaps(board: Board): Array<[string, string]>;
+export function overlaps(
+  a: Rect | Board,
+  b?: Rect,
+  gap = 0,
+): boolean | Array<[string, string]> {
+  if ("modules" in a) return overlappingPairs(a);
+  const r = b!;
   return (
-    a.x - gap < b.x + b.w &&
-    a.x + a.w + gap > b.x &&
-    a.y - gap < b.y + b.h &&
-    a.y + a.h + gap > b.y
+    a.x - gap < r.x + r.w &&
+    a.x + a.w + gap > r.x &&
+    a.y - gap < r.y + r.h &&
+    a.y + a.h + gap > r.y
   );
 }
 
@@ -92,28 +102,69 @@ export function boardBounds(board: Board): Rect | null {
   return { x: left, y: top, w: right - left, h: bottom - top };
 }
 
-/** Position for a new card of `size`, inside a frame, near a target or to the right of the board. */
+/**
+ * Position for a new card of `size`, inside a frame (at slot `index` when given), near a
+ * target (on `side` first when given) or to the right of the board.
+ */
 export function placeCard(
   board: Board,
   size: Size,
-  opts: { frameId?: string; near?: string } = {},
+  opts: { frameId?: string; near?: string; side?: NearSide; index?: number } = {},
 ): { x: number; y: number } {
   const frame = opts.frameId ? findFrame(board, opts.frameId) : undefined;
-  if (frame) return placeInFrame(board, frame, size);
+  if (frame) return placeInFrame(board, frame, size, opts.index);
   const target = opts.near ? findRect(board, opts.near) : undefined;
-  if (target) return placeNear(board, target, size);
+  if (target) return placeNear(board, target, size, opts.side);
   return placeRightOfBoard(board, size);
 }
 
-/** Position for a new frame of `size`, near a target or to the right of the board. */
+/** Position for a new frame of `size`, near a target (on `side` first when given) or to the right of the board. */
 export function placeFrame(
   board: Board,
   size: Size,
-  opts: { near?: string } = {},
+  opts: { near?: string; side?: NearSide } = {},
 ): { x: number; y: number } {
   const target = opts.near ? findRect(board, opts.near) : undefined;
-  if (target) return placeNear(board, target, size);
+  if (target) return placeNear(board, target, size, opts.side);
   return placeRightOfBoard(board, size);
+}
+
+/**
+ * Where the next card of the frame would land: the first free grid slot, row-major.
+ * Unknown frame: the origin.
+ */
+export function freeSlot(board: Board, frameId: string): { x: number; y: number } {
+  const frame = findFrame(board, frameId);
+  if (!frame) return { x: 0, y: 0 };
+  return placeInFrame(board, frame, { w: 0, h: 0 });
+}
+
+/**
+ * Re-flows the frame's cards into the grid in the given id order. Ids that are not cards of
+ * the frame are ignored; the frame's other cards follow in their current slot order. The
+ * frame is then fitted to its cards. Unknown frame: the board is returned unchanged.
+ */
+export function reorderFrame(board: Board, frameId: string, ids: string[]): Board {
+  return flowFrame(board, frameId, ids);
+}
+
+/**
+ * Stores the card `cardId` (already in the board with `frameId`) at slot `index` of the frame
+ * and re-flows the frame: the cards from that slot on shift one slot later. The index is
+ * clamped to the end of the frame's cards.
+ */
+export function insertInFrame(
+  board: Board,
+  frameId: string,
+  cardId: string,
+  index: number,
+): Board {
+  const others = sortByPosition(
+    cardsIn(board, frameId).filter((c) => c.id !== cardId),
+  ).map((c) => c.id);
+  const at = Math.min(Math.max(Math.trunc(index), 0), others.length);
+  others.splice(at, 0, cardId);
+  return flowFrame(board, frameId, others);
 }
 
 /** Grows a frame so it contains all its cards plus padding; never shrinks it. */
@@ -248,24 +299,36 @@ function growToContain(frame: Frame, cards: BoardModule[]): Frame {
   };
 }
 
-/** First slot of the frame grid, row-major, that no existing card of the frame occupies. */
+/**
+ * Grid slot for a new card: the given `index` (clamped to the end of the frame's cards), or
+ * else the first slot, row-major, that no existing card occupies. An explicit index does not
+ * move the other cards; `insertInFrame` re-flows them.
+ */
 function placeInFrame(
   board: Board,
   frame: Frame,
   size: Size,
+  index?: number,
 ): { x: number; y: number } {
   const cards = cardsIn(board, frame.id);
   const cellW = Math.max(size.w, ...cards.map((c) => c.w));
   const cellH = Math.max(size.h, ...cards.map((c) => c.h));
-  for (let index = 0; ; index++) {
-    const col = index % FRAME_COLUMNS;
-    const row = Math.floor(index / FRAME_COLUMNS);
-    const slot = {
+  const slotAt = (i: number): Rect => {
+    const col = i % FRAME_COLUMNS;
+    const row = Math.floor(i / FRAME_COLUMNS);
+    return {
       x: frame.x + FRAME_PAD + col * (cellW + GAP),
       y: frame.y + FRAME_HEADER + row * (cellH + GAP),
       w: cellW,
       h: cellH,
     };
+  };
+  if (index !== undefined) {
+    const slot = slotAt(Math.min(Math.max(Math.trunc(index), 0), cards.length));
+    return { x: Math.round(slot.x), y: Math.round(slot.y) };
+  }
+  for (let i = 0; ; i++) {
+    const slot = slotAt(i);
     if (!cards.some((c) => overlaps(slot, c))) {
       return { x: Math.round(slot.x), y: Math.round(slot.y) };
     }
@@ -276,11 +339,118 @@ function placeNear(
   board: Board,
   target: Rect,
   size: Size,
+  side?: NearSide,
 ): { x: number; y: number } {
+  const candidates =
+    side === undefined
+      ? nearCandidates(target, size)
+      : [...sideCandidates(target, size, side), ...nearCandidates(target, size)];
   return (
-    firstFree(nearCandidates(target, size), board, size) ??
-    placeRightOfBoard(board, size)
+    firstFree(candidates, board, size) ?? placeRightOfBoard(board, size)
   );
+}
+
+/** Positions along one side of the target, stepping away from its first corner; the first touches it at GAP. */
+function sideCandidates(
+  target: Rect,
+  size: Size,
+  side: NearSide,
+): { x: number; y: number }[] {
+  const candidates: { x: number; y: number }[] = [];
+  for (let step = 0; step < NEAR_STEPS; step++) {
+    switch (side) {
+      case "right":
+        candidates.push({
+          x: target.x + target.w + GAP,
+          y: target.y + step * (size.h + GAP),
+        });
+        break;
+      case "left":
+        candidates.push({
+          x: target.x - size.w - GAP,
+          y: target.y + step * (size.h + GAP),
+        });
+        break;
+      case "below":
+        candidates.push({
+          x: target.x + step * (size.w + GAP),
+          y: target.y + target.h + GAP,
+        });
+        break;
+      case "above":
+        candidates.push({
+          x: target.x + step * (size.w + GAP),
+          y: target.y - size.h - GAP,
+        });
+        break;
+    }
+  }
+  return candidates;
+}
+
+/** Id pairs of intersecting cards and frames, in board order (cards first). A card inside its own frame is skipped. */
+function overlappingPairs(board: Board): Array<[string, string]> {
+  const items: { id: string; rect: Rect; frameId?: string }[] = [
+    ...board.modules.map((m) => ({
+      id: m.id,
+      rect: rectOf(m),
+      frameId: m.frameId,
+    })),
+    ...board.frames.map((f) => ({ id: f.id, rect: rectOf(f) })),
+  ];
+  const pairs: Array<[string, string]> = [];
+  for (let i = 0; i < items.length; i++) {
+    for (let j = i + 1; j < items.length; j++) {
+      const a = items[i]!;
+      const b = items[j]!;
+      if (a.frameId === b.id || b.frameId === a.id) continue;
+      if (overlaps(a.rect, b.rect)) pairs.push([a.id, b.id]);
+    }
+  }
+  return pairs;
+}
+
+function rectOf(item: Rect): Rect {
+  return { x: item.x, y: item.y, w: item.w, h: item.h };
+}
+
+/**
+ * Places the frame's cards in grid slots in the given order, then fits the frame. The cell
+ * size is the largest card of the frame, as in `placeInFrame`.
+ */
+function flowFrame(board: Board, frameId: string, orderedIds: string[]): Board {
+  const frame = findFrame(board, frameId);
+  if (!frame) return board;
+  const cards = cardsIn(board, frameId);
+  const byId = new Set(cards.map((c) => c.id));
+  const listed = [...new Set(orderedIds)].filter((id) => byId.has(id));
+  const listedSet = new Set(listed);
+  const order = [
+    ...listed,
+    ...sortByPosition(cards)
+      .map((c) => c.id)
+      .filter((id) => !listedSet.has(id)),
+  ];
+  const cellW = Math.max(0, ...cards.map((c) => c.w));
+  const cellH = Math.max(0, ...cards.map((c) => c.h));
+  const slots = new Map<string, Pos>(
+    order.map((id, index): [string, Pos] => {
+      const col = index % FRAME_COLUMNS;
+      const row = Math.floor(index / FRAME_COLUMNS);
+      return [
+        id,
+        {
+          x: Math.round(frame.x + FRAME_PAD + col * (cellW + GAP)),
+          y: Math.round(frame.y + FRAME_HEADER + row * (cellH + GAP)),
+        },
+      ];
+    }),
+  );
+  const modules = board.modules.map((m) => {
+    const pos = m.frameId === frameId ? slots.get(m.id) : undefined;
+    return pos ? { ...m, x: pos.x, y: pos.y } : m;
+  });
+  return fitFrame({ ...board, modules }, frameId);
 }
 
 /** Right and below the target, then further in steps; alternates right and below. */

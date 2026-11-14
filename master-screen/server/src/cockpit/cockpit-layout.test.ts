@@ -18,10 +18,13 @@ import {
   boardBounds,
   defaultSize,
   fitFrame,
+  freeSlot,
+  insertInFrame,
   moveFrame,
   overlaps,
   placeCard,
   placeFrame,
+  reorderFrame,
 } from "./layout.js";
 
 const STAMP = "2026-01-01T00:00:00.000Z";
@@ -517,5 +520,223 @@ describe("arrangeFrame", () => {
   test("unknown frame id returns the board unchanged", () => {
     const b = board([card("a", 0, 0)], [frame("F", 0, 0, 320, 200)]);
     expect(arrangeFrame(b, "nope")).toEqual(b);
+  });
+});
+
+describe("placeCard and placeFrame with side", () => {
+  const size = { w: 260, h: 180 };
+  const target = card("t", 500, 400, 260, 180);
+
+  test("left of the target lands at GAP to its left, on the target's top", () => {
+    const pos = placeCard(board([target]), size, { near: "t", side: "left" });
+    expect(pos).toEqual({ x: 500 - 260 - GAP, y: 400 });
+  });
+
+  test("above the target lands at GAP above it, on the target's left", () => {
+    const pos = placeCard(board([target]), size, { near: "t", side: "above" });
+    expect(pos).toEqual({ x: 500, y: 400 - 180 - GAP });
+  });
+
+  test("below the target lands at GAP below it, on the target's left", () => {
+    const pos = placeCard(board([target]), size, { near: "t", side: "below" });
+    expect(pos).toEqual({ x: 500, y: 400 + 180 + GAP });
+  });
+
+  test("right side equals the default placement next to a target", () => {
+    const b = board([target]);
+    expect(placeCard(b, size, { near: "t", side: "right" })).toEqual(
+      placeCard(b, size, { near: "t" }),
+    );
+  });
+
+  test("a taken side moves further along that side before falling back", () => {
+    const blocker = card("r", 500 + 260 + GAP, 400, 260, 180);
+    const b = board([target, blocker]);
+    const pos = placeCard(b, size, { near: "t", side: "right" });
+    expect(pos).toEqual({ x: 500 + 260 + GAP, y: 400 + 180 + GAP });
+    expect(overlaps({ ...pos, ...size }, rectOf(blocker), GAP)).toBe(false);
+  });
+
+  test("a fully taken side falls back to the default candidate order", () => {
+    // 200 cards fill the whole left strip (one per step), so the side is unusable.
+    const strip = Array.from({ length: 200 }, (_, step) =>
+      card(`s${step}`, 500 - 260 - GAP, 400 + step * (180 + GAP), 260, 180),
+    );
+    const b = board([target, ...strip]);
+    const pos = placeCard(b, size, { near: "t", side: "left" });
+    expect(pos).toEqual({ x: 500 + 260 + GAP, y: 400 });
+  });
+
+  test("side is ignored without a target", () => {
+    expect(placeCard(board(), size, { side: "left" })).toEqual({ x: 0, y: 0 });
+  });
+
+  test("placeFrame honours side too", () => {
+    const f = frame("f", 500, 400, 400, 300);
+    const pos = placeFrame(board([], [f]), { w: 320, h: 200 }, {
+      near: "f",
+      side: "below",
+    });
+    expect(pos).toEqual({ x: 500, y: 400 + 300 + GAP });
+  });
+});
+
+describe("placeCard with index and insertInFrame", () => {
+  /** Frame at (0,0) with cards a and b in slots 0 and 1. */
+  function twoCards(): Board {
+    return board(
+      [
+        card("a", FRAME_PAD, FRAME_HEADER, 260, 180, "F"),
+        card("b", FRAME_PAD + 260 + GAP, FRAME_HEADER, 260, 180, "F"),
+      ],
+      [frame("F", 0, 0, 800, 400)],
+    );
+  }
+  const slotX = (n: number) => FRAME_PAD + n * (260 + GAP);
+
+  test("placeCard with index returns that slot, clamped to the end of the frame", () => {
+    const b = twoCards();
+    expect(placeCard(b, { w: 260, h: 180 }, { frameId: "F", index: 1 })).toEqual({
+      x: slotX(1),
+      y: FRAME_HEADER,
+    });
+    expect(placeCard(b, { w: 260, h: 180 }, { frameId: "F", index: 9 })).toEqual({
+      x: slotX(2),
+      y: FRAME_HEADER,
+    });
+  });
+
+  test("insertInFrame puts the card in the slot and shifts the later cards one slot", () => {
+    const b = twoCards();
+    const withNew: Board = {
+      ...b,
+      modules: [...b.modules, card("n", 700, 300, 260, 180, "F")],
+    };
+    const out = insertInFrame(withNew, "F", "n", 0);
+    const at = (id: string) => out.modules.find((m) => m.id === id)!;
+    expect(at("n")).toMatchObject({ x: slotX(0), y: FRAME_HEADER });
+    expect(at("a")).toMatchObject({ x: slotX(1), y: FRAME_HEADER });
+    expect(at("b")).toMatchObject({ x: slotX(2), y: FRAME_HEADER });
+    const f = out.frames[0]!;
+    expect(f.x + f.w).toBeGreaterThanOrEqual(slotX(2) + 260 + FRAME_PAD);
+    expectNoOverlaps(out.modules.map(rectOf));
+  });
+
+  test("insertInFrame with an index past the end appends the card", () => {
+    const b = twoCards();
+    const withNew: Board = {
+      ...b,
+      modules: [...b.modules, card("n", 700, 300, 260, 180, "F")],
+    };
+    const out = insertInFrame(withNew, "F", "n", 50);
+    expect(out.modules.find((m) => m.id === "n")).toMatchObject({
+      x: slotX(2),
+      y: FRAME_HEADER,
+    });
+  });
+});
+
+describe("overlaps on a board", () => {
+  test("a card that overlaps a loose card is reported as a pair", () => {
+    const b = board([card("a", 0, 0), card("b", 100, 50)]);
+    expect(overlaps(b)).toEqual([["a", "b"]]);
+  });
+
+  test("a card inside its own frame is not reported", () => {
+    const b = board(
+      [card("c", 40, 80, 260, 180, "F")],
+      [frame("F", 0, 0, 400, 300)],
+    );
+    expect(overlaps(b)).toEqual([]);
+  });
+
+  test("a card overlapping a frame it does not belong to is reported", () => {
+    const b = board(
+      [card("c", 100, 100)],
+      [frame("G", 0, 0, 400, 300)],
+    );
+    expect(overlaps(b)).toEqual([["c", "G"]]);
+  });
+
+  test("two frames that touch are not reported, two that cross are", () => {
+    expect(
+      overlaps(board([], [frame("A", 0, 0, 100, 100), frame("B", 100, 0, 100, 100)])),
+    ).toEqual([]);
+    expect(
+      overlaps(board([], [frame("A", 0, 0, 100, 100), frame("B", 50, 50, 100, 100)])),
+    ).toEqual([["A", "B"]]);
+  });
+
+  test("two cards of the same frame that overlap are reported", () => {
+    const b = board(
+      [card("c1", 40, 80, 260, 180, "F"), card("c2", 100, 100, 260, 180, "F")],
+      [frame("F", 0, 0, 800, 400)],
+    );
+    expect(overlaps(b)).toEqual([["c1", "c2"]]);
+  });
+});
+
+describe("freeSlot", () => {
+  test("an empty frame's next card lands in its first slot", () => {
+    const b = board([], [frame("F", 0, 0, 400, 300)]);
+    expect(freeSlot(b, "F")).toEqual({ x: FRAME_PAD, y: FRAME_HEADER });
+  });
+
+  test("after one card the next slot is the second column", () => {
+    const b = board(
+      [card("a", FRAME_PAD, FRAME_HEADER, 260, 180, "F")],
+      [frame("F", 0, 0, 800, 400)],
+    );
+    expect(freeSlot(b, "F")).toEqual({
+      x: FRAME_PAD + 260 + GAP,
+      y: FRAME_HEADER,
+    });
+  });
+});
+
+describe("reorderFrame", () => {
+  /** Frame F with a, b, c in slots 0, 1, 2 (in that order). */
+  function threeCards(): Board {
+    const slot = (n: number) => FRAME_PAD + n * (260 + GAP);
+    return board(
+      [
+        card("a", slot(0), FRAME_HEADER, 260, 180, "F"),
+        card("b", slot(1), FRAME_HEADER, 260, 180, "F"),
+        card("c", slot(2), FRAME_HEADER, 260, 180, "F"),
+      ],
+      [frame("F", 0, 0, 800, 400)],
+    );
+  }
+  const xOf = (b: Board, id: string) => b.modules.find((m) => m.id === id)!.x;
+
+  test("listed ids take the first slots in the given order", () => {
+    const out = reorderFrame(threeCards(), "F", ["c", "a", "b"]);
+    expect(xOf(out, "c")).toBe(FRAME_PAD);
+    expect(xOf(out, "a")).toBe(FRAME_PAD + 260 + GAP);
+    expect(xOf(out, "b")).toBe(FRAME_PAD + 2 * (260 + GAP));
+    expectNoOverlaps(out.modules.map(rectOf));
+  });
+
+  test("unlisted cards keep their relative order after the listed ones", () => {
+    const out = reorderFrame(threeCards(), "F", ["c"]);
+    expect(xOf(out, "c")).toBe(FRAME_PAD);
+    expect(xOf(out, "a")).toBe(FRAME_PAD + 260 + GAP);
+    expect(xOf(out, "b")).toBe(FRAME_PAD + 2 * (260 + GAP));
+  });
+
+  test("ids that are not cards of the frame are ignored", () => {
+    const out = reorderFrame(threeCards(), "F", ["ghost", "b"]);
+    expect(xOf(out, "b")).toBe(FRAME_PAD);
+    expect(xOf(out, "a")).toBe(FRAME_PAD + 260 + GAP);
+  });
+
+  test("the frame is fitted to the cards and an unknown frame is unchanged", () => {
+    const b = threeCards();
+    const out = reorderFrame(b, "F", ["c", "a", "b"]);
+    const f = out.frames[0]!;
+    expect(f.x + f.w).toBeGreaterThanOrEqual(
+      xOf(out, "b") + 260 + FRAME_PAD,
+    );
+    expect(reorderFrame(b, "nope", ["a"])).toBe(b);
   });
 });

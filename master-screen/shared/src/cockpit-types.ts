@@ -210,6 +210,9 @@ export interface CockpitStateView extends Omit<CockpitState, "board"> {
 
 // ──────────────────────────── Actions ────────────────────────────
 
+/** Side of a target card or frame where a new one is placed. */
+export type NearSide = "left" | "right" | "above" | "below";
+
 export type ModuleInput = {
   /** Omit to create; reuse to update. A `show` with the same kind+ref updates the existing card. */
   id?: string;
@@ -221,6 +224,10 @@ export type ModuleInput = {
   frameId?: string;
   /** Place the card next to this card or frame id. Ignored when x/y are given. */
   near?: string;
+  /** Side of `near` to try first; the other sides are the fallback. Ignored without `near`. */
+  side?: NearSide;
+  /** 0-based slot in the frame's grid: the card takes it and the later cards shift one slot. Ignored without a frame. Wins over x/y. */
+  index?: number;
   /** Explicit geometry (DM drops). Missing values come from the layout engine. */
   x?: number;
   y?: number;
@@ -234,6 +241,8 @@ export type FrameInput = {
   color?: CardColor;
   /** Place the frame next to this card or frame id. Ignored when x/y are given. */
   near?: string;
+  /** Side of `near` to try first; the other sides are the fallback. Ignored without `near`. */
+  side?: NearSide;
   x?: number;
   y?: number;
   w?: number;
@@ -275,6 +284,8 @@ export type CockpitAction =
         reason?: string;
         color?: CardColor | null;
         frameId?: string | null;
+        /** With a `frameId`: the 0-based slot in that frame (see `ModuleInput.index`). */
+        index?: number;
       };
     }
   /** Spotlight one card or frame (null clears). */
@@ -287,6 +298,8 @@ export type CockpitAction =
       patch: { title?: string; color?: CardColor | null };
     }
   /** `withCards`: also remove the frame's unpinned cards; otherwise they stay, unframed. */
+  /** Re-flows the cards of the frame in the given id order (unlisted cards follow in their current order). */
+  | { type: "frame.reorder"; frameId: string; ids: string[] }
   | { type: "frame.remove"; id: string; withCards: boolean }
   | { type: "link.add"; from: string; to: string; label?: string }
   | { type: "link.remove"; id: string }

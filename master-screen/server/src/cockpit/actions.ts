@@ -18,11 +18,13 @@ import {
   arrangeFrame,
   defaultSize,
   fitFrame,
+  insertInFrame,
   MIN_FRAME,
   minFrameWidth,
   moveFrame,
   placeCard,
   placeFrame,
+  reorderFrame,
 } from "./layout.js";
 
 export const MAX_CARDS = 300;
@@ -60,6 +62,8 @@ const id = z.string().min(1).max(200);
 export const coordinateSchema = z.number().finite().min(-1e6).max(1e6);
 export const dimensionSchema = z.number().finite().min(40).max(4000);
 const colorSchema = z.enum(CARD_COLORS);
+const sideSchema = z.enum(["left", "right", "above", "below"]);
+const indexSchema = z.number().int().min(0).max(MAX_CARDS);
 
 export const sourceRefSchema = z
   .object({
@@ -99,6 +103,8 @@ export const moduleInputSchema = z
     reason: z.string().max(300),
     frameId: id.optional(),
     near: id.optional(),
+    side: sideSchema.optional(),
+    index: indexSchema.optional(),
     x: coordinateSchema.optional(),
     y: coordinateSchema.optional(),
     w: dimensionSchema.optional(),
@@ -112,6 +118,7 @@ const moduleUpdateSchema = z
     reason: z.string().max(300).optional(),
     color: colorSchema.nullable().optional(),
     frameId: id.nullable().optional(),
+    index: indexSchema.optional(),
   })
   .strict();
 const frameInputSchema = z
@@ -119,6 +126,7 @@ const frameInputSchema = z
     title: z.string().min(1).max(200),
     color: colorSchema.optional(),
     near: id.optional(),
+    side: sideSchema.optional(),
     x: coordinateSchema.optional(),
     y: coordinateSchema.optional(),
     w: dimensionSchema.optional(),
@@ -185,6 +193,13 @@ export const actionSchema = z.discriminatedUnion("type", [
       type: z.literal("frame.update"),
       id,
       patch: frameUpdateSchema,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal("frame.reorder"),
+      frameId: id,
+      ids: z.array(id).max(MAX_CARDS),
     })
     .strict(),
   z
@@ -446,6 +461,8 @@ function showModule(
     throw capError("Troppe carte sulla scrivania");
   if (input.frameId !== undefined) frameOrThrow(board, input.frameId);
   const frameId = input.frameId ?? old?.frameId;
+  // A slot is only meaningful inside a frame: without one, `index` is ignored.
+  const slot = frameId !== undefined ? input.index : undefined;
   const defaults = defaultSize(input.kind);
   const size = {
     w: Math.round(input.w ?? old?.w ?? defaults.w),
@@ -454,11 +471,13 @@ function showModule(
   const relocated =
     !old || (input.frameId !== undefined && input.frameId !== old.frameId);
   const spot =
-    old && !relocated
+    old && !relocated && slot === undefined
       ? { x: old.x, y: old.y }
       : placeCard(withoutCard(board, old?.id), size, {
           frameId,
           near: input.near,
+          side: input.side,
+          index: slot,
         });
   const color = input.color ?? old?.color;
   const card: BoardModule = {
@@ -477,6 +496,8 @@ function showModule(
     updatedAt: ctx.now,
   };
   storeCard(state, card);
+  if (frameId !== undefined && slot !== undefined)
+    state.board = insertInFrame(state.board, frameId, card.id, slot);
   return { label: `Mostra · ${moduleLabel(input.ref)}`, targetId: card.id };
 }
 
@@ -489,20 +510,26 @@ function removeModule(state: CockpitState, cardId: string): Outcome {
   return { label: "Rimuove carta", targetId: cardId };
 }
 
-/** Moves a card into a frame, placing it in the frame grid, then grows the frame. */
+/**
+ * Moves a card into a frame, placing it in the frame grid, then grows the frame. With `index`
+ * the card takes that slot and the frame's later cards shift one slot.
+ */
 function moveIntoFrame(
   state: CockpitState,
   card: BoardModule,
   frameId: string,
+  index?: number,
 ) {
   frameOrThrow(state.board, frameId);
   const spot = placeCard(
     withoutCard(state.board, card.id),
     { w: card.w, h: card.h },
-    { frameId },
+    { frameId, index },
   );
   Object.assign(card, spot, { frameId });
   state.board = fitFrame(state.board, frameId);
+  if (index !== undefined)
+    state.board = insertInFrame(state.board, frameId, card.id, index);
 }
 
 function updateModule(
@@ -522,8 +549,11 @@ function updateModule(
   else if (patch.color !== undefined) card.color = patch.color;
   if (patch.frameId === null) delete card.frameId;
   else if (patch.frameId !== undefined && patch.frameId !== card.frameId)
-    moveIntoFrame(state, card, patch.frameId);
-  card.updatedAt = ctx.now;
+    moveIntoFrame(state, card, patch.frameId, patch.index);
+  else if (patch.index !== undefined && card.frameId !== undefined)
+    state.board = insertInFrame(state.board, card.frameId, card.id, patch.index);
+  // The moves above may replace the card object: look it up again.
+  cardOrThrow(state.board, cardId).updatedAt = ctx.now;
   return { label: "Modifica carta", targetId: cardId };
 }
 
@@ -565,7 +595,7 @@ function addFrame(
     w: Math.round(input.w ?? minFrameWidth(input.title)),
     h: Math.round(input.h ?? MIN_FRAME.h),
   };
-  const spot = placeFrame(board, size, { near: input.near });
+  const spot = placeFrame(board, size, { near: input.near, side: input.side });
   const frame: Frame = {
     id: ctx.newId("f"),
     title: input.title,
@@ -597,6 +627,22 @@ function updateFrame(
   else if (patch.color !== undefined) frame.color = patch.color;
   frame.updatedAt = ctx.now;
   return { label: "Modifica riquadro", targetId: frameId };
+}
+
+/** Re-flows the frame's cards in the given order; every listed id must be a card of that frame. */
+function reorderFrameCards(
+  state: CockpitState,
+  frameId: string,
+  ids: string[],
+): Outcome {
+  const board = state.board;
+  frameOrThrow(board, frameId);
+  for (const cardId of ids) {
+    if (cardOrThrow(board, cardId).frameId !== frameId)
+      throw new ActionError("Il modulo non è in questo riquadro");
+  }
+  state.board = reorderFrame(board, frameId, ids);
+  return { label: "Ordina carte del riquadro", targetId: frameId };
 }
 
 /** Cards that leave with their frame: its unpinned cards, when `withCards` is set. */
@@ -784,6 +830,8 @@ function applyBoardAction(
       return addFrame(state, action.frame, ctx);
     case "frame.update":
       return updateFrame(state, action.id, action.patch, ctx);
+    case "frame.reorder":
+      return reorderFrameCards(state, action.frameId, action.ids);
     case "frame.remove":
       return removeFrame(state, action.id, action.withCards);
     case "link.add":

@@ -71,6 +71,67 @@ test("il digest elimina i messaggi vecchi e preserva posizione, registro e nuovo
   expect(digest).not.toContain("D&D");
 });
 
+test("il prompt di sistema indica board_reorder e get_board per il posizionamento, e tiene il colore dei riquadri", () => {
+  const prompt = buildSystemPrompt({ language: "it", systemName: null });
+  expect(prompt).toContain("board_reorder");
+  expect(prompt).toContain("get_board");
+  expect(prompt).toContain("newFrame");
+  expect(prompt).toContain("colour");
+  expect(prompt).toContain("never call board_arrange on the whole desk");
+  expect(prompt).toContain("board_position, which is only for coordinates");
+});
+
+test("il digest indica il colore dei riquadri che ne hanno uno", () => {
+  const state = emptyState();
+  state.board.frames.push({
+    id: "f1",
+    title: "Porto",
+    color: "amber",
+    x: 0,
+    y: 0,
+    w: 320,
+    h: 200,
+    addedBy: "agent",
+    addedAt: "",
+    updatedAt: "",
+  } as CockpitState["board"]["frames"][number]);
+  state.board.frames.push({
+    id: "f2",
+    title: "Taverna",
+    x: 400,
+    y: 0,
+    w: 320,
+    h: 200,
+    addedBy: "agent",
+    addedAt: "",
+    updatedAt: "",
+  } as CockpitState["board"]["frames"][number]);
+  const session = {
+    id: "s",
+    title: "Test",
+    provider: "claude",
+    model: "m",
+    createdAt: "",
+    updatedAt: "",
+    revision: 0,
+    state,
+    history: [],
+    messages: [],
+    turns: [],
+  } as unknown as CockpitSession;
+  const current: ChatMessage = {
+    id: "current-id",
+    role: "dm",
+    text: "Ciao",
+    at: "",
+    turnId: "t",
+    status: "complete",
+  };
+  const digest = buildUserPrompt(session, current);
+  expect(digest).toContain("- f1 · frame «Porto» · colour amber");
+  expect(digest).toContain("- f2 · frame «Taverna»: empty");
+});
+
 test("il prompt di sistema separa le richieste di plancia dal registro e spiega il recupero dagli errori", () => {
   const prompt = buildSystemPrompt({ language: "it", systemName: null });
   expect(prompt).toContain("Desk and layout requests");
