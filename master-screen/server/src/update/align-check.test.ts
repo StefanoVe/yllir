@@ -57,25 +57,52 @@ describe('alignNeeded', () => {
     assert.equal(alignNeeded(result), false);
   });
 
-  it('needs it for a would-update with equal versions when a migration is not not-needed', () => {
+  it('does not need it for equal versions when a migration is needed by content only (drift)', () => {
     const result = {
       status: 'would-update',
       from: '0.2.0',
       to: '0.2.0',
-      restored_by_hand: ['CLAUDE.md'],
+      restored_by_hand: [],
       migrations: { x: 'complete' },
       pending_migrations: [],
+      saved_pending: [],
+    };
+    assert.equal(alignNeeded(result), false);
+  });
+
+  it('needs it for equal versions when a migration is saved as pending', () => {
+    const result = {
+      status: 'would-update',
+      from: '0.2.0',
+      to: '0.2.0',
+      restored_by_hand: [],
+      migrations: { x: 'pending' },
+      pending_migrations: ['x'],
+      saved_pending: ['x'],
     };
     assert.equal(alignNeeded(result), true);
   });
 
   it('needs it for a would-update whose versions differ, or whose version is unknown', () => {
-    assert.equal(alignNeeded({ status: 'would-update', from: '0.1.0', to: '0.2.0', migrations: { x: 'not-needed' }, pending_migrations: [] }), true);
-    assert.equal(alignNeeded({ status: 'would-update', from: null, to: '0.2.0', pending_migrations: [] }), true);
+    assert.equal(alignNeeded({ status: 'would-update', from: '0.1.0', to: '0.2.0', migrations: { x: 'not-needed' }, pending_migrations: [], saved_pending: [] }), true);
+    assert.equal(alignNeeded({ status: 'would-update', from: null, to: '0.2.0', pending_migrations: [], saved_pending: [] }), true);
   });
 
-  it('needs the alignment when a post-update migration is pending, even when up to date', () => {
-    assert.equal(alignNeeded({ status: 'up-to-date', errors: [], pending_migrations: ['statistics-tables-v1'] }), true);
+  it('does not need it for equal versions when the dry run pends a migration but nothing is saved as pending', () => {
+    const result = {
+      status: 'up-to-date',
+      from: '0.2.0',
+      to: '0.2.0',
+      errors: [],
+      pending_migrations: ['item-descriptions-v1'],
+      saved_pending: [],
+    };
+    assert.equal(alignNeeded(result), false);
+    assert.equal(alignNeeded({ ...result, status: 'would-update' }), false);
+  });
+
+  it('needs the alignment when a migration saved as pending is still open, even when up to date', () => {
+    assert.equal(alignNeeded({ status: 'up-to-date', errors: [], pending_migrations: ['statistics-tables-v1'], saved_pending: ['statistics-tables-v1'] }), true);
   });
 
   it('does not need it when up to date with nothing pending, or when another failure happened', () => {

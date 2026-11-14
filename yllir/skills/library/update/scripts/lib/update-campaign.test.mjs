@@ -194,6 +194,26 @@ test('geography completion refuses pending work and preserves other update marke
   assert.equal(read(dir, '.campaign/state/update.yaml'), savedBefore.replace('status: pending', 'status: complete'));
 });
 
+test('saved_pending lists only the migrations saved as pending, not the dry run statuses', async () => {
+  const dir = makeCurrentCampaign(GEOGRAPHIC_CONFIG);
+  const clean = await updateCampaign(dir, { dryRun: true });
+  assert.deepEqual(clean.saved_pending, []);
+
+  write(dir, 'Subjects/Guardia.md', '---\nid: guardia\n---\n\n# Guardia\n');
+  saveVersion(dir, { message: 'Added a subject', kind: 'manual' });
+  // The real update records the guided part as pending: that is the saved state.
+  await updateCampaign(dir);
+  const result = await updateCampaign(dir, { dryRun: true });
+  assert.equal(result.status, 'up-to-date');
+  assert.deepEqual(result.saved_pending, ['category-first-geography-v1']);
+
+  // Once the guided part is complete, nothing is saved as pending any more.
+  fs.mkdirSync(path.join(dir, 'Subjects/Da collocare'), { recursive: true });
+  fs.renameSync(path.join(dir, 'Subjects/Guardia.md'), path.join(dir, 'Subjects/Da collocare/Guardia.md'));
+  assert.equal((await completeMigration(dir, 'category-first-geography-v1')).status, 'complete');
+  assert.deepEqual((await updateCampaign(dir, { dryRun: true })).saved_pending, []);
+});
+
 test('a dry-run never clears a stale pending sheet-migration marker', async () => {
   const dir = makeCurrentCampaign();
   const state = 'status: completed\nsheet_migration_id: "statistics-tables-v1"\nsheet_migration: pending\n';

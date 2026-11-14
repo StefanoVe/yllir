@@ -45,6 +45,7 @@ const STATE_FIELDS = ['status', 'from_version', 'to_version', 'restore_point', '
  *   migrated: string[],
  *   migrations: Record<string, 'complete' | 'pending' | 'not-needed' | 'failed'>,
  *   pending_migrations: string[],
+ *   saved_pending: string[],
  *   world_migration_files: string[],
  *   details: Record<string, { status: string, changed: string[], skipped: object[], errors: object[] }>,
  *   errors: Array<{ code: string, message: string, file?: string, line?: number | null }>,
@@ -53,6 +54,10 @@ const STATE_FIELDS = ['status', 'from_version', 'to_version', 'restore_point', '
  * `news` is set only when status is 'updated': the framework news between the campaign's
  * old version (from) and the installed one (to), in the campaign language, or null when
  * there is none or it cannot be read. A news failure never changes the status.
+ * `saved_pending` lists the migrations whose SAVED state (update.yaml) is 'pending', i.e. a
+ * guided part an earlier real update left unfinished. Unlike `pending_migrations`, which
+ * comes from the dry probe, it is not affected by content drift (a file edited from the
+ * cloud), so callers can tell a real pending update from drift.
  */
 
 /**
@@ -229,6 +234,7 @@ async function runUpdate(root, out, { dryRun, resume, today, registryDir }) {
   }
 
   const savedMigrations = saved?.migrations ?? new Map();
+  out.saved_pending = [...savedMigrations].filter(([, value]) => value === 'pending').map(([id]) => id);
 
   // Step 3: nothing to write when the versions match and no generated file was changed by hand.
   const fingerprints = checkFingerprints(root);
@@ -467,6 +473,7 @@ function newResult(from, to) {
     migrated: [],
     migrations: {},
     pending_migrations: [],
+    saved_pending: [],
     details: {},
     world_migration_files: [],
     errors: [],

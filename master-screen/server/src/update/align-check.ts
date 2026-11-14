@@ -12,22 +12,31 @@ export function alignScriptPath(frameworkRoot: string): string {
 }
 
 /**
- * A 'would-update' result is real work only when the framework version changed (or is unknown), or when
- * a migration is still to be run. A dry run with equal versions and only hand-edited generated files is not
- * an update, so it does not count.
+ * True when the saved state (update.yaml) has a migration still pending: a guided part that an earlier
+ * real update left unfinished. The dry run's own statuses (pending_migrations, migrations) are not used
+ * here, because a content-driven migration (a file edited from the cloud) reports needed without any
+ * framework change, which is drift and not an alignment.
+ */
+function hasSavedPending(data: Record<string, unknown>): boolean {
+  return Array.isArray(data.saved_pending) && data.saved_pending.length > 0;
+}
+
+/**
+ * A 'would-update' result is real work when the framework version changed (or is unknown), or when a
+ * migration left pending by an earlier real update is saved as pending. With equal versions, the dry
+ * run's migration statuses alone do not count, and neither does a dry run that only finds hand-edited
+ * generated files.
  */
 function wouldUpdateNeeded(data: Record<string, unknown>): boolean {
   if (typeof data.from !== 'string' || typeof data.to !== 'string' || data.from !== data.to) return true;
-  const migrations = typeof data.migrations === 'object' && data.migrations !== null ? data.migrations : {};
-  if (Object.values(migrations).some((state) => state !== 'not-needed')) return true;
-  return Array.isArray(data.pending_migrations) && data.pending_migrations.length > 0;
+  return hasSavedPending(data);
 }
 
 /**
  * True when the dry-run result says there is work to do: the framework would really be updated (the
- * versions differ, or a migration is not 'not-needed'), an earlier update was interrupted, or a
- * post-update migration is pending. A 'would-update' with equal versions and no migration is not work.
- * Throws when the result is not an object.
+ * versions differ or are unknown), an earlier update was interrupted, or a migration saved as pending
+ * by an earlier real update is still to be finished. Migration statuses of the dry run alone (content
+ * drift) never count. Throws when the result is not an object.
  */
 export function alignNeeded(result: unknown): boolean {
   if (typeof result !== 'object' || result === null) throw new Error('the alignment check printed no object');
@@ -36,7 +45,7 @@ export function alignNeeded(result: unknown): boolean {
   const errors = Array.isArray(data.errors) ? data.errors : [];
   const first = errors[0] as { code?: unknown } | undefined;
   if (data.status === 'failed' && first?.code === 'interrupted-update') return true;
-  return Array.isArray(data.pending_migrations) && data.pending_migrations.length > 0;
+  return hasSavedPending(data);
 }
 
 /** Runs the dry run of the campaign alignment (no shell) and says whether the campaign needs it. */
