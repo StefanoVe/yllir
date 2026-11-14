@@ -583,3 +583,16 @@ test('encyclopedia and print must be mappings', () => {
   assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia: yes\n`)), ['bad-type encyclopedia']);
   assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print: a4\n`)), ['bad-type print']);
 });
+
+test('workflow with auto_accept true or false validates with no errors', () => {
+  assert.deepEqual(errorsOf(`${MINIMAL}workflow:\n  auto_accept: true\n`), []);
+  assert.deepEqual(errorsOf(`${MINIMAL}workflow:\n  auto_accept: false\n`), []);
+});
+
+test('workflow.auto_accept must be true or false', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}workflow:\n  auto_accept: "yes"\n`)), ['bad-type workflow.auto_accept']);
+});
+
+test('an unknown key under workflow is reported as unknown-key', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}workflow:\n  auto_publish: true\n`)), ['unknown-key workflow.auto_publish']);
+});

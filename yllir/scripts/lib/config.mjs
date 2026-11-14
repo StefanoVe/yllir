@@ -11,9 +11,10 @@ import { listAdapters, pluginRootFromHere } from './adapter.mjs';
 const FILE = 'campaign.yaml';
 // allow_model_imagination is no longer read: it is accepted with any value and ignored
 // (the migration removes it from older campaigns).
-const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit', 'encyclopedia', 'print', 'allow_model_imagination'];
+const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit', 'encyclopedia', 'print', 'workflow', 'allow_model_imagination'];
 const ENCYCLOPEDIA_KEYS = ['title', 'base_url'];
 const PRINT_KEYS = ['format', 'cmyk', 'renderer'];
+const WORKFLOW_KEYS = ['auto_accept'];
 const PRINT_FORMATS = ['5x7', 'a4'];
 const PRINT_RENDERERS = ['auto', 'photoshop', 'node'];
 const ENCYCLOPEDIA_TITLE_MAX = 120;
@@ -306,6 +307,9 @@ function validateTopLevel(r, config, campaignRoot) {
 
   const print = mappingField(r, config, '', 'print');
   if (print !== null) validatePrint(r, print);
+
+  const workflow = mappingField(r, config, '', 'workflow');
+  if (workflow !== null) validateWorkflow(r, workflow);
 }
 
 /**
@@ -354,6 +358,16 @@ function validatePrint(r, print) {
     r.error('bad-type', 'print.cmyk', 'print.cmyk must be true or false');
   }
   checkEnum(r, print, 'print', 'renderer', PRINT_RENDERERS);
+}
+
+/**
+ * workflow (optional): auto_accept true lets write-document write without asking the master to confirm the plan first.
+ */
+function validateWorkflow(r, workflow) {
+  checkUnknownKeys(r, workflow, 'workflow', WORKFLOW_KEYS);
+  if (Object.hasOwn(workflow, 'auto_accept') && typeof workflow.auto_accept !== 'boolean') {
+    r.error('bad-type', 'workflow.auto_accept', 'workflow.auto_accept must be true or false');
+  }
 }
 
 function validateCampaign(r, campaign) {

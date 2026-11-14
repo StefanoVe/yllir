@@ -85,6 +85,8 @@ difficulty:
     - ["29", 135000]
     - ["30", 155000]
 economy:
+  # value of the reference item in copper pieces, the smallest coin of the game
+  reference_value: 50
   reference_item:
     it: Razione (un giorno)
     en: Rations (one day)

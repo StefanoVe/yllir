@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { runQuery } from './query.mjs';
+import { pluginRootFromHere } from '../adapter.mjs';
 
 const CAMPAIGN_YAML = `schema: 1
 
@@ -413,4 +414,111 @@ test('usage names the three new queries and encounters', (t) => {
   for (const name of ['prices', 'unreachable', 'forgotten', 'encounters']) {
     assert.equal(result.error.includes(name), true, `usage must name ${name}`);
   }
+});
+
+// ---------------------------------------------------------------------------
+// price-proposal
+
+const RATION_ECONOMY = page(
+  ['id: economia', 'provenance: master'],
+  [
+    '# Economia',
+    '',
+    '## Valute',
+    '',
+    '| Valuta | Equivalenza | Nota |',
+    '| --- | --- | --- |',
+    '| scudo / scudi | unità di conto | moneta comune |',
+    '| corona / corone | 10 scudi | |',
+    '',
+    '## Prezzi base',
+    '',
+    '| Categoria | Minimo | Massimo | Unità |',
+    '| --- | --- | --- | --- |',
+    '| Razione (un giorno) | 2 | 2 | corona |',
+    '',
+  ].join('\n'),
+);
+
+/** Runs `fn` with YLLIR_PLUGIN_ROOT set to `pluginRoot`, restoring the previous value after. */
+function withPluginRoot(pluginRoot, fn) {
+  const previous = process.env.YLLIR_PLUGIN_ROOT;
+  process.env.YLLIR_PLUGIN_ROOT = pluginRoot;
+  try {
+    return fn();
+  } finally {
+    if (previous === undefined) delete process.env.YLLIR_PLUGIN_ROOT;
+    else process.env.YLLIR_PLUGIN_ROOT = previous;
+  }
+}
+
+test('price-proposal without a game system adapter is no-adapter', (t) => {
+  const result = runQuery(makeCampaign(t, { 'Storia/Economia.md': RATION_ECONOMY }), 'price-proposal', ['1500']);
+  assert.equal(result.error, undefined);
+  assert.deepEqual(result.results, [{ status: 'no-adapter', message: 'the campaign has no game system adapter' }]);
+});
+
+test('price-proposal with adapter none is no-adapter', (t) => {
+  const root = makeCampaign(t, { 'campaign.yaml': `${CAMPAIGN_YAML}system:\n  adapter: none\n` });
+  assert.deepEqual(runQuery(root, 'price-proposal', ['1500']).results, [
+    { status: 'no-adapter', message: 'the campaign has no game system adapter' },
+  ]);
+});
+
+test('price-proposal with an adapter that does not load is no-adapter with its first error', (t) => {
+  const pluginRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-query-plugin-'));
+  t.after(() => fs.rmSync(pluginRoot, { recursive: true, force: true }));
+  const root = makeCampaign(t, { 'campaign.yaml': `${CAMPAIGN_YAML}system:\n  adapter: assente\n`, 'Storia/Economia.md': RATION_ECONOMY });
+  const result = withPluginRoot(pluginRoot, () => runQuery(root, 'price-proposal', ['1500']));
+  assert.equal(result.results.length, 1);
+  assert.equal(result.results[0].status, 'no-adapter');
+  assert.equal(result.results[0].message, 'adapter assente is not installed');
+});
+
+test('price-proposal with a value that is not a number is an error', (t) => {
+  const root = makeCampaign(t);
+  for (const value of ['molto', '1500,5', '']) {
+    const result = runQuery(root, 'price-proposal', [value]);
+    assert.equal(typeof result.error, 'string', value);
+    assert.equal(result.results, undefined);
+  }
+});
+
+test('price-proposal takes exactly one argument and is named in the usage', (t) => {
+  const root = makeCampaign(t);
+  assert.equal(runQuery(root, 'price-proposal').error.startsWith('price-proposal takes 1 argument.'), true);
+  assert.equal(runQuery(root, 'price-proposal', ['1', '2']).error.startsWith('price-proposal takes 1 argument.'), true);
+  assert.equal(runQuery(root, 'nosuch').error.includes('price-proposal <systemValue>'), true);
+});
+
+test('price-proposal with the adapter reference value gives the proposal through runQuery', (t) => {
+  const pluginRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'engine-query-plugin-'));
+  t.after(() => fs.rmSync(pluginRoot, { recursive: true, force: true }));
+  const sourceDir = path.join(pluginRootFromHere(), 'modules', 'systems', 'dnd-2024');
+  const targetDir = path.join(pluginRoot, 'modules', 'systems', 'dnd-2024');
+  fs.cpSync(sourceDir, targetDir, { recursive: true });
+  const manifest = path.join(targetDir, 'adapter.yaml');
+  const text = fs.readFileSync(manifest, 'utf8');
+  if (!text.includes('reference_value')) {
+    fs.writeFileSync(manifest, text.replace('economy:\n', 'economy:\n  reference_value: 50\n'));
+  }
+  const root = makeCampaign(t, {
+    'campaign.yaml': `${CAMPAIGN_YAML}system:\n  adapter: dnd-2024\n`,
+    'Storia/Economia.md': RATION_ECONOMY,
+  });
+  const result = withPluginRoot(pluginRoot, () => runQuery(root, 'price-proposal', ['1500']));
+  assert.equal(result.error, undefined);
+  assert.deepEqual(result.results, [
+    {
+      status: 'ok',
+      systemValue: 1500,
+      referenceValue: 50,
+      referenceCategory: 'Razione (un giorno)',
+      referencePrice: 2,
+      unit: 'corona',
+      proposed: 60,
+      unitOfAccount: 'scudo',
+      proposedInUnitOfAccount: 600,
+    },
+  ]);
 });

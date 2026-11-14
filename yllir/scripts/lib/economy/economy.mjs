@@ -314,6 +314,64 @@ export function priceReport(root) {
 // ---------------------------------------------------------------------------
 // Sheets
 
+/**
+ * Proposed price of an item in the master's scale. The item's value in the game's
+ * smallest coin is compared with the reference food's value in that same coin, and
+ * the ratio is applied to the reference food's price in the economy document.
+ * Reads the economy document only; no model is used.
+ * @param {string} root campaign folder
+ * @param {{ referenceValue: unknown, referenceLabels?: string[], systemValue: unknown }} input
+ *   referenceValue: value of the reference food in the smallest coin (adapter economy.reference_value);
+ *   referenceLabels: the reference food's names in the adapter (it and en);
+ *   systemValue: the item's value in the same smallest coin.
+ * @returns {object} status `ok` with the proposal, or a status and a message explaining why none was made
+ */
+export function priceProposal(root, { referenceValue, referenceLabels = [], systemValue }) {
+  const rel = findEconomyDocument(root);
+  if (rel === null) {
+    return { status: 'no-economy', message: 'the campaign has no economy document (metadata id economia)' };
+  }
+  if (!isPositiveNumber(referenceValue)) {
+    return { status: 'no-reference-value', message: 'the game system does not give a value for the reference food' };
+  }
+  if (!isPositiveNumber(systemValue)) {
+    return { status: 'bad-system-value', message: `the value of the item must be a positive number, got ${String(systemValue)}` };
+  }
+
+  const economy = parseEconomy(readText(root, rel), readLanguage(root));
+  const labels = new Set(referenceLabels.filter((label) => typeof label === 'string').map((label) => foldForm(label)));
+  const row = economy.categories.find((category) => labels.has(foldForm(category.name)));
+  if (row === undefined) {
+    return { status: 'no-reference-row', message: 'the economy document has no base price row for the reference food' };
+  }
+  if (row.minInUnit === null || row.maxInUnit === null || row.min === null || row.max === null) {
+    return { status: 'no-reference-row', message: `the base price row "${row.name}" has no usable range` };
+  }
+
+  const ratio = systemValue / referenceValue;
+  const referencePrice = (row.min + row.max) / 2;
+  const referencePriceInUnit = (row.minInUnit + row.maxInUnit) / 2;
+  return {
+    status: 'ok',
+    systemValue,
+    referenceValue,
+    referenceCategory: row.name,
+    referencePrice,
+    unit: row.unit,
+    proposed: round2(ratio * referencePrice),
+    unitOfAccount: economy.unit,
+    proposedInUnitOfAccount: round(ratio * referencePriceInUnit),
+  };
+}
+
+function isPositiveNumber(x) {
+  return typeof x === 'number' && Number.isFinite(x) && x > 0;
+}
+
+function round2(x) {
+  return Math.round(x * 100) / 100;
+}
+
 /** Economy, world places and the campaign language, or null without an economy document. */
 function priceContext(root) {
   const rel = findEconomyDocument(root);

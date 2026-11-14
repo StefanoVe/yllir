@@ -323,6 +323,7 @@ Validated by the world graph: `when` is a number, `participants` and `location` 
 - **Price text (`Paga`, and every price or reward in other documents).** `<number> <currency>`, for example `2 scudi` or `0.5 scudo l'uno`. A sum joins its pairs with `e` (English `and`): `1 corona e 5 scudi`. Text in parentheses is ignored.
 - **`Unità` (`Prezzi base`).** The name of a currency of `## Valute`.
 - **Place factor (`Fattore`).** A positive number. It multiplies the price range of the vendors whose place is that `Luogo`, or whose nearest place above it has a row (4.4).
+- **Later `Prezzi base` row.** A row may be added later, from a price the master confirmed (`authoring.md` section 12): one row per category, with the same column rules.
 
 Example with two currencies:
 

@@ -160,16 +160,17 @@ Le parole mostrate al master sono nel lessico della skill di ingresso (`yllir/sk
 2. **Contesto.** Come nel processo 2.
 3. **Tipo e modello.** Il tipo è uno fra luogo, personaggio (PNG o venditore), creatura (nemico o no), oggetto (oggetto o annuncio), fazione, evento storico. I campi del modello sono nel formato dei contenuti (`templates/content-format.md`); i campi facoltativi di luoghi e personaggi (abitanti, punti d'interesse, motivazioni, legami, segreti, agganci di trama) si compilano quando la richiesta li dà o il contesto li richiede.
 4. **Valori di regola.** Solo se la campagna ha un adattatore: statistiche, difficoltà, prezzi ed effetti vengono dalla conoscenza del sistema o da una ricerca che non riceve il blocco riservato; il motore ne controlla forma e aritmetica. Senza adattatore, restano a parole. *Deciso, 2026-11-11* (decisione 10); *il controllo è implementato in 0.30.0*.
-5. **Bozza.** Un solo documento, con la sua provenienza. Un documento `generated` si può cambiare liberamente; un documento `master` o `played` non si sovrascrive né si contraddice.
-6. **Conseguenze.** Il comando `query related` e `query timeline` dicono quali altri documenti dipendono dalla modifica. Quelli che la modifica rende incoerenti si correggono nello stesso lotto, cambiando solo le righe in conflitto. Un documento `master` o `played` in conflitto non si cambia: il conflitto va al master.
-7. **Scrittura.** Il ciclo di scrittura, con tutte le bozze nello stesso lotto.
-8. **Messaggio.** Che cosa è stato creato o cambiato, per nome; che cosa è inventato («L'ho inventato io: il suo passato e il suo debito»); che cosa resta a parole perché non c'è un adattatore; quali altri documenti sono cambiati per la modifica.
+5. **Piano e conferma** (*Deciso, 2026-11-14*): prima di scrivere, l'assistente riassume ciò che creerà o cambierà, i documenti toccati e ciò che inventerà, e chiede al master se può procedere. Con `workflow.auto_accept: true` in `campaign.yaml` (predefinito falso) salta la domanda e scrive subito.
+6. **Bozza.** Un solo documento, con la sua provenienza. Un documento `generated` si può cambiare liberamente; un documento `master` o `played` non si sovrascrive né si contraddice.
+7. **Conseguenze.** Il comando `query related` e `query timeline` dicono quali altri documenti dipendono dalla modifica. Quelli che la modifica rende incoerenti si correggono nello stesso lotto, cambiando solo le righe in conflitto. Un documento `master` o `played` in conflitto non si cambia: il conflitto va al master.
+8. **Scrittura.** Il ciclo di scrittura, con tutte le bozze nello stesso lotto.
+9. **Messaggio.** Che cosa è stato creato o cambiato, per nome; che cosa è inventato («L'ho inventato io: il suo passato e il suo debito»); che cosa resta a parole perché non c'è un adattatore; quali altri documenti sono cambiati per la modifica.
 
 **Cosa vede l'utente:** il messaggio finale, senza parole tecniche.
 
 **Output:** un documento creato o cambiato, eventuali documenti collegati, una versione salvata.
 
-**Conferme richieste:** nessuna per le creazioni. Un conflitto con un documento `master` o `played` attende la decisione del master.
+**Conferme richieste:** una, il piano prima di scrivere, saltata con `workflow.auto_accept: true`. Un conflitto con un documento `master` o `played` attende la decisione del master.
 
 **Errori:** più documenti con lo stesso nome: una sola domanda. Il documento che il master ha cambiato a mano: le sue modifiche si salvano a parte e il master è avvisato. Il tipo non ha un modello: il processo lo dice e propone il tipo più vicino.
 

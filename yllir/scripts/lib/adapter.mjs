@@ -166,10 +166,15 @@ function validateDifficulty(difficulty, folder, error) {
 }
 
 // economy.reference_item: a mapping of language to nonempty text, with it and en required.
+// economy.reference_value: optional positive number, the value of the reference item in the smallest coin.
 function validateEconomy(economy, error) {
   if (!isMapping(economy)) { error('bad-type', 'economy', 'economy must be a mapping'); return; }
   for (const key of Object.keys(economy)) {
-    if (key !== 'reference_item') error('unknown-key', `economy.${key}`, `"${key}" is not a setting of economy`);
+    if (key !== 'reference_item' && key !== 'reference_value') error('unknown-key', `economy.${key}`, `"${key}" is not a setting of economy`);
+  }
+  const value = economy.reference_value;
+  if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value <= 0)) {
+    error('bad-value', 'economy.reference_value', 'economy.reference_value must be a positive number');
   }
   if (economy.reference_item === undefined) return;
   const item = economy.reference_item;

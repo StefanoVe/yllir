@@ -290,7 +290,7 @@ test('the D&D manifest loads the difficulty tables as maps and the reference foo
     assert.equal(loaded.adapter.difficulty.cr_xp['1/8'], 25);
     assert.equal(loaded.adapter.difficulty.cr_xp['0'], 10);
     assert.equal(Object.keys(loaded.adapter.difficulty.cr_xp).length, 34);
-    assert.deepEqual(loaded.adapter.economy, { reference_item: { it: 'Razione (un giorno)', en: 'Rations (one day)' } });
+    assert.deepEqual(loaded.adapter.economy, { reference_value: 50, reference_item: { it: 'Razione (un giorno)', en: 'Rations (one day)' } });
   });
 });
 
@@ -323,6 +323,28 @@ test('difficulty tables reject bad levels, bad numbers and bad ratings', () => {
       const errors = loadAdapter(temp, 'dnd-2024').errors;
       assert.ok(errors.some((e) => e.code === 'bad-value' && e.path === at), `${bad} -> ${at}`);
     }
+  });
+});
+
+test('economy reference_value must be a positive number and may stand without reference_item', () => {
+  withRoot((temp) => {
+    fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/difficulty.mjs'), 'export {};\n');
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    for (const bad of ['0', '-3', '"abc"']) {
+      write(temp, 'dnd-2024', replace(source, 'reference_value: 50', `reference_value: ${bad}`));
+      assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'economy.reference_value'), bad);
+    }
+
+    write(temp, 'dnd-2024', replace(source, 'reference_value: 50', 'reference_value: 120'));
+    assert.deepEqual(loadAdapter(temp, 'dnd-2024').errors, []);
+
+    const withoutItem = source.replace(/  reference_item:\n    it: .*\n    en: .*\n/, '');
+    assert.notEqual(withoutItem, source);
+    write(temp, 'dnd-2024', withoutItem);
+    const loaded = loadAdapter(temp, 'dnd-2024');
+    assert.deepEqual(loaded.errors, []);
+    assert.deepEqual(loaded.adapter.economy, { reference_value: 50 });
   });
 });
 

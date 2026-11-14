@@ -340,3 +340,14 @@ test('a top-level allow_model_imagination is written and reads back as null, tru
     assert.deepEqual(validateConfig(campaignWith(text)).errors, []);
   }
 });
+
+test('workflow is written right after modules and reads back', () => {
+  const config = parse(MINIMAL);
+  config.modules = { print: false };
+  config.workflow = { auto_accept: true };
+  const text = stringifyConfig(config);
+  const topKeys = text.split('\n').filter((line) => /^[a-z]/.test(line)).map((line) => line.split(':')[0]);
+  assert.deepEqual(topKeys.slice(topKeys.indexOf('modules'), topKeys.indexOf('modules') + 2), ['modules', 'workflow']);
+  assert.match(text, /^workflow:\n  auto_accept: true$/m);
+  assert.deepEqual(parse(text), config);
+});

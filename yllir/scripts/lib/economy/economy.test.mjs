@@ -11,6 +11,7 @@ import {
   checkEconomyDocument,
   checkSheetPrices,
   priceReport,
+  priceProposal,
 } from './economy.mjs';
 
 // ---------------------------------------------------------------------------
@@ -519,5 +520,112 @@ test('priceReport lists out-of-range rows with range, unit and price, sorted by 
       { file: MARA, id: 'mara', item: 'Corda da 15 metri', price: 5, status: 'out-of-range', range: [1, 3], unit: 'scudo' },
       { file: TAGLIA, id: 'taglia', item: '30 dobloni', price: null, status: 'unknown-currency', range: null, unit: 'scudo' },
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// priceProposal
+
+const RATION = ['Razione (un giorno)', 'Rations (one day)'];
+
+/** Economy with one base price row for the reference food, in the given row cells. */
+function rationEconomy(cells = ['2', '2', 'corona']) {
+  return economyIt({
+    prezzi: [...HEAD('Categoria', 'Minimo', 'Massimo', 'Unità'), `| Razione (un giorno) | ${cells.join(' | ')} |`, '| Corda | 1 | 3 | scudo |'],
+  });
+}
+
+const PROPOSAL = { referenceValue: 50, referenceLabels: RATION, systemValue: 1500 };
+
+test('priceProposal scales the reference food price by the ratio of the two values', () => {
+  withCampaign({ [ECON]: rationEconomy() }, (root) => {
+    assert.deepEqual(priceProposal(root, PROPOSAL), {
+      status: 'ok',
+      systemValue: 1500,
+      referenceValue: 50,
+      referenceCategory: 'Razione (un giorno)',
+      referencePrice: 2,
+      unit: 'corona',
+      proposed: 60,
+      unitOfAccount: 'scudo',
+      proposedInUnitOfAccount: 600,
+    });
+  });
+});
+
+test('priceProposal uses the middle of a min-max range and converts it to the unit of account', () => {
+  withCampaign({ [ECON]: rationEconomy(['2', '4', 'corona']) }, (root) => {
+    const result = priceProposal(root, PROPOSAL);
+    assert.equal(result.status, 'ok');
+    assert.equal(result.referencePrice, 3);
+    assert.equal(result.proposed, 90);
+    // corona = 10 scudi: the row is 20-40 scudi, its middle 30 scudi.
+    assert.equal(result.proposedInUnitOfAccount, 900);
+  });
+});
+
+test('priceProposal rounds the proposed price to two decimals', () => {
+  withCampaign({ [ECON]: rationEconomy(['1', '2', 'corona']) }, (root) => {
+    // 100 / 3 * 1.5 is exactly 50.
+    assert.equal(priceProposal(root, { referenceValue: 3, referenceLabels: RATION, systemValue: 100 }).proposed, 50);
+    // 10 / 7 * 1.5 = 2.142857... is rounded to 2.14.
+    assert.equal(priceProposal(root, { referenceValue: 7, referenceLabels: RATION, systemValue: 10 }).proposed, 2.14);
+  });
+});
+
+test('priceProposal with the unit of account as the row currency gives the same number twice', () => {
+  withCampaign({ [ECON]: rationEconomy(['1', '1', 'scudo']) }, (root) => {
+    const result = priceProposal(root, { referenceValue: 50, referenceLabels: RATION, systemValue: 75 });
+    assert.equal(result.status, 'ok');
+    assert.equal(result.unit, 'scudo');
+    assert.equal(result.proposed, 1.5);
+    assert.equal(result.proposedInUnitOfAccount, 1.5);
+  });
+});
+
+test('priceProposal matches the reference label folded, in either adapter language', () => {
+  withCampaign({ [ECON]: rationEconomy() }, (root) => {
+    assert.equal(priceProposal(root, { ...PROPOSAL, referenceLabels: ['  RAZIONE   (un giorno) '] }).status, 'ok');
+    assert.equal(priceProposal(root, { ...PROPOSAL, referenceLabels: ['Rations (one day)'] }).status, 'no-reference-row');
+  });
+});
+
+test('priceProposal without an economy document is no-economy', () => {
+  withCampaign({}, (root) => {
+    const result = priceProposal(root, PROPOSAL);
+    assert.equal(result.status, 'no-economy');
+    assert.equal(typeof result.message, 'string');
+  });
+});
+
+test('priceProposal without a positive finite reference value is no-reference-value', () => {
+  withCampaign({ [ECON]: rationEconomy() }, (root) => {
+    for (const referenceValue of [undefined, null, 0, -50, NaN, Infinity, '50']) {
+      assert.equal(priceProposal(root, { ...PROPOSAL, referenceValue }).status, 'no-reference-value', String(referenceValue));
+    }
+  });
+});
+
+test('priceProposal with a system value that is not a positive finite number is bad-system-value', () => {
+  withCampaign({ [ECON]: rationEconomy() }, (root) => {
+    for (const systemValue of [undefined, 0, -1, NaN, Infinity, '1500']) {
+      assert.equal(priceProposal(root, { ...PROPOSAL, systemValue }).status, 'bad-system-value', String(systemValue));
+    }
+  });
+});
+
+test('priceProposal without a row for the reference food is no-reference-row', () => {
+  withCampaign({ [ECON]: economyIt() }, (root) => {
+    assert.equal(priceProposal(root, PROPOSAL).status, 'no-reference-row');
+    assert.equal(priceProposal(root, { ...PROPOSAL, referenceLabels: [] }).status, 'no-reference-row');
+  });
+});
+
+test('priceProposal with a reference row that has no usable range is no-reference-row', () => {
+  withCampaign({ [ECON]: rationEconomy(['', '2', 'corona']) }, (root) => {
+    assert.equal(priceProposal(root, PROPOSAL).status, 'no-reference-row');
+  });
+  withCampaign({ [ECON]: rationEconomy(['2', '2', 'fiorino']) }, (root) => {
+    assert.equal(priceProposal(root, PROPOSAL).status, 'no-reference-row');
   });
 });

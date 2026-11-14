@@ -5,13 +5,17 @@
 import { buildWorldIndex } from '../world-graph.mjs';
 import { foldForm } from '../fold.mjs';
 import { compareStrings } from '../subjects.mjs';
-import { priceReport } from '../economy/economy.mjs';
+import { priceReport, priceProposal } from '../economy/economy.mjs';
 import { unreachableNodes, forgottenCharacters } from '../plot/doctor.mjs';
+import { loadAdapter, pluginRootFromHere } from '../adapter.mjs';
+import { parseYamlLite } from '../yaml-lite.mjs';
+import fs from 'node:fs';
+import path from 'node:path';
 
 // `encounters [sessionId]` is asynchronous (adapter loaders): it is run by
 // runEncounters in encounters.mjs, which the engine calls for that name.
 const USAGE =
-  'usage: find <text> | at <placeId> | where <id> | related <id> | timeline [from] [to] | sketches | errors | prices | unreachable | forgotten | encounters [sessionId]';
+  'usage: find <text> | at <placeId> | where <id> | related <id> | timeline [from] [to] | sketches | errors | prices | price-proposal <systemValue> | unreachable | forgotten | encounters [sessionId]';
 
 // name -> allowed argument counts
 const QUERIES = {
@@ -23,6 +27,7 @@ const QUERIES = {
   sketches: { min: 0, max: 0 },
   errors: { min: 0, max: 0 },
   prices: { min: 0, max: 0 },
+  'price-proposal': { min: 1, max: 1 },
   unreachable: { min: 0, max: 0 },
   forgotten: { min: 0, max: 0 },
 };
@@ -33,6 +38,12 @@ const ROOT_HANDLERS = {
   prices(root) {
     const report = priceReport(root);
     return { results: report.results, economy: report.economy };
+  },
+  'price-proposal'(root, value) {
+    if (typeof value !== 'string' || !NUMBER_RE.test(value)) {
+      throw new QueryError(`price-proposal must be a number, got "${value}"`);
+    }
+    return { results: [priceProposalFor(root, Number(value))] };
   },
   unreachable(root) {
     return { results: unreachableNodes(root) };
@@ -67,7 +78,7 @@ export function runQuery(root, name, args = []) {
 
   try {
     if (Object.hasOwn(ROOT_HANDLERS, name)) {
-      return { query: name, args: argList, ...ROOT_HANDLERS[name](root) };
+      return { query: name, args: argList, ...ROOT_HANDLERS[name](root, ...argList) };
     }
     const index = buildWorldIndex(root);
     const results = HANDLERS[name](index, ...argList);
@@ -76,6 +87,36 @@ export function runQuery(root, name, args = []) {
     if (err instanceof QueryError) return { query: name, args: argList, error: err.message };
     throw err;
   }
+}
+
+// Price proposal for the campaign's game system. YLLIR_PLUGIN_ROOT, when set, replaces
+// the plugin folder (tests use a temporary one); otherwise the installed plugin is used.
+function priceProposalFor(root, systemValue) {
+  const adapterId = campaignAdapterId(root);
+  if (adapterId === null || adapterId === 'none') {
+    return { status: 'no-adapter', message: 'the campaign has no game system adapter' };
+  }
+  const pluginRoot = process.env.YLLIR_PLUGIN_ROOT || pluginRootFromHere();
+  const loaded = loadAdapter(pluginRoot, adapterId);
+  if (!loaded.ok || loaded.adapter === null) {
+    const first = loaded.errors[0];
+    return { status: 'no-adapter', message: first ? first.message : `adapter ${adapterId} could not be loaded` };
+  }
+  const economy = loaded.adapter.economy ?? {};
+  const referenceLabels = Object.values(economy.reference_item ?? {}).filter((label) => typeof label === 'string');
+  return priceProposal(root, { referenceValue: economy.reference_value, referenceLabels, systemValue });
+}
+
+/** The system.adapter id of campaign.yaml, or null when it is missing or empty. */
+function campaignAdapterId(root) {
+  let text;
+  try {
+    text = fs.readFileSync(path.join(root, 'campaign.yaml'), 'utf8');
+  } catch {
+    return null;
+  }
+  const id = parseYamlLite(text).data?.system?.adapter;
+  return typeof id === 'string' && id !== '' ? id : null;
 }
 
 function countText(min, max) {

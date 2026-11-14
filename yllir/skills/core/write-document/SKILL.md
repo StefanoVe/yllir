@@ -9,11 +9,11 @@ allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(nod
 
 You run this process yourself, in the main conversation. Follow the write cycle in `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/authoring.md` for every command, draft, check, review and commit, and its section 8 (provenance) for every change to an existing document. Do not repeat them: follow them. This process is a batch of one: there is no outline.
 
-Run every command from the campaign root, exactly as written, with nothing added. Write the document in the campaign language. Ask the master a question only when a choice would change who the subject is; otherwise decide, and tell the master what you invented.
+Run every command from the campaign root, exactly as written, with nothing added. Write the document in the campaign language. Ask the master a question only when a choice would change who the subject is; otherwise decide, and tell the master what you invented. The plan confirmation of Step 4b is the one other question, and it is skipped when `workflow.auto_accept` is `true`.
 
 ## Step 1 — Settings and the request
 
-1. Read `campaign.yaml` with the Read tool: `language.main`, `system.adapter`, `campaign.seed`, and the `structure` list (the folder of each category and its type).
+1. Read `campaign.yaml` with the Read tool: `language.main`, `system.adapter`, `campaign.seed`, and the `structure` list (the folder of each category and its type), and `workflow.auto_accept`. `workflow.auto_accept` is `true` only when written as `true`; if the key or the section is missing, it is `false`.
 2. Decide the operation from the request:
    - **create**: a new document;
    - **change**: an existing document the master names or describes;
@@ -56,6 +56,21 @@ Use this step for a character (`npc`, `vendor`), a creature that fights (`enemy`
 - If you are not sure of a rule value, do not guess it: write it in words, and tell the master in the final message which value is not yet exact.
 - The statistic block goes in the public part of the document, in the sections of its template.
 
+## Step 4b — Plan and confirmation
+
+This step runs after Steps 1 to 4 and before any file is written to `.campaign/drafts/`. At this point nothing has been written yet. A request that is only to answer a question, or where the master asked nothing to be changed, never reaches this step.
+
+1. Build the plan from what you already know:
+   - the operation (create, change, expand), and each document that will be created or changed, by name: the main one, and the ones Step 6 will probably touch. For a change, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . related "<id>"` and `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . timeline` here, before the confirmation, as Step 6 says;
+   - what the master said that you will use;
+   - what you will invent;
+   - for a `master` or `played` document, the exact lines that will change.
+2. If `workflow.auto_accept` is `true`: do not ask. Go on to Step 5. In Step 8 the summary says what was done, as always.
+3. If it is `false` (the default): tell the master the plan in the campaign language, in plain words with no technical terms, in at most six short lines: what you will create or change, which other documents the change touches, and what you will invent. Then ask ONE question: whether you can proceed (for example «Procedo?»). Then stop and wait for the answer. Write nothing before the answer.
+4. On a yes: go on to Step 5. On a no or a correction: change the plan with what the master said and ask again; if the master changed the subject, drop the plan. Never write after a no.
+5. The plan is not asked again for the consequences found in Step 6 that were already listed in it. A consequence that was NOT in the plan (a new conflict found while writing) goes into the Step 8 summary; a `master` or `played` conflict keeps the question rule of Step 6.
+6. When `workflow.auto_accept` is `false` and the master says something like «da ora in poi non chiedermelo» or «scrivi senza chiedere», the master is asking to turn auto accept on. Tell the master that the setting is `workflow.auto_accept: true` in `campaign.yaml`, and change it only if the entry skill's rules for configuration changes allow it; otherwise say in one sentence that you cannot change it from here.
+
 ## Step 5 — Write the draft
 
 **Create.** Write `.campaign/drafts/<folder>/<Title>.md` with the Write tool, in the shape of section 4 of `authoring.md`:
@@ -88,6 +103,7 @@ Use this step for a character (`npc`, `vendor`), a creature that fights (`enemy`
 - Shape: exactly as `content-format.md` section 4.11. The title, then `## Valute` (English `## Currencies`), `## Prezzi base` (English `## Base prices`), `## Salari` (English `## Wages`) and `## Variazioni per luogo` (English `## Variations by place`), in this order, then the master block with `### Indicazioni per il master` (English `### Master notes`) and one line that says where the prices come from. A table may keep only its header and separator rows.
 - The currency rules are those of 4.11: one currency per row; exactly one `unità di conto` (English `unit of account`) row, the first currency named unless the master says otherwise; the other equivalences as the master gave them.
 - A reference food from the answer to the economy question: one `Prezzi base` row with `Minimo` = `Massimo` = the stated number (a plain number, for example `1`, not `1 scudo`), with the currency in `Unità`, unless the master gave a range. Empty `## Salari` and `## Variazioni per luogo` tables are valid.
+- A new category row is added from a price the master confirmed (`authoring.md` section 12, the proposal): one row per category, `Categoria` = the generic item name as it appears in sheets, `Minimo` = `Massimo` = the confirmed price as a plain number (a range only if the master gave one), `Unità` = the currency. It goes in the same batch as the sheet that needed the price. A category that already has a row gets no second row.
 - When a change is made to an existing economy document, change only what the master asked, as Step 5 "Change" says.
 - After the economy document is committed, run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" query . prices` and read `results`. Before you change any sheet, show the master the sheets out of range (file, item, price, range), and ask one question: update them? Change them only on a yes, as a change of their own batch.
 

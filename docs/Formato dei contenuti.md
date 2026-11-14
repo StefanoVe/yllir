@@ -690,6 +690,7 @@ I numeri usano il punto come separatore decimale, così il controllo dei prezzi 
 - `Fattore` è un numero positivo; moltiplica l'intervallo dei venditori del luogo.
 - Le tabelle vuote, con solo intestazione e separatore, sono valide.
 - Il cibo di riferimento della domanda iniziale è una riga di `Prezzi base`, con `Minimo` e `Massimo` uguali al prezzo dato dal master: `Razione (un giorno)` con l'adattatore D&D 2024, `Pasto semplice` senza adattatore.
+- **Deciso (2026-11-14): riga aggiunta in seguito.** Una riga di `Prezzi base` può essere aggiunta più tardi, da un prezzo confermato dal master, una per categoria; valgono le stesse regole di colonna.
 
 ```markdown
 <!-- yllir
