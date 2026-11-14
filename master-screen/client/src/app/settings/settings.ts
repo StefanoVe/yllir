@@ -2,6 +2,8 @@ import {
   Component,
   DestroyRef,
   ElementRef,
+  HostListener,
+  ViewChild,
   afterNextRender,
   afterRenderEffect,
   computed,
@@ -10,9 +12,26 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { Check, LoaderCircle, LucideAngularModule, Monitor, Moon, Power, RefreshCw, Sun, TriangleAlert, WifiOff } from 'lucide-angular';
+import { ActivatedRoute } from '@angular/router';
+import {
+  Check,
+  ChevronDown,
+  ChevronRight,
+  LoaderCircle,
+  LucideAngularModule,
+  Monitor,
+  Moon,
+  Power,
+  RefreshCw,
+  Search,
+  Sun,
+  TriangleAlert,
+  WifiOff,
+  X,
+} from 'lucide-angular';
 import type { ChecksResponse, ModuleId, ScreenModel, ScreenSettings, ScreenSettingsPatch, UpdateStatus } from '@shared/types';
 import { ApiService, isApiFailure } from '../core/api.service';
+import { foldText } from '../documents/documents';
 import { BLOCKED_REASON_KEYS, UpdateService } from '../core/update';
 import { PrefsService } from '../core/prefs.service';
 import { SettingsService } from '../core/settings.service';
@@ -159,6 +178,54 @@ export function checkSummary(
   ];
 }
 
+/**
+ * True when the section text contains the filter, ignoring case, accents and the line breaks of the
+ * markup. An empty filter matches every section.
+ */
+export function sectionMatches(sectionText: string, filter: string): boolean {
+  const needle = foldText(filter.trim());
+  if (needle === '') return true;
+  return foldText(sectionText.replace(/\s+/g, ' ')).includes(needle);
+}
+
+/** Storage key of the sections the master has folded. Every read and write is guarded. */
+export const SETTINGS_COLLAPSED_KEY = 'yllir.settings.collapsed';
+
+/** The folded sections as saved; anything unreadable gives an empty list, and the page still works. */
+function readCollapsed(): string[] {
+  try {
+    const raw = localStorage.getItem(SETTINGS_COLLAPSED_KEY);
+    if (raw === null) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Saves the folded sections. Blocked storage is ignored: the choice then lasts only for this page. */
+function writeCollapsed(list: string[]): void {
+  try {
+    localStorage.setItem(SETTINGS_COLLAPSED_KEY, JSON.stringify(list));
+  } catch {
+    // Storage is not available (private window, blocked site data): nothing to keep.
+  }
+}
+
+/** Text entry: keys typed here belong to the element, never to the page shortcuts. */
+function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  if (target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true;
+  if (target instanceof HTMLInputElement) {
+    return !['checkbox', 'radio', 'range', 'button', 'submit', 'reset'].includes(target.type);
+  }
+  return false;
+}
+
+/** The sections that have a Reset button, by their page id. */
+const RESETTABLE: Record<string, SectionKey> = { 's-table': 'table', 's-combat': 'combat', 's-music': 'music', 's-appearance': 'ui' };
+
 @Component({
   selector: 'ms-settings',
   imports: [LucideAngularModule],
@@ -175,7 +242,11 @@ export class Settings {
   readonly updates = inject(UpdateService);
   readonly i18n = inject(I18n);
 
-  readonly icons = { Check, LoaderCircle, Monitor, Moon, Power, RefreshCw, Sun, TriangleAlert, WifiOff };
+  readonly icons = { Check, ChevronDown, ChevronRight, LoaderCircle, Monitor, Moon, Power, RefreshCw, Search, Sun, TriangleAlert, WifiOff, X };
+  @ViewChild('searchField') private searchField?: ElementRef<HTMLInputElement>;
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  /** The section named by the URL fragment (`/settings#s-appearance`), applied once it is on the page. */
+  private pendingFragment: string | null = this.route?.snapshot.fragment ?? null;
   readonly themeOptions = THEME_OPTIONS;
   readonly modelOptions = MODEL_OPTIONS;
   readonly densityOptions = DENSITY_OPTIONS;
@@ -198,6 +269,14 @@ export class Settings {
   readonly checkError = signal<string | null>(null);
   readonly checking = signal(false);
   readonly activeId = signal('s-table');
+  /** The search text as typed. A text with only spaces is no search. */
+  readonly query = signal('');
+  readonly searchActive = computed(() => this.query().trim() !== '');
+  /** The ids of the sections that match the search, or null when no search is active. */
+  readonly searchIds = signal<string[] | null>(null);
+  readonly filterFocused = signal(false);
+  /** The folded sections, saved in localStorage. A search shows every section regardless. */
+  readonly collapsed = signal<string[]>(readCollapsed());
   /** Stop button: the first click arms it for a few seconds, the second one stops the process. */
   readonly quitArmed = signal(false);
   readonly quitting = signal(false);
@@ -249,6 +328,12 @@ export class Settings {
     { id: 's-checks', label: 'settings.checks' },
     { id: 's-about', label: 'settings.about' },
   ]);
+  /** The table of contents while a search is active: only the matching sections. */
+  readonly visibleToc = computed<TocItem[]>(() => {
+    const ids = this.searchIds();
+    return ids === null ? this.tocItems() : this.tocItems().filter((item) => ids.includes(item.id));
+  });
+  readonly searchCount = computed(() => this.searchIds()?.length ?? 0);
 
   private observer: IntersectionObserver | null = null;
 
@@ -261,7 +346,10 @@ export class Settings {
     afterNextRender(() => this.startScrollSpy());
     afterRenderEffect(() => {
       this.tocItems();
-      untracked(() => this.observeSections());
+      untracked(() => {
+        this.observeSections();
+        this.openFragment();
+      });
     });
     inject(DestroyRef).onDestroy(() => this.observer?.disconnect());
     void this.loadChecks();
@@ -488,7 +576,93 @@ export class Settings {
   jump(event: Event, id: string): void {
     event.preventDefault();
     this.activeId.set(id);
+    this.expandSection(id);
     const target = this.host.nativeElement.querySelector<HTMLElement>(`#${id}`);
     target?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }
+
+  // Search.
+
+  /** Filters the sections by the text typed; the search is applied to what the page shows now. */
+  onSearch(value: string): void {
+    this.query.set(value);
+    this.searchIds.set(this.searchActive() ? this.matchingIds(value) : null);
+  }
+
+  clearSearch(): void {
+    this.query.set('');
+    this.searchIds.set(null);
+    this.searchField?.nativeElement.focus();
+  }
+
+  private matchingIds(filter: string): string[] {
+    const ids: string[] = [];
+    this.host.nativeElement.querySelectorAll<HTMLElement>('section[id]').forEach((section) => {
+      if (sectionMatches(section.textContent ?? '', filter)) ids.push(section.id);
+    });
+    return ids;
+  }
+
+  isShown(id: string): boolean {
+    const ids = this.searchIds();
+    return ids === null || ids.includes(id);
+  }
+
+  /** The `/` key focuses the search, unless the master is already typing or a dialog is open. */
+  @HostListener('document:keydown', ['$event'])
+  onSlashKey(event: KeyboardEvent): void {
+    if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey) return;
+    if (isTextEntry(event.target) || document.querySelector('dialog[open], [aria-modal="true"]') !== null) return;
+    event.preventDefault();
+    this.searchField?.nativeElement.focus();
+  }
+
+  // Collapsing.
+
+  /** A section is open while a search is active, wherever the master folded it. */
+  isCollapsed(id: string): boolean {
+    return !this.searchActive() && this.collapsed().includes(id);
+  }
+
+  /** Opens or closes one section. Ignored while a search is active. */
+  toggleSection(id: string): void {
+    if (this.searchActive()) return;
+    const list = this.collapsed();
+    this.setCollapsed(list.includes(id) ? list.filter((item) => item !== id) : [...list, id]);
+  }
+
+  collapseAll(): void {
+    this.setCollapsed(this.tocItems().map((item) => item.id));
+  }
+
+  expandAll(): void {
+    this.setCollapsed([]);
+  }
+
+  private expandSection(id: string): void {
+    if (this.collapsed().includes(id)) this.setCollapsed(this.collapsed().filter((item) => item !== id));
+  }
+
+  private setCollapsed(list: string[]): void {
+    this.collapsed.set(list);
+    writeCollapsed(list);
+  }
+
+  /** The "Changed" dot: only for the sections that have a Reset button, and only when they differ from the defaults. */
+  isChanged(id: string): boolean {
+    const key = RESETTABLE[id];
+    return key !== undefined && !this.sectionIsDefault(key);
+  }
+
+  // Deep link: `/settings#s-appearance` opens that section and scrolls to it, once it is on the page.
+
+  private openFragment(): void {
+    const id = this.pendingFragment;
+    if (id === null || !this.tocItems().some((item) => item.id === id)) return;
+    const target = this.host.nativeElement.querySelector<HTMLElement>(`#${id}`);
+    if (!target) return;
+    this.pendingFragment = null;
+    this.expandSection(id);
+    target.scrollIntoView?.({ block: 'start' });
   }
 }
