@@ -232,3 +232,18 @@ describe('Shell density, motion and start page', () => {
     expect(router.url).toBe('/plot');
   });
 });
+
+describe('Shell logo', () => {
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('shows the Yllir logo as the first child of the rail, decorative only', () => {
+    const fixture = create(ALL_MODULES).fixture;
+    const rail = fixture.nativeElement.querySelector('nav.rail') as HTMLElement;
+    const logo = rail.querySelector('img.rail-logo') as HTMLImageElement | null;
+    expect(logo).not.toBeNull();
+    expect(rail.firstElementChild).toBe(logo);
+    expect(logo?.getAttribute('alt')).toBe('');
+  });
+});

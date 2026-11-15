@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 40 512 420">
+<defs><clipPath id="d"><path d="M16 300 Q256 250 496 300 Q496 420 256 440 Q16 420 16 300Z"/></clipPath></defs>
+<g clip-path="url(#d)">
+<rect width="512" height="512" fill="#F2C77E"/>
+<path d="M0 330 Q130 296 256 332 T512 318 V512 H0Z" fill="#E3A659"/>
+<path d="M0 382 Q130 346 270 384 T512 366 V512 H0Z" fill="#C98440"/>
+<path d="M300 306 L520 346 V420 L330 380Z" fill="#C98440"/>
+</g>
+<path d="M146 120 V300 A110 30 0 0 0 366 300 V120Z" fill="#D2692F"/>
+<path d="M294.5 148.2 V328.2 A110 30 0 0 0 366 300 V120Z" fill="#A24D22"/>
+<path d="M226 328 V240 A30 30 0 0 1 286 240 V328Z" fill="#2E1A0F"/>
+<ellipse cx="256" cy="120" rx="110" ry="30" fill="#A24D22"/>
+<rect x="352.1" y="88.4" width="24" height="32" fill="#A24D22"/><rect x="331.6" y="75.9" width="24" height="32" fill="#A24D22"/><rect x="292.9" y="67.1" width="24" height="32" fill="#A24D22"/><rect x="244.0" y="64.0" width="24" height="32" fill="#A24D22"/><rect x="195.1" y="67.1" width="24" height="32" fill="#A24D22"/><rect x="156.4" y="75.9" width="24" height="32" fill="#A24D22"/><rect x="135.9" y="88.4" width="24" height="32" fill="#A24D22"/>
+<ellipse cx="256" cy="120" rx="96" ry="22" fill="#2E1A0F"/>
+<rect x="352.1" y="99.6" width="24" height="34" fill="#A24D22"/><rect x="331.6" y="112.1" width="24" height="34" fill="#A24D22"/><rect x="292.9" y="120.9" width="24" height="34" fill="#A24D22"/><rect x="244.0" y="124.0" width="24" height="34" fill="#D2692F"/><rect x="195.1" y="120.9" width="24" height="34" fill="#D2692F"/><rect x="156.4" y="112.1" width="24" height="34" fill="#D2692F"/><rect x="135.9" y="99.6" width="24" height="34" fill="#D2692F"/></svg>

@@ -27,6 +27,17 @@
   border-right: var(--border-width) solid var(--color-border);
 }
 
+/* The logo sits at the top of the rail. Decorative only: no pointer, no selection. */
+.rail-logo {
+  display: block;
+  width: 40px;
+  height: auto;
+  flex: 0 0 auto;
+  margin-bottom: var(--space-1);
+  pointer-events: none;
+  user-select: none;
+}
+
 /* Square 40 px buttons, no border. The focus outline (2 px + 2 px offset) fits inside the rail's padding. */
 .rail-item {
   position: relative;
@@ -190,6 +201,11 @@
     border-right: 0;
     border-top: var(--border-width) solid var(--color-border-strong);
     padding-bottom: calc(var(--space-1) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* The bottom bar has no logo. */
+  .rail-logo {
+    display: none;
   }
 
   /* Groups are not drawn on the bottom bar. */
