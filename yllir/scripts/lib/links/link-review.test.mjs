@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { planReview, applyReview } from './link-review.mjs';
+import { checkLinks } from './check-links.mjs';
 import { ensureRepo, saveVersion, listVersions } from '../versions.mjs';
 
 const CAMPAIGN = [
@@ -86,16 +87,24 @@ test('plan output has evidence and sheet excerpt, and no master-only text', () =
   });
 });
 
-test('a proposal inside master-only text has empty before and after and is OMIT-only', () => {
+test('a proposal inside master-only text is a normal proposal, marked in_master', () => {
   const line = `Riservato: Teodo Marr e' il traitore.`;
   withCampaign({ 'Trama/Nota.md': `# Nota\n\n<!-- master -->\n${line}\n<!-- /master -->\n` }, (root) => {
     const result = planReview(root, { files: ['Trama/Nota.md'] });
     assert.equal(result.count, 1);
     const [item] = result.proposals;
     assert.equal(item.in_master, true);
-    assert.equal(item.before, '');
-    assert.equal(item.after, '');
-    assert.equal(JSON.stringify(result).includes('traitore'), false);
+    assert.equal(item.text, 'Teodo Marr');
+    assert.equal(item.after, `Riservato: ${LINK} e' il traitore.`);
+  });
+});
+
+test('a mention in a heading is a normal proposal', () => {
+  withCampaign({ 'Trama/Nota.md': '# Nota\n\n## Visita a Teodo Marr\n' }, (root) => {
+    const result = planReview(root, { files: ['Trama/Nota.md'] });
+    assert.equal(result.count, 1);
+    assert.equal(result.proposals[0].line, 3);
+    assert.equal(result.proposals[0].in_master, false);
   });
 });
 
@@ -150,24 +159,37 @@ test('OMIT and ASK leave the file unchanged, ASK is listed, and nothing is saved
   });
 });
 
-test('an OMIT on a master-only proposal is accepted, and any other outcome on it is refused', () => {
+test('an APPLY on a master-only proposal links the text inside the master block', () => {
   const line = `Riservato: Teodo Marr e' il traitore.`;
   const original = `# Nota\n\n<!-- master -->\n${line}\n<!-- /master -->\n`;
   withRepo({ 'Trama/Nota.md': original }, (root) => {
     const plan = planReview(root, { files: ['Trama/Nota.md'] });
     const pid = plan.proposals[0].pid;
-    const apply = outcomesFile(root, [{ id: pid, outcome: 'APPLY', reason: 'looks linkable' }]);
-    const refused = applyReview(root, { outcomesFile: apply, message: 'Links: Nota' });
-    assert.equal(refused.ok, false);
-    assert.equal(refused.rejected.length, 1);
-    assert.equal(read(root, 'Trama/Nota.md'), original);
-
-    // The plan was kept (not ok), so the same pid is still there to omit.
-    const omit = outcomesFile(root, [{ id: pid, outcome: 'OMIT', reason: 'master-only line' }]);
-    const accepted = applyReview(root, { outcomesFile: omit, message: 'Links: Nota' });
-    assert.equal(accepted.ok, true, JSON.stringify(accepted));
-    assert.equal(read(root, 'Trama/Nota.md'), original);
+    const apply = outcomesFile(root, [{ id: pid, outcome: 'APPLY', reason: 'the subject is named here' }]);
+    const result = applyReview(root, { outcomesFile: apply, message: 'Links: Nota' });
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.deepEqual(result.applied, [pid]);
+    assert.equal(read(root, 'Trama/Nota.md'), original.replace('Teodo Marr', LINK));
   });
+});
+
+test('a linked heading keeps its anchor: the link to #visita-a-teodo-marr resolves', () => {
+  withRepo(
+    {
+      'Trama/Nota.md': '# Nota\n\n## Visita a Teodo Marr\n\nTesto.\n',
+      'Trama/Altro.md': '# Altro\n\nVedi [la visita](Nota.md#visita-a-teodo-marr).\n',
+    },
+    (root) => {
+      const TRAMA = { files: ['Trama/Nota.md', 'Trama/Altro.md'] }; // the fixture sheet has its own master-block error
+      assert.deepEqual(checkLinks(root, TRAMA).errors, []);
+      const plan = planReview(root, { files: ['Trama/Nota.md'] });
+      const outcomes = outcomesFile(root, [{ id: plan.proposals[0].pid, outcome: 'APPLY', reason: 'the subject is named in the heading' }]);
+      const result = applyReview(root, { outcomesFile: outcomes, message: 'Links: Nota' });
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(read(root, 'Trama/Nota.md'), `# Nota\n\n## Visita a ${LINK}\n\nTesto.\n`);
+      assert.deepEqual(checkLinks(root, TRAMA).errors, []);
+    },
+  );
 });
 
 test('an unknown id is rejected and the file is not changed', () => {

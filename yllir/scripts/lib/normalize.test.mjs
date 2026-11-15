@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeForm, slugify, headingAnchor } from './normalize.mjs';
+import { normalizeForm, slugify, headingAnchor, plainHeadingText } from './normalize.mjs';
 
 test('normalizeForm examples', () => {
   assert.equal(normalizeForm('Torre dell’Àscia'), "torre dell'ascia");
@@ -42,4 +42,10 @@ test('headingAnchor examples', () => {
 
 test('headingAnchor does not collapse spaces or keep punctuation', () => {
   assert.equal(headingAnchor(' A  B - C_d! '), 'a--b---c_d');
+});
+
+test('plainHeadingText keeps the label of each link, so the anchor is the one of the visible text', () => {
+  assert.equal(plainHeadingText('Visita a [Teodo Marr](../People/Teodo%20Marr.md)'), 'Visita a Teodo Marr');
+  assert.equal(headingAnchor(plainHeadingText('Visita a [Teodo Marr](../People/Teodo%20Marr.md)')), 'visita-a-teodo-marr');
+  assert.equal(plainHeadingText('Senza link'), 'Senza link');
 });

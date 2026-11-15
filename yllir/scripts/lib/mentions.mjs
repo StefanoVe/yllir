@@ -23,8 +23,6 @@ const STATES = [
   'linked-elsewhere',
   'ambiguous',
   'self',
-  'excluded-title',
-  'excluded-italic',
   'excluded-code',
   'excluded-comment',
   'excluded-image',
@@ -181,16 +179,16 @@ function classifyGroup(group, line, map, file, campaignRoot, index) {
     ...base,
     state,
     ...extra,
-    in_master: line.inMaster,
+    in_master: line.inMaster, // informational: master-block text is linked like any other
   });
 
-  // Rules 1-4: the block decides. Table lines fall through to the span rules.
-  if (line.block === 'heading') return finish('excluded-title');
+  // Rules 1-3: the block decides. Headings, italic paragraphs and the master block are
+  // ordinary text for linking. Table lines fall through to the span rules.
   if (line.block === 'code') return finish('excluded-code');
   if (line.block === 'mermaid') return finish('excluded-diagram');
   if (line.block === 'comment') return finish('excluded-comment');
 
-  // Rule 6: inline spans.
+  // Rule 4: inline spans.
   const span = line.spans.find((s) => s.start <= colStart && colEnd <= s.end);
   if (span) {
     if (span.kind === 'code') return finish('excluded-code');
@@ -215,16 +213,15 @@ function classifyGroup(group, line, map, file, campaignRoot, index) {
     }
   }
 
-  // Rule 7: narrative italic paragraph.
-  if (line.block === 'paragraph' && line.italic) return finish('excluded-italic');
+  // Rule 5: the subject's own sheet. In a homonym group, a sheet of one of the candidates
+  // (only its heading counts as self; body mentions stay ambiguous).
+  const ownSheet = group.members.some((m) => m.subject.sheet === file || m.subject.paths?.includes(file));
+  if (ownSheet && (!isHomonym || line.block === 'heading')) return finish('self');
 
-  // Rule 8: the subject's own sheet (single subjects only).
-  if (!isHomonym && (member.subject.sheet === file || member.subject.paths?.includes(file))) return finish('self');
-
-  // Rule 9: homonyms.
+  // Rule 6: homonyms.
   if (isHomonym) return finish('ambiguous', { candidates: memberIds });
 
-  // Rule 10: an alias that is also a word inside another subject's form.
+  // Rule 7: an alias that is also a word inside another subject's form.
   if (member.form.kind === 'alias') {
     const others = otherSubjectsSharing(member.form.folded, member.subject.id, index.subjects);
     if (others.length > 0) {
@@ -233,7 +230,7 @@ function classifyGroup(group, line, map, file, campaignRoot, index) {
     }
   }
 
-  // Rule 11.
+  // Rule 8.
   return finish('bare');
 }
 

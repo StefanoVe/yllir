@@ -63,12 +63,26 @@ function inFile(result, file) {
   return result.occurrences.filter((o) => o.file === file);
 }
 
-test('rule 1: heading gives excluded-title', () => {
-  const { result } = scan({ 'Plot/Trama.md': '# Trama\n\n## Oria Valdes\n' });
-  const [occ] = inFile(result, 'Plot/Trama.md');
-  assert.equal(occ.state, 'excluded-title');
-  assert.equal(occ.subject, 'oria-valdes');
-  assert.equal(occ.line, 3);
+test('rule 1: a mention in a heading is bare, like any text', () => {
+  const { result } = scan({ 'Plot/Trama.md': '# Trama\n\n## Oria Valdes\n\n### Visita a Morvalle\n' });
+  const occ = inFile(result, 'Plot/Trama.md');
+  assert.deepEqual(
+    occ.map((o) => [o.line, o.subject, o.state]),
+    [
+      [3, 'oria-valdes', 'bare'],
+      [5, 'morvalle', 'bare'],
+    ],
+  );
+});
+
+test('rule 1: a level-1 heading in a homonym sheet is self, not ambiguous', () => {
+  const { result } = scan({
+    'People/Lino A.md': subject('lino-a', 'Lino Valdes'),
+    'People/Lino B.md': subject('lino-b', 'Lino Valdes'),
+  });
+  // The title "# Lino Valdes" (line 5) of each candidate's own sheet is not a mention of the other.
+  assert.deepEqual(inFile(result, 'People/Lino A.md').map((o) => [o.line, o.state]), [[5, 'self']]);
+  assert.deepEqual(inFile(result, 'People/Lino B.md').map((o) => [o.line, o.state]), [[5, 'self']]);
 });
 
 test('rule 2: code block gives excluded-code', () => {
@@ -144,10 +158,11 @@ test('rule 6: link label gives linked or linked-elsewhere, link target is droppe
   assert.equal(occ[1].link_target, 'Plot/Trama.md');
 });
 
-test('rule 7: narrative italic paragraph gives excluded-italic', () => {
+test('rule 1: a mention in a narrative italic paragraph is bare', () => {
   const { result } = scan({ 'Plot/Ital.md': '_Oria Valdes cammina nella cenere._\n' });
   const [occ] = inFile(result, 'Plot/Ital.md');
-  assert.equal(occ.state, 'excluded-italic');
+  assert.equal(occ.state, 'bare');
+  assert.equal(occ.subject, 'oria-valdes');
 });
 
 test('rule 8: the subject own sheet gives self', () => {
@@ -158,7 +173,7 @@ test('rule 8: the subject own sheet gives self', () => {
   assert.deepEqual(
     own.map((o) => [o.line, o.state]),
     [
-      [5, 'excluded-title'],
+      [5, 'self'],
       [7, 'self'],
     ],
   );
@@ -256,7 +271,7 @@ test('three mentions in one line are all reported', () => {
   assert.ok(occ.every((o) => o.state === 'bare' && o.in_master === false));
 });
 
-test('in_master is true inside the master block', () => {
+test('in_master is true inside the master block, and the mention is bare (linkable)', () => {
   const { result } = scan({
     'Plot/Master.md': '<!-- master -->\n## Master\nOria Valdes e\' il traitore.\n<!-- /master -->\n',
   });
@@ -264,6 +279,29 @@ test('in_master is true inside the master block', () => {
   assert.equal(occ.line, 3);
   assert.equal(occ.in_master, true);
   assert.equal(occ.state, 'bare');
+  assert.equal(occ.subject, 'oria-valdes');
+});
+
+test('a mention in a master-block heading is bare too', () => {
+  const { result } = scan({
+    'Plot/MasterHead.md': '<!-- master -->\n## Master\n### Note su Morvalle\nSegreto.\n<!-- /master -->\n',
+  });
+  const [occ] = inFile(result, 'Plot/MasterHead.md');
+  assert.equal(occ.line, 3);
+  assert.equal(occ.in_master, true);
+  assert.equal(occ.state, 'bare');
+});
+
+test('code and HTML comments stay excluded inside a master block and in headings', () => {
+  const { result } = scan({
+    'Plot/Keep.md': '# Oria Valdes `codice`\n<!-- master -->\n## Master\n```\nOria Valdes\n```\n<!-- Morvalle -->\n<!-- /master -->\n',
+  });
+  const states = inFile(result, 'Plot/Keep.md').map((o) => [o.line, o.state]);
+  assert.deepEqual(states, [
+    [1, 'bare'],
+    [5, 'excluded-code'],
+    [7, 'excluded-comment'],
+  ]);
 });
 
 test('line and col are correct with frontmatter present', () => {
@@ -325,8 +363,6 @@ test('summary has every state, with zero when absent', () => {
     'excluded-comment',
     'excluded-diagram',
     'excluded-image',
-    'excluded-italic',
-    'excluded-title',
     'linked',
     'linked-elsewhere',
     'self',

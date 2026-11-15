@@ -286,6 +286,25 @@ test('public chronicle: master-only subject is not linked, normal subject is', (
   );
 });
 
+test('mentions in a heading and in master-only text are proposals', () => {
+  withCampaign(
+    {
+      ...BASE,
+      'Trama/Nota.md': '# Visita a Teodo Marr\n\n<!-- master -->\n## Master\n### Segreto\nTeodo Marr e\' il traitore.\n<!-- /master -->\n',
+    },
+    (root) => {
+      const plan = planLinks(root);
+      assert.deepEqual(
+        plan.proposals.map((p) => [p.file, p.line, p.in_master]),
+        [
+          ['Trama/Nota.md', 1, false],
+          ['Trama/Nota.md', 6, true],
+        ],
+      );
+    },
+  );
+});
+
 test('master-only subject stays in the subject index', () => {
   withCampaign(MASTER_BASE, (root) => {
     const index = buildSubjectIndex(root);

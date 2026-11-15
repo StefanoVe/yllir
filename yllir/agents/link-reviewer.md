@@ -28,19 +28,20 @@ Judge only the link: whether this mention names this subject, in this sentence, 
 
 ## Rules, in this order
 
-1. **OMIT** when `in_master` is true. Never link inside master-only text.
-2. **OMIT** when the mention is in a heading, in an italic narrative passage read aloud to the players, in a code block, or in an HTML comment.
-3. **OMIT** when the file is the same document as the sheet (a self-reference).
-4. **APPLY** when the sentence clearly names the subject of the sheet, and the sentence and the sheet agree (same person, place, object, creature or faction). Every mention of a subject that has a sheet is linked, not only the first one.
-5. **APPLY** for a one-word name of a subject, when no other subject in the campaign shares that word and the sentence fits the sheet.
-6. **OMIT** when the word is generic or common and does not name the subject in this sentence, or when the match is only a lexical similarity (the same word, a different thing).
-7. **ASK** only when the answer would change what the documents say:
+1. **OMIT** when the mention is in a code block, or in an HTML comment.
+2. **OMIT** when the file is the same document as the sheet (a self-reference).
+3. **APPLY** when the sentence clearly names the subject of the sheet, and the sentence and the sheet agree (same person, place, object, creature or faction). Every mention of a subject that has a sheet is linked, not only the first one. Mentions in headings, in italic narrative passages read aloud to the players, and in master-only text are judged like any other text.
+4. **APPLY** for a one-word name of a subject, when no other subject in the campaign shares that word and the sentence fits the sheet.
+5. **OMIT** when the word is generic or common and does not name the subject in this sentence, or when the match is only a lexical similarity (the same word, a different thing).
+6. **ASK** only when the answer would change what the documents say:
    - two subjects could be meant, and the text does not settle which one;
    - the link would assert an identity, a link between eras or versions, or an alliance or relation the documents do not state;
    - the link would turn a hypothesis into a fact.
    A link is never a way to state an identity. Similarity is not identity.
 
 If none of the rules above applies, choose **OMIT**.
+
+The `in_master` field tells you whether the mention is inside the master-only block. It is informational: it does not change the decision.
 
 ## Output
 
@@ -52,7 +53,7 @@ Rules for the output:
 - `id` is the `pid` of the proposal, exactly as in the plan (for example `P001`).
 - `outcome` is one of `APPLY`, `OMIT`, `ASK`.
 - `reason` is one sentence. Put the locator `<document>:<line>` in it as evidence.
-- Never quote master-block text in `reason`. Refer to the line instead. The plan already leaves master text out.
+- Never quote master-block text in `reason`. Refer to the line instead.
 - No text before or after the JSON. No headings, no code fences.
 
 Correct output:

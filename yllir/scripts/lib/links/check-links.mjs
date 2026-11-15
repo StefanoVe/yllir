@@ -7,7 +7,7 @@ import path from 'node:path';
 import { readStructure, listCanonicalSheets, canonicalInternalPath, compareStrings, masterOnlyChecker } from '../subjects.mjs';
 import { parseFrontmatter } from '../frontmatter.mjs';
 import { analyzeMarkdown } from '../zones.mjs';
-import { headingAnchor } from '../normalize.mjs';
+import { headingAnchor, plainHeadingText } from '../normalize.mjs';
 
 const SCHEME = /^[a-z][a-z0-9+.-]*:/i;
 
@@ -165,7 +165,7 @@ function analyzeDoc(text) {
   for (const line of zones.lines) {
     if (line.block === 'master-open') hasMaster = true;
     if (line.block !== 'heading') continue;
-    const base = headingAnchor(line.headingText);
+    const base = headingAnchor(plainHeadingText(line.headingText));
     const count = seen.get(base) ?? 0;
     seen.set(base, count + 1);
     anchors.add(count === 0 ? base : `${base}-${count}`);

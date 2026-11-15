@@ -30,6 +30,16 @@ export function slugify(s) {
 }
 
 /**
+ * Heading text as plain text for anchors: each Markdown link `[label](target)`
+ * becomes its label, so the anchor of `## Visit to [Name](x.md)` is that of `Visit to Name`.
+ * @param {string} s
+ * @returns {string}
+ */
+export function plainHeadingText(s) {
+  return s.replace(/\[([^\]]*)\]\([^)]*\)/g, '$1');
+}
+
+/**
  * GitHub-style anchor for a Markdown heading text.
  * Accents are kept; each space becomes `-` (no collapsing).
  * @param {string} s

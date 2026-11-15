@@ -99,13 +99,13 @@ test('a name with a lowercase word is uncertain', () => {
   );
 });
 
-test('a proposal in master-only text is uncertain', () => {
+test('a proposal in master-only text is safe like any other proposal', () => {
   withCampaign(SAFE_FILES, (root) => {
     const plan = planLinks(root);
     plan.proposals[0].in_master = true;
     const { outcomes, uncertain } = autoOutcomes(root, plan);
-    assert.deepEqual(outcomes, []);
-    assert.deepEqual(uncertain, ['P001']);
+    assert.deepEqual(outcomes.map((o) => o.id), ['P001']);
+    assert.deepEqual(uncertain, []);
   });
 });
 

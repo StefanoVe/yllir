@@ -3,7 +3,8 @@
 // each one and the sheet it points to, and saves the plan with its pids.
 // applyReview takes the reviewer's outcomes (id, outcome, reason only), fills the
 // rest from the saved plan, applies them with applyLinks and saves one version
-// when links were written. Master-only text never goes to the reviewer.
+// when links were written. The sheet excerpt leaves out master-only text; mentions
+// inside master-only text of a document are reviewed like any other text.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -173,11 +174,6 @@ export function planReview(root, { files = [], out = DEFAULT_PLAN_FILE } = {}) {
       evidence: info.evidence,
       sheet_excerpt: info.excerpt,
     };
-    if (p.in_master) {
-      item.before = '';
-      item.after = '';
-      item.in_master = true;
-    }
     return item;
   });
 
@@ -253,16 +249,11 @@ export function applyReview(root, { outcomesFile, planFile = DEFAULT_PLAN_FILE, 
   const byPid = new Map(plan.proposals.map((p) => [p.pid, p]));
   const cache = new Map();
   const outcomes = [];
-  const masterRejected = [];
   for (const entry of outcomesRaw) {
     const proposal = isPlainObject(entry) && typeof entry.id === 'string' ? byPid.get(entry.id) : undefined;
     if (proposal === undefined) {
       // Unknown or malformed entries go through unchanged, so applyLinks rejects them.
       outcomes.push(entry);
-      continue;
-    }
-    if (proposal.in_master && entry.outcome !== 'OMIT') {
-      masterRejected.push({ entry, reason: 'master-only text: the only allowed outcome is OMIT' });
       continue;
     }
     outcomes.push({
@@ -286,7 +277,7 @@ export function applyReview(root, { outcomesFile, planFile = DEFAULT_PLAN_FILE, 
     saved = version.saved ? { hash: version.hash } : null;
   }
 
-  const ok = result.ok && masterRejected.length === 0;
+  const ok = result.ok;
   if (ok) fs.rmSync(planFull, { force: true });
 
   const detail = (pid) => {
@@ -300,7 +291,7 @@ export function applyReview(root, { outcomesFile, planFile = DEFAULT_PLAN_FILE, 
     omit: result.omit,
     ask: result.ask.map(detail),
     missing_outcome: result.missing_outcome,
-    rejected: [...masterRejected, ...result.rejected],
+    rejected: result.rejected,
     skipped: result.skipped,
     residual_unexplained: result.residual_unexplained.map((p) => p.pid),
     saved,

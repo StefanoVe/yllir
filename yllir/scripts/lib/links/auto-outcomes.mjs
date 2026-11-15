@@ -1,6 +1,6 @@
 // Accepts without the reviewer the proposals that are obviously safe, and leaves
 // every other proposal UNCERTAIN, for the reviewer agent. A safe proposal is a full
-// proper name of one subject, outside master-only text, whose sheet is a regular
+// proper name of one subject, whose sheet is a regular
 // file of the campaign, and whose position no other proposal shares. Nothing here
 // writes a file: the caller saves the outcomes and applies them with applyLinks.
 
@@ -67,7 +67,6 @@ export function autoOutcomes(campaignRoot, plan) {
   for (const p of plan.proposals) {
     const samePosition = positionCount.get(`${p.file}|${p.line}|${p.col}`);
     const safe =
-      p.in_master === false &&
       isFullProperName(p.text) &&
       samePosition === 1 &&
       isCampaignFile(campaignRoot, p.sheet);
