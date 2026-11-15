@@ -352,7 +352,10 @@ export interface LiveSnapshot {
 
 export interface PlotNode { id: string; kind: 'session' | 'scene'; title: string; path: string; session?: string; status?: string }
 export interface PlotEdge { from: string; to: string; kind: 'depends' | 'order' } // 'depends' = declared depends_on; 'order' = only file order
-export interface PlotResponse { nodes: PlotNode[]; edges: PlotEdge[] }
+/** A node of the plot flowchart: its id is the Mermaid node id, its path the sheet it opens. Never a body. */
+export interface PlotFlowNode { id: string; path: string; title: string; kind: 'session' | 'scene'; status?: 'played' | 'ready' | 'waiting' }
+/** GET /api/plot: the Mermaid source of the plot flowchart (with status classes), its clickable nodes, `missing` when there is no file. */
+export interface PlotResponse { mermaid: string; nodes: PlotFlowNode[]; missing: boolean }
 /** One sheet of the plot in navigator order (sessions, each followed by its scenes). Never a body. */
 export interface PlotSheet { path: string; title: string; kind: 'session' | 'scene'; session?: string }
 export interface PlotSheetsResponse { sheets: PlotSheet[] }

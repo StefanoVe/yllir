@@ -81,6 +81,10 @@ Follow section 7 of `authoring.md` with ONE batch:
 - `--files`: every draft path written in this step (documents, sketches, `campaign.yaml` if the factions entry was added, the seed if changed), campaign-relative, without `.campaign/drafts/`. Never `outline.md`.
 - `--message`: one sentence in the campaign language, for example `Mondo: Borgo Cenere, Teodo Marr e la Gilda del sale.`
 
+## Step 6a — Plot map
+
+When this batch created a session or a scene, or changed the `depends_on` of one, follow section 7b of `authoring.md` after the commit. Say nothing to the master about it.
+
 ## Step 6b — Item illustrations
 
 Runs only after Step 6 has saved the batch, and only when `workflow.auto_item_images` is not `false`. The full rule is in `write-document` Step 7b; this is what applies here.

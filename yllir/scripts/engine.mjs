@@ -15,6 +15,7 @@
 //   change-draft <root> --op merge --subject <survivor> --other <id>   (two sheets become one; writes the drafts)
 //   links <root> --files "a,b" [--out .campaign/state/link-review.json]   (plan mode: the mentions the engine did not link, for review)
 //   links <root> --apply <outcomes-file> --message "<text>" [--plan .campaign/state/link-review.json]   (apply mode: the reviewer's outcomes)
+//   plot-flowchart <root>   (checks the plot flowchart file against the plot graph; prints the errors, exit 1 when there are any)
 // Exit codes: 0 ok, 1 campaign problem (ok:false, or a query error), 2 usage or internal error.
 
 import fs from 'node:fs';
@@ -27,6 +28,7 @@ import { planReview, applyReview, DEFAULT_PLAN_FILE } from './lib/links/link-rev
 import { runQuery } from './lib/engine/query.mjs';
 import { runEncounters } from './lib/engine/encounters.mjs';
 import { buildSubjectIndex } from './lib/subjects.mjs';
+import { checkPlotFlowchart } from './lib/plot/plot-flowchart.mjs';
 import { buildWorldIndex, writeWorldIndex } from './lib/world-graph.mjs';
 import { exitWith } from './lib/cli-exit.mjs';
 
@@ -42,6 +44,7 @@ const USAGE = [
   '  change-draft <root> --op rename|delete|merge --subject <id> [--title "<new title>"] [--other <id>]',
   '  links <root> --files "a,b" [--out .campaign/state/link-review.json]',
   '  links <root> --apply <outcomes-file> --message "<text>" [--plan .campaign/state/link-review.json]',
+  '  plot-flowchart <root>',
 ].join('\n');
 
 const COMMANDS = {
@@ -54,6 +57,7 @@ const COMMANDS = {
   'change-plan': ['subject'],
   'change-draft': ['op', 'subject', 'title', 'other'],
   links: ['files', 'out', 'apply', 'plan', 'message'],
+  'plot-flowchart': [],
 };
 
 class UsageError extends Error {}
@@ -228,6 +232,10 @@ async function run(parsed) {
         out: options.out === undefined ? DEFAULT_PLAN_FILE : checkedOutPath(options.out),
       });
       return { code: 0, value: result };
+    }
+    case 'plot-flowchart': {
+      const errors = checkPlotFlowchart(root);
+      return { code: errors.length === 0 ? 0 : 1, value: errors };
     }
     default:
       usageError(`unknown command '${command}'`);

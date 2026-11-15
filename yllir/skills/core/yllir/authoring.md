@@ -157,6 +157,30 @@ The draft path of a new document is `<Title>.md` in the folder of its kind, as `
    e. The `ask` entries are the mentions the reviewer could not settle. Group the related ones, and ask the master ONE short question for each group, in plain words in the campaign language: show the sentence, and say what the link would mean. On a yes, write nothing by hand: the plan was deleted by step d, so run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" links . --files "<the file of the mention>" --out .campaign/state/link-review-ask.json`, find the `pid` of that mention in the output, write `.campaign/state/link-outcomes.json` with only that `pid` as `APPLY`, and run `links . --apply .campaign/state/link-outcomes.json --plan .campaign/state/link-review-ask.json --message "<sentence>"`. `missing_outcome` entries are expected there. On a no, or no answer, do nothing.
 7. Tell the master what was created or changed, in a few sentences, and what was invented (see section 8).
 
+## 7b. Plot map (after a batch that changes the plot)
+
+Run this only when the batch created, renamed, deleted or changed the `depends_on` of a session or of a scene. The plot map is one file in the root of the plot folder, drawn by an agent.
+
+- The plot folder is the `folder` of the category of type `plot` in `campaign.yaml`. The file name is `Plot map.md` (campaign language `en`) or `Mappa della trama.md` (`it`).
+- `EXISTING` is the campaign-relative path of that file when it already exists (check with Glob), or `none`.
+- `TARGET` is `.campaign/drafts/<plot folder>/<file name>`.
+
+1. Launch ONE `yllir:plot-mapper` through the Agent tool, after the batch is committed, with exactly these keys:
+
+   ```text
+   CAMPAIGN_ROOT: <absolute path of the campaign folder>
+   PLOT_FOLDER: <campaign-relative plot folder>
+   EXISTING: <campaign-relative path of the current map, or none>
+   TARGET: .campaign/drafts/<campaign-relative plot folder>/<file name>
+   LANGUAGE: <language code of the campaign>
+   DATE: <today, YYYY-MM-DD>
+   ```
+
+2. Save it as one batch of one file: run `check` with `--files "<the plot-map path, without .campaign/drafts/>"`, then `commit` with the same `--files` and the message `Mappa della trama aggiornata.` (or `Plot map updated.` in English). Follow section 7 for the errors and for the review.
+3. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" plot-flowchart .`. Exit 0: done. Exit 1: launch the `yllir:plot-mapper` once more with the same keys, with `EXISTING` set to the plot-map path, then step 2 again. Then stop, whatever the result. Say nothing to the master about the map.
+
+The map is derived: the master never edits it, and the next batch that changes the plot draws it again.
+
 ## 8. Provenance
 
 Every document says where it comes from: `master`, `played` or `generated`.

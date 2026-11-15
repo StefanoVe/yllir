@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { after, describe, it } from 'node:test';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { PlotResponse, PlotSheetsResponse } from '../../../shared/src/types.js';
-import { makeCampaign, makeFramework, get, startApp, type Harness } from '../live/test-support.js';
-import { toPlotResponse, toPlotSheets, type PlotMapResult } from '../plot/map.js';
+import { makeCampaign, makeFramework, get, startApp, tempDir, type Harness } from '../live/test-support.js';
+import {
+  toPlotFlow,
+  toPlotResponse,
+  toPlotSheets,
+  type PlotFlowchartResult,
+  type PlotMapResult,
+} from '../plot/map.js';
 
 const REAL_FRAMEWORK = fileURLToPath(new URL('../../../../yllir', import.meta.url));
+const REAL_PLOT_MAP = path.join(REAL_FRAMEWORK, 'scripts/lib/plot/plot-map.mjs');
 
 const harnesses: Harness[] = [];
 after(async () => {
@@ -56,68 +65,171 @@ const FIXTURE: Record<string, string> = {
   'Cronaca/2026-01-01.md': '---\nid: c-1\nplayed: [s-01]\n---\n\n# Cronaca\n\nTesto.\n',
 };
 
-async function plotOf(files: Record<string, string>): Promise<{ h: Harness; body: PlotResponse }> {
+/**
+ * A framework root for the HTTP tests: the real plot-map module (re-exported by URL) and a fake
+ * plot-flowchart module that returns `flow`. `flow: undefined` leaves the flowchart module out.
+ */
+function makeFlowFramework(flow: PlotFlowchartResult | undefined): string {
+  const root = tempDir('ms-plot-framework-');
+  const dir = path.join(root, 'scripts', 'lib', 'plot');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, 'plot-map.mjs'),
+    `export { plotMap } from ${JSON.stringify(pathToFileURL(REAL_PLOT_MAP).href)};\n`,
+  );
+  if (flow !== undefined) {
+    fs.writeFileSync(
+      path.join(dir, 'plot-flowchart.mjs'),
+      `export function readPlotFlowchart() { return ${JSON.stringify(flow)}; }\n`,
+    );
+  }
+  return root;
+}
+
+const FLOW_MERMAID = [
+  'flowchart TD',
+  '  subgraph S1["Sessione 1"]',
+  '    s1["Sessione 1"]',
+  '    e1["Faro"]',
+  '  end',
+  '  s2["Sessione 2"]',
+  '  d1{Scelta}',
+  '  s1 --> s2',
+  '  s1 -.-> e1',
+  '  s1 --> d1',
+].join('\n');
+
+/** The flowchart of FIXTURE: s1 and s2 sessions, e1 a scene, x1 a path that is no sheet, d1 a decision. */
+const FLOW: PlotFlowchartResult = {
+  file: 'Trama/Mappa della trama.md',
+  mermaid: FLOW_MERMAID,
+  paths: [
+    { id: 's1', path: 'Trama/Sessione 1/Sessione 1.md' },
+    { id: 's2', path: 'Trama/Sessione 2/Sessione 2.md' },
+    { id: 'e1', path: 'Trama/Sessione 1/Eventi/Faro.md' },
+    { id: 'x1', path: 'Trama/Non esiste.md' },
+  ],
+  errors: [],
+};
+
+async function flowOf(
+  files: Record<string, string>,
+  flow: PlotFlowchartResult | undefined = FLOW,
+): Promise<{ h: Harness; body: PlotResponse; text: string }> {
   const root = makeCampaign(files);
-  const h = await startApp(root, REAL_FRAMEWORK);
+  const h = await startApp(root, makeFlowFramework(flow));
   harnesses.push(h);
   const res = await get(h, '/plot');
   assert.equal(res.status, 200, res.text);
-  return { h, body: res.json as PlotResponse };
+  return { h, body: res.json as PlotResponse, text: res.text };
 }
 
-const byKey = (a: { from: string; to: string }, b: { from: string; to: string }): number =>
-  `${a.from}>${a.to}`.localeCompare(`${b.from}>${b.to}`);
-
-describe('GET /api/plot on a real plot-map fixture', () => {
-  it('maps sessions and scenes to nodes with campaign-relative paths and statuses', async () => {
-    const { body } = await plotOf(FIXTURE);
-    const nodes = Object.fromEntries(body.nodes.map((n) => [n.id, n]));
-    assert.deepEqual(nodes['session:s-01'], {
-      id: 'session:s-01',
-      kind: 'session',
-      title: 'Sessione 1',
-      path: 'Trama/Sessione 1/Sessione 1.md',
-      status: 'played',
-    });
-    assert.equal(nodes['session:s-02'].status, 'ready');
-    assert.equal(nodes['session:s-03'].status, 'ready');
-    assert.equal(nodes['session:a-01'].status, 'ready');
-    assert.deepEqual(nodes['scene:e-faro'], {
-      id: 'scene:e-faro',
-      kind: 'scene',
-      title: 'Faro',
-      path: 'Trama/Sessione 1/Eventi/Faro.md',
-      session: 'session:s-01',
-    });
-    assert.equal(body.nodes.length, 4 + 3);
+describe('GET /api/plot joins the flowchart with the plot map', () => {
+  it('keeps the sheets of the flowchart that are sheets of the plot, with titles, kinds and statuses', async () => {
+    const { body } = await flowOf(FIXTURE);
+    assert.equal(body.missing, false);
+    assert.deepEqual(body.nodes, [
+      { id: 's1', path: 'Trama/Sessione 1/Sessione 1.md', title: 'Sessione 1', kind: 'session', status: 'played' },
+      { id: 's2', path: 'Trama/Sessione 2/Sessione 2.md', title: 'Sessione 2', kind: 'session', status: 'ready' },
+      { id: 'e1', path: 'Trama/Sessione 1/Eventi/Faro.md', title: 'Faro', kind: 'scene' },
+    ]);
+    assert.equal('status' in body.nodes[2], false, 'a scene has no status');
   });
 
-  it('draws declared dependencies as depends edges, from prerequisite to dependent', async () => {
-    const { body } = await plotOf(FIXTURE);
-    const depends = body.edges.filter((e) => e.kind === 'depends').sort(byKey);
-    assert.deepEqual(depends, [
-      { from: 'scene:e-porto', to: 'scene:e-faro', kind: 'depends' },
-      { from: 'session:s-01', to: 'session:s-02', kind: 'depends' },
-    ]);
-  });
-
-  it('draws order edges only between consecutive items with no declared dependency', async () => {
-    const { body } = await plotOf(FIXTURE);
-    const order = body.edges.filter((e) => e.kind === 'order').sort(byKey);
-    assert.deepEqual(order, [
-      { from: 'scene:e-mercato', to: 'scene:e-porto', kind: 'order' },
-      { from: 'session:s-02', to: 'session:s-03', kind: 'order' },
-    ]);
+  it('sends the flowchart source with the status classes appended for the nodes that have a status', async () => {
+    const { body } = await flowOf(FIXTURE);
+    assert.ok(body.mermaid.startsWith(FLOW_MERMAID + '\n'), body.mermaid);
+    const lines = body.mermaid.split('\n');
+    for (const line of [
+      'classDef played fill:#d9d9d9,stroke:#4a4a4a,color:#111111',
+      'classDef ready fill:#fff4c2,stroke:#9a7b00,color:#111111',
+      'classDef waiting fill:#ffffff,stroke:#8a8a8a,color:#333333,stroke-dasharray:4 3',
+      'class s1 played',
+      'class s2 ready',
+    ]) {
+      assert.ok(lines.includes(line), `missing line: ${line}`);
+    }
+    assert.equal(lines.some((line) => line.startsWith('class e1')), false, 'a scene gets no class line');
+    assert.equal(lines.some((line) => line.startsWith('class x1')), false, 'an unknown path gets no class line');
   });
 
   it('never carries the body text of a document', async () => {
-    const { h, body } = await plotOf(FIXTURE);
-    assert.doesNotMatch(JSON.stringify(body), /SEGRETO/);
-    assert.equal((await get(h, '/plot')).text.includes('SEGRETO'), false);
+    const { text } = await flowOf(FIXTURE);
+    assert.equal(text.includes('SEGRETO'), false);
+  });
+
+  it('answers missing with an empty source when there is no flowchart file', async () => {
+    const { body } = await flowOf(FIXTURE, { ...FLOW, file: null, mermaid: '', paths: [], errors: [] });
+    assert.deepEqual(body, { mermaid: '', nodes: [], missing: true });
+  });
+
+  it('answers an empty source and no nodes when the file has no mermaid block', async () => {
+    const { body } = await flowOf(FIXTURE, { ...FLOW, mermaid: '', paths: [], errors: [] });
+    assert.deepEqual(body, { mermaid: '', nodes: [], missing: false });
+  });
+
+  it('answers 503 with the plain message when the flowchart module is absent', async () => {
+    const root = makeCampaign(FIXTURE);
+    const h = await startApp(root, makeFlowFramework(undefined));
+    harnesses.push(h);
+    const res = await get(h, '/plot');
+    assert.equal(res.status, 503);
+    assert.deepEqual(res.json, { error: 'This version of Yllir does not support the plot map yet.' });
+  });
+
+  it('answers 503 when the plot map module is absent', async () => {
+    const root = makeCampaign(FIXTURE);
+    const h = await startApp(root, makeFramework({ libs: false }));
+    harnesses.push(h);
+    const res = await get(h, '/plot');
+    assert.equal(res.status, 503);
+    assert.deepEqual(res.json, { error: 'This version of Yllir does not support the plot map yet.' });
   });
 });
 
-describe('plot mapping', () => {
+describe('toPlotFlow', () => {
+  const result: PlotMapResult = {
+    sessions: [
+      {
+        id: 'x',
+        file: 'T/x/x.md',
+        name: 'X',
+        arc: 'A',
+        depends_on: [],
+        played: true,
+        ready: false,
+        events: [{ id: 'e1', file: 'T/x/e1.md', name: 'E1', depends_on: [] }],
+      },
+      { id: 'y', file: 'T/y/y.md', name: 'Y', arc: 'A', depends_on: [], played: false, ready: false, events: [] },
+    ],
+  };
+
+  it('answers missing with no source and no nodes when there is no flowchart file', () => {
+    const out = toPlotFlow({ file: null, mermaid: '', paths: [], errors: [] }, result);
+    assert.deepEqual(out, { mermaid: '', nodes: [], missing: true });
+  });
+
+  it('gives a waiting session the waiting status and appends its class line', () => {
+    const out = toPlotFlow(
+      {
+        file: 'T/m.md',
+        mermaid: 'flowchart TD\n  y["Y"]',
+        paths: [{ id: 'y', path: 'T/y/y.md' }],
+        errors: [],
+      },
+      result,
+    );
+    assert.deepEqual(out.nodes, [{ id: 'y', path: 'T/y/y.md', title: 'Y', kind: 'session', status: 'waiting' }]);
+    assert.ok(out.mermaid.endsWith('class y waiting'));
+  });
+
+  it('keeps the source as it is when the file has no mermaid block', () => {
+    const out = toPlotFlow({ file: 'T/m.md', mermaid: '', paths: [], errors: [] }, result);
+    assert.deepEqual(out, { mermaid: '', nodes: [], missing: false });
+  });
+});
+
+describe('plot graph mapping', () => {
   it('ignores unknown dependencies and cycles and never invents an edge for them', () => {
     const result: PlotMapResult = {
       sessions: [

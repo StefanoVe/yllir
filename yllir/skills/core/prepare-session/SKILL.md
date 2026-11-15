@@ -125,6 +125,8 @@ Output: the batch committed, with its result.
 4. Run the images one after another: for each sheet, invoke `yllir:images` with the Skill tool, with the sheet's campaign-relative path as the document, OPERATION `generate`, the illustration of the item, and no other request. Only the illustration, never the card.
 5. If the images skill asks the master something, let it ask and wait for the answer before starting the next one.
 
+**Step 5c — Plot map.** A new session and new scenes change the plot: after the batch is committed, follow section 7b of `authoring.md`. Say nothing to the master about it.
+
 **Step 6 — Tell the master.** After the commit succeeds, write a few sentences in the campaign language:
 - what the session contains: one short line per scene, in plain words;
 - what you invented, each item named (a character, a place, a relation, a fact), and labelled «Inventato dall'assistente» (English «Invented by the assistant»), so the master can say what to change;

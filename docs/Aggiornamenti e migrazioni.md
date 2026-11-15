@@ -363,6 +363,18 @@ Migrazione post-aggiornamento, decisione 4 del 2026-11-14. Dichiara il campo `en
 - non cambia la prosa dell'evento e non scrive un `id` che non corrisponde a una scheda di creatura: lo decide il master;
 - è reversibile con git, come ogni migrazione.
 
+---
+
+## Migrazione plot-flowchart-v1 (Deciso, 2026-11-15)
+
+Migrazione post-aggiornamento, decisione del 2026-11-15 sulla mappa della trama (vedi [Master screen](Master%20screen.md)). Per le campagne che hanno sessioni e non hanno ancora il file della mappa:
+
+- la parte deterministica verifica se il file manca; non scrive nulla;
+- la parte guidata fa disegnare la mappa all'agente `plot-mapper`, che crea `Mappa della trama.md` (o `Plot map.md`, nella lingua della campagna) nella cartella della trama, come diagramma a flusso di sessioni e scene;
+- non cambia nessun documento della campagna: il file della mappa è il solo file nuovo;
+- resta in sospeso finché il file non esiste e passa il controllo del motore; poi il controllo di completamento la segna completa;
+- è reversibile con git, come ogni migrazione.
+
 ## Questioni aperte
 
 - Dove si trova, sul computer del master, la cartella del plugin pubblicato (la sorgente delle novità): per ora il controllo la legge dalla variabile `YLLIR_PUBLISHED_SOURCE`, e senza di essa tace. Va verificato come il marketplace la rende disponibile.

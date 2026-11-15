@@ -69,6 +69,7 @@ Rules:
 Write the fields in these forms: `status: dead`, `ended: 312` (a number), `participants: [id1, id2]` and `location: [place-id]` as flow lists. Write the STATED changes into the batch: a draft of each changed document, with only those changes, all other text kept. Keep each document's provenance. Never infer possession, location, status or effects from the events. PROPOSED changes are not written.
 
 **Step 6 — Write the batch.** One batch through the write cycle, containing the chronicle page of Step 4 and the changed documents of Step 5. The commit message is one sentence in the campaign language, for example «Registrata la serata del <DATE>». If the write cycle asks a question, ask that question, and stop.
+After the commit, if this batch changed the `depends_on` of a session or a scene, follow section 7b of `authoring.md` (the plot map). Say nothing to the master about it.
 
 **Step 7 — Message to the master.** After the commit succeeds, write a few sentences in the campaign language:
 - the evening is recorded, named by its date in words («la serata del 3 novembre»);

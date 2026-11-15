@@ -43,11 +43,13 @@ Ogni processo che crea o modifica documenti usa lo stesso ciclo, descritto in [O
 
 1. contesto del motore (`context`), con il seme del mondo;
 2. bozze scritte in `.campaign/drafts/`, mai direttamente nella campagna;
-3. controllo del motore (`check`), senza scrivere: formato, schema dell'adattatore, grafo, mappa della trama, link;
+3. controllo del motore (`check`), senza scrivere: formato, schema dell'adattatore, grafo, presenza e percorsi della mappa della trama, link;
 4. revisione di un solo revisore del lotto, solo se il lotto aggiunge fatti al canone; esito `APPLY` o `FIX`;
 5. scrittura del motore (`commit`), in un'unica transazione: salvataggio delle modifiche a mano, collocazione geografica, link sicuri, schede di sessione derivate, indici, nota sul lavoro in corso, una versione salvata.
 
 Se il controllo o il commit fallisce, non si scrive nulla. *Implementato in 0.30.0.*
+
+**Mappa della trama** (*Deciso, 2026-11-15*): il disegno della trama non è più costruito dal motore a ogni commit. Dopo il lavoro su sessioni e scene, l'agente `plot-mapper` riscrive il file `Mappa della trama.md` (o `Plot map.md`) nella cartella della trama, come diagramma a flusso; il controllo del motore verifica che il file ci sia e che ogni sessione e scena vi compaia con il suo percorso. La mappa non è una sessione, né una scena, né un documento della campagna da modificare a mano.
 
 **Collegamenti sui documenti che menzionano un soggetto nuovo.** **Deciso** (2026-11-07): quando la scrittura crea un soggetto o un alias nuovo, si collega su ogni documento che lo menziona; l'indice dei soggetti dice quali sono. **Superata dalla Riprogettazione (2026-11-11):** il linker come skill è eliminato (sezione 9); i link li applica il motore nel commit, e le menzioni ambigue le giudica l'autore. La revisione è proporzionata: un lotto che sposta soltanto documenti non la richiede (*Deciso, 2026-11-11*, decisioni 5 e 14). Sostituisce il cablaggio di scrittura a otto passi della versione precedente, che era una skill eseguita dal modello economico (Riprogettazione, sezione 9).
 

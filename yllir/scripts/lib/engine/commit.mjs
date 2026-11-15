@@ -10,7 +10,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { buildSubjectIndex, compareStrings, readStructure } from '../subjects.mjs';
+import { buildSubjectIndex, compareStrings, readStructure, isPlotFlowchart } from '../subjects.mjs';
 import { buildWorldIndex, writeWorldIndex } from '../world-graph.mjs';
 import { planGeographicLayout, applyGeographicLayout } from '../geographic-layout.mjs';
 import { validateConfig } from '../config.mjs';
@@ -401,11 +401,13 @@ async function transform(dir, copy, { files, deletes, retired }) {
   const out = { errors: [], finalFiles: [...files], pathMap: {}, ambiguousMentions: [], externalLinks: new Map() };
   out.externalLinks = copyCampaign(dir, copy);
 
+  const copyStructure = readStructure(copy).structure ?? [];
   for (const rel of files) {
     const dest = path.join(copy, rel);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(path.join(dir, DRAFT_DIR, rel), dest);
-    if (rel.endsWith('.md')) {
+    // The plot flowchart keeps its own frontmatter (type: plot-map): it is not a sheet, so no metadata comment is added.
+    if (rel.endsWith('.md') && !isPlotFlowchart(copyStructure, rel)) {
       // Every saved document uses the comment form, even when an agent wrote a dashes block.
       const converted = toCommentMetadata(fs.readFileSync(dest, 'utf8'));
       if (converted !== null) fs.writeFileSync(dest, converted);
@@ -586,7 +588,8 @@ async function adapterErrors(dir, files) {
 /** Scope of the validators: the batch files, and the whole campaign when a file is deleted. */
 function scopesFor(dir, files, deletes) {
   // campaign.yaml is checked by validate's config run, not by the per-document checks.
-  const documents = files.filter((rel) => rel !== CONFIG_FILE);
+  const structure = readStructure(dir).structure ?? [];
+  const documents = files.filter((rel) => rel !== CONFIG_FILE && !isPlotFlowchart(structure, rel));
   return {
     files: documents,
     checkFiles: deletes.length > 0 ? null : documents,
@@ -881,9 +884,12 @@ function hashDrafts(dir, files, deletes, sources) {
  */
 function needsReview(dir, files, deletes, sources) {
   // A campaign.yaml draft that only appends structure or audit exclusions, or sets workflow.auto_accept or workflow.auto_item_images (see configChange) adds no facts: it is not reviewed.
-  const reviewed = files.includes(CONFIG_FILE) && configChange(dir, files).errors.length === 0
-    ? files.filter((rel) => rel !== CONFIG_FILE)
-    : files;
+  // The plot flowchart is drawn by an agent from sheets that were already reviewed: it adds no facts.
+  const structure = readStructure(dir).structure ?? [];
+  const documents = files.filter((rel) => !isPlotFlowchart(structure, rel));
+  const reviewed = documents.includes(CONFIG_FILE) && configChange(dir, files).errors.length === 0
+    ? documents.filter((rel) => rel !== CONFIG_FILE)
+    : documents;
   // Image styles and image providers are configuration, not canon: their Markdown prompts need no review.
   const markdownSources = sources.some((rel) => rel.endsWith('.md') && !isCampaignContentSource(rel));
   if (reviewed.length > 0 && deletes.length === 0 && !markdownSources && onlyLinksOrImagesChanged(dir, reviewed)) return false;
@@ -1115,7 +1121,8 @@ function folderPaths(structure, predicate) {
 function linkableFiles(dir, files) {
   const structure = readStructure(dir).structure ?? [];
   const scanned = folderPaths(structure, (type) => !UNSCANNED_TYPES.has(type));
-  return files.filter((rel) => scanned.some((folder) => isInside(rel, folder)) && !isGenerated(dir, rel));
+  return files.filter((rel) => scanned.some((folder) => isInside(rel, folder))
+    && !isPlotFlowchart(structure, rel) && !isGenerated(dir, rel));
 }
 
 function isInside(rel, folder) {

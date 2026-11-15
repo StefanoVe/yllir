@@ -11,6 +11,26 @@ import { foldForm } from './fold.mjs';
 
 const SUBJECT_TYPES = new Set(['places', 'subjects', 'objects', 'free', 'master-only']);
 
+// The plot flowchart is one agent-kept file at the root of a plot category. It is
+// not a sheet, so every sheet lister skips it (see listSheets).
+const PLOT_FLOWCHART_NAMES = new Set(['Plot map.md', 'Mappa della trama.md']);
+
+/**
+ * True when a campaign-relative path is the plot flowchart: a file of the plot flowchart name that sits at the
+ * root of a plot category (see listSheets). It is not a sheet, a session or a scene.
+ * @param {object[]} structure the structure list of campaign.yaml (see readStructure)
+ * @param {string} rel campaign-relative posix path
+ * @returns {boolean}
+ */
+export function isPlotFlowchart(structure, rel) {
+  if (!PLOT_FLOWCHART_NAMES.has(path.posix.basename(rel))) return false;
+  const parent = path.posix.dirname(rel);
+  return (structure ?? []).some(
+    (category) => category.type === 'plot' && typeof category.folder === 'string'
+      && path.posix.normalize(category.folder).replace(/\/+$/, '') === parent,
+  );
+}
+
 /**
  * Reads the structure list of campaign.yaml.
  * @param {string} campaignRoot absolute path
@@ -93,6 +113,8 @@ export function listSheets(campaignRoot, folder) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (entry.name !== 'img') walk(full);
+      } else if (dir === base && PLOT_FLOWCHART_NAMES.has(entry.name)) {
+        continue; // the plot flowchart is not a sheet
       } else if (entry.name.endsWith('.md') && isRegularFile(full, entry)) {
         found.push(path.relative(campaignRoot, full).split(path.sep).join('/'));
       }

@@ -123,6 +123,10 @@ If the request adds a fact for the whole world (a new faction, a convention of n
 
 Follow section 7 of `authoring.md` with ONE batch: every draft of this process, campaign-relative, without `.campaign/drafts/`, in `--files`. The `--message` is one sentence in the campaign language, for example `Ilde Varno: scheda creata.` or `Gilda del sale: membro morto, cronologia aggiornata.`
 
+## Step 7a — Plot map
+
+When this batch created, renamed, deleted or changed the `depends_on` of a session or of a scene, follow section 7b of `authoring.md` after the commit. Say nothing to the master about it.
+
 ## Step 7b — Item illustrations
 
 Runs only after Step 7 has saved the batch, and only when `workflow.auto_item_images` is not `false`.

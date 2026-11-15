@@ -16,78 +16,70 @@
   <p class="state" role="alert">{{ message }}</p>
 } @else if (loading()) {
   <p class="state" role="status">{{ s.t('panels.common.loading') }}</p>
+} @else if (missing()) {
+  <p class="state">{{ s.t('plot.missing') }}</p>
+} @else if (drawError(); as message) {
+  <p class="state" role="alert">{{ message }}</p>
 } @else if (!hasSessions()) {
   <p class="state">{{ s.t('plot.empty') }}</p>
 }
 
-<div class="viewport" #viewport
+<div class="viewport" #viewport [hidden]="!showMap()"
      (pointerdown)="onPointerDown($event)" (pointermove)="onPointerMove($event)"
      (pointerup)="onPointerUp()" (pointercancel)="onPointerUp()" (pointerleave)="onPointerUp()">
-  @if (layout(); as map) {
-    <svg class="map" role="group" [attr.aria-label]="s.t('plot.canvasLabel')" width="100%" height="100%">
-      <defs>
-        <marker id="plot-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-          <path class="arrow-head" d="M0 0 L10 5 L0 10 z" />
-        </marker>
-      </defs>
-      <g [attr.transform]="transformAttr()">
-        @for (edge of edgeView(); track edge.from + '|' + edge.to + '|' + edge.kind) {
-          <path class="edge" [class.depends]="edge.kind === 'depends'" [class.order]="edge.kind === 'order'"
-                [class.lit]="edge.lit" [class.dim]="edge.dim" [attr.d]="edge.d"
-                [attr.marker-end]="edge.kind === 'depends' ? 'url(#plot-arrow)' : null" />
-        }
-        @for (node of nodeView(); track node.id) {
-          <g class="node" [class.session]="node.kind === 'session'" [class.scene]="node.kind === 'scene'"
-             [class.lit]="node.lit && chain() !== null" [class.dim]="!node.lit"
-             [attr.transform]="'translate(' + node.x + ' ' + node.y + ')'"
-             role="link" tabindex="0" [attr.aria-label]="node.label" [attr.data-path]="node.path"
-             (click)="open(node)" (keydown.enter)="open(node)"
-             (mouseenter)="setHover(node.id)" (mouseleave)="setHover(null)"
-             (focus)="setHover(node.id)" (blur)="setHover(null)">
-            <title>{{ node.label }}</title>
-            <rect class="card" [attr.width]="node.w" [attr.height]="node.h" rx="12" />
-            <text class="kind-label" x="12" y="18">{{ kindText(node.kind) }}</text>
-            <text class="title-label" x="12" [attr.y]="node.kind === 'session' ? 50 : 36">{{ node.short }}</text>
-            @if (node.status) {
-              <g class="status" [attr.transform]="'translate(' + (node.w - 24) + ' 6)'" aria-hidden="true">
-                @if (node.done) {
-                  <path d="M4 12 L9 17 L18 7" />
-                } @else {
-                  <circle cx="11" cy="11" r="6" />
-                }
-              </g>
-            }
-          </g>
-        }
-      </g>
-    </svg>
-  }
+  <div class="canvas" #canvas role="group" [attr.aria-label]="s.t('plot.canvasLabel')" [style.transform]="transformStyle()"></div>
 </div>
 
-@if (layout(); as map) {
-  @if (hasSessions()) {
-    <ul class="legend" [attr.aria-label]="s.t('plot.legendTitle')">
-      <li class="legend-title">{{ s.t('plot.legendTitle') }}</li>
-      <li>
-        <svg class="sample" width="48" height="12" aria-hidden="true">
-          <line class="edge depends" x1="2" y1="6" x2="44" y2="6" marker-end="url(#plot-arrow)" />
-        </svg>
-        <span>{{ s.t('plot.legendNeeds') }}</span>
-      </li>
-      <li>
-        <svg class="sample" width="48" height="12" aria-hidden="true">
-          <line class="edge order" x1="2" y1="6" x2="46" y2="6" />
-        </svg>
-        <span>{{ s.t('plot.legendFollows') }}</span>
-      </li>
-    </ul>
-  }
+@if (showMap() && hasSessions()) {
+  <ul class="legend" [attr.aria-label]="s.t('plot.legendTitle')">
+    <li class="legend-title">{{ s.t('plot.legendTitle') }}</li>
+    <li>
+      <svg class="sample" width="48" height="12" aria-hidden="true">
+        <defs>
+          <marker id="plot-legend-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path class="arrow-head" d="M0 0 L10 5 L0 10 z" />
+          </marker>
+        </defs>
+        <line class="edge" x1="2" y1="6" x2="44" y2="6" marker-end="url(#plot-legend-arrow)" />
+      </svg>
+      <span>{{ s.t('plot.legendNeeds') }}</span>
+    </li>
+    <li>
+      <svg class="sample" width="48" height="12" aria-hidden="true">
+        <line class="edge order" x1="2" y1="6" x2="46" y2="6" />
+      </svg>
+      <span>{{ s.t('plot.legendFollows') }}</span>
+    </li>
+    <li>
+      <svg class="sample sample-status" width="48" height="18" aria-hidden="true">
+        <rect class="sample-shape played" x="2" y="2" width="44" height="14" rx="2" />
+        <path class="sample-mark" d="M38 6 L41 9 L46 3" />
+      </svg>
+      <span>{{ s.t('plot.legendPlayed') }}</span>
+    </li>
+    <li>
+      <svg class="sample sample-status" width="48" height="18" aria-hidden="true">
+        <rect class="sample-shape ready" x="2" y="2" width="44" height="14" rx="2" />
+        <circle class="sample-mark ready" cx="41" cy="9" r="3" />
+      </svg>
+      <span>{{ s.t('plot.legendReady') }}</span>
+    </li>
+    <li>
+      <svg class="sample sample-status" width="48" height="18" aria-hidden="true">
+        <rect class="sample-shape waiting" x="2" y="2" width="44" height="14" rx="2" />
+        <circle class="sample-mark waiting" cx="41" cy="9" r="3" />
+      </svg>
+      <span>{{ s.t('plot.legendWaiting') }}</span>
+    </li>
+  </ul>
+}
 
+@if (data(); as plot) {
   <section class="sr-only">
     <h3>{{ s.t('plot.textList') }}</h3>
     <ul>
-      @for (node of map.nodes; track node.id) {
-        <li>{{ node.title }} ({{ kindText(node.kind) }}). {{ needsText(node) }}</li>
+      @for (node of plot.nodes; track node.id) {
+        <li>{{ labelOf(node) }}</li>
       }
     </ul>
   </section>

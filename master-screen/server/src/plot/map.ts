@@ -4,8 +4,18 @@
 // depends_on only, unknown ids dropped); 'order' from each item to the next one of the same
 // list (sessions of one arc, scenes of one session) when the two have no declared dependency
 // between them. Only paths, titles, ids and statuses leave here: never a document body.
+// GET /api/plot is built by toPlotFlow: the Mermaid source of the plot flowchart (readPlotFlowchart)
+// joined with the statuses and titles of plotMap(root), plus the status classes appended server side.
+// toPlotResponse keeps the graph of the cockpit (nodes and edges from the same plotMap result).
 // Owner: plot engineer.
-import type { PlotEdge, PlotNode, PlotResponse, PlotSheet, PlotSheetsResponse } from '../../../shared/src/types.js';
+import type {
+  PlotEdge,
+  PlotFlowNode,
+  PlotNode,
+  PlotResponse,
+  PlotSheet,
+  PlotSheetsResponse,
+} from '../../../shared/src/types.js';
 
 /** The fields of plotMap(root).sessions[] that the map uses. */
 export interface PlotSceneInput {
@@ -30,6 +40,30 @@ export interface PlotMapResult {
   sessions: PlotSessionInput[];
 }
 
+/** The fields of readPlotFlowchart(root) that the flowchart uses. */
+export interface PlotFlowchartResult {
+  file: string | null;
+  mermaid: string;
+  paths: Array<{ id: string; path: string }>;
+  errors: Array<{ code: string; file: string; message: string }>;
+}
+
+/** The graph of the cockpit: nodes and edges of the plot map (not the master screen flowchart). */
+export interface PlotMapGraph {
+  nodes: PlotNode[];
+  edges: PlotEdge[];
+}
+
+type PlotStatus = NonNullable<PlotFlowNode['status']>;
+
+// Explicit colours: the flowchart is drawn in the master screen with its own theme, so the
+// classes carry their own fill and text colour. Played is the quietest, waiting is dashed.
+const STATUS_CLASS_DEFS: string[] = [
+  'classDef played fill:#d9d9d9,stroke:#4a4a4a,color:#111111',
+  'classDef ready fill:#fff4c2,stroke:#9a7b00,color:#111111',
+  'classDef waiting fill:#ffffff,stroke:#8a8a8a,color:#333333,stroke-dasharray:4 3',
+];
+
 export const sessionNodeId = (id: string): string => `session:${id}`;
 export const sceneNodeId = (id: string): string => `scene:${id}`;
 
@@ -37,7 +71,7 @@ function unique(values: string[]): string[] {
   return [...new Set(values)];
 }
 
-export function toPlotResponse(result: PlotMapResult): PlotResponse {
+export function toPlotResponse(result: PlotMapResult): PlotMapGraph {
   const nodes: PlotNode[] = [];
   const edges: PlotEdge[] = [];
   const sessionIds = new Set(result.sessions.map((s) => sessionNodeId(s.id)));
@@ -101,6 +135,38 @@ export function toPlotResponse(result: PlotMapResult): PlotResponse {
   }
 
   return { nodes, edges };
+}
+
+/**
+ * GET /api/plot. A missing flowchart file gives `missing: true` and no source. Otherwise the
+ * source is the file's Mermaid block, then the three status classes, then one `class <id> <status>`
+ * line per node that has a status. Only nodes whose path is a sheet of the plot map are kept.
+ */
+export function toPlotFlow(flow: PlotFlowchartResult, result: PlotMapResult): PlotResponse {
+  if (flow.file === null) return { mermaid: '', nodes: [], missing: true };
+
+  const bySheet = new Map<string, Omit<PlotFlowNode, 'id' | 'path'>>();
+  for (const session of result.sessions) {
+    const status: PlotStatus = session.played ? 'played' : session.ready ? 'ready' : 'waiting';
+    if (session.file) bySheet.set(session.file, { title: session.name, kind: 'session', status });
+    for (const scene of session.events) {
+      if (scene.file) bySheet.set(scene.file, { title: scene.name, kind: 'scene' });
+    }
+  }
+
+  const nodes: PlotFlowNode[] = [];
+  const classLines: string[] = [];
+  for (const entry of flow.paths) {
+    const sheet = bySheet.get(entry.path);
+    if (sheet === undefined) continue;
+    const node: PlotFlowNode = { id: entry.id, path: entry.path, ...sheet };
+    nodes.push(node);
+    if (node.status !== undefined) classLines.push(`class ${node.id} ${node.status}`);
+  }
+
+  const source = flow.mermaid.trimEnd();
+  const mermaid = source === '' ? '' : [source, ...STATUS_CLASS_DEFS, ...classLines].join('\n');
+  return { mermaid, nodes, missing: false };
 }
 
 /**
