@@ -17,13 +17,12 @@
 }
 
 /* Opening animation. The scrim is the sibling before the dialog, so it is matched from the dialog's side. */
-@media (prefers-reduced-motion: no-preference) {
-  .document-modal {
-    animation: document-modal-in 160ms ease-out both;
-  }
-  .cockpit-scrim:has(+ .document-modal) {
-    animation: document-scrim-in 160ms ease-out both;
-  }
+/* Not inside a media query: Angular does not scope keyframe names in nested rules. Reduced motion is handled by the global rule. */
+.document-modal {
+  animation: document-modal-in 160ms ease-out both;
+}
+.cockpit-scrim:has(+ .document-modal) {
+  animation: document-scrim-in 160ms ease-out both;
 }
 @keyframes document-modal-in {
   from {
@@ -389,10 +388,8 @@
 .document-modal .skel-4 { width: 72%; }
 .document-modal .skel-5 { width: 92%; }
 .document-modal .skel-6 { width: 54%; }
-@media (prefers-reduced-motion: no-preference) {
-  .document-modal .skeleton-bar {
-    animation: document-pulse 1.4s ease-in-out infinite;
-  }
+.document-modal .skeleton-bar {
+  animation: document-pulse 1.4s ease-in-out infinite;
 }
 @keyframes document-pulse {
   from {

@@ -550,10 +550,8 @@ h1 {
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .skeleton-row {
-    animation: documents-skeleton-pulse 1400ms ease-in-out infinite;
-  }
+.skeleton-row {
+  animation: documents-skeleton-pulse 1400ms ease-in-out infinite;
 }
 
 @keyframes documents-skeleton-pulse {

@@ -741,10 +741,8 @@
   font-size: var(--font-size-sm);
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .context-bar {
-    animation: bar-in 140ms ease-out;
-  }
+.context-bar {
+  animation: bar-in 140ms ease-out;
 }
 
 @keyframes bar-in {
