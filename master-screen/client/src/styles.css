@@ -535,15 +535,6 @@ textarea {
   scroll-behavior: auto !important;
 }
 
-/* A spinner is a status signal, not decoration: it keeps turning under reduced motion (the global rules above would freeze it after one turn). */
-:root .spin,
-:root .spinner,
-:root[data-motion="reduced"] .spin,
-:root[data-motion="reduced"] .spinner {
-  animation-duration: 1.4s !important;
-  animation-iteration-count: infinite !important;
-}
-
 /* Visually hidden, still read by screen readers. */
 .sr-only {
   position: absolute;
