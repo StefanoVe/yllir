@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildJob, joinPrompt, placeImage, renderSidecar, slugify, subjectDescription } from './image-job.mjs';
+import { buildJob, ITEM_REQUIREMENT, joinPrompt, PLACEHOLDER, placeImage, renderSidecar, slugify, subjectDescription } from './image-job.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -616,4 +616,109 @@ test('joinPrompt trims the style text and removes its final period before append
   assert.equal(joinPrompt('Stile pulito. Dalla breccia.\n', ['Top-down.']), 'Stile pulito. Dalla breccia. Top-down.');
   assert.equal(joinPrompt('Stile pulito.\n', []), 'Stile pulito.');
   assert.equal(joinPrompt('Stile.\n', ['  ', '']), 'Stile.');
+});
+
+const ITEM_SHEET = `<!-- yllir
+id: spada-di-vetro
+kind: item
+template: item
+-->
+# Spada di vetro
+
+Una lama lunga e trasparente, con impugnatura d'argento.
+
+<!-- master -->
+Segreto: SEGRETO-7731 nell'elsa.
+<!-- /master -->
+`;
+
+const LEGACY_ITEM_SHEET = `---
+id: spada-di-vetro
+kind: item
+---
+# Spada di vetro
+
+Una lama lunga e trasparente, con impugnatura d'argento.
+`;
+
+test('a legacy --- metadata block with kind: item gets ITEM_REQUIREMENT', () => {
+  const root = makeCampaign();
+  write(root, 'Personaggi/Spada di vetro.md', LEGACY_ITEM_SHEET);
+  const result = buildJob({ root, document: 'Personaggi/Spada di vetro.md', operation: 'generate' });
+  assert.equal(result.ok, true, result.message);
+  assert.ok(result.job.prompt.endsWith(ITEM_REQUIREMENT), result.job.prompt);
+});
+
+test('kind: item in the body, with kind: character in the metadata, is not an item', () => {
+  const root = makeCampaign();
+  write(
+    root,
+    'Personaggi/Lama comune.md',
+    '<!-- yllir\nid: lama-comune\nkind: character\ntemplate: npc\n-->\n# Lama comune\n\nkind: item\n',
+  );
+  const result = buildJob({ root, document: 'Personaggi/Lama comune.md', operation: 'generate' });
+  assert.equal(result.ok, true, result.message);
+  assert.ok(!result.job.prompt.includes(ITEM_REQUIREMENT), result.job.prompt);
+});
+
+test('an item document gets ITEM_REQUIREMENT after the style text, and no master-only text', () => {
+  const root = makeCampaign();
+  write(root, 'Personaggi/Spada di vetro.md', ITEM_SHEET);
+  const result = buildJob({ root, document: 'Personaggi/Spada di vetro.md', operation: 'generate' });
+  assert.equal(result.ok, true, result.message);
+  assert.ok(result.job.prompt.endsWith(ITEM_REQUIREMENT), result.job.prompt);
+  assert.equal(result.job.prompt, joinPrompt(STYLE_PROMPT.replace(PLACEHOLDER, subjectDescription('# Spada di vetro\n\nUna lama lunga e trasparente, con impugnatura d\'argento.\n')), [ITEM_REQUIREMENT]));
+  assert.ok(!result.job.prompt.includes('SEGRETO'));
+});
+
+test('an item document with a request has the order style, request, ITEM_REQUIREMENT', () => {
+  const root = makeCampaign();
+  write(root, 'Personaggi/Spada di vetro.md', ITEM_SHEET);
+  const result = buildJob({ root, document: 'Personaggi/Spada di vetro.md', operation: 'generate', request: 'luce dorata' });
+  assert.equal(result.ok, true, result.message);
+  const styleAt = result.job.prompt.indexOf('stile acquerello');
+  const noteAt = result.job.prompt.indexOf('luce dorata');
+  const itemAt = result.job.prompt.indexOf(ITEM_REQUIREMENT);
+  assert.ok(styleAt >= 0 && noteAt > styleAt && itemAt > noteAt, result.job.prompt);
+  assert.ok(result.job.prompt.endsWith(`luce dorata. ${ITEM_REQUIREMENT}`), result.job.prompt);
+});
+
+test('a character document prompt does not mention a transparent background', () => {
+  const root = makeCampaign();
+  const result = buildJob({ root, document: 'Personaggi/Oria Brunel.md', operation: 'generate' });
+  assert.equal(result.ok, true, result.message);
+  assert.ok(!result.job.prompt.includes('transparent'));
+  assert.ok(!result.job.prompt.includes(ITEM_REQUIREMENT));
+});
+
+test('a map job for an item document does not get ITEM_REQUIREMENT', () => {
+  const root = makeCampaign();
+  addMapStyle(root);
+  write(root, 'Personaggi/Spada di vetro.md', ITEM_SHEET);
+  const result = buildJob({
+    root,
+    document: 'Personaggi/Spada di vetro.md',
+    operation: 'generate',
+    purpose: 'map',
+    cells: { cols: 24, rows: 16 },
+  });
+  assert.equal(result.ok, true, result.message);
+  assert.ok(!result.job.prompt.includes(ITEM_REQUIREMENT));
+  assert.match(result.job.prompt, /Top-down orthographic/);
+});
+
+test('a remove_background job for an item document is unaffected', () => {
+  const root = makeCampaign();
+  write(root, 'Personaggi/Spada di vetro.md', ITEM_SHEET);
+  write(root, 'Personaggi/img/spada-di-vetro.png', 'PNG');
+  const result = buildJob({
+    root,
+    document: 'Personaggi/Spada di vetro.md',
+    operation: 'remove_background',
+    image: 'Personaggi/img/spada-di-vetro.png',
+  });
+  assert.equal(result.ok, true, result.message);
+  assert.equal(result.job.prompt, '');
+  assert.equal(result.job.style, null);
+  assert.ok(!JSON.stringify(result.job).includes(ITEM_REQUIREMENT));
 });

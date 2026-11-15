@@ -36,6 +36,36 @@ export function slugify(text) {
 /** Style id that every map job uses, whatever the folder of the document. */
 export const MAP_STYLE = 'map';
 
+/** Fixed English request added to every generate job of an item document. */
+export const ITEM_REQUIREMENT =
+  'The object alone, centred, with a fully transparent background (PNG with alpha channel), no background of any kind, no scenery, no surface, no floor, no cast shadow, no hands, no characters';
+
+const ITEM_KIND = /^kind:\s*item\s*$/m;
+
+/**
+ * The lines of the metadata block of a raw document, or null when there is none.
+ * Current form: line 1 is `<!-- yllir`, the block ends at the first line that is exactly `-->`.
+ * Legacy form: a `---` block at the top of the file.
+ */
+function metadataLines(rawText) {
+  const lines = String(rawText ?? '').replace(/\r\n/g, '\n').split('\n');
+  if (lines[0] === '<!-- yllir') {
+    const end = lines.indexOf('-->', 1);
+    return end === -1 ? null : lines.slice(1, end);
+  }
+  if (lines[0] === '---') {
+    const end = lines.indexOf('---', 1);
+    return end === -1 ? null : lines.slice(1, end);
+  }
+  return null;
+}
+
+/** True when the metadata block of the raw document text declares `kind: item` (never the body). */
+function isItemDocument(rawText) {
+  const block = metadataLines(rawText);
+  return block !== null && ITEM_KIND.test(block.join('\n'));
+}
+
 /** Fixed English request of every map job; C and R are the grid size. */
 export function mapRequirement(cols, rows) {
   return (
@@ -243,7 +273,8 @@ export function buildJob({
   }
   const docAbs = path.join(rootAbs, rel);
   if (!isFile(docAbs)) return fail('not-found', `document not found: ${rel}`);
-  const pub = publicText(fs.readFileSync(docAbs, 'utf8'), rel, config);
+  const rawText = fs.readFileSync(docAbs, 'utf8');
+  const pub = publicText(rawText, rel, config);
   if (pub === null) return fail('not-public', `${rel} is not public: its text cannot be sent to an image service`);
 
   let referencePath = null;
@@ -274,6 +305,7 @@ export function buildJob({
     const pieces = [];
     if (note !== '') pieces.push(note.replace(/\.$/, ''));
     if (isMap) pieces.push(mapRequirement(cells.cols, cells.rows));
+    else if (isItemDocument(rawText)) pieces.push(ITEM_REQUIREMENT);
     prompt = joinPrompt(loaded.template.split(PLACEHOLDER).join(subjectDescription(pub)), pieces);
     negative = loaded.negative;
     width = loaded.width;
