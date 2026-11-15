@@ -13,6 +13,8 @@
 //   change-draft <root> --op rename --subject <id> --title "<new title>"
 //   change-draft <root> --op delete --subject <id>   (writes the drafts of a whole-subject change)
 //   change-draft <root> --op merge --subject <survivor> --other <id>   (two sheets become one; writes the drafts)
+//   links <root> --files "a,b" [--out .campaign/state/link-review.json]   (plan mode: the mentions the engine did not link, for review)
+//   links <root> --apply <outcomes-file> --message "<text>" [--plan .campaign/state/link-review.json]   (apply mode: the reviewer's outcomes)
 // Exit codes: 0 ok, 1 campaign problem (ok:false, or a query error), 2 usage or internal error.
 
 import fs from 'node:fs';
@@ -21,6 +23,7 @@ import { checkBatch, commitBatch, recordReview } from './lib/engine/commit.mjs';
 import { buildContext } from './lib/engine/context.mjs';
 import { changePlan } from './lib/engine/change-plan.mjs';
 import { changeDraft } from './lib/engine/change-draft.mjs';
+import { planReview, applyReview, DEFAULT_PLAN_FILE } from './lib/links/link-review.mjs';
 import { runQuery } from './lib/engine/query.mjs';
 import { runEncounters } from './lib/engine/encounters.mjs';
 import { buildSubjectIndex } from './lib/subjects.mjs';
@@ -37,6 +40,8 @@ const USAGE = [
   '  index   <root>',
   '  change-plan <root> --subject <id>',
   '  change-draft <root> --op rename|delete|merge --subject <id> [--title "<new title>"] [--other <id>]',
+  '  links <root> --files "a,b" [--out .campaign/state/link-review.json]',
+  '  links <root> --apply <outcomes-file> --message "<text>" [--plan .campaign/state/link-review.json]',
 ].join('\n');
 
 const COMMANDS = {
@@ -48,6 +53,7 @@ const COMMANDS = {
   index: [],
   'change-plan': ['subject'],
   'change-draft': ['op', 'subject', 'title', 'other'],
+  links: ['files', 'out', 'apply', 'plan', 'message'],
 };
 
 class UsageError extends Error {}
@@ -198,6 +204,30 @@ async function run(parsed) {
         other: options.other?.trim(),
       });
       return { code: result.ok ? 0 : 1, value: result };
+    }
+    case 'links': {
+      if (options.apply !== undefined) {
+        if (options.files !== undefined) usageError('--apply and --files cannot be used together');
+        if (options.out !== undefined) usageError('--out is for plan mode only; use --plan with --apply');
+        if (options.message === undefined || options.message.trim() === '') {
+          usageError('--message is required with --apply');
+        }
+        const result = applyReview(root, {
+          outcomesFile: options.apply,
+          planFile: options.plan === undefined ? DEFAULT_PLAN_FILE : checkedOutPath(options.plan),
+          message: options.message,
+        });
+        return { code: result.ok ? 0 : 1, value: result };
+      }
+      if (options.files === undefined) usageError('links needs --files (plan mode) or --apply (apply mode)');
+      if (options.plan !== undefined || options.message !== undefined) {
+        usageError('--plan and --message are for apply mode only; use --apply');
+      }
+      const result = planReview(root, {
+        files: listOption(options, 'files'),
+        out: options.out === undefined ? DEFAULT_PLAN_FILE : checkedOutPath(options.out),
+      });
+      return { code: 0, value: result };
     }
     default:
       usageError(`unknown command '${command}'`);

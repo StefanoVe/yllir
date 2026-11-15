@@ -140,10 +140,22 @@ The draft path of a new document is `<Title>.md` in the folder of its kind, as `
    - `"outcome":"APPLY"`: go to step 5.
 5. Run `commit` with the same `--files` and `--deletes` as the last `check`, `--sources` when there are imported files to save, the message sentence in the campaign language, and `--note` with what is in progress, when there is something in progress. Read the output:
    - `manualChanges`: the master's hand edits were kept. Tell the master in one sentence.
-   - `ambiguousMentions`: judge each one. If it is clearly a subject, add its link in a follow-up batch: read one existing document with the Read tool to see how links are written, then rewrite the draft with the name linked.
+   - `ambiguousMentions`: the engine linked only the sure ones. Run step 6 (link review) on `finalFiles`; do not rewrite drafts by hand to add links.
    - `errors`: if not empty, say the fixed sentence of the lexicon for an operation that could not be completed.
    If `commit` exits 1, nothing was written: fix, check and commit again.
-6. Tell the master what was created or changed, in a few sentences, and what was invented (see section 8).
+6. **Link review (after every commit).** The engine links the mentions it is sure of. The others go to a link reviewer.
+   a. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" links . --files "<finalFiles, comma-separated>"`, with the `finalFiles` of the last `check`. If `count` is 0, go to step 7.
+   b. Launch ONE `yllir:link-reviewer` through the Agent tool with exactly these keys:
+
+      ```text
+      CAMPAIGN_ROOT: <absolute path of the campaign folder>
+      PLAN_FILE: .campaign/state/link-review.json
+      ```
+
+   c. Save its answer, exactly as returned, with the Write tool to `.campaign/state/link-outcomes.json`. It must be a JSON array with one entry for every `pid` of the plan. If it is not, launch the reviewer once more with the same keys and save again. If the second answer is not valid either, tell the master nothing technical, leave those mentions unlinked, and go to step 7.
+   d. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" links . --apply .campaign/state/link-outcomes.json --message "<one sentence in the campaign language, for example «Collegate le menzioni sicure.»>"`. Read the output. If `missing_outcome` or `rejected` is not empty, fix `.campaign/state/link-outcomes.json` with the Write tool and run this step again. At most 2 rounds.
+   e. The `ask` entries are the mentions the reviewer could not settle. Group the related ones, and ask the master ONE short question for each group, in plain words in the campaign language: show the sentence, and say what the link would mean. On a yes, write nothing by hand: the plan was deleted by step d, so run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" links . --files "<the file of the mention>" --out .campaign/state/link-review-ask.json`, find the `pid` of that mention in the output, write `.campaign/state/link-outcomes.json` with only that `pid` as `APPLY`, and run `links . --apply .campaign/state/link-outcomes.json --plan .campaign/state/link-review-ask.json --message "<sentence>"`. `missing_outcome` entries are expected there. On a no, or no answer, do nothing.
+7. Tell the master what was created or changed, in a few sentences, and what was invented (see section 8).
 
 ## 8. Provenance
 

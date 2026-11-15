@@ -93,7 +93,7 @@ A place is placed in the world by its `location` metadata. An item or a characte
 1. Run `check` with `--files "<drafts>"` and `--deletes "<deleted paths>"`, if any. If it exits 1, read the errors, fix the drafts, and run `check` again. At most 3 rounds. Read `finalFiles` and `reviewRequired`.
 2. If `reviewRequired` is true, launch the batch reviewer as `authoring.md` section 7 step 4 says. Merge, split and retcon always change facts, so for them the review applies whenever the engine asks for it. Follow its `FIX` and `APPLY` outcome exactly.
 3. Run `commit` with the same `--files` and `--deletes` as the last check. The `--message` is one sentence in the campaign language that says what was done, for example «Rinominata la scheda di <vecchio titolo> in <nuovo titolo>». Add `--note` only if something is still in progress.
-4. Read the output. Follow `authoring.md` section 7 step 5 for `manualChanges`, `ambiguousMentions` and `errors`.
+4. Read the output. Follow `authoring.md` section 7 steps 5 and 6 for `manualChanges`, `ambiguousMentions` and `errors`.
 
 One operation is one saved version, except when a delete needed answers first (Step 3c, step 4).
 

@@ -1,0 +1,17 @@
+#!/usr/bin/env node
+import path from 'node:path';
+import { markChunkDone, prepareLinksReview } from './lib/links-review.mjs';
+import { runCli, exitWith } from '../../../../scripts/lib/cli-exit.mjs';
+
+async function main() {
+  const [campaign = '.', flag = '--prepare', ...args] = process.argv.slice(2);
+  const root = path.resolve(campaign);
+  let result;
+  if (flag === '--prepare' && args.length === 0) result = prepareLinksReview(root);
+  else if (flag === '--done' && args.length === 1) result = markChunkDone(root, args[0]);
+  else throw new Error('usage: links-review.mjs <root> --prepare | --done <chunkId>');
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  exitWith(result.status === 'failed' ? 1 : 0);
+}
+
+runCli(main);

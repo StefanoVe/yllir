@@ -197,7 +197,7 @@ The work runs in two stages. Stage 1 brings every file in as a source and reads 
    - `"outcome":"APPLY"`: go to item 4.
 4. Run `commit` with the same `--files` as the last `check`, `--sources` with the cards, transcriptions and originals of the ids whose statements are in this batch (campaign-relative, comma-separated; these files were placed by the framework's scripts), and `--message` with one sentence in the campaign language, for example «Mondo: Borgo Cenere, Teodo Marr e la Gilda del sale.». Add `--note` with what is in progress when something is still open: the note names the ids and the open question in one sentence, for example `Waiting for the master on Q001 of src-1a2b3c4d: the name at p1:l2.`. Read the output:
    - `manualChanges`: the master's hand edits were kept. Tell the master in one sentence in the final message.
-   - `ambiguousMentions`: judge each one. A clear subject gets its link in the next batch: read one existing document with the Read tool to see how links are written, then rewrite the draft with the name linked.
+   - `ambiguousMentions`: the engine linked only the sure ones. Follow `authoring.md` section 7 step 6 for the link review after each batch.
    - `errors`: not empty: the Failures sentence, and stop.
    If `commit` exits 1, nothing was written: fix, check and commit again.
 5. Set `done` for every id and the batch number in `progress.json`, and `next` to the next batch. Write `progress.json` with the Read tool and then the Write tool.
