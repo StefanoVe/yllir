@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/assets/yllir-logo.svg" alt="Yllir" width="220">
+
 # Yllir
 
 **Your campaign, written with you. Consistent, linked and saved, just by talking.**
@@ -14,7 +16,7 @@ A [Claude Code](https://claude.com/claude-code) plugin for game masters who want
 
 ---
 
-You tell Yllir what you need, in your own words and your own language: *"a port town ruled by a smugglers' guild"*, *"prepare next session"*, *"tonight they burned the warehouse"*. Yllir writes the places, characters, scenes and chronicle, checks every new fact against what already exists, links every mention, and saves a version you can always go back to.
+You tell Yllir what you need, in your own words and your own language: *"a port town ruled by a smugglers' guild"*, *"prepare next session"*, *"tonight they burned the warehouse"*. Yllir writes the places, characters, scenes and chronicle, checks every new fact against what already exists, links every mention (doubtful ones are checked by a second reader), and saves a version you can always go back to.
 
 There are no commands to learn and no technical setup inside the campaign. Git, scripts, reviews and links all run behind the scenes.
 
@@ -71,6 +73,8 @@ From here, build the world as you need it. Nothing is generated unless you ask, 
 
 > [!TIP]
 > Already have notes, a notebook or old session PDFs? Just share them: *"here are my notes from the last campaign"*. Yllir transcribes them, keeps the originals as sources, and asks you whenever a reading is unclear.
+>
+> Have a **whole campaign already written** (text, Word, PDFs, photos)? Hand it over. Yllir shows you what it found, writes nothing until you say yes, then builds the documents, the world seed and the past sessions in small groups. Your originals are kept untouched.
 
 ## What you can ask
 
@@ -104,7 +108,8 @@ Yllir writes the chronicle page from what you said, applies the consequences you
 ### Looking after the canon
 
 - *"Rename Varn to Varnak everywhere."* · *"Merge the two smugglers, they're the same person."* · *"Actually, the duke died ten years ago, not five."*
-- *"Check the whole campaign for contradictions."*
+- *"Check the whole campaign for contradictions."* The report also lists structural and story problems (unused characters, threads nobody picks up, unreachable plot nodes), each with a proposed fix.
+- *"Make the fights of session 4 easier for four players."* Yllir measures each fight with the game's rules, shows a plan and changes nothing until you say yes.
 - *"Where were we?"* · *"Undo the last change."* · *"Go back to how it was yesterday."*
 
 ### Extras
