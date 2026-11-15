@@ -56,23 +56,101 @@
   cursor: grab;
 }
 
-/* The drawn SVG is inserted at runtime, so its rules go through ::ng-deep. Shape colours are set on
-   each shape from the app tokens (plot-render.ts); only the focus ring and the pointer live here. */
-.canvas {
-  position: absolute;
-  left: 0;
-  top: 0;
-  transform-origin: 0 0;
+/* The drawn SVG is inserted at runtime, so its rules go through ::ng-deep. These are the card rules of
+   the plot map (same tokens and classes as before the Mermaid flowchart). */
+:host ::ng-deep .canvas svg {
+  overflow: visible;
 }
 
-:host ::ng-deep .canvas g.plot-node {
+:host ::ng-deep .canvas .arrow-head {
+  fill: var(--color-text-muted);
+}
+
+:host ::ng-deep .canvas .edge {
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 1.5;
+  transition: opacity var(--transition-fast);
+}
+
+:host ::ng-deep .canvas .edge.order {
+  stroke-dasharray: 6 5;
+}
+
+:host ::ng-deep .canvas .edge.lit {
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}
+
+:host ::ng-deep .canvas .edge.dim,
+:host ::ng-deep .canvas .node.dim {
+  opacity: 0.25;
+}
+
+:host ::ng-deep .canvas .node {
   cursor: pointer;
   outline: none;
+  transition: opacity var(--transition-fast);
 }
 
-:host ::ng-deep .canvas g.plot-node:focus-visible .plot-shape {
-  stroke: var(--color-focus) !important;
-  stroke-width: 3 !important;
+:host ::ng-deep .canvas .node .card {
+  fill: var(--color-surface-2);
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+:host ::ng-deep .canvas .node.session .card {
+  fill: var(--color-accent-soft);
+  stroke: var(--color-accent);
+  stroke-width: 1.5;
+}
+
+:host ::ng-deep .canvas .node.lit .card {
+  stroke: var(--color-accent);
+  stroke-width: 3;
+}
+
+:host ::ng-deep .canvas .node:focus-visible .card {
+  stroke: var(--color-focus);
+  stroke-width: 3;
+}
+
+:host ::ng-deep .canvas .kind-label {
+  font-size: 11px;
+  fill: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+:host ::ng-deep .canvas .title-label {
+  font-size: 14px;
+  font-weight: 600;
+  fill: var(--color-text);
+}
+
+:host ::ng-deep .canvas .status path,
+:host ::ng-deep .canvas .status circle {
+  fill: none;
+  stroke: var(--color-text-muted);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+:host ::ng-deep .canvas .status path {
+  stroke: var(--color-accent);
+}
+
+/* Session clusters: a quiet dashed outline, no fill. */
+:host ::ng-deep .canvas .cluster-outline {
+  fill: none;
+  stroke: var(--color-border);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+}
+
+:host ::ng-deep .canvas .cluster-title {
+  font-size: 12px;
+  fill: var(--color-text-muted);
 }
 
 .legend {
@@ -109,48 +187,4 @@
 
 .sample .edge.order {
   stroke-dasharray: 6 5;
-}
-
-.sample .arrow-head {
-  fill: var(--color-text-muted);
-}
-
-/* Same look as the drawn nodes in plot-render.ts: played is shaded, ready has a thick outline, waiting is dashed. */
-.sample .sample-shape {
-  fill: var(--color-surface);
-  stroke: var(--color-border-strong);
-  stroke-width: 1.5;
-}
-
-.sample .sample-shape.played {
-  fill: var(--color-surface-2);
-  stroke: var(--color-text-muted);
-}
-
-.sample .sample-shape.ready {
-  stroke: var(--color-accent);
-  stroke-width: 2.5;
-}
-
-.sample .sample-shape.waiting {
-  stroke-dasharray: 5 4;
-}
-
-.sample .sample-mark {
-  fill: none;
-  stroke: var(--color-text-muted);
-  stroke-width: 1.75;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.sample .sample-mark.ready {
-  fill: var(--color-accent);
-  stroke: var(--color-accent);
-}
-
-.sample .sample-mark.waiting {
-  fill: none;
-  stroke: var(--color-text-muted);
-  stroke-width: 1.5;
 }

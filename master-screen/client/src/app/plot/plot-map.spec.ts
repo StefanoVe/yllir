@@ -27,14 +27,16 @@ const sheets = {
   ],
 };
 
-/** The SVG mermaid would draw: one group per node, named the way mermaid names them. */
+/** The SVG after mermaid and decoratePlot: one group per node id, and the edges with their ends. */
 function drawnSvg(): SVGSVGElement {
   const box = document.createElement('div');
   box.innerHTML =
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300">' +
-    '<g class="node default played" id="flowchart-s1-0"></g>' +
-    '<g class="node default ready" id="flowchart-sc1-0"></g>' +
-    '<g class="node default waiting" id="flowchart-s2-0"></g>' +
+    '<g class="node session played" id="flowchart-s1-0"></g>' +
+    '<g class="node scene ready" id="flowchart-sc1-0"></g>' +
+    '<g class="node session waiting" id="flowchart-s2-0"></g>' +
+    '<path class="edge depends" data-from="s1" data-to="sc1"></path>' +
+    '<path class="edge order" data-from="sc1" data-to="s2"></path>' +
     '</svg>';
   return box.querySelector('svg') as SVGSVGElement;
 }
@@ -84,23 +86,38 @@ describe('PlotMapComponent', () => {
     fixture.detectChanges();
   }
 
-  it('shows a legend for the arrows and for the three statuses', async () => {
+  it('shows a legend that explains solid arrows and dashed lines', async () => {
     create();
     await settle();
     const legend = el.querySelector('ul.legend')?.textContent ?? '';
     expect(legend).toContain('Solid arrow: needs');
     expect(legend).toContain('Dashed line: just follows in the file');
-    expect(legend).toContain('Ticked and shaded: already played.');
-    expect(legend).toContain('Thick outline: ready to play next.');
-    expect(legend).toContain('Dashed outline: waiting for something first.');
-    expect(el.querySelectorAll('ul.legend .sample-shape')).toHaveLength(3);
+    expect(el.querySelectorAll('ul.legend li')).toHaveLength(3);
+  });
+
+  it('lights the chain of a hovered node and dims the rest', async () => {
+    create();
+    await settle();
+    const scene = el.querySelector<SVGGElement>('g.node[data-path="sessions/1/arrival.md"]');
+    scene?.dispatchEvent(new Event('mouseenter'));
+    await settle();
+    const nodes = el.querySelectorAll<SVGGElement>('g.node');
+    expect([...nodes].map((node) => node.classList.contains('dim'))).toEqual([false, false, true]);
+    expect([...nodes].map((node) => node.classList.contains('lit'))).toEqual([true, true, false]);
+    const edges = el.querySelectorAll<SVGPathElement>('path.edge');
+    expect(edges[0].classList.contains('lit')).toBe(true);
+    expect(edges[1].classList.contains('dim')).toBe(true);
+    scene?.dispatchEvent(new Event('mouseleave'));
+    await settle();
+    expect(el.querySelectorAll('g.node.dim')).toHaveLength(0);
+    expect(el.querySelectorAll('path.edge.lit')).toHaveLength(0);
   });
 
   it('draws the map from the server source with the app theme', async () => {
     create();
     await settle();
     expect(drawer.render).toHaveBeenCalledWith(data.mermaid, expect.stringMatching(/^(dark|default)$/));
-    expect(drawer.decorate).toHaveBeenCalled();
+    expect(drawer.decorate).toHaveBeenCalledWith(expect.anything(), data.nodes, expect.any(Function));
     expect(el.querySelector('.canvas svg')).not.toBeNull();
   });
 
