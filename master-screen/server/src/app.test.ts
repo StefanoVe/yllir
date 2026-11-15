@@ -57,6 +57,7 @@ describe('app and status route', () => {
       ok: boolean;
       campaign: { name: string; slug: string; language: string };
       frameworkVersion: string;
+      screenVersion: string;
       modules: Record<string, boolean>;
       agent: { available: boolean; reason?: string };
       git: { ok: boolean };
@@ -64,6 +65,7 @@ describe('app and status route', () => {
     assert.equal(body.ok, true);
     assert.deepEqual(body.campaign, { name: 'Test Campaign', slug: 'test-campaign', language: 'it' });
     assert.match(body.frameworkVersion, /^\d+\.\d+\.\d+$/);
+    assert.ok(body.screenVersion === 'unknown' || /^\d+\.\d+\.\d+$/.test(body.screenVersion));
     assert.equal(body.modules.music, true);
     assert.equal(body.modules.print, false);
     assert.deepEqual(body.agent, { available: false, reason: 'Not configured' });

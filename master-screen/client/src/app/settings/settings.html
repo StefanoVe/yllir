@@ -636,6 +636,8 @@
           <dd>{{ campaign()?.name ?? '' }}</dd>
           <dt>{{ t('settings.version') }}</dt>
           <dd>{{ framework() }}</dd>
+          <dt>{{ t('settings.screenVersion') }}</dt>
+          <dd>{{ screenVersion() }}</dd>
           <dt>{{ t('settings.assistant') }}</dt>
           <dd>
             @if (agent()?.available) {

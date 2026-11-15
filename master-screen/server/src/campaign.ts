@@ -2,6 +2,7 @@
 // and the framework version. Owner: server skeleton.
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ModuleId, StatusResponse } from '../../shared/src/types.js';
 import type { Ctx } from './context.js';
 import { loadFrameworkModule } from './engine.js';
@@ -90,4 +91,28 @@ export async function readFrameworkVersion(frameworkRoot: string): Promise<strin
   } catch {
     return 'unknown';
   }
+}
+
+/**
+ * Version of the running master screen, from its VERSION file. The packaged layout has
+ * VERSION next to the running server file; the dev layout (dist/server.mjs) has it one
+ * folder up. The first readable file wins. Never throws.
+ */
+export async function readScreenVersion(): Promise<string> {
+  let serverDir: string;
+  try {
+    serverDir = path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    return 'unknown';
+  }
+  const candidates = [path.join(serverDir, 'VERSION'), path.join(serverDir, '..', 'VERSION')];
+  for (const file of candidates) {
+    try {
+      const raw = (await fs.readFile(file, 'utf8')).trim();
+      if (/^\d+\.\d+\.\d+$/.test(raw)) return raw;
+    } catch {
+      // try the next location
+    }
+  }
+  return 'unknown';
 }

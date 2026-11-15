@@ -2,7 +2,7 @@
 import { execFile } from 'node:child_process';
 import type { Router } from 'express';
 import type { StatusResponse } from '../../../shared/src/types.js';
-import { readCampaignSummary, readFrameworkVersion } from '../campaign.js';
+import { readCampaignSummary, readFrameworkVersion, readScreenVersion } from '../campaign.js';
 import type { Ctx } from '../context.js';
 import { wrap } from '../http.js';
 import { musicAvailable } from '../music/availability.js';
@@ -20,9 +20,10 @@ function gitOk(campaignRoot: string): Promise<boolean> {
 }
 
 export async function buildStatus(ctx: Ctx): Promise<StatusResponse> {
-  const [summary, frameworkVersion, git, music] = await Promise.all([
+  const [summary, frameworkVersion, screenVersion, git, music] = await Promise.all([
     readCampaignSummary(ctx),
     readFrameworkVersion(ctx.frameworkRoot),
+    readScreenVersion(),
     gitOk(ctx.campaignRoot),
     musicAvailable(ctx),
   ]);
@@ -30,6 +31,7 @@ export async function buildStatus(ctx: Ctx): Promise<StatusResponse> {
     ok: summary.ok,
     campaign: summary.campaign,
     frameworkVersion,
+    screenVersion,
     modules: { ...summary.modules, music },
     agent: ctx.agentStatus(),
     git: { ok: git },

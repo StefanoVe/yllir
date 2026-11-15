@@ -175,6 +175,7 @@ export const it: Record<TranslationKey, string> = {
   'settings.about': 'Informazioni',
   'settings.campaign': 'Campagna',
   'settings.version': 'Versione del framework',
+  'settings.screenVersion': 'Versione del master screen',
   'settings.assistant': 'Assistente',
   'settings.agentReady': 'Pronto',
   'settings.agentUnavailable': 'Non disponibile',

@@ -308,6 +308,7 @@ export class Settings {
 
   readonly campaign = computed(() => this.status.campaign());
   readonly framework = computed(() => this.status.status()?.frameworkVersion ?? '');
+  readonly screenVersion = computed(() => this.status.status()?.screenVersion ?? '');
   readonly agent = computed(() => this.status.status()?.agent ?? null);
   readonly musicOn = computed(() => this.status.modules()?.music === true);
   readonly moduleRows = computed(() => {

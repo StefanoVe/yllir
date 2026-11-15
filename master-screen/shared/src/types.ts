@@ -4,6 +4,7 @@ export interface StatusResponse {
   ok: boolean;
   campaign: { name: string; slug: string; language: string };
   frameworkVersion: string;           // from <framework>/.claude-plugin/plugin.json
+  screenVersion: string;              // version of the running master screen, from its VERSION file ('unknown' when missing)
   modules: Record<ModuleId, boolean>;  // from campaign.yaml `modules:` (missing key = false)
   agent: { available: boolean; reason?: string }; // reason is plain language, in the campaign language
   git: { ok: boolean };

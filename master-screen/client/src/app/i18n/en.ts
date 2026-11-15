@@ -174,6 +174,7 @@ export const en = {
   'settings.about': 'About',
   'settings.campaign': 'Campaign',
   'settings.version': 'Framework version',
+  'settings.screenVersion': 'Master screen version',
   'settings.assistant': 'Assistant',
   'settings.agentReady': 'Ready',
   'settings.agentUnavailable': 'Not available',
