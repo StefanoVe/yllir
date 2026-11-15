@@ -158,8 +158,8 @@ test('a dnd-2024 campaign rejects a check value without ability and accepts the 
 test('a changed scene is reopened as pending by refresh, with its draft dropped and its errors recomputed', async () => {
   const root = campaign({ scene: CONVERTED });
   assert.equal((await prepareSceneChecks(root)).status, 'complete');
-  // The scene is completed on a previous run, then the master edits it.
-  const state = { scenes: [{ file: FILE, source: 'old', status: 'complete' }] };
+  // The scene is pending from a previous run, then the master edits it.
+  const state = { scenes: [{ file: FILE, source: 'old', status: 'pending' }] };
   fs.mkdirSync(path.join(root, '.campaign/state/update'), { recursive: true });
   fs.writeFileSync(path.join(root, '.campaign/state/update/scene-checks.json'), JSON.stringify(state));
   const edited = `${CONVERTED}\nModifica del master.\n`;
@@ -182,4 +182,32 @@ test('refresh refuses a scene that is not changed', async () => {
   const root = campaign();
   await prepareSceneChecks(root);
   assert.equal((await refreshChangedScene(root, FILE)).errors[0].code, 'scene-not-changed');
+});
+
+async function completeScene(root) {
+  await prepareSceneChecks(root);
+  await stageSceneDraft(root, FILE, CONVERTED);
+  assert.equal((await verifySceneDrafts(root, [FILE])).status, 'verified');
+  fs.writeFileSync(path.join(root, FILE), CONVERTED);
+  assert.equal((await completeScenes(root, [FILE])).status, 'complete');
+}
+
+test('a complete scene that a later rewrite leaves passing stays complete, not changed', async () => {
+  const root = campaign({ scene: OLD });
+  await completeScene(root);
+  fs.writeFileSync(path.join(root, FILE), CONVERTED.replace('Il gruppo arriva.', 'Il gruppo arriva.\n\nUn dettaglio in più.'));
+  const result = await prepareSceneChecks(root);
+  assert.equal(result.scenes[0].status, 'complete');
+  assert.equal(result.scenes[0].current_source, undefined);
+  assert.equal(result.status, 'complete');
+});
+
+test('a complete scene rewritten into the old form becomes pending, not changed', async () => {
+  const root = campaign({ scene: OLD });
+  await completeScene(root);
+  fs.writeFileSync(path.join(root, FILE), OLD);
+  const result = await prepareSceneChecks(root);
+  assert.equal(result.scenes[0].status, 'pending');
+  assert.ok(result.scenes[0].errors.length > 0);
+  assert.equal(result.scenes[0].current_source, undefined);
 });

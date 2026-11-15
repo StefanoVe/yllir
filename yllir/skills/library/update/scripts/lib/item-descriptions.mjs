@@ -56,6 +56,10 @@ export function prepareItemDescriptions(root, { persist = true, migration = DEFA
     let old = previous.get(item.file) ?? moved.get(item.file);
     if (old && old.source === item.legacy && old.source !== item.source) old = { ...old, source: item.source };
     if (old?.status === 'complete' && old.source === item.source) return { ...old };
+    if (old?.status === 'complete' && old.source !== item.source) {
+      const text = fs.readFileSync(path.join(root, item.file), 'utf8');
+      return hasBriefAndDescription(text) ? { ...old, source: item.source } : item;
+    }
     if (old?.status === 'changed' && old.source !== item.source) return { ...old, current_source: item.source };
     if (old?.source && old.source !== item.source) return { ...old, status: 'changed', current_source: item.source };
     if (old?.status === 'pending' && old.source === item.source) return { ...old };

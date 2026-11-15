@@ -165,27 +165,32 @@ export async function prepareCombatStatistics(root, { persist = true } = {}) {
   }
 
   const previous = new Map(readState(root).sheets.map((record) => [record.file, record]));
+  const pendingRecord = (file, now) => {
+    const record = { file, source: now.source, status: 'pending', rolls: now.rolls, needs_actions: now.needsActions };
+    if (now.rolls > 0 && persist) {
+      const fixed = applyRollFix(now.text, lang, rollFix);
+      const dest = safeDraftPath(root, file);
+      if (dest) {
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.writeFileSync(dest, fixed, 'utf8');
+        record.draft = hash(fixed);
+        record.auto_draft = true;
+      }
+    }
+    return record;
+  };
   const sheets = [];
   for (const [file, now] of current) {
     const old = previous.get(file);
     const needed = now.rolls > 0 || now.needsActions;
     if (!old) {
       if (!needed) continue;
-      const record = { file, source: now.source, status: 'pending', rolls: now.rolls, needs_actions: now.needsActions };
-      if (now.rolls > 0 && persist) {
-        const fixed = applyRollFix(now.text, lang, rollFix);
-        const dest = safeDraftPath(root, file);
-        if (dest) {
-          fs.mkdirSync(path.dirname(dest), { recursive: true });
-          fs.writeFileSync(dest, fixed, 'utf8');
-          record.draft = hash(fixed);
-          record.auto_draft = true;
-        }
-      }
-      sheets.push(record);
+      sheets.push(pendingRecord(file, now));
       continue;
     }
     if (old.status === 'complete' && old.source === now.source) sheets.push({ ...old });
+    else if (old.status === 'complete' && !needed) sheets.push({ ...old, source: now.source });
+    else if (old.status === 'complete') sheets.push(pendingRecord(file, now));
     else if (old.source !== now.source) sheets.push({ file, source: old.source, status: 'changed', current_source: now.source });
     else sheets.push({ ...old, status: 'pending', ...formatProblems(now) });
   }

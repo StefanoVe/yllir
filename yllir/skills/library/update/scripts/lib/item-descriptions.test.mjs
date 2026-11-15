@@ -201,3 +201,22 @@ test('the two migrations keep separate inventories', () => {
   assert.equal(prepareItemDescriptions(root, { migration: K }).status, 'complete');
   assert.equal(prepareItemDescriptions(root).status, 'pending');
 });
+
+test('a complete item that a later rewrite leaves passing stays complete, not changed', () => {
+  const root = campaign([['key.md', sheet()]]);
+  assert.equal(completeSheet(root, 'Objects/key.md').status, 'complete');
+  fs.appendFileSync(path.join(root, 'Objects/key.md'), '\nA harmless trailing line.\n');
+  const result = prepareItemDescriptions(root);
+  assert.equal(result.items[0].status, 'complete');
+  assert.equal(result.items[0].current_source, undefined);
+  assert.equal(result.status, 'complete');
+});
+
+test('a complete item rewritten without its brief becomes pending, not changed', () => {
+  const root = campaign([['key.md', sheet()]]);
+  assert.equal(completeSheet(root, 'Objects/key.md').status, 'complete');
+  fs.writeFileSync(path.join(root, 'Objects/key.md'), sheet().replace(/## In breve[\s\S]*?## Descrizione/, '## Descrizione'));
+  const result = prepareItemDescriptions(root);
+  assert.equal(result.items[0].status, 'pending');
+  assert.equal(result.items[0].current_source, undefined);
+});

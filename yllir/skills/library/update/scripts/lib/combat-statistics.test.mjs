@@ -246,9 +246,9 @@ test('complete refuses a published text that differs from the verified draft', a
 test('a sheet changed after prepare is reported as changed, and refresh reopens it as pending', async () => {
   const root = campaign();
   await prepareCombatStatistics(root);
-  // A complete record of the earlier text, then the master edits the sheet.
+  // A pending record of the earlier text, then the master edits the sheet.
   fs.mkdirSync(path.join(root, '.campaign/state/update'), { recursive: true });
-  fs.writeFileSync(path.join(root, '.campaign/state/update/combat-statistics.json'), JSON.stringify({ sheets: [{ file: FILE, source: 'old', status: 'complete' }] }));
+  fs.writeFileSync(path.join(root, '.campaign/state/update/combat-statistics.json'), JSON.stringify({ sheets: [{ file: FILE, source: 'old', status: 'pending' }] }));
   fs.writeFileSync(path.join(root, FILE), `${NPC}\nModifica del master.\n`);
 
   const prepared = await prepareCombatStatistics(root);
@@ -262,4 +262,32 @@ test('a sheet changed after prepare is reported as changed, and refresh reopens 
   assert.equal(fs.existsSync(path.join(root, '.campaign/state/write/draft', FILE)), false);
   assert.equal((await prepareCombatStatistics(root)).sheets[0].status, 'pending');
   assert.equal((await refreshChangedSheet(root, FILE)).errors[0].code, 'sheet-not-changed');
+});
+
+async function completeNpc(root) {
+  await prepareCombatStatistics(root);
+  await stageCombatDraft(root, FILE, withStatistics(NPC));
+  assert.equal((await verifyCombatDrafts(root, [FILE])).status, 'verified');
+  fs.writeFileSync(path.join(root, FILE), withStatistics(NPC));
+  assert.equal((await completeCombatSheets(root, [FILE])).status, 'complete');
+}
+
+test('a complete sheet that a later rewrite leaves passing stays complete, not changed', async () => {
+  const root = campaign();
+  await completeNpc(root);
+  fs.writeFileSync(path.join(root, FILE), withStatistics(NPC).replace('Gestisce la locanda del villaggio.', 'Gestisce la locanda del villaggio.\n\nUna frase in più.'));
+  const result = await prepareCombatStatistics(root);
+  assert.equal(result.sheets[0].status, 'complete');
+  assert.equal(result.sheets[0].current_source, undefined);
+  assert.equal(result.status, 'complete');
+});
+
+test('a complete sheet rewritten so the check fails again becomes pending, not changed', async () => {
+  const root = campaign();
+  await completeNpc(root);
+  fs.writeFileSync(path.join(root, FILE), withStatistics(NPC, NPC_FIXED_TABLES.replace('| Colpo disarmato | Attacco in mischia: +2. Colpisce: 1d4 danni contundenti. |\n', '')));
+  const result = await prepareCombatStatistics(root);
+  assert.equal(result.sheets[0].status, 'pending');
+  assert.equal(result.sheets[0].needs_actions, true);
+  assert.equal(result.sheets[0].current_source, undefined);
 });

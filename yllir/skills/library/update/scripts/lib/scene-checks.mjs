@@ -143,6 +143,8 @@ export async function prepareSceneChecks(root, { persist = true } = {}) {
       continue;
     }
     if (old.status === 'complete' && old.source === now.source) scenes.push({ ...old });
+    else if (old.status === 'complete' && now.errors.length === 0) scenes.push({ ...old, source: now.source });
+    else if (old.status === 'complete') scenes.push({ file, source: now.source, status: 'pending', errors: formatErrors(now.errors) });
     else if (old.source !== now.source) scenes.push({ file, source: old.source, status: 'changed', current_source: now.source });
     else scenes.push({ ...old, status: 'pending', errors: formatErrors(now.errors) });
   }
