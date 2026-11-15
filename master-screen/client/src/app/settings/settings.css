@@ -733,10 +733,8 @@ summary {
   display: inline-flex;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .spin {
-    animation: spin 1s linear infinite;
-  }
+.spin {
+  animation: spin 1s linear infinite;
 }
 
 @keyframes spin {

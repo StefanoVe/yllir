@@ -881,11 +881,6 @@
   margin-top: var(--space-1);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .spin {
-    animation: none;
-  }
-}
 
 
 /* Conversation bar: the shown conversation's name opens the list, "+" starts a new one. */

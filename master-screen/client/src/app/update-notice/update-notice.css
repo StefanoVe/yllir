@@ -229,8 +229,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .notice,
-  .notice.tip,
-  .spin {
+  .notice.tip {
     animation: none;
   }
 
