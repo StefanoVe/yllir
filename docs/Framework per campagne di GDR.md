@@ -22,6 +22,7 @@ Questo file è l’indice: raccoglie le decisioni dell’autore, che sono vincol
 | [Configurazione](Configurazione.md) | File di configurazione della campagna, istruzioni generate da template, personalizzazioni dell’utente |
 | [Processi di core](Processi%20di%20core.md) | Nuova campagna, preparazione, sessione live, dopo la sessione, manutenzione, import di materiale, completamento di una scheda (**Proposta**) |
 | [Skill di libreria](Skill%20di%20libreria.md) | Catalogo e schede delle skill specialistiche |
+| [Modelli 3D](Modelli%203D.md) | Modelli STL da stampare di personaggi e creature: immagine monocromatica in posa adatta, poi strumenti locali |
 | [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md) | Adattatori dei sistemi di gioco e profili di stile visivo |
 | [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md) | Agente principale, esecutori economici, revisori, Claude e Codex |
 | [Esperienza utente](Esperienza%20utente.md) | Uso da parte di chi non programma: ingresso, onboarding, lessico, versioni, dialoghi d’esempio |

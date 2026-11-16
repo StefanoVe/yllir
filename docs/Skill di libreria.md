@@ -65,7 +65,7 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | [Artwork](#l8-artwork) (`artwork`) | Libreria, chiamata dal core | Dipingere una creatura o un personaggio partendo da una descrizione verificata, e collegare il dipinto alla scheda. | Deciso (indice). Implementata come skill `images`; restano fuori `modifica_zona`, `espandi` e `ingrandisci` |
 | [Ricerca artwork](#l23-ricerca-artwork) (`artwork-search`) | Libreria, chiamata dal core | Trovare illustrazioni esistenti online, senza IA generativa, e proporne al master al massimo tre, con lo sfondo tolto da quella scelta. | Proposta (richiesta dell'autore, 2026-11-12). Implementata come skill `artwork-search` |
 | [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Deciso (indice). Prima implementazione (2026-11-12) come skill `cards`; il percorso con Photoshop MCP, predefinito, non è verificato nei test |
-| [Modelli 3D da stampare](#l24-modelli-3d-da-stampare) (`models-3d`) | Libreria, chiamata dal core | Creare il modello 3D, pronto per la stampa 3D, di un personaggio o di una creatura a partire dalla sua scheda. | **Proposta** (richiesta dell'autore, 2026-11-16). Non implementata |
+| [Modelli 3D da stampare](#l24-modelli-3d-da-stampare) (`models-3d`) | Libreria, chiamata dal core | Creare il modello 3D, pronto per la stampa 3D, di un personaggio o di una creatura a partire dalla sua scheda. | Processo **Deciso** (2026-11-16), strumenti Proposta. Non implementata; vedi [Modelli 3D](Modelli%203D.md) |
 | [Mappe di luogo e di battaglia](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Creare mappe con livelli separati, per luoghi e scontri. | Deciso (indice; modalità `map` dello strumento `images`, Deciso 2026-11-11). Implementata in 0.41.0 per mappe di luogo e di battaglia |
 | [Mappe del mondo](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Modificare una carta del mondo senza alterarne la geometria. | Deciso (indice). Non implementata. Rinviata: la decisione sulle mappe di battaglia (indice, 2026-11-11) lascia fuori la carta del mondo, e `images` la rifiuta |
 | [Scontri](#l12-scontri) (`combat-tracker`) | Libreria, con adattatore | Tenere lo stato di uno scontro per il master: iniziativa, PF, fasi, condizioni, risorse dei nemici. | Deciso (indice). Implementata (2026-11-12) |
@@ -344,29 +344,17 @@ Implementata in 0.61.0: il tipo «personaggio giocante» di `write-document` (ca
 
 ### L24. Modelli 3D da stampare
 
-- **Stato:** **Proposta** (richiesta dell'autore, 2026-11-16). Non decisa e non implementata. Il numero è il primo libero dopo L23; la scheda sta prima di L11 perché, come la stampa (L10), è un output fisico.
-- **Scopo:** generare, per la scheda di un personaggio (PNG, nemico, personaggio giocante) o di una creatura, un modello 3D pronto per la stampa 3D (una miniatura o una sagoma da tavolo), e collocarlo accanto alla scheda.
+- **Stato:** processo **Deciso** dall'autore (2026-11-16); strumenti e dettagli **Proposta**. Non implementata. Il numero è il primo libero dopo L23; la scheda sta prima di L11 perché, come la stampa (L10), è un output fisico. Il documento dedicato è [Modelli 3D](Modelli%203D.md).
+- **Scopo:** generare, per la scheda di un personaggio o di una creatura, un modello 3D (STL) adatto alla stampa 3D, e collocarlo accanto alla scheda.
 - **Avvio:** dal core, solo su richiesta del master. Mai in autorun.
-- **Input → output:** parte pubblica della scheda (tratti visibili, taglia dall'adattatore del sistema di gioco), eventuale immagine già collegata alla scheda → file `.stl` o `.3mf` nella cartella `3d/` della categoria, anteprima PNG, file di provenienza accanto al modello (sidecar), rapporto del controllo di stampabilità.
-- **Percorsi di generazione (da scegliere, vedi Questioni aperte):**
-  1. *miniatura da servizio esterno*: un fornitore di immagine-in-3D o testo-in-3D, avvolto come fornitore Yllir (come per le immagini, vedi [Integrazioni esterne](Integrazioni%20esterne.md)), con disponibilità e consenso nella tabella locale dei fornitori;
-  2. *sagoma da tavolo (standee)*: l'immagine della scheda, senza sfondo, estrusa con uno spessore fisso su una base, tutto generato da uno script locale, senza servizi esterni;
-  3. *miniatura parametrica*: solo base, scala e segnaposto della figura da uno script locale; il corpo resta al fornitore o al master.
-- **Deterministico:** conversione della taglia in diametro della base (la tabella sta nell'adattatore del sistema, non nel codice); scala e dimensioni in millimetri; nomi dei file; controllo di stampabilità sulla mesh (chiusa e senza spigoli aperti, orientamento delle facce, spessore minimo delle pareti, sporgenze oltre l'angolo massimo, base piana, dimensioni entro il volume di stampa dichiarato); riparazione automatica dei difetti semplici; scrittura del sidecar con fornitore, versione, data e esito del controllo; collocamento tramite il motore.
-- **Giudizio:** descrizione visiva della figura (posa, equipaggiamento, tratti) senza segreti; confronto fra anteprima e descrizione pubblica; scelta fra riparare, rigenerare o scartare un modello che non supera il controllo; proposta di semplificare i dettagli troppo sottili per la scala.
-- **Dipendenze:** adattatore del sistema di gioco (taglia e scala di base); strumento `images` (immagine di partenza e rimozione dello sfondo); fornitori 3D come moduli; motore (collocamento e controllo della parte riservata); profilo di stile per le descrizioni visive.
-- **Requisiti:**
-  - la parte riservata al master, compresi i segreti e il blocco del master, non arriva mai a un fornitore 3D, a una ricerca web o a un servizio di pubblicazione: la descrizione è costruita da uno script dalla sola parte pubblica (come per `images`, vedi [Sicurezza e privacy](Sicurezza%20e%20privacy.md));
-  - il modello è **a prova di stampa**: mesh chiusa, spessori e sporgenze entro i limiti dichiarati, base piana, scala in millimetri; un modello che non supera il controllo non viene collocato senza dirlo al master;
-  - i parametri di stampa (volume, diametro della punta, spessore minimo, angolo di sporgenza, scala) sono configurazione del modulo, non costanti nel codice;
-  - il formato è aperto e leggibile dai programmi di taglio più comuni;
-  - il modello è un derivato della scheda: non modifica la scheda e non aggiunge fatti al canone, quindi non richiede la revisione di un modello distinto;
-  - se nessun percorso è disponibile, la skill lo dice e propone la sagoma da tavolo, che non ha dipendenze esterne.
-- **Rischi da evitare:**
-  - i generatori 3D da immagine producono spesso mesh non stampabili (buchi, pareti sottilissime, parti staccate): il controllo deterministico viene sempre dopo la generazione, mai si fida del fornitore;
-  - un servizio esterno può avere licenze o condizioni sul riuso dei modelli e sull'uso dei dati inviati: vanno dichiarate nel sidecar e al master;
-  - una scala scritta a mano nel codice sbaglia appena cambia il sistema di gioco o la taglia della creatura;
-  - modelli grandi o molti in un lotto sono lenti e costosi: un modello alla volta, con conferma prima di un lotto.
+- **Processo (Deciso):**
+  1. si genera un'immagine pulita, con canale alpha, in monocromo e in una posa che riduce al minimo i supporti;
+  2. dall'immagine si genera l'STL con strumenti scaricabili e presenti nel sistema, da definire al momento dell'implementazione.
+- **Input → output:** parte pubblica della scheda e taglia dall'adattatore del sistema di gioco → immagine monocromatica, STL in `3d/`, anteprima PNG, file di provenienza, rapporto di stampabilità.
+- **Deterministico:** descrizione dell'immagine dalla sola parte pubblica; scala e base dalla taglia; controllo di stampabilità sulla mesh; nomi dei file; collocamento tramite il motore.
+- **Giudizio:** confronto fra immagine, descrizione e requisiti di posa; scelta fra riparare, rigenerare con una posa più semplice o scartare.
+- **Dipendenze:** strumento `images` (passo 1); strumenti locali per l'STL (passo 2); adattatore del sistema di gioco; motore.
+- **Requisiti e rischi:** nel documento [Modelli 3D](Modelli%203D.md).
 
 ### L11. Mappe
 
@@ -583,7 +571,7 @@ Le tre skill seguenti sono **Deciso (2026-11-11)** come skill di libreria. Sono 
 - **Economia: premi e salari.** I premi degli annunci e i salari vanno controllati con un intervallo? Oggi no (0.61.0).
 - **Economia:** serve una sola valuta di riferimento per i confronti? **Risposta (2026-11-14, decisione 1):** più valute sono ammesse; ciascuna ha un'equivalenza verso l'unità di conto, e il controllo converte.
 - **Ricerca musicale:** fonti ammesse (solo YouTube o anche altre piattaforme) e lingua delle ricerche.
-- **Modelli 3D:** quale percorso di generazione (servizio esterno, sagoma da tavolo, miniatura parametrica) e quale formato (`.stl`, `.3mf` o entrambi)? Quali fornitori entrano come moduli? Il modulo è opzionale come `print`, e i parametri della stampante stanno in `campaign.yaml` o in una configurazione del modulo? Si stampa anche con più parti (figura e base separate)?
+- **Modelli 3D:** le questioni aperte sono nel documento [Modelli 3D](Modelli%203D.md).
 - **Mappe:** una skill con due modalità o due skill? La scelta incide sulla dimensione della skill, non sul risultato. **Risposta (2026-11-11):** modalità di `images` (Deciso, 2026-11-11).
 - **Stampa:** libreria attivata da un modulo, o modulo puro? Nel documento è trattata come modulo opzionale con una skill di esecuzione; confermare.
 - **Modelli:** Superata dalla Riprogettazione (2026-11-11): non c'è più un modello assegnato per skill. Quando delegare e a quale modello lo decide il framework, tarato con il testbench (decisione 16).
