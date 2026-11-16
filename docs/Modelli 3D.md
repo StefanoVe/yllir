@@ -31,6 +31,11 @@ L'avvio è dal core, solo su richiesta del master, mai in autorun.
 ## 3. Passo 2: dall'immagine all'STL
 
 - **Strumenti (da definire all'implementazione).** Programmi che il master può scaricare e che girano in locale, nessun servizio in rete obbligatorio. Chi implementa sceglie dopo una verifica (licenza, installazione senza terminale, funzionamento su macOS, Windows e Linux), registra la scelta e la ragione, e dichiara le dipendenze come per gli altri moduli (sezione 6 di [Integrazioni esterne](Integrazioni%20esterne.md)). Qui non se ne indica nessuno.
+- **Candidato segnalato dall'autore (2026-11-16):** la skill `image-to-3d-generation` del repository `kngender5/hermes`. Verificato lo stesso giorno: quel nome non esiste nel repository; la skill più vicina è `trellis-3d-generation`, che usa Microsoft TRELLIS in locale (da una o più immagini a un GLB con texture). Limiti emersi, da pesare prima di adottarla:
+  - richiede una scheda NVIDIA con CUDA (circa 8 GB di memoria video), Python e PyTorch, pesi da scaricare (circa 13,6 GB), ambiente conda o WSL2 sotto Windows: non gira su Mac e non è installabile da chi non usa il terminale;
+  - l'uscita è GLB, non STL: serve una conversione e una pulizia della mesh;
+  - il repository è privato, con tutti i diritti riservati, e non dichiara una licenza per la skill; vanno verificate le licenze di TRELLIS e dei pesi;
+  - il framework non copia codice altrui (principio di progettazione da zero): al massimo ne trae l'idea, e un modello simile entrerebbe come modulo con la propria dichiarazione.
 - **Come i fornitori delle immagini.** Ogni strumento è un modulo con una dichiarazione che dice che cosa sa fare e come si verifica che sia presente; l'ordine di scelta e il ripiego sono del framework, non del master. **Proposta.**
 - **Dimensioni.** Il modello esce in millimetri. La scala e il diametro della base dipendono dalla taglia della creatura e vengono dall'adattatore del sistema di gioco, non da costanti nel codice. **Proposta.**
 - **Se nessuno strumento è disponibile,** la skill lo dice in parole semplici e propone che cosa installare, senza eseguire comandi che il master non capisce. L'immagine del passo 1 resta valida e collocata.
@@ -70,6 +75,7 @@ I difetti semplici si riparano in automatico e si dichiara cosa è stato riparat
 
 ## Questioni aperte
 
+- **TRELLIS come strumento del passo 2:** accettabile come modulo facoltativo solo per chi ha una scheda NVIDIA, o serve un percorso che giri anche su Mac e senza GPU (strumenti più leggeri, o un servizio esterno avvolto come fornitore)? Vedi la nota della sezione 3.
 - **Strumenti del passo 2:** quali, e se più d'uno con un ordine di ripiego. Da decidere all'implementazione, come indicato dall'autore.
 - **Da immagine a volume:** l'immagine, essendo una vista frontale, può dare una sagoma estrusa o un rilievo; una figura a tutto tondo richiede più viste o uno strumento che deduce il volume. Quale forma di modello si vuole: sagoma, rilievo o figura a tutto tondo?
 - **Più viste:** serve generare più immagini dello stesso soggetto (fronte, retro, lato), o ne basta una?
