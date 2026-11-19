@@ -2,7 +2,7 @@
 name: build-world
 description: Core process. Builds or enlarges the world on the master's request, from a few words to a whole region: writes an outline of the subjects with their relations decided, turns the needed ones into full documents and the others into sketches, updates the world seed, and saves the whole batch.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Edit, Agent, Skill, Glob, Grep
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" status *), Bash(node */skills/library/atlas/scripts/atlas.mjs status *), Read, Write, Edit, Agent, Skill, Glob, Grep
 ---
 
 # Build the world
@@ -93,6 +93,13 @@ Runs only after Step 6 has saved the batch, and only when `workflow.auto_item_im
 3. If more than 5 remain, keep the first 5 in the order of the outline and leave the others: they can be made on request.
 4. Run the images for the chosen sheets one after another: for each, invoke `yllir:images` with the Skill tool, with the sheet's campaign-relative path as the document, OPERATION `generate`, the illustration of the item, and no other request. Only the illustration, never the card.
 5. If the images skill asks the master something (for example the consent to an outside service), let it ask and wait for the answer before starting the next one.
+
+## Step 6c — Atlas
+
+Runs only when this batch created at least one place sheet (`kind: place`), and only after Step 6 has saved the batch.
+1. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" status .` and read its `exists` line. When it is `false`, the campaign has no atlas: skip the rest of this step.
+2. Invoke `yllir:atlas` with the Skill tool and the argument `update`. Wait for it to finish.
+3. Read `.campaign/state/atlas/report.txt` with the Read tool. In Step 7, add one plain sentence when the `placed:` line names places, for example «Ho aggiunto all'atlante il Borgo Cenere e la Torre dell'Ascia». When the `ask:` line is not `none`, ask that question as the last sentence of Step 7. When the file says `nothing`, say nothing about the atlas.
 
 ## Step 7 — Tell the master
 

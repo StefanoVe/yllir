@@ -1,0 +1,54 @@
+schema: 1
+
+campaign:
+  name: "Le ceneri della valle"
+  slug: ceneri-della-valle
+  seed: Seme del mondo.md
+  created: 2026-11-07
+
+language:
+  main: it
+  other: []
+
+prose:
+  register: plain
+
+system:
+  adapter: none
+
+structure:
+  - id: trama
+    folder: Trama
+    type: plot
+  - id: cronaca
+    folder: Cronaca
+    type: chronicle
+  - id: luoghi
+    folder: Mondo
+    type: places
+  - id: personaggi
+    folder: Personaggi
+    type: subjects
+  - id: creature
+    folder: Creature
+    type: subjects
+  - id: oggetti
+    folder: Oggetti
+    type: objects
+  - id: storia
+    folder: Storia
+    type: free
+  - id: giocatori
+    folder: Giocatori
+    type: master-only
+  - id: appunti
+    folder: Appunti
+    type: notes
+
+audit:
+  exclusions:
+    - subject: lago-grigio
+      attribute: number.depth
+      values: ["30", "40"]
+      reason: "Il master: «la profondità del lago cambia con le piogge, va bene così»."
+      date: 2026-11-07

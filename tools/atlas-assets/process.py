@@ -2,15 +2,17 @@
 # requires-python = ">=3.10"
 # dependencies = ["pillow", "numpy", "scipy"]
 # ///
-"""Cuts the raw Codex generations into the atlas stamp and texture pack.
+"""Cuts the raw Codex generations into the atlas stamp and texture pack of one style.
 
-Run from anywhere: uv run tools/atlas-assets/process.py
-Inputs:  .claude/scratchpad/atlas/raw/<id>/result.png (see prompts.json)
-Outputs: yllir/skills/library/atlas/assets/ (stamps, textures, manifest.json)
-         .claude/scratchpad/atlas/contact-sheet.png
+Run from anywhere: uv run tools/atlas-assets/process.py --style <id>
+Inputs:  tools/atlas-assets/styles/<id>/prompts.json
+         .claude/scratchpad/atlas/raw/<id>/<job>/result.png (see the prompts)
+Outputs: yllir/skills/library/atlas/assets/styles/<id>/ (stamps, textures, manifest.json)
+         .claude/scratchpad/atlas/contact-sheet-<id>.png
 Deterministic: the same raw inputs always give the same files.
 """
 
+import argparse
 import json
 import math
 import shutil
@@ -22,10 +24,49 @@ from scipy import ndimage
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRATCH = ROOT / ".claude" / "scratchpad" / "atlas"
+TOOL = Path(__file__).resolve().parent
+
+# Paths of the style being processed; set by configure() from --style.
+STYLE = ""
 RAW = SCRATCH / "raw"
-ASSETS = ROOT / "yllir" / "skills" / "library" / "atlas" / "assets"
+ASSETS = ROOT / "yllir" / "skills" / "library" / "atlas" / "assets" / "styles"
 CONTACT = SCRATCH / "contact-sheet.png"
-PROMPTS = Path(__file__).resolve().parent / "prompts.json"
+PROMPTS = TOOL / "styles" / "fantasy-color" / "prompts.json"
+# Per-style processing options (tools/atlas-assets/styles/<id>/process.json). Absent means none.
+TONE: str | None = None
+INK = (0x3A, 0x2A, 0x1A)  # sepia tone: darkest ink
+PAPER_INK = (0xE9, 0xD6, 0xAB)  # sepia tone: lightest paper ink
+TONES = ("sepia",)
+
+
+def configure(style: str) -> None:
+    """Points the paths at one style: its prompts, its raw folder, its pack folder and its options."""
+    global STYLE, RAW, ASSETS, CONTACT, PROMPTS, TONE
+    STYLE = style
+    RAW = SCRATCH / "raw" / style
+    ASSETS = ROOT / "yllir" / "skills" / "library" / "atlas" / "assets" / "styles" / style
+    CONTACT = SCRATCH / f"contact-sheet-{style}.png"
+    PROMPTS = TOOL / "styles" / style / "prompts.json"
+    options_file = TOOL / "styles" / style / "process.json"
+    TONE = None
+    if options_file.is_file():
+        options = json.loads(options_file.read_text(encoding="utf-8"))
+        TONE = options.get("tone")
+        if TONE is not None and TONE not in TONES:
+            raise SystemExit(f"{options_file}: unknown tone {TONE!r}, expected one of {TONES}")
+
+
+def sepia_recolour(box_rgb: np.ndarray, box_alpha: np.ndarray) -> np.ndarray:
+    """Maps every opaque pixel onto the ink-to-paper gradient by its luminance (keeps alpha).
+
+    Removes any magenta or other hue left by the generator: the result is one brown tone only.
+    """
+    f = box_rgb.astype(float) / 255.0
+    lum = 0.299 * f[..., 0] + 0.587 * f[..., 1] + 0.114 * f[..., 2]
+    ink = np.array(INK, dtype=float)
+    paper = np.array(PAPER_INK, dtype=float)
+    mapped = ink + (paper - ink) * lum[..., None]
+    return np.where((box_alpha > 0)[..., None], mapped.round(), box_rgb.astype(float)).astype(np.uint8)
 
 GENERATED = "2026-11-19"
 SIZE_LIMIT_BYTES = 4_000_000
@@ -132,7 +173,9 @@ def process_sheet(job: dict, counters: dict, stamps: list, excluded: list) -> No
         own = labels[y0:y1, x0:x1] == label
         box_alpha = alpha[y0:y1, x0:x1] * own
         box_rgb = rgb[y0:y1, x0:x1]
-        stamp = Image.fromarray(np.dstack([box_rgb, box_alpha]).astype(np.uint8), "RGBA")
+        if TONE == "sepia":
+            box_rgb = sepia_recolour(box_rgb, box_alpha)
+        stamp =Image.fromarray(np.dstack([box_rgb, box_alpha]).astype(np.uint8), "RGBA")
 
         scale = target / max(stamp.size)
         new_size = (max(1, round(stamp.width * scale)), max(1, round(stamp.height * scale)))
@@ -252,6 +295,12 @@ def draw_contact_sheet(stamps: list, textures: list) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Process the raw generations of one atlas style into its pack.")
+    parser.add_argument("--style", required=True, help="style id, a folder of tools/atlas-assets/styles/")
+    args = parser.parse_args()
+    if not (TOOL / "styles" / args.style / "prompts.json").is_file():
+        raise SystemExit(f"no prompts for style {args.style}: tools/atlas-assets/styles/{args.style}/prompts.json")
+    configure(args.style)
     jobs = json.loads(PROMPTS.read_text(encoding="utf-8"))
     for stale in ("stamps", "textures"):
         shutil.rmtree(ASSETS / stale, ignore_errors=True)
@@ -273,7 +322,7 @@ def main() -> None:
     textures.sort(key=lambda t: t["id"])
     manifest = {
         "schema": 1,
-        "style": "fantasy-color",
+        "style": STYLE,
         "generated": GENERATED,
         "tool": "Codex ImageGen, processed by tools/atlas-assets/process.py",
         "stamps": stamps,

@@ -1,0 +1,60 @@
+<h1 class="sr-only">{{ t('atlas.title') }}</h1>
+
+@if (loadError(); as message) {
+  <p class="alert" role="alert">{{ message }}</p>
+}
+
+@if (actionError(); as message) {
+  <p class="alert" role="alert">{{ message }}</p>
+}
+
+@switch (view()) {
+  @case ('preparing') {
+    <div class="centre">
+      <p role="status">{{ t('atlas.preparing') }}</p>
+      <button type="button" class="primary" (click)="reopen()">{{ t('atlas.open') }}</button>
+    </div>
+  }
+  @case ('empty') {
+    <div class="centre">
+      <button type="button" class="primary" [disabled]="busy() || !agentAvailable()"
+              [attr.title]="agentAvailable() ? null : unavailableReason()"
+              [attr.aria-describedby]="agentAvailable() ? null : 'atlas-unavailable'"
+              (click)="startCreate()">{{ t('atlas.create') }}</button>
+      @if (!agentAvailable()) {
+        <span id="atlas-unavailable" class="sr-only">{{ unavailableReason() }}</span>
+      }
+      @if (failed()) {
+        <p class="alert" role="alert">{{ t('atlas.failed') }}</p>
+      }
+    </div>
+  }
+  @case ('unbuilt') {
+    <div class="centre">
+      <button type="button" class="primary" [disabled]="busy()" (click)="redraw()">{{ t('atlas.draw') }}</button>
+    </div>
+  }
+  @case ('viewer') {
+    <div class="viewer">
+      <iframe #frame class="atlas-frame" [src]="frameSrc()" sandbox="allow-scripts allow-same-origin"
+              [title]="t('atlas.title')"></iframe>
+      <div class="toolbar" role="toolbar" [attr.aria-label]="t('atlas.title')">
+        @if (generating()) {
+          <span class="badge" role="status">{{ t('atlas.updating') }}</span>
+          <button type="button" class="btn" (click)="reopen()">{{ t('atlas.open') }}</button>
+        } @else {
+          @if (pending() > 0) {
+            <span class="badge">{{ pendingText() }}</span>
+            <button type="button" class="btn" [disabled]="busy()" (click)="startUpdate()">{{ t('atlas.place') }}</button>
+          }
+          <button type="button" class="btn icon-only" [disabled]="busy()" [attr.aria-label]="t('atlas.redraw')"
+                  [title]="t('atlas.redraw')" (click)="redraw()">
+            <lucide-angular [img]="icons.RefreshCw" [size]="18" aria-hidden="true" [class.spin]="busy()" />
+          </button>
+        }
+      </div>
+    </div>
+  }
+}
+
+<ms-atlas-dialog #dialog />

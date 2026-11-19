@@ -191,7 +191,7 @@ function validate(adapter, folderId, folder) {
   const errors = [];
   const error = (code, field, message) => errors.push({ code, path: field, message });
   if (!isMapping(adapter)) return [{ code: 'bad-type', path: '', message: 'adapter manifest must be a mapping' }];
-  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'economy', 'resources', 'conditions', 'condition_durations', 'condition_labels', 'duration_labels', 'action_table', 'action_groups', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not'];
+  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'economy', 'resources', 'conditions', 'condition_durations', 'condition_labels', 'duration_labels', 'action_table', 'action_groups', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not', 'atlas_style'];
   for (const key of Object.keys(adapter)) if (!allowed.includes(key)) error('unknown-key', key, `"${key}" is not a setting of an adapter manifest`);
   if (typeof adapter.id !== 'string' || !SLUG_RE.test(adapter.id)) error('bad-value', 'id', 'id must be a lowercase slug');
   if (adapter.id !== folderId) error('id-mismatch', 'id', `id must match the adapter folder ${folderId}`);
@@ -324,5 +324,9 @@ function validate(adapter, folderId, folder) {
   }
   if (!isMapping(adapter.item_sheet) || !Array.isArray(adapter.item_sheet.printable_fields) || adapter.item_sheet.printable_fields.length === 0) error('bad-value', 'item_sheet.printable_fields', 'item_sheet.printable_fields must be a nonempty list');
   if (!Array.isArray(adapter.do_not) || adapter.do_not.length === 0) error('bad-value', 'do_not', 'do_not must be a nonempty list');
+  // Optional style of the atlas for this system (a style id; whether it is installed is checked by the atlas, not here).
+  if (adapter.atlas_style !== undefined && (typeof adapter.atlas_style !== 'string' || !SLUG_RE.test(adapter.atlas_style))) {
+    error('bad-value', 'atlas_style', 'atlas_style must be a style id of lowercase letters, digits and hyphens');
+  }
   return errors;
 }

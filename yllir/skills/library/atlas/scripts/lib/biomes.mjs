@@ -10,6 +10,8 @@ import {
 
 const FILE = 'biomes.json';
 const TYPES = ['forest', 'swamp', 'desert', 'ice', 'grassland'];
+// A forest may say which trees it has: conifer (needles) or broadleaf (deciduous).
+const VARIANTS = ['conifer', 'broadleaf'];
 // Biomes keep this many grid cells away from mountains, so that the two simplified outlines never touch.
 const MOUNTAIN_MARGIN = 2;
 
@@ -51,6 +53,10 @@ export function generateBiomes({ canvas, seed, constraints = [], layers = {}, lo
       problems.push({ code: 'bad-constraint', file: FILE, path, message: `biome ${c.id} needs a type, a point and a radius` });
       continue;
     }
+    if (c.variant !== undefined && (c.type !== 'forest' || !VARIANTS.includes(c.variant))) {
+      problems.push({ code: 'bad-constraint', file: FILE, path, message: `biome ${c.id} takes a variant only as a forest: conifer or broadleaf` });
+      continue;
+    }
     const avoidMountains = avoidRelief && c.type !== 'ice';
 
     // Field: positive within about one radius of the centre, with two noise terms on the edge.
@@ -77,7 +83,9 @@ export function generateBiomes({ canvas, seed, constraints = [], layers = {}, lo
       problems.push({ code: 'biome-not-on-land', file: FILE, path, message: `biome ${c.id} has no part on land` });
       continue;
     }
-    features.push(...pieceFeatures(c.id, polygons, c.type, featureMeta(c)));
+    // The variant of a forest is copied onto each of its pieces.
+    const variant = c.type === 'forest' && c.variant !== undefined ? { variant: c.variant } : {};
+    features.push(...pieceFeatures(c.id, polygons, c.type, { ...featureMeta(c), ...variant }));
   }
 
   return { features: [...lockedFeatures, ...features], problems };

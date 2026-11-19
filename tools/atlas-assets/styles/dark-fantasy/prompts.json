@@ -1,0 +1,151 @@
+[
+  {
+    "id": "mountains-a",
+    "kind": "sheet",
+    "category": "mountains",
+    "grid": [
+      4,
+      3
+    ],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 12 separate mountains for a dark grim fantasy world map, hand-painted digital illustration, desaturated muted colours, dramatic shading, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 3 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: dark jagged mountain peaks of grey-black rock with no snow, varied sizes and shapes.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "mountains-b",
+    "kind": "sheet",
+    "category": "mountains",
+    "grid": [
+      4,
+      3
+    ],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 12 separate mountains for a dark grim fantasy world map, hand-painted digital illustration, desaturated muted colours, dramatic shading, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 3 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: dark jagged mountain ranges of two or three peaks each, black-grey rock with a few pale snow streaks.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "hills",
+    "kind": "sheet",
+    "category": "hills",
+    "grid": [
+      4,
+      3
+    ],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 12 separate hills for a dark grim fantasy world map, hand-painted digital illustration, desaturated muted colours, dramatic shading, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 3 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: dark barren hills with dead grey-brown grass.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "trees-broadleaf",
+    "kind": "sheet",
+    "category": "trees-broadleaf",
+    "grid": [
+      5,
+      4
+    ],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 20 separate broadleaf trees for a dark grim fantasy world map, hand-painted digital illustration, desaturated muted colours, dramatic shading, viewed from a high three-quarter angle, arranged in a regular grid of 5 columns and 4 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: dead and twisted leafless broadleaf trees, grey-brown, single trees and small clusters.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "trees-conifer",
+    "kind": "sheet",
+    "category": "trees-conifer",
+    "grid": [
+      5,
+      4
+    ],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 20 separate conifer trees for a dark grim fantasy world map, hand-painted digital illustration, desaturated muted colours, dramatic shading, viewed from a high three-quarter angle, arranged in a regular grid of 5 columns and 4 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: black pines, dark and gaunt, single trees and small clusters.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "swamp",
+    "kind": "sheet",
+    "category": "swamp",
+    "grid": [
+      4,
+      3
+    ],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 12 separate swamp features for a dark grim fantasy world map, hand-painted digital illustration, desaturated muted colours, dramatic shading, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 3 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: a fetid swamp: murky green-black pools with dead reeds and thin mist. The mist is pale grey only: no pink, no purple, no magenta colour anywhere in the mist or the water. The background must be a single flat magenta colour with nothing else on it.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "dunes",
+    "kind": "sheet",
+    "category": "dunes",
+    "grid": [
+      4,
+      3
+    ],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 12 separate dunes for a dark grim fantasy world map, hand-painted digital illustration, desaturated muted colours, dramatic shading, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 3 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: ashen dunes and grey wasteland rocks.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "settlements",
+    "kind": "sheet",
+    "category": "icons",
+    "grid": [
+      4,
+      2
+    ],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 8 separate map icons for a dark grim fantasy world map, hand-painted digital illustration, desaturated muted colours, dramatic shading, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 2 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: eight grim fortified map icons in this exact order, left to right, top to bottom: a walled capital with a tall dark keep, a city with towers, a small town with a church spire, a tiny village of three houses, a wooden fort with a palisade, crumbling stone ruins, a standing stone monument, a harbour with a small pier and a boat. The three houses of the village form one tight cluster in which the houses touch each other, drawn as one connected icon. The background must be a single flat magenta colour with nothing else on it.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "land",
+    "kind": "texture",
+    "category": "textures",
+    "width": 1024,
+    "height": 1024,
+    "prompt": "A seamless tileable texture, top-down, dark mossy earth for a dark grim fantasy world map, desaturated muted colours, dramatic shading, no objects, no text",
+    "negative": "text, objects, seams, vignette, border, frame"
+  },
+  {
+    "id": "sand",
+    "kind": "texture",
+    "category": "textures",
+    "width": 1024,
+    "height": 1024,
+    "prompt": "A seamless tileable texture, top-down, ash-grey wasteland sand for a dark grim fantasy world map, desaturated muted colours, dramatic shading, no objects, no text",
+    "negative": "text, objects, seams, vignette, border, frame"
+  },
+  {
+    "id": "snow",
+    "kind": "texture",
+    "category": "textures",
+    "width": 1024,
+    "height": 1024,
+    "prompt": "A seamless tileable texture, top-down, dirty grey snow for a dark grim fantasy world map, desaturated muted colours, dramatic shading, no objects, no text",
+    "negative": "text, objects, seams, vignette, border, frame"
+  },
+  {
+    "id": "sea",
+    "kind": "texture",
+    "category": "textures",
+    "width": 1024,
+    "height": 1024,
+    "prompt": "A seamless tileable texture, top-down, dark murky green-grey sea with faint ripples for a dark grim fantasy world map, desaturated muted colours, dramatic shading, no objects, no text",
+    "negative": "text, objects, seams, vignette, border, frame"
+  },
+  {
+    "id": "deep-sea",
+    "kind": "texture",
+    "category": "textures",
+    "width": 1024,
+    "height": 1024,
+    "prompt": "A seamless tileable texture, top-down, black-blue abyssal ocean with faint ripples for a dark grim fantasy world map, desaturated muted colours, dramatic shading, no objects, no text",
+    "negative": "text, objects, seams, vignette, border, frame"
+  }
+]

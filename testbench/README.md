@@ -6,6 +6,7 @@ The testbench holds synthetic campaigns, each with an answer key, and the runner
 - `fixtures/morvalle/key.yaml`: the answer key for the mention scanner and the continuity audit: what must be found and what must not.
 - `fixtures/morvalle-seeded/campaign/`: the same campaign with three constraints seeded in the world seed (a faction, a family naming rule and something to avoid). Only the `world/region` case uses it. Its answer key is `cases/world/region/key.yaml`.
 - `fixtures/continuity/campaign/`: a small synthetic campaign for the library skill `continuity-keeper` (rename with a homonym, delete with a dependent document, merge with a conflicting fact, retcon of a played chronicle). Its traps are listed in `fixtures/continuity/README.md`. Each answer key is `cases/continuity/<name>/key.yaml`.
+- `fixtures/atlas-morvalle/campaign/`: the Morvalle campaign plus a second region (Valdaspra), two wells with the same title, a hidden refuge and no stated direction for one well. Only the atlas cases use it. Its traps are listed in `fixtures/atlas-morvalle/README.md`; each answer key is `cases/atlas/<name>/key.yaml`.
 - `fixtures/morvalle-legacy/campaign/`: a frozen copy of the same campaign before the world-graph migration (no `kind`, `provenance` or relations, and no seed). Only the update cases use it, because they need the old format.
 - `cases/<kind>/<name>/case.yaml`: one case: the master's message, the expected behaviour and its limits.
 - `runners/`: the scripts that run a case or grade a component against its key.
@@ -48,6 +49,9 @@ A run that exceeds a limit fails. The current values:
 | `audit/full` | 10 | 140 | target: audit; calls about 1.5x the median (93) |
 | `world/region` | 10 | 200 | target: a region of about 30 subjects in 5 to 10 minutes (section 11, «Misura», of `docs/Riprogettazione.md`) |
 | `world/creature` | 3 | 60 | target: one enemy sheet, the same budget as the entry cases |
+| `atlas/create-asks` | 6 | 120 | target: the atlas question on a campaign with no atlas |
+| `atlas/update-keeps-land` | 8 | 160 | target: an added place on a locked atlas (agent update) |
+| `atlas/players-no-secrets` | 4 | 60 | target: the players' version of the atlas |
 
 The minute targets come from the redesign document («Tempi misurati»). Note that the medians recorded there for prepare-session (6.5 min) and after-session (3.4 min) are above the 3-minute targets, so those cases will fail on time until the framework is faster. The tool-call limits come from `results/*.jsonl` (haiku runs).
 
@@ -61,6 +65,7 @@ The minute targets come from the redesign document («Tempi misurati»). Note th
 | `run-audit-case.mjs` | `audit/full` | A1 to A8: recall of the contradictions, no problem for perspectives, hypotheses or recorded exclusions, no change to the documents |
 | `run-continuity-case.mjs` | `continuity/rename-with-homonym`, `continuity/delete-still-referenced` (two turns), `continuity/merge-conflicting-fact`, `continuity/retcon-contradicts-chronicle` | R1 to R6 (rename), D1 to D4 after the question and D5 to D9 after the answer (delete), M1 to M4 (merge), T1 to T3 (retcon). Each run starts from a copy of the fixture with one baseline version; a question turn must save nothing and change nothing. Three runs per agent (`runs: 3` in each `case.yaml`) |
 | `run-world-case.mjs` | `world/region`, `world/creature` | W1 to W10 (region: new subjects with provenance, kinds, sketches and full documents, no new world-graph error, the lake subtree, a faction with members, the family-name rule, the seed changed, one saved version, a final message that names a created subject and says it is invented). C1 to C5 (creature: one enemy sheet that the adapter validates, ability modifiers, location, one saved version). Optional `Q-grid` with `--judge` |
+| `run-atlas-case.mjs` | `atlas/create-asks`, `atlas/update-keeps-land`, `atlas/players-no-secrets` | A1 to A4 (create: ends on a question in Italian, no locked layer, every name and label is a sheet title, no forbidden word), U1 to U4 (update: Riva Storta has a sheet, the locked terrain is byte-identical, the place is on land and south of the lake or the question is asked, a version is saved), P1 to P4 (players: the players' version exists, no text of the hidden refuge, both Pozzo Vecchio places each near their own place, the master site kept). The setups are built through the atlas CLI only. Three runs per agent. Quick mode runs them: they are paid agent runs |
 | `run-convert-case.mjs` | `convert/basic` (two turns; run by hand, `run-suite.mjs` does not map the kind yet) | O1 to O4 (the outline turn), W1 and D1 (saved, nothing deleted), E1 to E6 (subjects), H1 to H3 (homonyms stay two), A1 and A2 (alias), C1 and C2 (contradiction reported, not decided), Y1 (no accusation), S1 to S3 (master-only secret), U1 to U3 (dated and undated evening), I1 (input unchanged). Deterministic, no model grades |
 
 Every case also has `L-time` and `L-calls` when it declares limits.
@@ -86,9 +91,16 @@ node testbench/runners/run-world-case.mjs testbench/cases/world/region --setup-o
 node testbench/runners/run-world-case.mjs testbench/cases/world/region [--runs N] [--model sonnet] [--keep] [--judge]
 node testbench/runners/run-world-case.mjs testbench/cases/world/creature --delegation always --keep
 node testbench/runners/run-world-case.mjs testbench/cases/world/region --grade-only <dir> --run-json <dir>.run.json [--judge]
+node testbench/runners/run-atlas-case.mjs testbench/cases/atlas/update-keeps-land [--runs N] [--model sonnet] [--keep]
+node testbench/runners/run-atlas-case.mjs testbench/cases/atlas/update-keeps-land --setup-only
+node testbench/runners/run-atlas-case.mjs testbench/cases/atlas/update-keeps-land --grade-only <dir> --run-json <dir>.run.json
 ```
 
 With `--keep` the folder is kept and the agent's final message, cost, duration and tool calls are saved beside it as `<dir>.run.json`, so `--grade-only` reproduces the record. A `--grade-only` record of the audit does not grade the limits, because the run was not kept.
+
+## Atlas cases
+
+The atlas cases do not run by default, in quick mode or in release mode: the suite runs them only with `--with-atlas`. Each run is a paid agent run that builds its setup through the atlas CLI first, so run them when the atlas path changes (`atlas` skill, its scripts, the entry or update process that calls it).
 
 ## World cases
 
@@ -120,9 +132,10 @@ node testbench/runners/run-suite.mjs                                  # quick: o
 node testbench/runners/run-suite.mjs --runs 3 --with-audit           # release measurement
 node testbench/runners/run-suite.mjs --only entry/                   # a subset
 node testbench/runners/run-suite.mjs --with-world --only world/      # the world cases (only when the world path changed)
+node testbench/runners/run-suite.mjs --with-atlas --only atlas/      # the atlas cases (paid; only when the atlas path changed)
 ```
 
-`--only world/` without `--with-world` runs nothing for the world cases and says so on stderr.
+`--only world/` without `--with-world` runs nothing for the world cases and says so on stderr. The same holds for `--only atlas/` without `--with-atlas`.
 
 ## Unit tests
 

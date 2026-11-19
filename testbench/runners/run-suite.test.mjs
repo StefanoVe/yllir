@@ -18,6 +18,7 @@ import {
   formatReport,
   childArgs,
   skippedWorldCases,
+  skippedAtlasCases,
 } from './run-suite.mjs';
 
 function makeCases(layout) {
@@ -91,9 +92,10 @@ test('childArgs passes the case, agent, one run and the model when given', () =>
 });
 
 test('parseArgs reads the options and rejects bad values', () => {
-  const opts = parseArgs(['--agent', 'claude', '--runs', '3', '--parallel', '4', '--with-audit', '--with-world', '--only', 'entry', '--model', 'haiku']);
-  assert.deepEqual(opts, { agent: 'claude', runs: 3, parallel: 4, withAudit: true, withWorld: true, only: 'entry', model: 'haiku' });
+  const opts = parseArgs(['--agent', 'claude', '--runs', '3', '--parallel', '4', '--with-audit', '--with-world', '--with-atlas', '--only', 'entry', '--model', 'haiku']);
+  assert.deepEqual(opts, { agent: 'claude', runs: 3, parallel: 4, withAudit: true, withWorld: true, withAtlas: true, only: 'entry', model: 'haiku' });
   assert.equal(parseArgs([]).withWorld, false);
+  assert.equal(parseArgs([]).withAtlas, false);
   assert.equal(parseArgs([]).agent, 'claude');
   assert.throws(() => parseArgs(['--agent', 'bogus']), /--agent must be claude/);
   assert.throws(() => parseArgs(['--agent', 'codex']), /codex is no longer a test agent/);
@@ -256,4 +258,27 @@ test('skippedWorldCases names the world cases that --only asks for without --wit
   assert.deepEqual(skippedWorldCases({ casesRoot: root, only: 'entry/' }), []);
   assert.deepEqual(skippedWorldCases({ casesRoot: root, only: null }), []);
   assert.deepEqual(skippedWorldCases({ casesRoot: root, only: 'world/', withWorld: true }), []);
+});
+
+test('planJobs registers the atlas kind with run-atlas-case.mjs, when withAtlas is set', () => {
+  const root = makeCases({ 'atlas/create-asks': 'case: atlas-create\n', 'atlas/players-no-secrets': 'case: atlas-players\n', 'entry/a': 'case: x\n' });
+  const jobs = planJobs({ casesRoot: root, withAtlas: true });
+  assert.deepEqual(jobs.map((job) => `${job.kind}/${job.name}`), ['atlas/create-asks', 'atlas/players-no-secrets', 'entry/a']);
+  assert.ok(jobs.filter((job) => job.kind === 'atlas').every((job) => job.runner.endsWith('run-atlas-case.mjs')));
+  const only = planJobs({ casesRoot: root, withAtlas: true, only: 'players' });
+  assert.deepEqual(only.map((job) => `${job.kind}/${job.name}`), ['atlas/players-no-secrets']);
+});
+
+test('planJobs excludes atlas cases by default, as paid agent runs', () => {
+  const root = makeCases({ 'atlas/create-asks': 'case: atlas-create\n', 'entry/a': 'case: x\n' });
+  assert.deepEqual(planJobs({ casesRoot: root }).map((job) => `${job.kind}/${job.name}`), ['entry/a']);
+  assert.deepEqual(planJobs({ casesRoot: root, withWorld: true }).map((job) => `${job.kind}/${job.name}`), ['entry/a']);
+});
+
+test('skippedAtlasCases names the atlas cases that --only asks for without --with-atlas', () => {
+  const root = makeCases({ 'atlas/create-asks': 'case: atlas-create\n', 'entry/a': 'case: x\n' });
+  assert.deepEqual(skippedAtlasCases({ casesRoot: root, only: 'atlas/' }), ['atlas/create-asks']);
+  assert.deepEqual(skippedAtlasCases({ casesRoot: root, only: 'entry/' }), []);
+  assert.deepEqual(skippedAtlasCases({ casesRoot: root, only: null }), []);
+  assert.deepEqual(skippedAtlasCases({ casesRoot: root, only: 'atlas/', withAtlas: true }), []);
 });

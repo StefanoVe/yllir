@@ -22,9 +22,26 @@ const FULL_PATCH: ScreenSettingsPatch = {
     density: 'compact',
     motion: 'reduced',
     startPage: 'plot',
-    rail: { plot: false, docs: false, music: false, encyclopedia: false, print: false },
+    rail: { plot: false, docs: false, music: false, encyclopedia: false, print: false, atlas: false },
   },
 };
+
+describe('the atlas rail key', () => {
+  it('is on by default, and a stored false is kept', () => {
+    assert.equal(DEFAULT_SETTINGS.ui.rail.atlas, true);
+    const { settings, explicit } = sanitizeStored({ ui: { rail: { atlas: false } } });
+    assert.equal(settings.ui.rail.atlas, false);
+    assert.deepEqual(explicit, ['ui.rail.atlas']);
+  });
+
+  it('is listed as a leaf, so it can be patched and saved', () => {
+    assert.ok(LEAVES.some((leaf) => leaf.path === 'ui.rail.atlas'));
+    const merged = mergeSettings(DEFAULT_SETTINGS, { ui: { rail: { atlas: false } } });
+    assert.equal(merged.ui.rail.atlas, false);
+    assert.equal(merged.ui.rail.plot, true);
+    assert.match(serializeSettings({ ui: { rail: { atlas: false } } }), /atlas: false/);
+  });
+});
 
 describe('sanitizeStored', () => {
   it('keeps valid values as they are', () => {

@@ -62,3 +62,28 @@ test('the same input gives the same features; another seed changes them', () => 
   const c = generateBiomes({ canvas, seed: 6, constraints: [forest()], layers });
   assert.notEqual(canonicalJson(a.features), canonicalJson(c.features));
 });
+
+test('a forest keeps its variant on every piece; the other biomes take none', () => {
+  const { features, problems } = generateBiomes({
+    canvas, seed: 5, constraints: [forest({ variant: 'conifer' })], layers: { terrain },
+  });
+  assert.deepEqual(problems, []);
+  assert.ok(features.length >= 1);
+  assert.ok(features.every((f) => f.variant === 'conifer'));
+  const bog = generateBiomes({
+    canvas, seed: 5, layers: { terrain },
+    constraints: [{ kind: 'biome', id: 'bog', type: 'swamp', at: [500, 500], radius: 120 }],
+  });
+  assert.ok(bog.features.every((f) => f.variant === undefined));
+});
+
+test('a variant that is not conifer or broadleaf, or that is set on a non-forest, gives bad-constraint', () => {
+  const badValue = generateBiomes({ canvas, seed: 5, constraints: [forest({ variant: 'palm' })], layers: { terrain } });
+  assert.deepEqual(badValue.problems.map((p) => p.code), ['bad-constraint']);
+  assert.deepEqual(badValue.features, []);
+  const onSwamp = generateBiomes({
+    canvas, seed: 5, layers: { terrain },
+    constraints: [{ kind: 'biome', id: 'bog', type: 'swamp', at: [500, 500], radius: 120, variant: 'broadleaf' }],
+  });
+  assert.deepEqual(onSwamp.problems.map((p) => p.code), ['bad-constraint']);
+});

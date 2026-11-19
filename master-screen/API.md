@@ -410,3 +410,23 @@ After the assistant is updated, the campaign is aligned: the framework's `update
 - While the state is `running` or `waiting-answer`, POST `/update/apply` answers 409 `{ error }` (the sentence of `alignBusy`).
 - The state is kept in memory: after a restart it is recomputed from the framework check (a run that was waiting is then `needed` again). No SSE event is sent for it: the screen follows the `turn` events of the conversation, or asks again.
 
+
+## Atlas (campaign atlas section)
+
+The atlas section is always in the rail (not gated by a module: generating the atlas turns its module on). Its rail key is `ui.rail.atlas` (in `ScreenSettings` and in `.campaign/master-screen.yaml`), default true, saved like the other rail keys. The atlas data is written only by the framework's atlas skill and CLI; the screen never writes it.
+
+Types (`shared/src/types.ts`): `AtlasStatus` `{ exists, built, pending, generation: { state: 'idle' | 'running' | 'waiting-answer' | 'done' | 'failed', conversationId, mode: 'create' | 'update' | null }, agent: { available, reason? } }`, `AtlasStartRequest` `{ mode: 'create' | 'update' }`, `AtlasRenderResult` `{ ok, error? }`.
+
+Framework CLI (JSON then `exit: <code>`): `node <fw>/skills/library/atlas/scripts/atlas.mjs status <root>` gives `{ folder, exists, layers, problems, pending: [...] }`, exit 1 when the campaign has no atlas folder (read as `exists: false`). `render <root>` redraws the master site into `.campaign/cache/atlas/master/`. The preview image `.campaign/cache/atlas/preview.png` is written by the skill's preview step; the screen only reads it. Both run through `execFile`, the one-job slot shared with the encyclopedia, a 120 s timeout.
+
+| Method and path | Request | Response |
+|---|---|---|
+| GET `/api/atlas` | | `AtlasStatus`. `exists` and `pending` come from the CLI `status` (cached 10 s, asked again while a run is active); `built` is the master site on disk. 500 `{ error }` when the framework answer cannot be read |
+| POST `/api/atlas/generate` | `AtlasStartRequest` | 202 `{ ok: true, status: AtlasStatus }`; 400 `{ error }` for another mode; 409 `{ error }` when a run is active, `create` while the atlas exists, or `update` while it does not; 503 `{ error }` (the agent's reason) when the assistant is not available |
+| POST `/api/atlas/render` | | `AtlasRenderResult`. 409 `{ ok: false, error }` while a generation runs, when there is no atlas, or when another job runs. A failed redraw is 200 `{ ok: false, error }` |
+| GET `/api/atlas/preview.png` | | the latest preview image (`image/png`, `Cache-Control: no-store`); 404 `{ error }` when there is none |
+| GET `/atlas/*` | | the built master site, same origin, read-only, with its own CSP `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'`, `X-Frame-Options: SAMEORIGIN`. 404 `{ error }` when there is no build, or the file is not in the site (dotfiles, `..`, symlinks that leave the site are refused) |
+
+Generation (`server/src/atlas/generation.ts`): `start(mode)` creates one conversation and submits the fixed English prompt of the mode (`server/src/atlas/texts.ts`) with the chat's default model (no override). The first line of the prompt is the conversation title. The state follows that conversation's turns, as the alignment does: a turn that is queued or running gives `running`; a turn that ends normally gives `done` when the atlas exists and the assistant's last message is not a question (places may stay pending), otherwise `waiting-answer`; an error or a cancel gives `failed` (start is allowed again). `mode` is kept in the state, and `conversationId` stays set after the run. The state is kept in memory: after a restart it is `idle`. Every turn end and every start publishes the `conversations` SSE event.
+
+The viewer in the iframe posts `{ type: 'yllir-atlas-open', path: '<campaign-relative .md path>' }` to its parent window; the screen opens that document.

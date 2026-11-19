@@ -55,6 +55,9 @@ Superata: la regola precedente «l'adattatore non contiene codice, e un calcolo 
 | `headings` | intestazioni delle sezioni della scheda, in italiano e in inglese | Statistiche, Descrizione, In breve, Effetti |
 | `checks` | file facoltativo con l'aritmetica del sistema | `checks.mjs` (modificatori, PF medi, GS, competenza) |
 | `do_not` | ciò che l'agente non decide né tira al posto del master | vedi regole comuni |
+| `atlas_style` | stile dell'atlante di questo sistema, usato se il master non ne sceglie uno (facoltativo) | `fantasy-color` |
+
+`atlas_style` indica lo stile grafico dell'atlante che il sistema suggerisce (pacchetto del framework, vedi [Atlante](Atlante.md), decisione 11). È un identificativo, per esempio `fantasy-color`. Se lo stile non è installato, l'atlante usa lo stile di base e lo dice al master. Il master può sempre scegliere un altro stile, e la scelta del master ha la precedenza.
 
 ### Operazioni
 

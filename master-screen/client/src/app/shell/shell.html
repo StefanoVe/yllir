@@ -27,6 +27,12 @@
         <lucide-angular [img]="icons.BookOpen" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
       </a>
     }
+    @if (showAtlas()) {
+      <a class="rail-item" routerLink="/atlas" routerLinkActive="active" ariaCurrentWhenActive="page"
+         [attr.aria-label]="i18n.t('nav.atlas')" [msTooltip]="i18n.t('nav.atlas')" [msTooltipPosition]="tooltipSide()">
+        <lucide-angular [img]="icons.MapIcon" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
+      </a>
+    }
     @if (showPrint()) {
       <a class="rail-item" routerLink="/print" routerLinkActive="active" ariaCurrentWhenActive="page"
          [attr.aria-label]="i18n.t('nav.print')" [msTooltip]="i18n.t('nav.print')" [msTooltipPosition]="tooltipSide()">

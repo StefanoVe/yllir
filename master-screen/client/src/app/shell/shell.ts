@@ -2,7 +2,7 @@ import { Component, DOCUMENT, DestroyRef, ElementRef, HostListener, computed, ef
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Music, Printer, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
+import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Map as MapIcon, Music, Printer, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
 import { filter, map } from 'rxjs';
 import { LiveService } from '../core/live.service';
 import { SettingsService } from '../core/settings.service';
@@ -49,7 +49,7 @@ export class Shell {
   readonly showUpdateNotice = this.updates.showNotice;
   readonly settingsLabel = computed(() => this.i18n.t(this.showUpdateNotice() ? 'shell.updateNotice' : 'nav.settings'));
 
-  readonly icons = { Dices, GitBranch, Library, Music, BookOpen, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
+  readonly icons = { Dices, GitBranch, Library, Music, BookOpen, MapIcon, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
   /** The connection notice shows only after the stream has been down for a while, so load and blips do not flash it. */
   readonly showOffline = signal(false);
   private offlineTimer: ReturnType<typeof setTimeout> | undefined;
@@ -62,6 +62,8 @@ export class Shell {
   readonly showDocs = computed(() => this.railSettings().docs);
   readonly showMusic = computed(() => this.musicEnabled() && this.railSettings().music);
   readonly showEncyclopedia = computed(() => this.encyclopediaEnabled() && this.railSettings().encyclopedia);
+  /** The atlas is always reachable: generating it turns its module on, so no module gates this entry. */
+  readonly showAtlas = computed(() => this.railSettings().atlas);
   readonly showPrint = computed(() => this.printEnabled() && this.railSettings().print);
   /** The bottom bar: 'always' shows it whenever music is on; 'playing' only while a track or a suggestion is there. */
   readonly dockVisible = computed(() => {

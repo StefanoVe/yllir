@@ -277,3 +277,42 @@ test('a port far from the water gives port-not-coast; a port near the coast pass
   const root = validRoot({ layers: { terrain: terrainLayer([landFeature('land-main', square(200, 100, 900, 900))]), places: coastal } });
   assert.equal(codes(check(root)).includes('port-not-coast'), false);
 });
+
+test('a realm names a place of the world: an unknown id is unknown-place, a character is id-not-place', () => {
+  const realmWith = (extra) => validRoot({
+    layers: {
+      political: {
+        layer: 'political',
+        constraints: [{ kind: 'realm', id: 'ash', color: '#aa3322', seeds: [[500, 500]], provenance: 'master', sources: [], ...extra }],
+        features: [],
+      },
+    },
+  });
+  assert.deepEqual(check(realmWith({ name: 'Ashmark', place: 'north' })), []);
+  assert.ok(codes(check(realmWith({ place: 'nowhere' }))).includes('unknown-place'));
+  assert.ok(codes(check(realmWith({ place: 'mara' }))).includes('id-not-place'));
+  assert.ok(codes(check(realmWith({ name: '' }))).includes('bad-constraint'));
+  assert.ok(codes(check(realmWith({ place: 7 }))).includes('bad-constraint'));
+});
+
+test('a realm feature takes the same name and place; a bad name on a feature is bad-feature', () => {
+  const feature = (extra) => ({
+    id: 'ash', type: 'realm', color: '#aa3322', seeds: [[500, 500]], polygon: square(300, 300, 700, 700),
+    provenance: 'master', visibility: 'public', sources: [], ...extra,
+  });
+  const layerWith = (f) => validRoot({ layers: { political: { layer: 'political', constraints: [], features: [f] } } });
+  assert.deepEqual(check(layerWith(feature({ name: 'Ashmark', place: 'north' }))), []);
+  assert.ok(codes(check(layerWith(feature({ name: 3 })))).includes('bad-feature'));
+  assert.ok(codes(check(layerWith(feature({ place: 'nowhere' })))).includes('unknown-place'));
+});
+
+test('a forest biome may carry a variant of conifer or broadleaf; other variants are refused', () => {
+  const biome = (extra) => ({
+    id: 'wood', type: 'forest', polygon: square(300, 300, 500, 500), provenance: 'master', visibility: 'public', sources: [], ...extra,
+  });
+  const layerWith = (f) => validRoot({ layers: { biomes: { layer: 'biomes', constraints: [], features: [f] } } });
+  assert.deepEqual(check(layerWith(biome({ variant: 'conifer' }))), []);
+  assert.deepEqual(check(layerWith(biome({ variant: 'broadleaf' }))), []);
+  assert.ok(codes(check(layerWith(biome({ variant: 'palm' })))).includes('bad-feature'));
+  assert.ok(codes(check(layerWith(biome({ type: 'swamp', variant: 'conifer' })))).includes('bad-feature'));
+});

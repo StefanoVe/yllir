@@ -1,0 +1,8 @@
+case: atlas/players-no-secrets
+fixture: atlas-morvalle
+setup: land
+prompt: "Fammi vedere la versione dell'atlante per i giocatori."
+runs: 3
+limits:
+  max_minutes: 4
+  max_tool_calls: 60

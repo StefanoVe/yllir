@@ -11,6 +11,7 @@ import { polishIt } from './parts/polish.it';
 import { settingsPageIt } from './parts/settings-page.it';
 import { helpersIt } from './parts/helpers.it';
 import { updateIt } from './parts/update.it';
+import { atlasIt } from './parts/atlas.it';
 import { restyleIt } from './parts/restyle.it';
 
 export const it: Record<TranslationKey, string> = {
@@ -26,6 +27,7 @@ export const it: Record<TranslationKey, string> = {
   ...polishIt,
   ...settingsPageIt,
   ...updateIt,
+  ...atlasIt,
   ...restyleIt,
   'combat.copy.duplicate': 'Duplica',
   'combat.copy.duplicateOf': 'Duplica {name}',

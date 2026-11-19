@@ -1,0 +1,304 @@
+/* The atlas popup: the app's surface, radius and accent. The preview sits beside the conversation on wide
+   screens and above it on phones. */
+.atlas-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2);
+  background: var(--color-scrim);
+}
+
+.atlas-panel {
+  display: flex;
+  flex-direction: column;
+  width: min(900px, 100%);
+  max-height: min(86vh, 900px);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-2);
+  outline: none;
+  overflow: hidden;
+}
+
+.atlas-panel:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.atlas-head {
+  padding: var(--space-3) var(--space-3) var(--space-1);
+}
+
+.atlas-head h2 {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 700;
+  line-height: var(--line-height-tight);
+}
+
+.atlas-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3) var(--space-2);
+  overflow: hidden;
+}
+
+.atlas-preview {
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.atlas-preview img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 260px;
+  object-fit: contain;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-2);
+}
+
+.atlas-log {
+  flex: 1;
+  min-height: 140px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Each message of the assistant is a block on the surface, with no frame of its own. */
+.msg {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+}
+
+.text.md {
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.text.md > :first-child {
+  margin-top: 0;
+}
+
+.text.md > :last-child {
+  margin-bottom: 0;
+}
+
+.activity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.dots {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  animation: atlas-wave 1.2s infinite ease-in-out;
+}
+
+.dots span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.dots span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes atlas-wave {
+  0%, 60%, 100% { opacity: 0.25; }
+  30% { opacity: 1; }
+}
+
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+}
+
+.step {
+  padding: 2px 0 2px var(--space-1);
+  border-left: 2px solid var(--color-border);
+}
+
+.step.child {
+  padding-left: var(--space-3);
+}
+
+.final {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  font-weight: 600;
+}
+
+/* The reply box appears only while the assistant waits for an answer. */
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.composer form {
+  margin: 0;
+}
+
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  font: inherit;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+}
+
+.input:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
+.input:disabled {
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: var(--font-size-sm);
+}
+
+.composer-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 40px;
+}
+
+.hint {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
+.hint[hidden] {
+  display: none;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.btn.primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+}
+
+.btn.primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+}
+
+.btn.primary.icon-only {
+  width: 40px;
+  padding: 0;
+}
+
+.btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Wide screens: the preview is a column beside the conversation. */
+@media (min-width: 720px) {
+  .atlas-body {
+    flex-direction: row;
+    align-items: stretch;
+  }
+
+  .atlas-preview {
+    flex: 0 0 42%;
+    display: flex;
+    align-items: flex-start;
+  }
+
+  .atlas-preview img {
+    max-height: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .atlas-scrim {
+    padding: 0;
+  }
+
+  .atlas-panel {
+    width: 100%;
+    max-height: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dots span {
+    animation: none;
+  }
+}

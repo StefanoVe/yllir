@@ -2,14 +2,16 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { stripExitLine } from '../../../../scripts/lib/cli-exit.mjs';
 import { pngSize } from '../../../../scripts/lib/png.mjs';
 import {
   cleanupCampaigns, standardCampaign, makeCampaign, campaignYaml, terrainLayer, placesLayer,
-  landFeature, square, readAtlasFile,
+  landFeature, square, readAtlasFile, placeSheet, writeAtlas, baseManifest,
 } from './lib/test-support.mjs';
+import { listStyles } from './lib/styles.mjs';
 
 after(cleanupCampaigns);
 
@@ -309,4 +311,226 @@ test('generate-terrain still works as an alias of generate terrain; an unknown l
   assert.equal(alias.code, 0);
   assert.equal(json(alias.stdout).ok, true);
   assert.equal(run('generate', root, 'volcanoes').code, 2);
+});
+
+/** A campaign.yaml that passes validateConfig, with the given language and categories. */
+function validYaml(language, structure) {
+  return [
+    'schema: 1',
+    'campaign:',
+    '  name: "Test"',
+    '  slug: test-campaign',
+    '  created: 2026-11-01',
+    'language:',
+    `  main: ${language}`,
+    '  other: []',
+    'prose:',
+    '  register: plain',
+    'system:',
+    '  adapter: none',
+    'structure:',
+    ...structure.flatMap((c) => [`  - id: ${c.id}`, `    folder: ${c.folder}`, `    type: ${c.type}`]),
+    '',
+  ].join('\n');
+}
+
+const PLACES_ONLY = [{ id: 'luoghi', folder: 'World', type: 'places' }, { id: 'persone', folder: 'People', type: 'subjects' }];
+
+test('places lists every place with its parent from the folders, sorted by file, and the placed ones with their point', () => {
+  const root = standardCampaign();
+  run('init', root, scopeFile(root));
+  run('write-layer', root, 'places', writeJsonFile(path.join(root, 'p.json'), placesLayer([['north', [300, 400]]])));
+  const result = run('places', root);
+  assert.equal(result.code, 0);
+  assert.equal(lastLine(result.stdout), 'exit: 0');
+  const out = json(result.stdout);
+  assert.deepEqual(out.places.map((p) => p.file), ['World/North/North.md', 'World/North/Port Ash.md', 'World/South.md']);
+  const [north, ash, south] = out.places;
+  assert.deepEqual(
+    { id: north.id, parent: north.parent, placed: north.placed, at: north.at, icon: north.icon },
+    { id: 'north', parent: null, placed: true, at: [300, 400], icon: 'town' },
+  );
+  assert.equal(ash.parent, 'north');
+  assert.equal(ash.placed, false);
+  assert.equal(ash.at, null);
+  assert.equal(south.parent, null);
+  assert.deepEqual(out.scope, { kind: 'region', places: ['north'] });
+});
+
+test('places without an atlas folder lists the places as not placed, with scope null, and exits 0', () => {
+  const root = makeCampaign({
+    'World/North/North.md': placeSheet({ id: 'north', title: 'North' }),
+    'World/North/Port Ash.md': placeSheet({ id: 'port-ash', title: 'Port Ash' }),
+  }, { yaml: validYaml('en', PLACES_ONLY) });
+  const result = run('places', root);
+  assert.equal(result.code, 0);
+  const out = json(result.stdout);
+  assert.equal(out.scope, null);
+  assert.deepEqual(out.places.map((p) => [p.id, p.parent, p.placed]), [['north', null, false], ['port-ash', 'north', false]]);
+});
+
+test('init on a campaign with no atlas category adds it (Atlante in Italian) and turns the module on', () => {
+  const root = makeCampaign({ 'World/North/North.md': placeSheet({ id: 'north', title: 'North' }) }, { yaml: validYaml('it', PLACES_ONLY) });
+  fs.rmSync(path.join(root, 'Atlas'), { recursive: true, force: true });
+  const result = run('init', root, scopeFile(root));
+  assert.equal(result.code, 0, result.stdout);
+  const out = json(result.stdout);
+  assert.equal(out.written, 'Atlante/atlas.json');
+  assert.equal(out.categoryAdded, true);
+  assert.equal(out.moduleEnabled, true);
+  const yaml = fs.readFileSync(path.join(root, 'campaign.yaml'), 'utf8');
+  assert.match(yaml, /folder: "?Atlante"?\n    type: atlas/);
+  assert.match(yaml, /modules:\n  atlas: true/);
+  assert.ok(fs.existsSync(path.join(root, 'Atlante', 'atlas.json')));
+});
+
+test('init in an English campaign uses the folder Atlas; a second init is refused and campaign.yaml is unchanged', () => {
+  const root = makeCampaign({ 'World/North/North.md': placeSheet({ id: 'north', title: 'North' }) }, { yaml: validYaml('en', PLACES_ONLY) });
+  const scope = scopeFile(root);
+  assert.equal(run('init', root, scope).code, 0);
+  assert.ok(fs.existsSync(path.join(root, 'Atlas', 'atlas.json')));
+  const before = fs.readFileSync(path.join(root, 'campaign.yaml'), 'utf8');
+  const second = run('init', root, scope);
+  assert.equal(second.code, 1);
+  assert.equal(json(second.stdout).problems[0].code, 'atlas-exists');
+  assert.equal(fs.readFileSync(path.join(root, 'campaign.yaml'), 'utf8'), before);
+});
+
+test('init picks another folder name when Atlante is already a category, and fills the defaults of seed, canvas and style', () => {
+  const structure = [...PLACES_ONLY, { id: 'storia', folder: 'Atlante', type: 'free' }];
+  const root = makeCampaign({ 'World/North/North.md': placeSheet({ id: 'north', title: 'North' }) }, { yaml: validYaml('it', structure) });
+  fs.mkdirSync(path.join(root, 'Atlante'));
+  fs.writeFileSync(path.join(root, 'scope.json'), JSON.stringify({ scope: { kind: 'region', places: ['north'] } }));
+  const result = run('init', root, path.join(root, 'scope.json'));
+  assert.equal(result.code, 0, result.stdout);
+  assert.equal(json(result.stdout).written, 'Atlante della campagna/atlas.json');
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'Atlante della campagna', 'atlas.json'), 'utf8'));
+  const slugSeed = parseInt(crypto.createHash('sha256').update('test-campaign').digest('hex').slice(0, 7), 16);
+  assert.equal(manifest.seed, slugSeed);
+  assert.deepEqual(manifest.canvas, { width: 4000, height: 3000 });
+  assert.equal(manifest.style, 'fantasy-color');
+});
+
+test('init with a refused scope leaves campaign.yaml exactly as it was', () => {
+  const root = makeCampaign({ 'World/North/North.md': placeSheet({ id: 'north', title: 'North' }) }, { yaml: validYaml('it', PLACES_ONLY) });
+  const before = fs.readFileSync(path.join(root, 'campaign.yaml'), 'utf8');
+  const bad = writeJsonFile(path.join(root, 'bad.json'), { scope: { kind: 'planet', places: [] } });
+  assert.equal(run('init', root, bad).code, 1);
+  assert.equal(fs.readFileSync(path.join(root, 'campaign.yaml'), 'utf8'), before);
+  assert.equal(fs.existsSync(path.join(root, 'Atlante')), false);
+});
+
+test('--open is accepted only by preview and render; elsewhere it is a usage error', () => {
+  const root = standardCampaign();
+  assert.equal(run('status', root, '--open').code, 2);
+  assert.equal(run('places', root, '--open').code, 2);
+});
+
+/** A campaign with a valid atlas (terrain and one place), style fantasy-color. */
+function renderableCampaign() {
+  const root = standardCampaign();
+  writeAtlas(root, {
+    manifest: baseManifest({ style: 'fantasy-color' }),
+    layers: { terrain: terrainLayer(), places: placesLayer([['north', [500, 500]]]) },
+  });
+  return root;
+}
+
+/** The bytes of every layer file of the atlas, by name. */
+function layerBytes(root) {
+  const out = {};
+  for (const name of ['terrain', 'places']) out[name] = readAtlasFile(root, `${name}.json`);
+  return out;
+}
+
+test('render writes the master export and prints its result with exit 0', () => {
+  const root = renderableCampaign();
+  const result = run('render', root);
+  assert.equal(result.code, 0, result.stdout);
+  const out = json(result.stdout);
+  assert.equal(out.ok, true);
+  assert.equal(out.dir, '.campaign/cache/atlas/master');
+  assert.equal(out.stats.places, 1);
+  assert.deepEqual(out.checks, []);
+  assert.deepEqual(out.problems, []);
+  assert.ok(fs.existsSync(path.join(root, out.dir, 'index.html')));
+});
+
+test('render --audience players writes the players export and runs its checks', () => {
+  const root = renderableCampaign();
+  const result = run('render', root, '--audience', 'players');
+  assert.equal(result.code, 0, result.stdout);
+  const out = json(result.stdout);
+  assert.equal(out.dir, '.campaign/cache/atlas/players');
+  assert.deepEqual(out.checks.map((c) => c.status), ['pass', 'pass', 'pass']);
+});
+
+test('render of an atlas that does not validate exits 1 with dir null; --open does not open a failed build', () => {
+  const root = standardCampaign();
+  writeAtlas(root, {
+    manifest: baseManifest({ style: 'fantasy-color' }),
+    layers: { terrain: terrainLayer(), places: placesLayer([['ghost', [500, 500]]]) },
+  });
+  const result = run('render', root, '--open');
+  assert.equal(result.code, 1);
+  const out = json(result.stdout);
+  assert.equal(out.ok, false);
+  assert.equal(out.dir, null);
+  assert.ok(out.problems.some((p) => p.code === 'unknown-place'));
+  assert.equal(out.opened, undefined);
+});
+
+test('render takes only the audience master or players, and --audience only on render', () => {
+  const root = renderableCampaign();
+  assert.equal(run('render', root, '--audience', 'gm').code, 2);
+  assert.equal(run('render', root, '--audience').code, 2);
+  assert.equal(run('status', root, '--audience', 'players').code, 2);
+});
+
+test('styles prints the installed styles and the one the atlas uses, and writes nothing', () => {
+  const root = renderableCampaign();
+  const before = layerBytes(root);
+  const result = run('styles', root);
+  assert.equal(result.code, 0, result.stdout);
+  const out = json(result.stdout);
+  const fantasy = out.styles.find((s) => s.id === 'fantasy-color');
+  assert.ok(fantasy && fantasy.installed === true);
+  assert.deepEqual(out.current, { id: 'fantasy-color', source: 'master', requested: null });
+  assert.deepEqual(layerBytes(root), before);
+});
+
+test('set-style with an unknown id exits 1 unknown-style and leaves atlas.json as it was', () => {
+  const root = renderableCampaign();
+  const atlasBefore = readAtlasFile(root, 'atlas.json');
+  const result = run('set-style', root, 'no-such-style');
+  assert.equal(result.code, 1);
+  assert.equal(json(result.stdout).problems[0].code, 'unknown-style');
+  assert.equal(readAtlasFile(root, 'atlas.json'), atlasBefore);
+});
+
+test('set-style to an installed style, and to auto, writes only the style of atlas.json', () => {
+  const root = renderableCampaign();
+  const layers = layerBytes(root);
+  const installed = run('set-style', root, 'fantasy-color');
+  assert.equal(installed.code, 0, installed.stdout);
+  assert.deepEqual(json(installed.stdout), { ok: true, style: 'fantasy-color', problems: [] });
+  assert.equal(JSON.parse(readAtlasFile(root, 'atlas.json')).style, 'fantasy-color');
+  assert.deepEqual(layerBytes(root), layers);
+
+  const auto = run('set-style', root, 'auto');
+  assert.equal(auto.code, 0, auto.stdout);
+  assert.equal(JSON.parse(readAtlasFile(root, 'atlas.json')).style, 'auto');
+  assert.deepEqual(layerBytes(root), layers);
+});
+
+const NOT_INSTALLED = listStyles().filter((s) => !s.installed).map((s) => s.id);
+test('set-style to a listed style that is not installed exits 1 style-not-installed', {
+  skip: NOT_INSTALLED.length === 0 ? 'every listed style is installed' : false,
+}, () => {
+  const root = renderableCampaign();
+  const atlasBefore = readAtlasFile(root, 'atlas.json');
+  const result = run('set-style', root, NOT_INSTALLED[0]);
+  assert.equal(result.code, 1);
+  assert.equal(json(result.stdout).problems[0].code, 'style-not-installed');
+  assert.equal(readAtlasFile(root, 'atlas.json'), atlasBefore);
 });

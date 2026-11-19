@@ -2,7 +2,7 @@
 name: write-document
 description: Core process. Creates or changes one campaign document from a description (a character, a place, an item, a creature with full stats, a faction, a historical event, the seed) or expands a sketch into a full sheet, and saves it through the write cycle as a batch of one.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Edit, Agent, Skill, Glob, Grep
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" status *), Bash(node */skills/library/atlas/scripts/atlas.mjs status *), Read, Write, Edit, Agent, Skill, Glob, Grep
 ---
 
 # Write one document
@@ -134,6 +134,13 @@ Runs only after Step 7 has saved the batch, and only when `workflow.auto_item_im
 2. If the master said in this same message not to make images, take none.
 3. For each sheet taken, invoke `yllir:images` with the Skill tool: the sheet's campaign-relative path as the document, OPERATION `generate`, the illustration of the item, and no other request. Only the illustration: never the card, which is made only on request.
 4. If the images skill asks the master something (for example the consent to an outside service), let it ask and wait for the answer before going on.
+
+## Step 7c — Atlas
+
+Runs only when this batch created a place sheet (`kind: place`), and only after Step 7 has saved the batch. A sheet that was only changed is not enough.
+1. Run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" status .` and read its `exists` line. When it is `false`, the campaign has no atlas: skip the rest of this step.
+2. Invoke `yllir:atlas` with the Skill tool and the argument `update`. Wait for it to finish.
+3. Read `.campaign/state/atlas/report.txt` with the Read tool. In Step 8, add one plain sentence when the `placed:` line names the place, for example «Ho aggiunto il Borgo Cenere all'atlante». When the `ask:` line is not `none`, ask that question as the last sentence of Step 8. When the file says `nothing`, say nothing about the atlas.
 
 ## Step 8 — Tell the master
 

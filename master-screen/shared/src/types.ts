@@ -105,7 +105,7 @@ export interface ScreenSettings {
     density: 'comfortable' | 'compact';
     motion: 'system' | 'reduced';
     startPage: 'live' | 'plot' | 'docs';
-    rail: { plot: boolean; docs: boolean; music: boolean; encyclopedia: boolean; print: boolean };
+    rail: { plot: boolean; docs: boolean; music: boolean; encyclopedia: boolean; print: boolean; atlas: boolean };
   };
 }
 /** Any subset of ScreenSettings, two levels deep (combat.panels and ui.rail may be partial too). */
@@ -147,6 +147,18 @@ export interface UpdateStatus {
 export type AlignState = 'none' | 'needed' | 'running' | 'waiting-answer' | 'done' | 'failed';
 /** conversationId: the alignment conversation when there is one for the current run, else null. */
 export type AlignStatus = { state: AlignState; conversationId: string | null };
+
+// Atlas (the campaign atlas section; not gated by a module: generating the atlas turns its module on).
+export type AtlasGenerationState = 'idle' | 'running' | 'waiting-answer' | 'done' | 'failed';
+export interface AtlasStatus {
+  exists: boolean;          // the atlas data exists (atlas.json present)
+  built: boolean;           // the master site exists (.campaign/cache/atlas/master/index.html)
+  pending: number;          // in-scope places not yet on the atlas (0 when !exists)
+  generation: { state: AtlasGenerationState; conversationId: string | null; mode: 'create' | 'update' | null };
+  agent: { available: boolean; reason?: string };
+}
+export interface AtlasStartRequest { mode: 'create' | 'update' }
+export interface AtlasRenderResult { ok: boolean; error?: string }
 
 export interface ChecksResponse {
   // checkedLinks (optional, added later): total number of links that were checked

@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "antique-parchment",
+  "names": { "it": "Pergamena antica", "en": "Antique parchment" },
+  "fonts": { "place": "IM Fell English", "realm": "IM Fell English", "feature": "IM Fell English" },
+  "textures": { "land": "parchment", "sand": "parchment", "snow": "parchment", "sea": "parchment-sea", "deepSea": "parchment-sea" },
+  "sea": { "glow": { "width": 36, "blur": 6, "opacity": 0.35 }, "ripples": { "count": 4, "color": "#5b4630", "opacity": 0.35, "step": 0.06, "base": 4, "spacing": 7 } },
+  "coast": { "color": "#3a2a1a", "width": 1.2, "shade": { "color": "#6b5232", "opacity": 0.12, "width": 3 } },
+  "rivers": { "under": "#efe3c4", "underWidth": 2.4, "color": "#4b3a28", "width": 1.0 },
+  "lakes": { "highlight": { "color": "#ffffff", "opacity": 0.25, "width": 2 } },
+  "borders": { "fillOpacity": 0.0, "width": 1.1, "dash": [2, 1.5], "opacity": 0.9, "coastGap": 3.5 },
+  "routes": { "road": { "color": "#4b3a28", "width": 0.9, "dash": [3, 1.5] }, "trail": { "color": "#4b3a28", "width": 0.6, "dash": [1.2, 1.8] }, "sea": { "color": "#4b3a28", "width": 0.6, "dash": [0.6, 2], "opacity": 0.7 } },
+  "labels": {
+    "fill": "#2e2214", "halo": "#efe3c4", "haloOpacity": 0.85, "haloWidth": 0.28,
+    "featureFill": "#3a2e22", "featureSize": 7, "featureSpacing": 0.2,
+    "placeSize": { "capital": 6.5, "city": 6.5, "other": 5 },
+    "realmDarken": 0.4, "realmOpacity": 0.75,
+    "realmSize": { "max": 22, "min": 8, "fitMin": 6, "areaDivisor": 14 },
+    "realmSpacing": 0.35, "realmSpacingMin": 0.12
+  },
+  "stamps": { "mirrorTrees": true, "scale": 1 },
+  "masks": { "blur": 3 },
+  "icons": { "capital": 26, "city": 21, "other": 17 },
+  "vignette": { "color": "#3b2a14", "opacity": 0.45 },
+  "forestTint": { "color": "#2f5a1f", "opacity": 0 }
+}

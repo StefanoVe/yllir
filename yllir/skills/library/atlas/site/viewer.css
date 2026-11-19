@@ -1,0 +1,372 @@
+/* Viewer of the atlas site: parchment and ink, to match the map. Phone width collapses the panels to icon buttons. */
+
+@font-face {
+  font-family: 'IM Fell English';
+  src: url('fonts/IMFellEnglish-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+:root {
+  --paper: #f3ead2;
+  --ink: #2b2118;
+  --line: #3b2f22;
+  --accent: #8a5a1c;
+  --shadow: 0 2px 10px rgba(43, 33, 24, 0.35);
+  --sea: #1f3a4d;
+  color-scheme: light;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--sea);
+  color: var(--ink);
+  font-family: 'IM Fell English', Georgia, serif;
+}
+
+/* The sea goes on past the map edges; its tile moves and scales with the map (set in viewer.js). */
+#sea {
+  position: fixed;
+  inset: 0;
+  background-color: var(--sea);
+  background-repeat: repeat;
+}
+
+#map {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: grab;
+}
+
+#map.dragging {
+  cursor: grabbing;
+}
+
+#stage {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+
+#stage.is-moving {
+  will-change: transform;
+}
+
+/* The last 3% of the map fades into the sea. */
+#stage svg {
+  display: block;
+  mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent),
+    linear-gradient(to bottom, transparent, #000 3%, #000 97%, transparent);
+  mask-size: 100% 100%;
+  mask-repeat: no-repeat;
+  mask-composite: intersect;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent),
+    linear-gradient(to bottom, transparent, #000 3%, #000 97%, transparent);
+  -webkit-mask-size: 100% 100%;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-composite: source-in;
+}
+
+.is-off {
+  display: none;
+}
+
+g.place {
+  cursor: pointer;
+}
+
+g.place:focus {
+  outline: none;
+}
+
+g.place:focus-visible image {
+  filter: drop-shadow(0 0 2px #fff3c4) drop-shadow(0 0 4px var(--accent));
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+button:hover {
+  background: rgba(59, 47, 34, 0.12);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.panel {
+  position: fixed;
+  z-index: 10;
+  box-sizing: border-box;
+  background: rgba(243, 234, 210, 0.95);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+  padding: 8px 10px;
+}
+
+.panel-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  min-height: 36px;
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 6px 10px;
+}
+
+/* A panel's body shows only while the panel is open. */
+.panel-body {
+  display: none;
+}
+
+.panel.open .panel-body {
+  display: block;
+}
+
+/* The vignette: over the map and under the panels, the viewport's own darkening at the edges. */
+.vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.panel-title {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  font-style: italic;
+}
+
+.panel-layers {
+  top: 16px;
+  right: 16px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.panel-layers.open {
+  padding: 8px 10px;
+  background: rgba(243, 234, 210, 0.95);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+.panel-layers .panel-toggle {
+  background: rgba(243, 234, 210, 0.95);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.panel-search {
+  top: 16px;
+  left: 16px;
+  width: min(320px, calc(100vw - 32px));
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.note {
+  font-style: italic;
+  opacity: 0.75;
+}
+
+.search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  background: #fbf6e6;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.results {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 1rem;
+  padding: 6px 4px;
+}
+
+.results .none {
+  padding: 6px 4px;
+  font-style: italic;
+}
+
+.zoom {
+  position: fixed;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.zoom button {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  font-size: 1.2rem;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
+}
+
+.card {
+  position: fixed;
+  z-index: 11;
+  left: 16px;
+  bottom: 16px;
+  width: min(360px, calc(100vw - 32px));
+  max-height: 50vh;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 14px 16px;
+  background: rgba(243, 234, 210, 0.95);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow);
+}
+
+.card:not(.is-open) {
+  display: none;
+}
+
+.card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: normal;
+}
+
+.card-title:focus {
+  outline: none;
+}
+
+.card-close {
+  flex: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 2px 8px;
+}
+
+.card-summary {
+  margin: 8px 0;
+  line-height: 1.4;
+}
+
+.card-link {
+  margin: 8px 0 0;
+}
+
+.card a,
+.card-action {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.card code {
+  font-size: 0.9rem;
+  word-break: break-all;
+}
+
+/* Wide screens: the search box is always open, with no toggle. */
+@media (min-width: 481px) {
+  .panel-search .panel-toggle {
+    display: none;
+  }
+
+  .panel-search .panel-body {
+    display: block;
+  }
+}
+
+/* Phone width: the search is an icon that expands into a full-width input, the zoom buttons go to the
+   bottom right, and the place card is a bottom sheet. */
+@media (max-width: 480px) {
+  .panel-search {
+    width: auto;
+  }
+
+  .panel-search:not(.open) {
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .panel-search .panel-toggle {
+    background: rgba(243, 234, 210, 0.95);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+  }
+
+  .panel-search.open {
+    width: calc(100vw - 32px);
+  }
+
+  .zoom {
+    top: auto;
+    bottom: 16px;
+    right: 16px;
+    transform: none;
+    flex-direction: row;
+  }
+
+  .card {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: auto;
+    max-height: 50vh;
+    border-radius: 10px 10px 0 0;
+  }
+}

@@ -111,6 +111,7 @@ const RAIL_OPTIONS: { key: RailKey; label: TranslationKey; module: ModuleId | nu
   { key: 'docs', label: 'nav.documents', module: null },
   { key: 'music', label: 'nav.music', module: 'music' },
   { key: 'encyclopedia', label: 'nav.encyclopedia', module: 'encyclopedia' },
+  { key: 'atlas', label: 'nav.atlas', module: null },
   { key: 'print', label: 'nav.print', module: 'print' },
 ];
 

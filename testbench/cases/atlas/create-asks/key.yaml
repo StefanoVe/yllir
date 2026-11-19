@@ -1,0 +1,6 @@
+kind: create-asks
+# A1: the final message ends with a question, written in Italian.
+# A2: no layer of the atlas is locked (no locked: true in the atlas manifest).
+# A3: every name and label text in the atlas files is the title of a sheet, or nothing.
+# A4: the final message uses none of these words (whole words, any case): SKILL.md rule 7.
+forbidden_words: [script, JSON, seed, canvas, hash, lock, constraint]

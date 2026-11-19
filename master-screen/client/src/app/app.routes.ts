@@ -37,6 +37,10 @@ export const routes: Routes = [
     loadComponent: () => import('./encyclopedia/encyclopedia').then((m) => m.EncyclopediaPage),
   },
   {
+    path: 'atlas',
+    loadComponent: () => import('./atlas/atlas').then((m) => m.AtlasPage),
+  },
+  {
     path: 'print',
     loadComponent: () => import('./print/print').then((m) => m.PrintPage),
   },

@@ -1,6 +1,6 @@
 # Atlante
 
-**Stato:** processo, forma e principi **Deciso** dall'autore (2026-11-19); formati e strumenti **Proposta**; nessuna implementazione
+**Stato:** processo, forma e principi **Deciso** dall'autore (2026-11-19); prima implementazione in 0.78.0 (skill `atlas`, sezione Atlante del master screen 0.19.0), con formati e strumenti come descritti qui
 **Parte di:** [Skill di libreria](Skill%20di%20libreria.md) (scheda [L25](Skill%20di%20libreria.md#l25-atlante)) e [Master screen](Master%20screen.md)
 
 ## Scopo del documento
@@ -21,6 +21,7 @@ Supera, per la carta del mondo, la frase «La carta del mondo resta fuori» dell
 8. **Geografia come dati (scelta del 2026-11-19).** Il territorio è descritto da dati, livello per livello, e disegnato da un renderer deterministico. Non è un'immagine dipinta da un modello: un'immagine dipinta non garantisce la decisione 6.
 9. **Timbri da un pacchetto originale (scelta del 2026-11-19).** Timbri e texture vengono da un pacchetto originale generato una volta con un fornitore di immagini, rifinito e distribuito con il framework.
 10. **Master e giocatori (scelta del 2026-11-19).** Nel master screen l'atlante mostra tutto, segreti compresi. Il sito esportato per i giocatori esclude ciò che è riservato al master, con gli stessi controlli dell'enciclopedia.
+11. **Stili diversi (Deciso, 2026-11-19).** L'atlante può avere stili diversi. Ogni stile è un pacchetto del framework (timbri, texture, palette, font e parametri di disegno). L'ordine di scelta è: la scelta del master, poi lo stile indicato dall'adattatore del sistema di gioco, poi lo stile di base del framework. Il master cambia stile a voce. Cambiare stile ridisegna solo l'aspetto e non tocca mai i dati, e quindi nemmeno il territorio. I primi stili sono: fantasy colorato (quello di base), pergamena antica e dark fantasy.
 
 ## 2. Dati
 

@@ -246,6 +246,7 @@ creature_sheet:
       label_en: CHA
   optional: [saves, skills, senses, proficiency_bonus, resistances, immunities, initiative, cr, phases, recharge_abilities, limited_uses, legendary_actions, reactions, traits, defeat_effects]
 checks: checks.mjs
+atlas_style: fantasy-color
 item_sheet:
   mechanical_fields: [activation, check, dc, duration, limits, resources, attunement, charges, frequency, bonus, dice, conditions, value]
   printable_fields: [title, description]

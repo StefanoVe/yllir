@@ -112,3 +112,29 @@ test('lock, then an appended realm: the locked one is identical and the new one 
     }
   }
 });
+
+test('a realm keeps its name and its place on the feature; without them the feature has neither', () => {
+  const named = generatePolitical({
+    canvas,
+    seed: 1,
+    constraints: [realm('north', '#aa3322', [[200, 500]], { name: 'Ashmark', place: 'north' }), realm('south', '#2233aa', [[800, 500]])],
+    layers: { terrain: dumbbell },
+  });
+  assert.deepEqual(named.problems, []);
+  const [north, south] = named.features;
+  assert.equal(north.name, 'Ashmark');
+  assert.equal(north.place, 'north');
+  assert.equal(south.name, undefined);
+  assert.equal(south.place, undefined);
+});
+
+test('a realm name that is not text gives bad-constraint and no feature', () => {
+  const result = generatePolitical({
+    canvas,
+    seed: 1,
+    constraints: [realm('north', '#aa3322', [[200, 500]], { name: '  ' })],
+    layers: { terrain: dumbbell },
+  });
+  assert.deepEqual(result.problems.map((p) => p.code), ['bad-constraint']);
+  assert.deepEqual(result.features, []);
+});

@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Ctx } from './context.js';
+import { registerAtlasRoutes, createAtlasSiteRouter } from './routes/atlas.js';
 import { registerBattleRoutes } from './routes/battle.js';
 import { registerChangesRoutes } from './routes/changes.js';
 import { registerChatRoutes } from './routes/chat.js';
@@ -77,6 +78,7 @@ export function createApp(ctx: Ctx): express.Express {
   registerPlotRoutes(api, ctx);
   registerMusicRoutes(api, ctx);
   registerEncyclopediaRoutes(api, ctx);
+  registerAtlasRoutes(api, ctx);
   registerPrintRoutes(api, ctx);
   registerSettingsRoutes(api, ctx);
   registerUpdateRoutes(api, ctx);
@@ -86,6 +88,8 @@ export function createApp(ctx: Ctx): express.Express {
   });
   // The built encyclopedia site, same origin, read-only. Answers every /enc request itself.
   app.use('/enc', createSiteRouter(ctx));
+  // The built atlas master site, same origin, read-only, with its own CSP (the viewer in the atlas page).
+  app.use('/atlas', createAtlasSiteRouter(ctx));
 
   const indexFile = path.join(PUBLIC_DIR, 'index.html');
   if (fs.existsSync(indexFile)) {

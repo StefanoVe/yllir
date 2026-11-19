@@ -121,12 +121,14 @@ export function generatePolitical({ canvas, seed, constraints = [], layers = {},
     const path = `constraints[${k}]`;
     const valid = typeof c.id === 'string' && COLOR.test(c.color ?? '') && isPointList(c.seeds, 1)
       && (c.cuts === undefined || (Array.isArray(c.cuts) && c.cuts.every((cut) => isPointList(cut, 2))))
-      && (c.reach === undefined || (c.reach > 0));
+      && (c.reach === undefined || (c.reach > 0))
+      && (c.name === undefined || (typeof c.name === 'string' && c.name.trim() !== ''))
+      && (c.place === undefined || typeof c.place === 'string');
     if (!valid) {
-      problems.push({ code: 'bad-constraint', file: FILE, path, message: `realm ${c.id} needs an id, a colour, seeds and optional cuts and reach` });
+      problems.push({ code: 'bad-constraint', file: FILE, path, message: `realm ${c.id} needs an id, a colour, seeds and optional cuts, reach, name and place` });
       continue;
     }
-    newRealms.push({ seeds: c.seeds, cuts: c.cuts, reach: c.reach });
+    newRealms.push({ seeds: c.seeds, cuts: c.cuts, reach: c.reach, name: c.name, place: c.place });
     newIndexes.push(k);
   }
 
@@ -152,7 +154,11 @@ export function generatePolitical({ canvas, seed, constraints = [], layers = {},
       problems.push({ code: 'realm-not-on-land', file: FILE, path: `constraints[${k}]`, message: `realm ${c.id} holds no land` });
       return;
     }
-    features.push({ id: c.id, type: 'realm', color: c.color, seeds: c.seeds, polygons, ...featureMeta(c) });
+    // A realm keeps its name and its place (the world's place sheet it stands for) when the constraint has them.
+    const naming = {};
+    if (c.name !== undefined) naming.name = c.name;
+    if (c.place !== undefined) naming.place = c.place;
+    features.push({ id: c.id, type: 'realm', color: c.color, seeds: c.seeds, polygons, ...naming, ...featureMeta(c) });
   });
 
   return { features: [...lockedFeatures, ...features], problems };

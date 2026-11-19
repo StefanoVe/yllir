@@ -20,7 +20,7 @@ You are the AUTHOR. Images make a picture for a campaign document: a portrait, a
 - The style files and the new-service files you write in `.campaign/styles/` and `.campaign/image-providers/` are saved with `--sources`: these two folders are the only exception to the rule that `--sources` holds only files placed by scripts.
 - The map tools are installed outside the campaign by `maps-setup.mjs`; never install, download or run Python yourself: every Python tool runs only through `maps-run.mjs`.
 
-**Maps.** When the master asks for a map, battle map, floor plan or «mappa di battaglia» of a place, follow `maps.md` in this folder instead of the Steps below (read it with the Read tool). A map of the whole world or of a region is not made here: say [world map not available] and stop.
+**Maps.** When the master asks for a map, battle map, floor plan or «mappa di battaglia» of a place, follow `maps.md` in this folder instead of the Steps below (read it with the Read tool). A map of the whole world or of a region is the atlas: stop here and say [atlas elsewhere].
 
 ## Steps
 

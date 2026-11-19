@@ -21,7 +21,7 @@ export const DEFAULT_SCREEN_SETTINGS: ScreenSettings = {
     density: 'comfortable',
     motion: 'system',
     startPage: 'plot',
-    rail: { plot: true, docs: true, music: true, encyclopedia: true, print: true },
+    rail: { plot: true, docs: true, music: true, encyclopedia: true, print: true, atlas: true },
   },
 };
 

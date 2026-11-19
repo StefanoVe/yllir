@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "id": "fantasy-color",
+  "names": { "it": "Fantasy colorato", "en": "Colourful fantasy" },
+  "fonts": { "place": "IM Fell English", "realm": "Cinzel", "feature": "IM Fell English" },
+  "textures": { "land": "land", "sand": "sand", "snow": "snow", "sea": "sea", "deepSea": "deep-sea" },
+  "sea": { "glow": { "width": 36, "blur": 6, "opacity": 0.9 }, "ripples": { "count": 3, "color": "#ffffff", "opacity": 0.22, "step": 0.05, "base": 4, "spacing": 7 } },
+  "coast": { "color": "#3b2f22", "width": 0.9, "shade": { "color": "#5a4a2a", "opacity": 0.18, "width": 3 } },
+  "rivers": { "under": "#e9f1f5", "underWidth": 2.4, "color": "#4a77a8", "width": 1.3 },
+  "lakes": { "highlight": { "color": "#ffffff", "opacity": 0.25, "width": 2 } },
+  "borders": { "fillOpacity": 0.10, "width": 1.1, "dash": [4, 2.5], "opacity": 0.85, "coastGap": 3.5 },
+  "routes": { "road": { "color": "#6b4a2b", "width": 0.9, "dash": [3, 1.5] }, "trail": { "color": "#6b4a2b", "width": 0.6, "dash": [1.2, 1.8] }, "sea": { "color": "#24425f", "width": 0.6, "dash": [0.6, 2], "opacity": 0.8 } },
+  "labels": {
+    "fill": "#2b2118", "halo": "#f3ead2", "haloOpacity": 0.85, "haloWidth": 0.28,
+    "featureFill": "#3a2e22", "featureSize": 7, "featureSpacing": 0.2,
+    "placeSize": { "capital": 6.5, "city": 6.5, "other": 5 },
+    "realmDarken": 0.4, "realmOpacity": 0.75,
+    "realmSize": { "max": 22, "min": 8, "fitMin": 6, "areaDivisor": 14 },
+    "realmSpacing": 0.35, "realmSpacingMin": 0.12
+  },
+  "stamps": { "mirrorTrees": true, "scale": 1 },
+  "masks": { "blur": 3 },
+  "icons": { "capital": 26, "city": 21, "other": 17 },
+  "vignette": { "color": "#2a1d0f", "opacity": 0.35 },
+  "forestTint": { "color": "#2f5a1f", "opacity": 0.12 }
+}

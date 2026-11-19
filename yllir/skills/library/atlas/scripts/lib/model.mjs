@@ -289,8 +289,28 @@ function checkConstraintFields(constraint, base, file, ctx, out) {
   }
 }
 
+const FOREST_VARIANTS = ['conifer', 'broadleaf'];
+
+/** The optional `name` (text) and `place` (a place sheet of the world) of a realm, on a constraint or a feature. */
+function checkRealmNaming(value, base, file, ctx, out, code) {
+  if (value.name !== undefined && (typeof value.name !== 'string' || value.name.trim() === '')) {
+    out.push(problem(code, file, `${base}.name`, 'name must be a non-empty text'));
+  }
+  if (value.place === undefined) return;
+  if (typeof value.place !== 'string') {
+    out.push(problem(code, file, `${base}.place`, 'place must be the id of a place'));
+    return;
+  }
+  const subject = ctx.byId.get(value.place);
+  if (subject === undefined) {
+    out.push(problem('unknown-place', file, `${base}.place`, `${value.place} is not a place of the world`));
+  } else if (subject.kind !== 'place') {
+    out.push(problem('id-not-place', file, `${base}.place`, `${value.place} is not a place sheet`));
+  }
+}
+
 /** Kind-specific fields of a constraint of the relief, biomes, water, political and routes layers. */
-function checkLayerConstraintFields(name, c, base, file, out) {
+function checkLayerConstraintFields(name, c, base, file, ctx, out) {
   const bad = (field, message) => out.push(problem('bad-constraint', file, `${base}.${field}`, message));
   const pointsOf = (value, min) => Array.isArray(value) && value.length >= min && value.every(isFinitePoint);
   const oneOf = (field, list) => {
@@ -311,6 +331,9 @@ function checkLayerConstraintFields(name, c, base, file, out) {
       if (!constraintPositive(c.radius)) bad('radius', 'radius must be a number above 0');
       constraintRoughness(c, base, file, out);
       if (c.avoidRelief !== undefined && typeof c.avoidRelief !== 'boolean') bad('avoidRelief', 'avoidRelief must be a boolean');
+      if (c.variant !== undefined && (c.type !== 'forest' || !FOREST_VARIANTS.includes(c.variant))) {
+        bad('variant', `variant is only for a forest and must be one of ${FOREST_VARIANTS.join(', ')}`);
+      }
       break;
     case 'water':
       constraintId(c, base, file, out);
@@ -329,6 +352,7 @@ function checkLayerConstraintFields(name, c, base, file, out) {
         bad('cuts', 'cuts must be a list of segments, each two points');
       }
       if (c.reach !== undefined && !constraintPositive(c.reach)) bad('reach', 'reach must be a number above 0');
+      checkRealmNaming(c, base, file, ctx, out, 'bad-constraint');
       break;
     default: // routes
       constraintId(c, base, file, out);
@@ -358,7 +382,7 @@ function checkConstraint(name, constraint, base, file, ctx, out) {
     out.push(problem('bad-constraint', file, `${base}.note`, 'note must be a string'));
   }
   if (name === 'terrain') checkConstraintFields(constraint, base, file, ctx, out);
-  else checkLayerConstraintFields(name, constraint, base, file, out);
+  else checkLayerConstraintFields(name, constraint, base, file, ctx, out);
 }
 
 /** Every constraint of a layer that has an id must have a different one from the others. */
@@ -400,6 +424,7 @@ function checkTyped(name, feature, base, file, ctx, out) {
 
 function checkPolitical(feature, base, file, ctx, out) {
   if (feature.type !== 'realm') out.push(problem('bad-feature', file, `${base}.type`, 'type must be realm'));
+  checkRealmNaming(feature, base, file, ctx, out, 'bad-feature');
   checkPoints(feature.seeds, 1, 'seeds', base, file, ctx, out);
   if (typeof feature.color !== 'string' || !COLOR.test(feature.color)) {
     out.push(problem('bad-feature', file, `${base}.color`, 'color must be #rrggbb'));
@@ -472,6 +497,9 @@ function checkFeatureShape(name, feature, base, file, ctx, out) {
     case 'water':
     case 'biomes':
       checkTyped(name, feature, base, file, ctx, out);
+      if (name === 'biomes' && feature.variant !== undefined && (feature.type !== 'forest' || !FOREST_VARIANTS.includes(feature.variant))) {
+        out.push(problem('bad-feature', file, `${base}.variant`, `variant is only for a forest and must be one of ${FOREST_VARIANTS.join(', ')}`));
+      }
       break;
     case 'political':
       checkPolitical(feature, base, file, ctx, out);

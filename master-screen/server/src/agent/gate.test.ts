@@ -28,6 +28,7 @@ before(() => {
   fs.mkdirSync(path.join(campaign, '.campaign', 'styles'), { recursive: true });
   fs.mkdirSync(path.join(campaign, '.campaign', 'image-providers'), { recursive: true });
   fs.mkdirSync(path.join(campaign, '.campaign', 'state', 'maps'), { recursive: true });
+  fs.mkdirSync(path.join(campaign, '.campaign', 'state', 'atlas'), { recursive: true });
   fs.mkdirSync(path.join(campaign, '.git'), { recursive: true });
   fs.mkdirSync(path.join(campaign, 'characters'), { recursive: true });
   fs.writeFileSync(path.join(campaign, 'characters', 'mara.md'), '# Mara\n');
@@ -177,6 +178,17 @@ describe('Write and Edit: writable working folders only', () => {
 
   it('allows a draft path whose folders do not exist yet', () => {
     assert.equal(allowed(isAllowed('Write', { file_path: '.campaign/drafts/new/deep/a.md' }, ctx)), true);
+  });
+});
+
+describe('atlas working files under the state folder', () => {
+  it('allows Write to the atlas working folder of the state', () => {
+    assert.equal(allowed(isAllowed('Write', { file_path: '.campaign/state/atlas/terrain.json' }, ctx)), true);
+  });
+
+  it('denies Write to the atlas folder of the campaign, which only the framework writes', () => {
+    const decision = isAllowed('Write', { file_path: 'Atlante/terrain.json' }, ctx);
+    assert.equal(decision.allow, false);
   });
 });
 

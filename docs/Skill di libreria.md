@@ -84,7 +84,7 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | Master screen | Strumento locale unico | Interfaccia locale unica per chat con l'agente, consultazione, sessione live, musica e stampa. Si costruisce dopo la prima versione. | Deciso (strumento unico); forma Proposta |
 | Stampa (`print`) | Modulo opzionale (output fisici) | Fogli di carte (5×7 o A4) e fogli-bacheca, con retro e codici QR, in RGB o CMYK. | Prima implementazione (2026-11-12) come skill `print` (L10), con renderer Node e PDF |
 | Enciclopedia pubblica | Modulo opzionale (output digitale) | Pagina statica consultabile dai giocatori, costruita da schede con segnaposto e da carte in formato compresso. | Deciso (2026-11-12, opzione A). Prima implementazione: skill `encyclopedia`, generazione locale con anteprima nel master screen, senza pubblicazione |
-| [Atlante](#l25-atlante) (`atlas`) | Libreria, chiamata dal core; modulo opzionale | Carta del mondo per livelli dai documenti, nel master screen e come sito statico. | Deciso (2026-11-19). Non implementata |
+| [Atlante](#l25-atlante) (`atlas`) | Libreria, chiamata dal core; modulo opzionale | Carta del mondo per livelli dai documenti, nel master screen e come sito statico. | Deciso (2026-11-19). Implementata in 0.78.0 |
 | Musica | Modulo opzionale, nel master screen | Colonna sonora di scene e sessioni. | Proposta |
 | Stile per output web | Modulo opzionale | Profilo grafico per le pagine di enciclopedia e master screen. Una skill esterna di design per siti web (design-taste-frontend) è un candidato da valutare in quel contesto. | Proposta |
 | Vedute e carte nautiche | Da valutare | Output non ancora analizzati. Rientrano nella questione aperta sugli strumenti da confluire. | Da valutare |
@@ -358,7 +358,7 @@ Implementata in 0.61.0: il tipo «personaggio giocante» di `write-document` (ca
 
 ### L25. Atlante
 
-- **Stato:** processo e forma **Deciso** dall'autore (2026-11-19); formati e strumenti **Proposta**. Non implementata. Il documento dedicato è [Atlante](Atlante.md).
+- **Stato:** processo e forma **Deciso** dall'autore (2026-11-19); formati e strumenti **Proposta**. Implementata in 0.78.0. Il documento dedicato è [Atlante](Atlante.md).
 - **Scopo:** costruire e tenere aggiornata la carta del mondo della campagna, per livelli, dai documenti; mostrarla nel master screen ed esportarla come sito statico.
 - **Avvio:** dal core o dal pulsante della sezione vuota del master screen, solo su richiesta del master. L'aggiornamento con i nuovi luoghi parte alla fine dei lotti di `build-world` e `write-document`, solo se l'atlante esiste.
 - **Deterministico:** coste e forme dai vincoli con un seme; confini da regole; controllo delle posizioni rispetto ai livelli; impronte dei livelli fissati e rifiuto delle modifiche non richieste; disegno; esportazione e controlli del sito dei giocatori.

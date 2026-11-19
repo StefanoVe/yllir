@@ -360,3 +360,19 @@ test('economy accepts only reference_item with it and en text', () => {
     assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'unknown-key' && e.path === 'economy.prices'));
   });
 });
+
+test('atlas_style is optional, a style id when present, and the D&D manifest declares fantasy-color', () => {
+  assert.equal(loadAdapter(root, 'dnd-2024').adapter.atlas_style, 'fantasy-color');
+  withRoot((temp) => {
+    write(temp, 'dnd-2024', source);
+    assert.deepEqual(loadAdapter(temp, 'dnd-2024').errors.filter((e) => e.path === 'atlas_style'), []);
+    write(temp, 'dnd-2024', replace(source, 'atlas_style: fantasy-color', 'atlas_style: Dark Fantasy'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'atlas_style'));
+    write(temp, 'dnd-2024', replace(source, 'atlas_style: fantasy-color', 'atlas_style: [dark]'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'atlas_style'));
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+    fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/difficulty.mjs'), 'export {};\n');
+    write(temp, 'dnd-2024', replace(source, 'atlas_style: fantasy-color\n', ''));
+    assert.deepEqual(loadAdapter(temp, 'dnd-2024').errors, []);
+  });
+});
