@@ -1,6 +1,6 @@
 # Atlante
 
-**Stato:** processo, forma e principi **Deciso** dall'autore (2026-11-19); prima implementazione in 0.78.0 (skill `atlas`, sezione Atlante del master screen 0.19.0), con formati e strumenti come descritti qui
+**Stato:** processo, forma e principi **Deciso** dall'autore (2026-11-19); prima implementazione in 0.78.0 (skill `atlas`, sezione Atlante del master screen 0.19.0), con formati e strumenti come descritti qui. Le carte di scala più piccola (decisione 12, sezione 2b) non sono implementate.
 **Parte di:** [Skill di libreria](Skill%20di%20libreria.md) (scheda [L25](Skill%20di%20libreria.md#l25-atlante)) e [Master screen](Master%20screen.md)
 
 ## Scopo del documento
@@ -22,6 +22,7 @@ Supera, per la carta del mondo, la frase «La carta del mondo resta fuori» dell
 9. **Timbri da un pacchetto originale (scelta del 2026-11-19).** Timbri e texture vengono da un pacchetto originale generato una volta con un fornitore di immagini, rifinito e distribuito con il framework.
 10. **Master e giocatori (scelta del 2026-11-19).** Nel master screen l'atlante mostra tutto, segreti compresi. Il sito esportato per i giocatori esclude ciò che è riservato al master, con gli stessi controlli dell'enciclopedia.
 11. **Stili diversi (Deciso, 2026-11-19).** L'atlante può avere stili diversi. Ogni stile è un pacchetto del framework (timbri, texture, palette, font e parametri di disegno). L'ordine di scelta è: la scelta del master, poi lo stile indicato dall'adattatore del sistema di gioco, poi lo stile di base del framework. Il master cambia stile a voce. Cambiare stile ridisegna solo l'aspetto e non tocca mai i dati, e quindi nemmeno il territorio. I primi stili sono: fantasy colorato (quello di base), pergamena antica e dark fantasy.
+12. **Carte di scala più piccola (Deciso, 2026-11-19).** L'atlante non si ferma alla scala geografica (mondo, continente, regione): deve poter rappresentare anche estensioni più piccole, come una città, un villaggio o un quartiere, per esempio quando il mondo della campagna è una sola città. A quella scala servono asset propri: strade, singoli edifici e gli altri elementi di un abitato. Valgono le stesse regole delle altre scale: livelli, vincoli dai documenti, domande su ciò che manca, territorio fissato dopo l'approvazione, stili, versione per i giocatori.
 
 ## 2. Dati
 
@@ -32,6 +33,30 @@ Supera, per la carta del mondo, la frase «La carta del mondo resta fuori» dell
 - **Ogni elemento** porta le fonti (documento e sezione da cui deriva), la provenienza (`master`, `document`, `agent-choice`) e la visibilità (`public` o `master`).
 - **Una sola fonte di verità.** Un luogo dell'atlante si riferisce alla scheda con il suo `id`: nome, descrizione e gerarchia vengono dalla scheda e dalle cartelle dei luoghi, mai copiati. L'atlante aggiunge solo la posizione e l'icona.
 - **Confini da regole.** Ogni stato ha punti di partenza sulla terra e regole (stretti da tagliare, isole da includere, laghi da escludere), e lo script calcola il territorio. Non si disegnano poligoni a mano.
+
+## 2b. Scale e carte più piccole
+
+**Proposta**, salvo la decisione 12.
+
+- **Scale.** All'estensione geografica (`world`, `continent`, `region`) si aggiunge l'estensione di un abitato: `settlement` (città o villaggio intero, con i dintorni) e `district` (un quartiere, un porto, un castello con il borgo). L'estensione decide quali livelli, timbri e unità di misura usare. La pianta di un singolo edificio o di uno scontro resta una mappa di luogo di `images` (decisione sulle mappe di battaglia, indice 2026-11-11).
+- **Livelli della scala urbana**, nell'ordine di disegno:
+  - `ground`: terreno, acqua (fiume, costa, canali), con lo stesso principio di `terrain`;
+  - `green`: parchi, giardini, orti, campi e boschi dei dintorni;
+  - `walls`: mura, torri e porte, da un tracciato e da regole;
+  - `streets`: strade principali, secondarie e vicoli, con ponti e piazze;
+  - `blocks`: isolati ricavati dalle strade e riempiti di edifici generici, con seme fisso;
+  - `buildings`: edifici singoli nominati nei documenti (taverna, tempio, palazzo, torre, magazzino), ciascuno legato alla sua scheda come i luoghi della scala geografica;
+  - `districts`: confini dei quartieri, al posto di `political`;
+  - `labels`, come nelle altre scale.
+- **Generazione.** Come nelle altre scale: l'assistente scrive i vincoli (andamento del fiume, perimetro delle mura, assi delle strade principali, posizione delle piazze, edifici nominati); gli script generano reticolo stradale, isolati e riempimento con un seme fisso; il master approva; i livelli `ground`, `walls` e `streets` vengono fissati. Gli edifici nominati crescono con il mondo come i luoghi.
+- **Asset urbani.** Ogni stile deve avere anche un pacchetto per la scala urbana, generato come quello geografico (decisione 9), con lo stesso stile visivo:
+  - edifici generici visti dall'alto o in prospettiva a tre quarti, in varianti di dimensione (casa, casa a schiera, bottega, fienile);
+  - edifici notevoli (tempio, palazzo, castello o mastio, torre, taverna, mulino, magazzino, mercato coperto);
+  - mura: tratti, torri, porte, con raccordi che si ripetono senza giunte;
+  - superfici: lastricato, terra battuta, acciottolato, acqua di canale, prato, campo arato;
+  - elementi minori: ponti, moli, barche, alberi isolati, fontane, bancarelle, recinti.
+- **Carte annidate.** Una campagna può avere più carte, ciascuna con la propria estensione (per esempio il mondo e la sua capitale). Ogni carta ha la propria cartella e il proprio manifesto (`Atlante/<carta>/atlas.json`). Il segnaposto di una città sulla carta del mondo apre la carta della città quando esiste. I dati di una carta non si copiano nell'altra: la gerarchia viene dalle cartelle dei luoghi.
+- **Unità.** A scala urbana la tela usa metri o passi, dichiarati nella configurazione, e i controlli sulle posizioni cambiano: un edificio sta su un isolato o su una piazza, mai in strada o in acqua; una porta sta sulle mura.
 
 ## 3. Generazione per livelli
 
@@ -79,13 +104,16 @@ Lo script fa la meccanica, l'assistente giudica: la scelta dei vincoli e la lett
 
 ## 8. Testbench
 
-Campagne sintetiche con risposte fuori dalla cartella che l'agente legge. Casi minimi: l'assistente chiede l'estensione e i nomi mancanti invece di inventarli; un luogo aggiunto con `build-world` viene collocato senza cambiare l'impronta del territorio; un luogo riservato manca dal sito dei giocatori; due luoghi omonimi non si confondono.
+Campagne sintetiche con risposte fuori dalla cartella che l'agente legge. Casi minimi: l'assistente chiede l'estensione e i nomi mancanti invece di inventarli; un luogo aggiunto con `build-world` viene collocato senza cambiare l'impronta del territorio; un luogo riservato manca dal sito dei giocatori; due luoghi omonimi non si confondono. Per la scala urbana (**Proposta**): una campagna fatta di una sola città produce una carta `settlement`, non una carta geografica; un edificio nominato in un documento viene collocato su un isolato e collegato alla sua scheda; una nuova taverna aggiunta dopo non cambia strade e mura fissate.
 
 ## Questioni aperte
 
 - **Allargare la tela:** chi decide dove si attacca una terra nuova, e se il master vuole vedere più proposte.
 - **Scala e distanze:** l'atlante deve dichiarare una scala e controllare le distanze scritte nei documenti (giorni di viaggio, leghe)?
 - **Griglia esagonale:** serve un livello facoltativo con esagoni per i viaggi?
-- **Carte di dettaglio:** una regione può avere un proprio atlante più dettagliato dentro quello del mondo, o si resta a un solo livello di dettaglio?
+- **Carte di dettaglio:** in parte risolta dalla decisione 12 (le scale più piccole esistono). Resta da decidere se anche una regione può avere una propria carta più dettagliata dentro quella del mondo (Proposta: sì, con le carte annidate della sezione 2b).
+- **Scelta della scala:** quando il mondo è una sola città la scala è ovvia; quando ci sono un mondo e una capitale descritta in dettaglio, l'assistente propone le due carte o chiede quale serve prima? Proposta: propone la carta più ampia e offre la seconda in una frase.
+- **Edifici generici:** il riempimento degli isolati è sempre generato dallo script (`agent-choice`), oppure il master può chiedere un quartiere «povero» o «ricco» che cambia densità e tipi di edifici? Proposta: un parametro di carattere per quartiere, dal documento del quartiere.
+- **Interni:** la pianta interna di un edificio nominato resta una mappa di luogo di `images`; un collegamento dalla carta della città a quella pianta è utile?
 - **Vedute e carte nautiche:** si ricavano dai livelli dell'atlante (la maschera di terra e mare c'è già) o restano fuori?
 - **Pubblicazione:** il sito dei giocatori resta locale come l'enciclopedia finché non c'è un hosting.

@@ -359,7 +359,7 @@ Implementata in 0.61.0: il tipo «personaggio giocante» di `write-document` (ca
 ### L25. Atlante
 
 - **Stato:** processo e forma **Deciso** dall'autore (2026-11-19); formati e strumenti **Proposta**. Implementata in 0.78.0. Il documento dedicato è [Atlante](Atlante.md).
-- **Scopo:** costruire e tenere aggiornata la carta del mondo della campagna, per livelli, dai documenti; mostrarla nel master screen ed esportarla come sito statico.
+- **Scopo:** costruire e tenere aggiornata la carta del mondo della campagna, per livelli, dai documenti; mostrarla nel master screen ed esportarla come sito statico. Anche a scala più piccola, fino a una città, un villaggio o un quartiere, con asset urbani propri (strade, edifici singoli, mura): decisione 12 di [Atlante](Atlante.md), non implementata.
 - **Avvio:** dal core o dal pulsante della sezione vuota del master screen, solo su richiesta del master. L'aggiornamento con i nuovi luoghi parte alla fine dei lotti di `build-world` e `write-document`, solo se l'atlante esiste.
 - **Deterministico:** coste e forme dai vincoli con un seme; confini da regole; controllo delle posizioni rispetto ai livelli; impronte dei livelli fissati e rifiuto delle modifiche non richieste; disegno; esportazione e controlli del sito dei giocatori.
 - **Giudizio:** estensione proposta, lettura dei documenti, vincoli di ogni livello, domande al master.
