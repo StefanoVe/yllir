@@ -20,8 +20,8 @@ const PRINT_RENDERERS = ['auto', 'photoshop', 'node'];
 const ENCYCLOPEDIA_TITLE_MAX = 120;
 const ENCYCLOPEDIA_URL_MAX = 200;
 const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];
-const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only', 'external'];
-const MODULE_KEYS = ['print', 'encyclopedia', 'master_screen', 'music'];
+const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only', 'external', 'atlas'];
+const MODULE_KEYS = ['print', 'encyclopedia', 'master_screen', 'music', 'atlas'];
 const INSTALLED_ADAPTERS = ['none', ...listAdapters(pluginRootFromHere())];
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const LANG_RE = /^[a-z]{2}$/;
@@ -454,6 +454,7 @@ function validateSystem(r, system) {
 function validateStructure(r, structure, campaignRoot) {
   const idOwners = new Map();
   const folderOwners = new Map();
+  let atlasIndex = null;
 
   structure.forEach((entry, index) => {
     const base = `structure[${index}]`;
@@ -511,6 +512,14 @@ function validateStructure(r, structure, campaignRoot) {
     }
 
     checkEnum(r, entry, base, 'type', STRUCTURE_TYPES, { required: true });
+
+    if (entry.type === 'atlas') {
+      if (atlasIndex === null) {
+        atlasIndex = index;
+      } else {
+        r.error('duplicate-atlas', `${base}.type`, 'only one category may have type atlas');
+      }
+    }
 
     if (Object.hasOwn(entry, 'style')) {
       if (typeof entry.style !== 'string') {

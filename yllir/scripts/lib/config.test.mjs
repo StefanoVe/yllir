@@ -351,6 +351,27 @@ test('modules accept only the known keys, with boolean values', () => {
   assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}modules:\n  print: "yes"\n`)), ['bad-type modules.print']);
 });
 
+test('an atlas category with the atlas module is valid', () => {
+  const yaml = `${MINIMAL}structure:\n  - id: atlante\n    folder: Atlante\n    type: atlas\nmodules:\n  atlas: true\n`;
+  assert.deepEqual(errorsOf(yaml, ['Atlante']), []);
+});
+
+test('only one category may have type atlas', () => {
+  const yaml = `${MINIMAL}structure:
+  - id: atlante
+    folder: Atlante
+    type: atlas
+  - id: atlante-due
+    folder: AtlanteDue
+    type: atlas
+`;
+  assert.deepEqual(pairsOf(errorsOf(yaml, ['Atlante', 'AtlanteDue'])), ['duplicate-atlas structure[1].type']);
+});
+
+test('modules.atlas must be true or false', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}modules:\n  atlas: "yes"\n`)), ['bad-type modules.atlas']);
+});
+
 test('audit accepts only exclusions, and each exclusion is complete and well formed', () => {
   assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}audit:\n  rules: []\n`)), ['unknown-key audit.rules']);
 

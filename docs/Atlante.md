@@ -26,7 +26,7 @@ Supera, per la carta del mondo, la frase «La carta del mondo resta fuori» dell
 
 **Proposta.** I dati dell'atlante sono canone: stanno nella campagna, nella cartella dell'atlante (localizzata, per esempio `Atlante/`), dichiarata in `structure` con il tipo `atlas`, e si salvano nella cronologia come ogni documento. Tutto ciò che si disegna (immagini, sito) è derivato e si rigenera in `.campaign/cache/atlas/`.
 
-- **`atlas.yaml`:** estensione dell'atlante (mondo, continente o regione, e i luoghi di primo livello che contiene), dimensioni della tela e spazio di coordinate, seme, stile, elenco dei livelli con lo stato di ognuno (`locked`, impronta del contenuto).
+- **`atlas.json` (manifesto):** estensione dell'atlante (mondo, continente o regione, e i luoghi di primo livello che contiene), dimensioni della tela e spazio di coordinate, seme, stile, elenco dei livelli con lo stato di ognuno (`locked`, impronta del contenuto).
 - **Un file per livello**, nell'ordine di disegno: `terrain` (terre e mari, coste), `relief` (catene montuose e colline), `water` (fiumi e laghi), `biomes` (foreste, paludi, deserti, ghiacci), `political` (confini), `places` (luoghi), `routes` (strade e rotte), `labels` (solo le correzioni manuali: le etichette si ricavano dagli altri livelli).
 - **Ogni elemento** porta le fonti (documento e sezione da cui deriva), la provenienza (`master`, `document`, `agent-choice`) e la visibilità (`public` o `master`).
 - **Una sola fonte di verità.** Un luogo dell'atlante si riferisce alla scheda con il suo `id`: nome, descrizione e gerarchia vengono dalla scheda e dalle cartelle dei luoghi, mai copiati. L'atlante aggiunge solo la posizione e l'icona.
