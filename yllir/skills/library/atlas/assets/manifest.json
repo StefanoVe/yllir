@@ -1,0 +1,1228 @@
+{
+  "schema": 1,
+  "style": "fantasy-color",
+  "generated": "2026-11-19",
+  "tool": "Codex ImageGen, processed by tools/atlas-assets/process.py",
+  "stamps": [
+    {
+      "id": "dunes-01",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-01.webp",
+      "width": 220,
+      "height": 150,
+      "anchor": [
+        0.49,
+        0.9733
+      ]
+    },
+    {
+      "id": "dunes-02",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-02.webp",
+      "width": 220,
+      "height": 151,
+      "anchor": [
+        0.4756,
+        0.9735
+      ]
+    },
+    {
+      "id": "dunes-03",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-03.webp",
+      "width": 220,
+      "height": 136,
+      "anchor": [
+        0.502,
+        0.9706
+      ]
+    },
+    {
+      "id": "dunes-04",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-04.webp",
+      "width": 220,
+      "height": 165,
+      "anchor": [
+        0.5119,
+        0.9758
+      ]
+    },
+    {
+      "id": "dunes-05",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-05.webp",
+      "width": 220,
+      "height": 122,
+      "anchor": [
+        0.5007,
+        0.9672
+      ]
+    },
+    {
+      "id": "dunes-06",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-06.webp",
+      "width": 220,
+      "height": 146,
+      "anchor": [
+        0.4774,
+        0.9726
+      ]
+    },
+    {
+      "id": "dunes-07",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-07.webp",
+      "width": 220,
+      "height": 167,
+      "anchor": [
+        0.5085,
+        0.976
+      ]
+    },
+    {
+      "id": "dunes-08",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-08.webp",
+      "width": 220,
+      "height": 135,
+      "anchor": [
+        0.4928,
+        0.9704
+      ]
+    },
+    {
+      "id": "dunes-09",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-09.webp",
+      "width": 220,
+      "height": 154,
+      "anchor": [
+        0.4809,
+        0.974
+      ]
+    },
+    {
+      "id": "dunes-10",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-10.webp",
+      "width": 220,
+      "height": 134,
+      "anchor": [
+        0.4871,
+        0.9701
+      ]
+    },
+    {
+      "id": "dunes-11",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-11.webp",
+      "width": 220,
+      "height": 150,
+      "anchor": [
+        0.5292,
+        0.9733
+      ]
+    },
+    {
+      "id": "dunes-12",
+      "category": "dunes",
+      "file": "stamps/dunes/dunes-12.webp",
+      "width": 220,
+      "height": 143,
+      "anchor": [
+        0.4941,
+        0.972
+      ]
+    },
+    {
+      "id": "hills-01",
+      "category": "hills",
+      "file": "stamps/hills/hills-01.webp",
+      "width": 220,
+      "height": 109,
+      "anchor": [
+        0.5065,
+        0.9633
+      ]
+    },
+    {
+      "id": "hills-02",
+      "category": "hills",
+      "file": "stamps/hills/hills-02.webp",
+      "width": 220,
+      "height": 121,
+      "anchor": [
+        0.4944,
+        0.9669
+      ]
+    },
+    {
+      "id": "hills-03",
+      "category": "hills",
+      "file": "stamps/hills/hills-03.webp",
+      "width": 220,
+      "height": 99,
+      "anchor": [
+        0.4862,
+        0.9596
+      ]
+    },
+    {
+      "id": "hills-04",
+      "category": "hills",
+      "file": "stamps/hills/hills-04.webp",
+      "width": 220,
+      "height": 110,
+      "anchor": [
+        0.5066,
+        0.9636
+      ]
+    },
+    {
+      "id": "hills-05",
+      "category": "hills",
+      "file": "stamps/hills/hills-05.webp",
+      "width": 220,
+      "height": 98,
+      "anchor": [
+        0.4842,
+        0.9592
+      ]
+    },
+    {
+      "id": "hills-06",
+      "category": "hills",
+      "file": "stamps/hills/hills-06.webp",
+      "width": 220,
+      "height": 108,
+      "anchor": [
+        0.4974,
+        0.963
+      ]
+    },
+    {
+      "id": "hills-07",
+      "category": "hills",
+      "file": "stamps/hills/hills-07.webp",
+      "width": 220,
+      "height": 97,
+      "anchor": [
+        0.5049,
+        0.9588
+      ]
+    },
+    {
+      "id": "hills-08",
+      "category": "hills",
+      "file": "stamps/hills/hills-08.webp",
+      "width": 220,
+      "height": 110,
+      "anchor": [
+        0.5051,
+        0.9636
+      ]
+    },
+    {
+      "id": "hills-09",
+      "category": "hills",
+      "file": "stamps/hills/hills-09.webp",
+      "width": 220,
+      "height": 99,
+      "anchor": [
+        0.4971,
+        0.9596
+      ]
+    },
+    {
+      "id": "hills-10",
+      "category": "hills",
+      "file": "stamps/hills/hills-10.webp",
+      "width": 220,
+      "height": 108,
+      "anchor": [
+        0.5157,
+        0.963
+      ]
+    },
+    {
+      "id": "hills-11",
+      "category": "hills",
+      "file": "stamps/hills/hills-11.webp",
+      "width": 220,
+      "height": 101,
+      "anchor": [
+        0.5065,
+        0.9604
+      ]
+    },
+    {
+      "id": "hills-12",
+      "category": "hills",
+      "file": "stamps/hills/hills-12.webp",
+      "width": 220,
+      "height": 112,
+      "anchor": [
+        0.5102,
+        0.9643
+      ]
+    },
+    {
+      "id": "icons-capital",
+      "category": "icons",
+      "file": "stamps/icons/capital.webp",
+      "width": 179,
+      "height": 192,
+      "anchor": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "id": "icons-city",
+      "category": "icons",
+      "file": "stamps/icons/city.webp",
+      "width": 192,
+      "height": 180,
+      "anchor": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "id": "icons-fort",
+      "category": "icons",
+      "file": "stamps/icons/fort.webp",
+      "width": 192,
+      "height": 173,
+      "anchor": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "id": "icons-landmark",
+      "category": "icons",
+      "file": "stamps/icons/landmark.webp",
+      "width": 103,
+      "height": 192,
+      "anchor": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "id": "icons-port",
+      "category": "icons",
+      "file": "stamps/icons/port.webp",
+      "width": 192,
+      "height": 117,
+      "anchor": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "id": "icons-ruin",
+      "category": "icons",
+      "file": "stamps/icons/ruin.webp",
+      "width": 192,
+      "height": 158,
+      "anchor": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "id": "icons-town",
+      "category": "icons",
+      "file": "stamps/icons/town.webp",
+      "width": 192,
+      "height": 181,
+      "anchor": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "id": "icons-village",
+      "category": "icons",
+      "file": "stamps/icons/village.webp",
+      "width": 192,
+      "height": 143,
+      "anchor": [
+        0.5,
+        0.5
+      ]
+    },
+    {
+      "id": "mountains-01",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-01.webp",
+      "width": 320,
+      "height": 245,
+      "anchor": [
+        0.5128,
+        0.9714
+      ]
+    },
+    {
+      "id": "mountains-02",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-02.webp",
+      "width": 320,
+      "height": 244,
+      "anchor": [
+        0.5071,
+        0.9795
+      ]
+    },
+    {
+      "id": "mountains-03",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-03.webp",
+      "width": 320,
+      "height": 174,
+      "anchor": [
+        0.4941,
+        0.9713
+      ]
+    },
+    {
+      "id": "mountains-04",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-04.webp",
+      "width": 320,
+      "height": 281,
+      "anchor": [
+        0.4965,
+        0.9751
+      ]
+    },
+    {
+      "id": "mountains-05",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-05.webp",
+      "width": 320,
+      "height": 165,
+      "anchor": [
+        0.4995,
+        0.9697
+      ]
+    },
+    {
+      "id": "mountains-06",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-06.webp",
+      "width": 320,
+      "height": 221,
+      "anchor": [
+        0.498,
+        0.9683
+      ]
+    },
+    {
+      "id": "mountains-07",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-07.webp",
+      "width": 320,
+      "height": 276,
+      "anchor": [
+        0.5036,
+        0.9819
+      ]
+    },
+    {
+      "id": "mountains-08",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-08.webp",
+      "width": 320,
+      "height": 177,
+      "anchor": [
+        0.4989,
+        0.9718
+      ]
+    },
+    {
+      "id": "mountains-09",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-09.webp",
+      "width": 320,
+      "height": 190,
+      "anchor": [
+        0.487,
+        0.9684
+      ]
+    },
+    {
+      "id": "mountains-10",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-10.webp",
+      "width": 320,
+      "height": 202,
+      "anchor": [
+        0.4785,
+        0.9752
+      ]
+    },
+    {
+      "id": "mountains-11",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-11.webp",
+      "width": 320,
+      "height": 273,
+      "anchor": [
+        0.4812,
+        0.9744
+      ]
+    },
+    {
+      "id": "mountains-12",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-12.webp",
+      "width": 320,
+      "height": 197,
+      "anchor": [
+        0.5211,
+        0.9746
+      ]
+    },
+    {
+      "id": "mountains-13",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-13.webp",
+      "width": 320,
+      "height": 158,
+      "anchor": [
+        0.4771,
+        0.9684
+      ]
+    },
+    {
+      "id": "mountains-14",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-14.webp",
+      "width": 320,
+      "height": 129,
+      "anchor": [
+        0.4919,
+        0.9612
+      ]
+    },
+    {
+      "id": "mountains-15",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-15.webp",
+      "width": 320,
+      "height": 162,
+      "anchor": [
+        0.4555,
+        0.9691
+      ]
+    },
+    {
+      "id": "mountains-16",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-16.webp",
+      "width": 320,
+      "height": 127,
+      "anchor": [
+        0.4778,
+        0.9606
+      ]
+    },
+    {
+      "id": "mountains-17",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-17.webp",
+      "width": 320,
+      "height": 151,
+      "anchor": [
+        0.5081,
+        0.9669
+      ]
+    },
+    {
+      "id": "mountains-18",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-18.webp",
+      "width": 320,
+      "height": 126,
+      "anchor": [
+        0.5098,
+        0.9603
+      ]
+    },
+    {
+      "id": "mountains-19",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-19.webp",
+      "width": 320,
+      "height": 153,
+      "anchor": [
+        0.4732,
+        0.9673
+      ]
+    },
+    {
+      "id": "mountains-20",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-20.webp",
+      "width": 320,
+      "height": 129,
+      "anchor": [
+        0.4784,
+        0.9612
+      ]
+    },
+    {
+      "id": "mountains-21",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-21.webp",
+      "width": 320,
+      "height": 148,
+      "anchor": [
+        0.4565,
+        0.9662
+      ]
+    },
+    {
+      "id": "mountains-22",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-22.webp",
+      "width": 320,
+      "height": 135,
+      "anchor": [
+        0.4951,
+        0.963
+      ]
+    },
+    {
+      "id": "mountains-23",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-23.webp",
+      "width": 320,
+      "height": 142,
+      "anchor": [
+        0.4806,
+        0.9648
+      ]
+    },
+    {
+      "id": "mountains-24",
+      "category": "mountains",
+      "file": "stamps/mountains/mountains-24.webp",
+      "width": 320,
+      "height": 129,
+      "anchor": [
+        0.4945,
+        0.9612
+      ]
+    },
+    {
+      "id": "swamp-01",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-01.webp",
+      "width": 160,
+      "height": 143,
+      "anchor": [
+        0.5067,
+        0.979
+      ]
+    },
+    {
+      "id": "swamp-02",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-02.webp",
+      "width": 159,
+      "height": 160,
+      "anchor": [
+        0.5085,
+        0.975
+      ]
+    },
+    {
+      "id": "swamp-03",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-03.webp",
+      "width": 153,
+      "height": 160,
+      "anchor": [
+        0.463,
+        0.9812
+      ]
+    },
+    {
+      "id": "swamp-04",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-04.webp",
+      "width": 146,
+      "height": 160,
+      "anchor": [
+        0.4675,
+        0.9812
+      ]
+    },
+    {
+      "id": "swamp-05",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-05.webp",
+      "width": 160,
+      "height": 151,
+      "anchor": [
+        0.5113,
+        0.9735
+      ]
+    },
+    {
+      "id": "swamp-06",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-06.webp",
+      "width": 144,
+      "height": 160,
+      "anchor": [
+        0.5292,
+        0.975
+      ]
+    },
+    {
+      "id": "swamp-07",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-07.webp",
+      "width": 160,
+      "height": 126,
+      "anchor": [
+        0.4953,
+        0.9762
+      ]
+    },
+    {
+      "id": "swamp-08",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-08.webp",
+      "width": 160,
+      "height": 115,
+      "anchor": [
+        0.48,
+        0.9739
+      ]
+    },
+    {
+      "id": "swamp-09",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-09.webp",
+      "width": 160,
+      "height": 130,
+      "anchor": [
+        0.4802,
+        0.9769
+      ]
+    },
+    {
+      "id": "swamp-10",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-10.webp",
+      "width": 160,
+      "height": 127,
+      "anchor": [
+        0.4782,
+        0.9764
+      ]
+    },
+    {
+      "id": "swamp-11",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-11.webp",
+      "width": 160,
+      "height": 136,
+      "anchor": [
+        0.491,
+        0.9779
+      ]
+    },
+    {
+      "id": "swamp-12",
+      "category": "swamp",
+      "file": "stamps/swamp/swamp-12.webp",
+      "width": 160,
+      "height": 126,
+      "anchor": [
+        0.4921,
+        0.9762
+      ]
+    },
+    {
+      "id": "trees-broadleaf-01",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-01.webp",
+      "width": 160,
+      "height": 158,
+      "anchor": [
+        0.5041,
+        0.9747
+      ]
+    },
+    {
+      "id": "trees-broadleaf-02",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-02.webp",
+      "width": 160,
+      "height": 131,
+      "anchor": [
+        0.4895,
+        0.9695
+      ]
+    },
+    {
+      "id": "trees-broadleaf-03",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-03.webp",
+      "width": 160,
+      "height": 155,
+      "anchor": [
+        0.4932,
+        0.9742
+      ]
+    },
+    {
+      "id": "trees-broadleaf-04",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-04.webp",
+      "width": 160,
+      "height": 133,
+      "anchor": [
+        0.4981,
+        0.9699
+      ]
+    },
+    {
+      "id": "trees-broadleaf-05",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-05.webp",
+      "width": 160,
+      "height": 153,
+      "anchor": [
+        0.4905,
+        0.9739
+      ]
+    },
+    {
+      "id": "trees-broadleaf-06",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-06.webp",
+      "width": 160,
+      "height": 157,
+      "anchor": [
+        0.4878,
+        0.9745
+      ]
+    },
+    {
+      "id": "trees-broadleaf-07",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-07.webp",
+      "width": 160,
+      "height": 134,
+      "anchor": [
+        0.4963,
+        0.9701
+      ]
+    },
+    {
+      "id": "trees-broadleaf-08",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-08.webp",
+      "width": 160,
+      "height": 144,
+      "anchor": [
+        0.4973,
+        0.9722
+      ]
+    },
+    {
+      "id": "trees-broadleaf-09",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-09.webp",
+      "width": 160,
+      "height": 132,
+      "anchor": [
+        0.4854,
+        0.9697
+      ]
+    },
+    {
+      "id": "trees-broadleaf-10",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-10.webp",
+      "width": 160,
+      "height": 149,
+      "anchor": [
+        0.4958,
+        0.9732
+      ]
+    },
+    {
+      "id": "trees-broadleaf-11",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-11.webp",
+      "width": 160,
+      "height": 131,
+      "anchor": [
+        0.4844,
+        0.9695
+      ]
+    },
+    {
+      "id": "trees-broadleaf-12",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-12.webp",
+      "width": 160,
+      "height": 160,
+      "anchor": [
+        0.4996,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-broadleaf-13",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-13.webp",
+      "width": 160,
+      "height": 130,
+      "anchor": [
+        0.4894,
+        0.9692
+      ]
+    },
+    {
+      "id": "trees-broadleaf-14",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-14.webp",
+      "width": 160,
+      "height": 150,
+      "anchor": [
+        0.4911,
+        0.9733
+      ]
+    },
+    {
+      "id": "trees-broadleaf-15",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-15.webp",
+      "width": 160,
+      "height": 125,
+      "anchor": [
+        0.5076,
+        0.968
+      ]
+    },
+    {
+      "id": "trees-broadleaf-16",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-16.webp",
+      "width": 160,
+      "height": 151,
+      "anchor": [
+        0.4849,
+        0.9735
+      ]
+    },
+    {
+      "id": "trees-broadleaf-17",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-17.webp",
+      "width": 160,
+      "height": 141,
+      "anchor": [
+        0.491,
+        0.9716
+      ]
+    },
+    {
+      "id": "trees-broadleaf-18",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-18.webp",
+      "width": 160,
+      "height": 152,
+      "anchor": [
+        0.4965,
+        0.9737
+      ]
+    },
+    {
+      "id": "trees-broadleaf-19",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-19.webp",
+      "width": 160,
+      "height": 131,
+      "anchor": [
+        0.4849,
+        0.9695
+      ]
+    },
+    {
+      "id": "trees-broadleaf-20",
+      "category": "trees-broadleaf",
+      "file": "stamps/trees-broadleaf/trees-broadleaf-20.webp",
+      "width": 160,
+      "height": 146,
+      "anchor": [
+        0.4981,
+        0.9726
+      ]
+    },
+    {
+      "id": "trees-conifer-01",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-01.webp",
+      "width": 119,
+      "height": 160,
+      "anchor": [
+        0.4962,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-02",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-02.webp",
+      "width": 107,
+      "height": 160,
+      "anchor": [
+        0.5029,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-03",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-03.webp",
+      "width": 134,
+      "height": 160,
+      "anchor": [
+        0.5065,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-04",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-04.webp",
+      "width": 83,
+      "height": 160,
+      "anchor": [
+        0.4951,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-05",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-05.webp",
+      "width": 139,
+      "height": 160,
+      "anchor": [
+        0.4862,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-06",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-06.webp",
+      "width": 139,
+      "height": 160,
+      "anchor": [
+        0.492,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-07",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-07.webp",
+      "width": 125,
+      "height": 160,
+      "anchor": [
+        0.4957,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-08",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-08.webp",
+      "width": 120,
+      "height": 160,
+      "anchor": [
+        0.5048,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-09",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-09.webp",
+      "width": 138,
+      "height": 160,
+      "anchor": [
+        0.4974,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-10",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-10.webp",
+      "width": 129,
+      "height": 160,
+      "anchor": [
+        0.5137,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-11",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-11.webp",
+      "width": 140,
+      "height": 160,
+      "anchor": [
+        0.4982,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-12",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-12.webp",
+      "width": 158,
+      "height": 160,
+      "anchor": [
+        0.4968,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-13",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-13.webp",
+      "width": 110,
+      "height": 160,
+      "anchor": [
+        0.4965,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-14",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-14.webp",
+      "width": 132,
+      "height": 160,
+      "anchor": [
+        0.4907,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-15",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-15.webp",
+      "width": 119,
+      "height": 160,
+      "anchor": [
+        0.4885,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-16",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-16.webp",
+      "width": 105,
+      "height": 160,
+      "anchor": [
+        0.5244,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-17",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-17.webp",
+      "width": 133,
+      "height": 160,
+      "anchor": [
+        0.5032,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-18",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-18.webp",
+      "width": 108,
+      "height": 160,
+      "anchor": [
+        0.5074,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-19",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-19.webp",
+      "width": 138,
+      "height": 160,
+      "anchor": [
+        0.4831,
+        0.975
+      ]
+    },
+    {
+      "id": "trees-conifer-20",
+      "category": "trees-conifer",
+      "file": "stamps/trees-conifer/trees-conifer-20.webp",
+      "width": 129,
+      "height": 160,
+      "anchor": [
+        0.5124,
+        0.975
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "id": "deep-sea",
+      "file": "textures/deep-sea.webp",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "id": "land",
+      "file": "textures/land.webp",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "id": "sand",
+      "file": "textures/sand.webp",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "id": "sea",
+      "file": "textures/sea.webp",
+      "width": 512,
+      "height": 512
+    },
+    {
+      "id": "snow",
+      "file": "textures/snow.webp",
+      "width": 512,
+      "height": 512
+    }
+  ]
+}

@@ -2,7 +2,7 @@
 // grid cells, not pixels.
 
 import { CELL_PX, collisionRects } from './map-layout.mjs';
-import { pngSize } from './png.mjs';
+import { pngSize } from '../../../../../../scripts/lib/png.mjs';
 
 const QUARTER_TURN = 1.5707963267948966;
 

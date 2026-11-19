@@ -2,7 +2,7 @@
 // Atlas of a campaign: the manifest and one file per layer, checked and written by
 // deterministic rules. The drawing is not here; the agent proposes constraints and this
 // script refuses every write that breaks the rules or a locked layer.
-// Usage: node atlas.mjs <status|validate|init|write-layer|lock> <root> [args] [--unlock]
+// Usage: node atlas.mjs <status|validate|init|write-layer|lock|generate-terrain|preview> <root> [args] [--unlock]
 // Exit codes: 0 ok, 1 campaign problem (validation errors, refused write, no atlas folder), 2 usage.
 
 import fs from 'node:fs';
@@ -13,11 +13,28 @@ import {
 import { checkWrite, snapshotOf } from './lib/lock.mjs';
 import { pendingPlaces } from './lib/pending.mjs';
 import { canonicalJson } from './lib/geometry.mjs';
+import { generateTerrain } from './lib/terrain.mjs';
+import { generateRelief } from './lib/relief.mjs';
+import { generateBiomes } from './lib/biomes.mjs';
+import { generateWater } from './lib/water.mjs';
+import { generatePolitical } from './lib/political.mjs';
+import { generateRoutes } from './lib/routes.mjs';
+import { renderPreview } from './lib/preview.mjs';
 import { buildWorldIndex } from '../../../../scripts/lib/world-graph.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
-const USAGE = 'usage: node atlas.mjs <status|validate|init|write-layer|lock> <root> [args] [--unlock]';
-const COMMANDS = ['status', 'validate', 'init', 'write-layer', 'lock'];
+const USAGE = 'usage: node atlas.mjs <status|validate|init|write-layer|lock|generate <layer>|generate-terrain|preview> <root> [args] [--unlock]';
+const COMMANDS = ['status', 'validate', 'init', 'write-layer', 'lock', 'generate', 'generate-terrain', 'preview'];
+// The generator of each layer. Every generator is pure: constraints, seed and the other layers in, features and problems out.
+const GENERATORS = {
+  terrain: generateTerrain,
+  relief: generateRelief,
+  biomes: generateBiomes,
+  water: generateWater,
+  political: generatePolitical,
+  routes: generateRoutes,
+};
+const PREVIEW_FILE = '.campaign/cache/atlas/preview.png';
 
 function print(value) {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
@@ -102,12 +119,43 @@ function init(root, scopeFile) {
   return 0;
 }
 
-function writeLayer(root, name, candidateFile, unlock) {
+/**
+ * The one write path of a layer: checkWrite and the whole-atlas validation, then the file and the manifest.
+ * Nothing is written when either refuses. Prints the result and returns the exit code.
+ * @param {object} [options.extra] fields added to the printed result (for example the feature count)
+ */
+function writeCandidate(root, name, value, { unlock = false, extra = {} } = {}) {
   const folder = atlasFolder(root);
   const dir = atlasDir(root);
-  if (dir === null) return refuse({ written: false, changed: [], removed: [], added: [], overlaps: [] }, [noAtlasProblem()]);
+  const empty = { written: false, changed: [], removed: [], added: [], overlaps: [], ...extra };
+  if (dir === null) return refuse(empty, [noAtlasProblem()]);
 
   const atlas = readAtlas(root);
+  const check = checkWrite(atlas.manifest, name, value, { unlock, current: atlas.layers[name] ?? null });
+  const manifest = structuredClone(atlas.manifest ?? {});
+  if (isPlainObject(manifest.layers)) {
+    if (unlock && (check.changed.length > 0 || check.removed.length > 0)) manifest.layers[name] = { locked: false };
+    if (!manifest.layers[name]) manifest.layers[name] = { locked: false };
+  }
+
+  const candidateAtlas = { ...atlas, manifest, layers: { ...atlas.layers, [name]: value } };
+  const problems = validateAtlas(root, candidateAtlas, { worldIndex: buildWorldIndex(root) });
+  const result = { changed: check.changed, removed: check.removed, added: check.added, overlaps: check.overlaps, ...extra };
+  if (!check.ok || problems.length > 0) {
+    return refuse({ written: false, ...result }, problems);
+  }
+
+  const layerFile = path.join(dir, `${name}.json`);
+  writeJson(layerFile, value);
+  if (canonicalJson(manifest) !== canonicalJson(atlas.manifest)) writeJson(path.join(dir, 'atlas.json'), manifest);
+  print({ ok: true, written: path.posix.join(folder, `${name}.json`), ...result, problems: [] });
+  return 0;
+}
+
+function writeLayer(root, name, candidateFile, unlock) {
+  if (atlasDir(root) === null) {
+    return refuse({ written: false, changed: [], removed: [], added: [], overlaps: [] }, [noAtlasProblem()]);
+  }
   const candidate = readJsonArg(candidateFile);
   if (candidate.error) {
     return refuse(
@@ -115,25 +163,71 @@ function writeLayer(root, name, candidateFile, unlock) {
       [{ code: 'bad-json', file: candidateFile, path: '', message: candidate.error }],
     );
   }
+  return writeCandidate(root, name, candidate.value, { unlock });
+}
 
-  const check = checkWrite(atlas.manifest, name, candidate.value, { unlock, current: atlas.layers[name] ?? null });
-  const manifest = structuredClone(atlas.manifest ?? {});
-  if (isPlainObject(manifest.layers)) {
-    if (unlock && (check.changed.length > 0 || check.removed.length > 0)) manifest.layers[name] = { locked: false };
-    if (!manifest.layers[name]) manifest.layers[name] = { locked: false };
+/**
+ * Generates one layer from the constraints in its file. When the layer is locked, the locked
+ * features are kept and only the constraints after the lock add features. The result goes through
+ * writeCandidate; a problem refuses the whole write.
+ */
+function generateCommand(root, name) {
+  const folder = atlasFolder(root);
+  const dir = atlasDir(root);
+  const empty = { written: false, changed: [], removed: [], added: [], overlaps: [], features: 0 };
+  if (dir === null) return refuse(empty, [noAtlasProblem()]);
+
+  const atlas = readAtlas(root);
+  const relative = path.posix.join(folder, `${name}.json`);
+  const current = atlas.layers[name];
+  if (current === undefined) {
+    return refuse(empty, [{ code: 'missing-layer', file: relative, path: '', message: `${name}.json must hold the constraints first` }]);
+  }
+  const manifestErrors = atlas.manifest === undefined ? [] : manifestProblems(atlas.manifest);
+  if (!isPlainObject(atlas.manifest) || manifestErrors.length > 0) {
+    return refuse(empty, manifestErrors.length > 0 ? prefixProblems(folder, manifestErrors) : [{ code: 'bad-manifest', file: path.posix.join(folder, 'atlas.json'), path: '', message: 'atlas.json is missing or invalid' }]);
   }
 
-  const candidateAtlas = { ...atlas, manifest, layers: { ...atlas.layers, [name]: candidate.value } };
-  const problems = validateAtlas(root, candidateAtlas, { worldIndex: buildWorldIndex(root) });
-  const result = { changed: check.changed, removed: check.removed, added: check.added, overlaps: check.overlaps };
-  if (!check.ok || problems.length > 0) {
-    return refuse({ written: false, ...result }, problems);
-  }
+  const constraints = Array.isArray(current.constraints) ? current.constraints : [];
+  const constraintProblems = validateAtlas(
+    root,
+    { ...atlas, layers: { ...atlas.layers, [name]: { layer: name, constraints, features: [] } } },
+    { worldIndex: buildWorldIndex(root) },
+  ).filter((p) => p.file === relative && p.path.startsWith('constraints'));
+  if (constraintProblems.length > 0) return refuse(empty, constraintProblems);
 
-  const layerFile = path.join(dir, `${name}.json`);
-  writeJson(layerFile, candidate.value);
-  if (canonicalJson(manifest) !== canonicalJson(atlas.manifest)) writeJson(path.join(dir, 'atlas.json'), manifest);
-  print({ ok: true, written: path.posix.join(folder, `${name}.json`), ...result, problems: [] });
+  const entry = atlas.manifest.layers?.[name];
+  const locked = entry?.locked === true && isPlainObject(entry.snapshot) && Array.isArray(entry.snapshot.constraints)
+    ? {
+      features: (Array.isArray(current.features) ? current.features : []).filter(isPlainObject),
+      constraintCount: entry.snapshot.constraints.length,
+    }
+    : null;
+
+  const { features, problems } = GENERATORS[name]({
+    canvas: atlas.manifest.canvas,
+    seed: atlas.manifest.seed,
+    constraints,
+    layers: atlas.layers,
+    locked,
+  });
+  if (problems.length > 0) return refuse(empty, prefixProblems(folder, problems));
+  return writeCandidate(root, name, { layer: name, constraints, features }, { extra: { features: features.length } });
+}
+
+/** Writes the PNG preview of the atlas under the campaign cache. Nothing in the atlas changes. */
+function previewCommand(root) {
+  const folder = atlasFolder(root);
+  if (folder === null) return refuse({ file: null }, [noAtlasProblem()]);
+  const atlas = readAtlas(root);
+  const errors = atlas.manifest === undefined ? [] : manifestProblems(atlas.manifest);
+  if (!isPlainObject(atlas.manifest) || errors.length > 0) {
+    return refuse({ file: null }, errors.length > 0 ? prefixProblems(folder, errors) : [{ code: 'bad-manifest', file: path.posix.join(folder, 'atlas.json'), path: '', message: 'atlas.json is missing or invalid' }]);
+  }
+  const file = path.join(root, PREVIEW_FILE);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, renderPreview({ canvas: atlas.manifest.canvas, layers: atlas.layers }));
+  print({ ok: true, file: PREVIEW_FILE });
   return 0;
 }
 
@@ -186,6 +280,18 @@ function main() {
     case 'lock':
       if (rest.length !== 1 || !LAYERS.includes(rest[0])) throw new Error(USAGE);
       code = lockLayer(root, rest[0]);
+      break;
+    case 'generate':
+      if (rest.length !== 1 || !Object.hasOwn(GENERATORS, rest[0])) throw new Error(USAGE);
+      code = generateCommand(root, rest[0]);
+      break;
+    case 'generate-terrain':
+      if (rest.length !== 0) throw new Error(USAGE);
+      code = generateCommand(root, 'terrain');
+      break;
+    case 'preview':
+      if (rest.length !== 0) throw new Error(USAGE);
+      code = previewCommand(root);
       break;
     default:
       if (rest.length !== 2 || !LAYERS.includes(rest[0])) throw new Error(USAGE);

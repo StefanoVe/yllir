@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { validateLayout, guidePixels, buildBundle, CELL_PX } from './lib/map-layout.mjs';
-import { encodePng, pngSize } from './lib/png.mjs';
+import { encodePng, pngSize } from '../../../../../scripts/lib/png.mjs';
 import { slugify } from '../lib/image-job.mjs';
 import { exitWith, runCli } from '../../../../../scripts/lib/cli-exit.mjs';
 

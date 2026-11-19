@@ -1,0 +1,127 @@
+[
+  {
+    "id": "mountains-a",
+    "kind": "sheet",
+    "category": "mountains",
+    "grid": [4, 3],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 12 separate mountains for a top-down fantasy world map, hand-painted digital illustration, soft shading, slightly stylised, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 3 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: rocky grey-brown mountain peaks with snowy tops, varied sizes and shapes.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "mountains-b",
+    "kind": "sheet",
+    "category": "mountains",
+    "grid": [4, 3],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 12 separate mountains for a top-down fantasy world map, hand-painted digital illustration, soft shading, slightly stylised, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 3 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: mountain ranges of two or three peaks each, grey-brown rock with light snow.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "hills",
+    "kind": "sheet",
+    "category": "hills",
+    "grid": [4, 3],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 12 separate hills for a top-down fantasy world map, hand-painted digital illustration, soft shading, slightly stylised, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 3 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: low rounded green-brown grassy hills.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "trees-broadleaf",
+    "kind": "sheet",
+    "category": "trees-broadleaf",
+    "grid": [5, 4],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 20 separate broadleaf trees for a top-down fantasy world map, hand-painted digital illustration, soft shading, slightly stylised, viewed from a high three-quarter angle, arranged in a regular grid of 5 columns and 4 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: round leafy green broadleaf trees, single trees and small clusters.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "trees-conifer",
+    "kind": "sheet",
+    "category": "trees-conifer",
+    "grid": [5, 4],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 20 separate conifer trees for a top-down fantasy world map, hand-painted digital illustration, soft shading, slightly stylised, viewed from a high three-quarter angle, arranged in a regular grid of 5 columns and 4 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: dark green pine and fir trees, single trees and small clusters.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "swamp",
+    "kind": "sheet",
+    "category": "swamp",
+    "grid": [4, 3],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 12 separate swamp features for a top-down fantasy world map, hand-painted digital illustration, soft shading, slightly stylised, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 3 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: swamp reed tufts and small murky ponds with reeds.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "dunes",
+    "kind": "sheet",
+    "category": "dunes",
+    "grid": [4, 3],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 12 separate dunes for a top-down fantasy world map, hand-painted digital illustration, soft shading, slightly stylised, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 3 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: sand dunes and desert rocks in warm ochre.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "settlements",
+    "kind": "sheet",
+    "category": "icons",
+    "grid": [4, 2],
+    "width": 1536,
+    "height": 1024,
+    "prompt": "A sprite sheet of 8 separate map icons for a top-down fantasy world map, hand-painted digital illustration, soft shading, slightly stylised, viewed from a high three-quarter angle, arranged in a regular grid of 4 columns and 2 rows, each item fully separated from the others by wide empty space, on a perfectly flat pure magenta background (#FF00FF), no shadow on the background, no ground patch under the items. Contents: eight map icons in this exact order, left to right, top to bottom: a large walled capital city with a tall keep, a city with towers, a small town with a church spire, a tiny village of three houses, a wooden fort with a palisade, crumbling stone ruins, a standing stone monument, a harbour with a small pier and a boat.",
+    "negative": "text, letters, numbers, labels, watermark, signature, frame, border, grid lines, cast shadows on background, gradient background, photo"
+  },
+  {
+    "id": "land",
+    "kind": "texture",
+    "category": "textures",
+    "width": 1024,
+    "height": 1024,
+    "prompt": "A seamless tileable texture, top-down, for the grassy lowland in soft light green and warm beige of a hand-painted fantasy world map, soft painterly brush strokes, even lighting, no objects, no text",
+    "negative": "text, objects, seams, vignette, border, frame"
+  },
+  {
+    "id": "sand",
+    "kind": "texture",
+    "category": "textures",
+    "width": 1024,
+    "height": 1024,
+    "prompt": "A seamless tileable texture, top-down, for the sandy desert in warm ochre of a hand-painted fantasy world map, soft painterly brush strokes, even lighting, no objects, no text",
+    "negative": "text, objects, seams, vignette, border, frame"
+  },
+  {
+    "id": "snow",
+    "kind": "texture",
+    "category": "textures",
+    "width": 1024,
+    "height": 1024,
+    "prompt": "A seamless tileable texture, top-down, for the snowfield in white and pale blue of a hand-painted fantasy world map, soft painterly brush strokes, even lighting, no objects, no text",
+    "negative": "text, objects, seams, vignette, border, frame"
+  },
+  {
+    "id": "sea",
+    "kind": "texture",
+    "category": "textures",
+    "width": 1024,
+    "height": 1024,
+    "prompt": "A seamless tileable texture, top-down, for the shallow sea in medium blue-teal with faint painted ripples of a hand-painted fantasy world map, soft painterly brush strokes, even lighting, no objects, no text",
+    "negative": "text, objects, seams, vignette, border, frame"
+  },
+  {
+    "id": "deep-sea",
+    "kind": "texture",
+    "category": "textures",
+    "width": 1024,
+    "height": 1024,
+    "prompt": "A seamless tileable texture, top-down, for the deep ocean in dark blue with faint painted ripples of a hand-painted fantasy world map, soft painterly brush strokes, even lighting, no objects, no text",
+    "negative": "text, objects, seams, vignette, border, frame"
+  }
+]

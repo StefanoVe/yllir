@@ -156,7 +156,7 @@ function fakeMain(callsFile, campaignDir) {
   // guide.png of the campaign's map jobs) scaled up 8x, or a fixed floor plan when there is none; any
   // other prompt gets the figure.
   const map = prompt.includes('Top-down orthographic battle map');
-  // Decodes the newest guide.png written by the encoder of maps/lib/png.mjs: { width, height, pixels }, or null.
+  // Decodes the newest guide.png written by the encoder of scripts/lib/png.mjs: { width, height, pixels }, or null.
   const readGuide = (root) => {
     const base = path.join(root, '.campaign', 'state', 'maps');
     if (!fs.existsSync(base)) return null;

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildUvtt } from './uvtt.mjs';
-import { encodePng } from './png.mjs';
+import { encodePng } from '../../../../../../scripts/lib/png.mjs';
 
 const LAYOUT = {
   cols: 8,

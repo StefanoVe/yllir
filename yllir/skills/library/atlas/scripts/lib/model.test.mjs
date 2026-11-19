@@ -151,11 +151,38 @@ test('manifest problems are reported with stable codes', () => {
 
 test('manifestProblems accepts a locked layer with a snapshot and rejects a bad digest', () => {
   const good = baseManifest({
-    layers: { terrain: { locked: true, snapshot: { constraints: 'a'.repeat(64), features: {} } } },
+    layers: { terrain: { locked: true, snapshot: { constraints: ['a'.repeat(64)], features: {} } } },
   });
   assert.deepEqual(manifestProblems(good), []);
   const bad = baseManifest({ layers: { terrain: { locked: true, snapshot: { constraints: 'nope', features: {} } } } });
   assert.deepEqual(codes(manifestProblems(bad)), ['bad-manifest']);
+  const badList = baseManifest({ layers: { terrain: { locked: true, snapshot: { constraints: ['nope'], features: {} } } } });
+  assert.deepEqual(codes(manifestProblems(badList)), ['bad-manifest']);
+});
+
+test('terrain constraints: unknown kind gives bad-constraint; a region on an unknown place gives unknown-place', () => {
+  const root = validRoot({
+    layers: {
+      terrain: { ...terrainLayer(), constraints: [{ kind: 'volcano', provenance: 'master', sources: [] }] },
+      places: placesLayer([['north', [500, 500]]]),
+    },
+  });
+  assert.ok(codes(check(root)).includes('bad-constraint'));
+
+  const unknown = validRoot({
+    layers: {
+      terrain: { ...terrainLayer(), constraints: [{ kind: 'region', place: 'ghost', at: [500, 500], radius: 50, provenance: 'master', sources: [] }] },
+    },
+  });
+  assert.ok(codes(check(unknown)).includes('unknown-place'));
+});
+
+test('terrain constraints: sources may be empty whatever the provenance, but a source file must exist', () => {
+  const documentEmpty = { kind: 'sea', at: [900, 900], radius: 10, provenance: 'document', sources: [] };
+  assert.deepEqual(check(validRoot({ layers: { terrain: { ...terrainLayer(), constraints: [documentEmpty] } } })), []);
+
+  const missing = { kind: 'sea', at: [900, 900], radius: 10, provenance: 'master', sources: [{ file: 'World/Nowhere.md' }] };
+  assert.ok(codes(check(validRoot({ layers: { terrain: { ...terrainLayer(), constraints: [missing] } } }))).includes('missing-source'));
 });
 
 test('a missing atlas.json is a bad-manifest problem', () => {
@@ -176,4 +203,77 @@ test('problems are sorted by file then path, and files are campaign-relative', (
   assert.deepEqual(files, [...files].sort());
   assert.ok(problems.every((p) => p.file.startsWith('Atlas/')));
   assert.equal(readAtlasFile(root, 'places.json').includes('ghost'), true);
+});
+
+test('a sea constraint with roughness 2 gives bad-constraint; roughness 0.5 is accepted', () => {
+  const bad = { kind: 'sea', at: [900, 900], radius: 10, roughness: 2, provenance: 'master', sources: [] };
+  const badRoot = validRoot({ layers: { terrain: { ...terrainLayer(), constraints: [bad] } } });
+  assert.ok(codes(check(badRoot)).includes('bad-constraint'));
+
+  const good = { kind: 'sea', at: [900, 900], radius: 10, roughness: 0.5, provenance: 'master', sources: [] };
+  assert.deepEqual(check(validRoot({ layers: { terrain: { ...terrainLayer(), constraints: [good] } } })), []);
+});
+
+test('each layer takes only its own constraint kinds; places and labels take none', () => {
+  const range = { kind: 'range', id: 'peaks', type: 'mountains', spine: [[100, 100], [300, 100]], width: 40, provenance: 'master', sources: [] };
+  const good = validRoot({ layers: { terrain: terrainLayer(), relief: { layer: 'relief', constraints: [range], features: [] } } });
+  assert.deepEqual(check(good), []);
+
+  const wrongLayer = validRoot({ layers: { terrain: { ...terrainLayer(), constraints: [range] } } });
+  assert.ok(codes(check(wrongLayer)).includes('bad-constraint'));
+
+  const placesWithConstraint = validRoot({
+    layers: { places: { ...placesLayer([['north', [500, 500]]]), constraints: [range] } },
+  });
+  assert.ok(check(placesWithConstraint).some((p) => p.code === 'bad-constraint' && p.file === 'Atlas/places.json'));
+});
+
+test('new layer constraints are checked field by field and need unique kebab ids', () => {
+  const badRiver = { kind: 'river', id: 'Silver River', source: [100, 100], mouth: [200, 200], meander: 3, provenance: 'master', sources: [] };
+  const badRoot = validRoot({ layers: { water: { layer: 'water', constraints: [badRiver], features: [] } } });
+  assert.ok(check(badRoot).some((p) => p.code === 'bad-constraint' && p.path === 'constraints[0].id'));
+  assert.ok(check(badRoot).some((p) => p.code === 'bad-constraint' && p.path === 'constraints[0].meander'));
+
+  const river = { kind: 'river', id: 'silver', source: [100, 100], mouth: [200, 200], provenance: 'master', sources: [] };
+  const dupRoot = validRoot({ layers: { water: { layer: 'water', constraints: [river, { ...river }], features: [] } } });
+  assert.ok(codes(check(dupRoot)).includes('duplicate-id'));
+});
+
+test('a realm constraint needs a colour and at least one seed; a route constraint needs from and to', () => {
+  const realm = { kind: 'realm', id: 'north', color: 'red', seeds: [], provenance: 'master', sources: [] };
+  const route = { kind: 'road', id: 'road-ab', from: 'a', provenance: 'master', sources: [] };
+  const root = validRoot({
+    layers: {
+      political: { layer: 'political', constraints: [realm], features: [] },
+      routes: { layer: 'routes', constraints: [route], features: [] },
+    },
+  });
+  const problems = check(root);
+  assert.ok(problems.some((p) => p.file === 'Atlas/political.json' && p.code === 'bad-constraint' && p.path === 'constraints[0].color'));
+  assert.ok(problems.some((p) => p.file === 'Atlas/routes.json' && p.code === 'bad-constraint' && p.path === 'constraints[0].to'));
+});
+
+test('political features accept polygons (a list) as well as the legacy polygon', () => {
+  const realmLayer = (feature) => ({ layer: 'political', constraints: [], features: [feature] });
+  const modern = {
+    id: 'north', type: 'realm', color: '#aa3322', seeds: [[500, 500]],
+    polygons: [square(100, 100, 300, 300), square(400, 400, 600, 600)],
+    provenance: 'agent-choice', visibility: 'public', sources: [],
+  };
+  assert.deepEqual(check(validRoot({ layers: { political: realmLayer(modern) } })), []);
+
+  const broken = { ...modern, polygons: [[[0, 0], [1, 1]]] };
+  assert.ok(codes(check(validRoot({ layers: { political: realmLayer(broken) } }))).includes('bad-feature'));
+});
+
+test('a port far from the water gives port-not-coast; a port near the coast passes', () => {
+  const inland = placesLayer([['north', [500, 500]]]);
+  inland.features[0].icon = 'port';
+  assert.ok(codes(check(validRoot({ layers: { terrain: terrainLayer(), places: inland } }))).includes('port-not-coast'));
+
+  const coastal = placesLayer([['north', [500, 500]]]);
+  coastal.features[0].icon = 'port';
+  coastal.features[0].at = [201, 500];
+  const root = validRoot({ layers: { terrain: terrainLayer([landFeature('land-main', square(200, 100, 900, 900))]), places: coastal } });
+  assert.equal(codes(check(root)).includes('port-not-coast'), false);
 });

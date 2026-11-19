@@ -8,12 +8,24 @@ import { readStructure } from '../../../../../scripts/lib/subjects.mjs';
 import { buildWorldIndex } from '../../../../../scripts/lib/world-graph.mjs';
 import { isFinitePoint, isUsablePolygon, pointInPolygon } from './geometry.mjs';
 import { lockProblems } from './lock.mjs';
+import { landMask } from './landmask.mjs';
 
 export const LAYERS = ['terrain', 'relief', 'water', 'biomes', 'political', 'places', 'routes', 'labels']; // drawing order
 export const PROVENANCES = ['master', 'document', 'agent-choice'];
 export const VISIBILITIES = ['public', 'master'];
 export const SCOPE_KINDS = ['world', 'continent', 'region'];
 export const ICONS = ['capital', 'city', 'town', 'village', 'fort', 'ruin', 'landmark', 'port'];
+export const CONSTRAINT_KINDS_BY_LAYER = {
+  terrain: ['landmass', 'region', 'sea', 'lake', 'open-edge'],
+  relief: ['range'],
+  biomes: ['biome'],
+  water: ['river'],
+  political: ['realm'],
+  routes: ['road', 'trail', 'sea-route'],
+  places: [],
+  labels: [],
+};
+export const SIDES = ['north', 'south', 'east', 'west'];
 export const FEATURE_TYPES = {
   terrain: ['land', 'lake'],
   relief: ['mountains', 'hills'],
@@ -145,7 +157,9 @@ export function manifestProblems(manifest) {
         const snap = entry.snapshot;
         const okFeatures = isPlainObject(snap?.features)
           && Object.values(snap.features).every((h) => typeof h === 'string' && HEX64.test(h));
-        if (!isPlainObject(snap) || typeof snap.constraints !== 'string' || !HEX64.test(snap.constraints) || !okFeatures) {
+        const okConstraints = Array.isArray(snap?.constraints)
+          && snap.constraints.every((h) => typeof h === 'string' && HEX64.test(h));
+        if (!isPlainObject(snap) || !okConstraints || !okFeatures) {
           bad(`${where}.snapshot`, 'a locked layer needs a snapshot with sha256 hex digests');
         }
       } else if (entry.snapshot !== undefined) {
@@ -176,12 +190,12 @@ function checkPoints(points, min, field, base, file, ctx, out) {
   points.forEach((point, k) => checkPoint(point, `${where}[${k}]`, ctx, file, out));
 }
 
-function checkSources(feature, base, file, ctx, out) {
-  if (!Array.isArray(feature.sources)) {
+function checkSourceList(sources, base, file, ctx, out) {
+  if (!Array.isArray(sources)) {
     out.push(problem('bad-feature', file, `${base}.sources`, 'sources must be a list'));
     return;
   }
-  feature.sources.forEach((source, j) => {
+  sources.forEach((source, j) => {
     const where = `${base}.sources[${j}]`;
     const valid = isPlainObject(source) && typeof source.file === 'string' && source.file !== ''
       && (source.section === undefined || typeof source.section === 'string');
@@ -191,9 +205,170 @@ function checkSources(feature, base, file, ctx, out) {
       out.push(problem('missing-source', file, `${where}.file`, `source file ${source.file} does not exist`));
     }
   });
-  if (feature.sources.length === 0 && feature.provenance === 'document') {
+}
+
+function checkSources(feature, base, file, ctx, out) {
+  checkSourceList(feature.sources, base, file, ctx, out);
+  if (Array.isArray(feature.sources) && feature.sources.length === 0 && feature.provenance === 'document') {
     out.push(problem('no-sources', file, `${base}.sources`, 'a document provenance needs at least one source'));
   }
+}
+
+/** A point of a constraint: two finite numbers. Constraints may lie outside the canvas. */
+function constraintPoint(constraint, field, base, file, out) {
+  if (!isFinitePoint(constraint[field])) {
+    out.push(problem('bad-constraint', file, `${base}.${field}`, `${field} must be a point (two finite numbers)`));
+  }
+}
+
+function constraintPositive(value) {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function constraintRoughness(constraint, base, file, out) {
+  if (constraint.roughness === undefined) return;
+  if (!(typeof constraint.roughness === 'number' && constraint.roughness >= 0 && constraint.roughness <= 1)) {
+    out.push(problem('bad-constraint', file, `${base}.roughness`, 'roughness must be a number from 0 to 1'));
+  }
+}
+
+function constraintId(constraint, base, file, out) {
+  if (typeof constraint.id !== 'string' || !ID_RE.test(constraint.id)) {
+    out.push(problem('bad-constraint', file, `${base}.id`, 'id must be kebab-case'));
+  }
+}
+
+/** Kind-specific fields of one terrain constraint. */
+function checkConstraintFields(constraint, base, file, ctx, out) {
+  const radius = (field) => {
+    if (!constraintPositive(constraint[field])) {
+      out.push(problem('bad-constraint', file, `${base}.${field}`, `${field} must be a number above 0`));
+    }
+  };
+  switch (constraint.kind) {
+    case 'landmass': {
+      constraintId(constraint, base, file, out);
+      constraintPoint(constraint, 'center', base, file, out);
+      const r = constraint.radius;
+      if (!Array.isArray(r) || r.length !== 2 || !r.every(constraintPositive)) {
+        out.push(problem('bad-constraint', file, `${base}.radius`, 'radius is [rx, ry], both above 0'));
+      }
+      constraintRoughness(constraint, base, file, out);
+      break;
+    }
+    case 'region': {
+      if (typeof constraint.place !== 'string') {
+        out.push(problem('bad-constraint', file, `${base}.place`, 'place must be a string'));
+      } else {
+        const subject = ctx.byId.get(constraint.place);
+        if (subject === undefined) {
+          out.push(problem('unknown-place', file, `${base}.place`, `${constraint.place} is not a place of the world`));
+        } else if (subject.kind !== 'place') {
+          out.push(problem('id-not-place', file, `${base}.place`, `${constraint.place} is not a place sheet`));
+        }
+      }
+      constraintPoint(constraint, 'at', base, file, out);
+      radius('radius');
+      break;
+    }
+    case 'sea':
+      constraintPoint(constraint, 'at', base, file, out);
+      radius('radius');
+      constraintRoughness(constraint, base, file, out);
+      break;
+    case 'lake':
+      constraintId(constraint, base, file, out);
+      constraintPoint(constraint, 'at', base, file, out);
+      radius('radius');
+      constraintRoughness(constraint, base, file, out);
+      break;
+    default: // open-edge
+      if (!SIDES.includes(constraint.side)) {
+        out.push(problem('bad-constraint', file, `${base}.side`, `side must be one of ${SIDES.join(', ')}`));
+      }
+  }
+}
+
+/** Kind-specific fields of a constraint of the relief, biomes, water, political and routes layers. */
+function checkLayerConstraintFields(name, c, base, file, out) {
+  const bad = (field, message) => out.push(problem('bad-constraint', file, `${base}.${field}`, message));
+  const pointsOf = (value, min) => Array.isArray(value) && value.length >= min && value.every(isFinitePoint);
+  const oneOf = (field, list) => {
+    if (!list.includes(c[field])) bad(field, `${field} must be one of ${list.join(', ')}`);
+  };
+  switch (name) {
+    case 'relief':
+      constraintId(c, base, file, out);
+      oneOf('type', ['mountains', 'hills']);
+      if (!pointsOf(c.spine, 2)) bad('spine', 'spine needs at least two points');
+      if (!constraintPositive(c.width)) bad('width', 'width must be a number above 0');
+      constraintRoughness(c, base, file, out);
+      break;
+    case 'biomes':
+      constraintId(c, base, file, out);
+      oneOf('type', ['forest', 'swamp', 'desert', 'ice', 'grassland']);
+      constraintPoint(c, 'at', base, file, out);
+      if (!constraintPositive(c.radius)) bad('radius', 'radius must be a number above 0');
+      constraintRoughness(c, base, file, out);
+      if (c.avoidRelief !== undefined && typeof c.avoidRelief !== 'boolean') bad('avoidRelief', 'avoidRelief must be a boolean');
+      break;
+    case 'water':
+      constraintId(c, base, file, out);
+      constraintPoint(c, 'source', base, file, out);
+      constraintPoint(c, 'mouth', base, file, out);
+      if (c.via !== undefined && !pointsOf(c.via, 0)) bad('via', 'via must be a list of points');
+      if (c.meander !== undefined && !(typeof c.meander === 'number' && c.meander >= 0 && c.meander <= 1)) {
+        bad('meander', 'meander must be a number from 0 to 1');
+      }
+      break;
+    case 'political':
+      constraintId(c, base, file, out);
+      if (typeof c.color !== 'string' || !COLOR.test(c.color)) bad('color', 'color must be #rrggbb');
+      if (!pointsOf(c.seeds, 1)) bad('seeds', 'seeds needs at least one point');
+      if (c.cuts !== undefined && !(Array.isArray(c.cuts) && c.cuts.every((cut) => pointsOf(cut, 2)))) {
+        bad('cuts', 'cuts must be a list of segments, each two points');
+      }
+      if (c.reach !== undefined && !constraintPositive(c.reach)) bad('reach', 'reach must be a number above 0');
+      break;
+    default: // routes
+      constraintId(c, base, file, out);
+      if (typeof c.from !== 'string') bad('from', 'from must be a place id');
+      if (typeof c.to !== 'string') bad('to', 'to must be a place id');
+      if (c.via !== undefined && !pointsOf(c.via, 0)) bad('via', 'via must be a list of points');
+  }
+}
+
+/**
+ * One constraint of a layer. Terrain keeps its own rules (provenance is required there).
+ * Other layers accept provenance when given. Sources may be empty whatever the provenance.
+ */
+function checkConstraint(name, constraint, base, file, ctx, out) {
+  const kinds = CONSTRAINT_KINDS_BY_LAYER[name] ?? [];
+  if (!kinds.includes(constraint.kind)) {
+    const message = kinds.length === 0 ? `${name} takes no constraints` : `kind must be one of ${kinds.join(', ')}`;
+    out.push(problem('bad-constraint', file, `${base}.kind`, message));
+    return;
+  }
+  const required = name === 'terrain';
+  if ((required || constraint.provenance !== undefined) && !PROVENANCES.includes(constraint.provenance)) {
+    out.push(problem('bad-feature', file, `${base}.provenance`, `provenance must be one of ${PROVENANCES.join(', ')}`));
+  }
+  checkSourceList(constraint.sources, base, file, ctx, out);
+  if (constraint.note !== undefined && typeof constraint.note !== 'string') {
+    out.push(problem('bad-constraint', file, `${base}.note`, 'note must be a string'));
+  }
+  if (name === 'terrain') checkConstraintFields(constraint, base, file, ctx, out);
+  else checkLayerConstraintFields(name, constraint, base, file, out);
+}
+
+/** Every constraint of a layer that has an id must have a different one from the others. */
+function checkDuplicateConstraintIds(constraints, file, out) {
+  const seen = new Set();
+  constraints.forEach((c, k) => {
+    if (typeof c.id !== 'string') return;
+    if (seen.has(c.id)) out.push(problem('duplicate-id', file, `constraints[${k}].id`, `duplicate constraint id ${c.id}`));
+    seen.add(c.id);
+  });
 }
 
 function checkCommon(feature, base, file, ctx, out) {
@@ -231,6 +406,11 @@ function checkPolitical(feature, base, file, ctx, out) {
   }
   if (feature.rules !== undefined && !isPlainObject(feature.rules)) {
     out.push(problem('bad-feature', file, `${base}.rules`, 'rules must be an object'));
+  }
+  if (Array.isArray(feature.polygons)) {
+    feature.polygons.forEach((polygon, n) => checkPoints(polygon, 3, 'polygon', `${base}.polygons[${n}]`, file, ctx, out));
+  } else if (feature.polygons !== undefined) {
+    out.push(problem('bad-feature', file, `${base}.polygons`, 'polygons must be a list of polygons'));
   }
   if (feature.polygon !== undefined) checkPoints(feature.polygon, 3, 'polygon', base, file, ctx, out);
 }
@@ -318,6 +498,11 @@ export function layerProblems(name, layer, ctx) {
   if (layer.layer !== name) out.push(problem('bad-layer', file, 'layer', `layer must be "${name}"`));
   if (!Array.isArray(layer.constraints) || !layer.constraints.every(isPlainObject)) {
     out.push(problem('bad-layer', file, 'constraints', 'constraints must be a list of objects'));
+  } else {
+    layer.constraints.forEach((constraint, k) => {
+      checkConstraint(name, constraint, `constraints[${k}]`, file, ctx, out);
+    });
+    checkDuplicateConstraintIds(layer.constraints, file, out);
   }
   if (!Array.isArray(layer.features)) {
     out.push(problem('bad-layer', file, 'features', 'features must be a list'));
@@ -365,6 +550,16 @@ export function crossLayerProblems(layers, ctx) {
       out.push(problem('place-in-lake', 'places.json', where, `${feature.id} is inside a lake`));
     }
   });
+  if (ctx.canvas) {
+    // A port must be on the coast: within four grid cells of water (sea or lake).
+    const mask = landMask({ canvas: ctx.canvas, terrain: layers.terrain });
+    places.forEach((feature, i) => {
+      if (!isPlainObject(feature) || !isFinitePoint(feature.at) || feature.icon !== 'port') return;
+      if (mask.waterDistance(feature.at[0], feature.at[1]) > mask.cell * 4) {
+        out.push(problem('port-not-coast', 'places.json', `features[${i}].at`, `${feature.id} is a port too far from the water`));
+      }
+    });
+  }
   return out;
 }
 

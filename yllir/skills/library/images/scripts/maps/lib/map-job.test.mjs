@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { encodePng, pngSize } from './png.mjs';
+import { encodePng, pngSize } from '../../../../../../scripts/lib/png.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const MAP_JOB = path.join(HERE, '..', 'map-job.mjs');

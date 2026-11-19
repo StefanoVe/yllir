@@ -1,7 +1,7 @@
-// Locks of the atlas layers. A locked layer keeps a snapshot (hash of its constraints
-// and of every feature). Changing or removing a locked feature is refused unless the
-// master unlocks the layer; adding a feature is allowed, except a new land that
-// overlaps locked land.
+// Locks of the atlas layers. A locked layer keeps a snapshot (the hash of each constraint,
+// in order, and of every feature). Changing or removing a locked feature or a locked
+// constraint is refused unless the master unlocks the layer. Adding a feature is allowed,
+// except a new land that overlaps locked land; constraints may be appended after the lock.
 
 import { canonicalJson, sha256, featureHash, vertexOverlap, isUsablePolygon } from './geometry.mjs';
 
@@ -19,14 +19,30 @@ function constraintsOf(layer) {
   return Array.isArray(layer?.constraints) ? layer.constraints : [];
 }
 
+/** One hash per constraint, in order. */
+function constraintHashes(layer) {
+  return constraintsOf(layer).map((c) => sha256(canonicalJson(c)));
+}
+
 /**
- * Snapshot of a layer object: the hash of its constraints and of each feature by id.
- * @returns {{ constraints: string, features: Record<string, string> }}
+ * True when the constraints of a layer no longer start with the locked ones. The locked hashes
+ * must be the first N constraints, in the same order; constraints appended after the lock are fine.
+ */
+function constraintsChanged(lockedHashes, layer) {
+  if (!Array.isArray(lockedHashes)) return true;
+  const current = constraintHashes(layer);
+  if (current.length < lockedHashes.length) return true;
+  return lockedHashes.some((hash, i) => current[i] !== hash);
+}
+
+/**
+ * Snapshot of a layer object: the hash of each constraint, in order, and the hash of each feature by id.
+ * @returns {{ constraints: string[], features: Record<string, string> }}
  */
 export function snapshotOf(layer) {
   const features = {};
   for (const feature of featuresOf(layer)) features[feature.id] = featureHash(feature);
-  return { constraints: sha256(canonicalJson(constraintsOf(layer))), features };
+  return { constraints: constraintHashes(layer), features };
 }
 
 /** Compares a snapshot with the current features of a layer (ids are sorted). */
@@ -60,9 +76,7 @@ export function lockProblems(manifest, layers) {
     if (!isPlainObject(entry) || entry.locked !== true || !isPlainObject(entry.snapshot)) continue;
     const layer = layers?.[name] ?? {};
     const { changed, removed } = diffFeatures(entry.snapshot.features ?? {}, layer);
-    if (entry.snapshot.constraints !== sha256(canonicalJson(constraintsOf(layer)))) {
-      changed.unshift(CONSTRAINTS_ID);
-    }
+    if (constraintsChanged(entry.snapshot.constraints, layer)) changed.unshift(CONSTRAINTS_ID);
     const ids = [...changed, ...removed];
     if (ids.length === 0) continue;
     problems.push({
@@ -96,9 +110,7 @@ export function checkWrite(manifest, layerName, candidateLayer, { unlock = false
   let added;
   if (base) {
     ({ changed, removed, added } = diffFeatures(base.features ?? {}, candidateLayer));
-    if (base.constraints !== sha256(canonicalJson(constraintsOf(candidateLayer)))) {
-      changed.unshift(CONSTRAINTS_ID);
-    }
+    if (constraintsChanged(base.constraints, candidateLayer)) changed.unshift(CONSTRAINTS_ID);
   } else {
     added = featuresOf(candidateLayer).map((f) => f.id).sort();
   }
