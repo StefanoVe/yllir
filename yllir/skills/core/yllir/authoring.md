@@ -76,6 +76,7 @@ Rules:
 - A read-aloud paragraph is one paragraph in `_italics_`.
 - The master block is the last content of the file, and it is exactly: `<!-- master -->`, `## Master`, at least one `###` heading, `<!-- /master -->`. Secrets go only there.
 - Write names of other subjects as plain text. The engine adds the links when you commit. Never type link syntax by hand.
+- Write full names and no rhetorical tics in spoken or player text, as section 1.12 of the content format reference says.
 - The main file of a plot session (`<Plot folder>/<Session>/<Session>.md`) is derived. The engine regenerates it from the event files at each commit. Never draft it.
 - Plot events and their scenes are written by the process skills, which follow these same engine rules.
 
@@ -123,8 +124,8 @@ The draft path of a new document is `<Title>.md` in the folder of its kind, as `
 ## 7. Write cycle (one batch, one commit)
 
 1. Run `context` for the subjects, place or session involved. Read the seed.
-2. Write each draft with the Write tool to `.campaign/drafts/<path>`. Include every document the batch creates or changes, and the seed when the batch adds world-wide information.
-3. Run `check` with the draft paths. If it exits 1, read the `errors`, fix the drafts with the Edit or Write tool, and run `check` again. At most 3 rounds. Read `finalFiles` and `reviewRequired` in the output.
+2. Write each draft with the Write tool to `.campaign/drafts/<path>`. Include every document the batch creates or changes, and the seed when the batch adds world-wide information. Before running `check`, reread the read-aloud paragraphs, the spoken lines and the player texts of each draft against section 1.12 of `${CLAUDE_PLUGIN_ROOT}/templates/content-format.md`, and rewrite any tic.
+3. Run `check` with the draft paths. If it exits 1, read the `errors`, fix the drafts with the Edit or Write tool, and run `check` again. At most 3 rounds. Read `finalFiles` and `reviewRequired` in the output. Read `shortNames` too: for each entry, write the full name of the subject in that line of the draft, unless the word is inside a character's spoken words. Then run `check` again. `shortNames` never blocks the batch.
 4. If `reviewRequired` is true, launch ONE `yllir:batch-reviewer` through the Agent tool with exactly these keys:
 
    ```text

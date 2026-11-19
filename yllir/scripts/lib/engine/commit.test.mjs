@@ -1517,3 +1517,20 @@ test('a new structure entry whose folder does not exist yet is saved, and no emp
   assert.equal(commitCount(dir), before + 1);
   assert.equal(fs.existsSync(path.join(dir, 'Diario')), false);
 });
+
+test('check returns shortNames for a draft that says "Teodo" when "Teodo Marr" exists, and stays ok', async (t) => {
+  const dir = makeCampaign(t);
+  const TEODO = '---\nid: teodo-marr\nprovenance: master\n---\n\n# Teodo Marr\n\nUn oste del borgo.\n';
+  fs.mkdirSync(path.join(dir, 'Personaggi'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'Personaggi/Teodo Marr.md'), TEODO);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'add Teodo Marr']);
+  writeDraft(dir, MIRA_PATH, MIRA.replace('Lavora ai mantelli', 'Oggi Teodo le porta la lana. Lavora ai mantelli'));
+
+  const check = await checkBatch(dir, { files: [MIRA_PATH] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  const teodo = check.shortNames.filter((hit) => hit.word === 'Teodo');
+  assert.equal(teodo.length, 1, JSON.stringify(check.shortNames));
+  assert.equal(teodo[0].file, 'Personaggi/Morvalle/Borgo Cenere/Mira Sanna.md');
+  assert.deepEqual(teodo[0].subjects, [{ id: 'teodo-marr', title: 'Teodo Marr' }]);
+});

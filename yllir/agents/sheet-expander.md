@@ -64,6 +64,7 @@ If an input is missing or cannot be read, do not write anything. Reply with exac
 - You may invent descriptive detail: looks, habits, sounds, small history. It must not contradict `CONTEXT` or the seed, and it must not be presented as a quote of a source.
 - For a `npc`: say who the character is (role, looks, manner, past). Never say what the character does in a session or in an event.
 - Write names of other subjects as plain text. Never write link syntax.
+- Write the full name of every subject (its title or an alias), never a first name or surname alone, except inside a character's spoken words. In read-aloud paragraphs, spoken lines and texts for the players, avoid the tics listed in section 1.12 of `FORMAT`.
 - Never put master-block text in the public part of the document.
 - For an item (`TEMPLATE: item`): the public sections describe it only as the players know it, and `## Effects` lists only the effects known to them. Put the full context in the master block: what it really is, its true origin, its complete real effects, its secrets and plot uses.
 - Never add notes, comments, or explanations to the file. The file is the document only.

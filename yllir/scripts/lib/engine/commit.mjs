@@ -24,6 +24,7 @@ import { plotMap } from '../plot/plot-map.mjs';
 import { checkScene } from '../plot/scene-checks.mjs';
 import { writeSessionMaps } from '../plot/session-map.mjs';
 import { isGenerated } from '../mentions.mjs';
+import { findShortNamesInFiles } from '../short-names.mjs';
 import { planLinks } from '../links/link-plan.mjs';
 import { autoOutcomes } from '../links/auto-outcomes.mjs';
 import { applyLinks } from '../links/apply-links.mjs';
@@ -66,7 +67,9 @@ const MANUAL_MESSAGE_EN = 'Changes made by hand';
  *   posix paths. files: documents whose draft is at <root>/.campaign/drafts/<path>. deletes: documents
  *   to remove. sources: files placed in the campaign by framework scripts (copied as they are).
  * @returns {Promise<{ ok: boolean, errors: object[], reviewRequired: boolean, layoutOnly: boolean,
- *   draftsHash: string, finalFiles: string[], ambiguousMentions: object[] }>}
+ *   draftsHash: string, finalFiles: string[], ambiguousMentions: object[], shortNames: object[] }>}
+ *   shortNames: abbreviated names of the batch's Markdown drafts (see findShortNamesInFiles). Informational:
+ *   it never sets ok or adds to errors. file is the campaign-relative final path; empty when evaluation did not run.
  */
 export async function checkBatch(root, options = {}) {
   const { files, deletes, sources, tmpRoot } = readArgs(root, options, false);
@@ -84,6 +87,7 @@ export async function checkBatch(root, options = {}) {
       draftsHash,
       finalFiles: [...files],
       ambiguousMentions: [],
+      shortNames: [],
     };
   }
 
@@ -91,7 +95,7 @@ export async function checkBatch(root, options = {}) {
   const batch = new Set([...files, ...deletes]);
   const conflicts = dirty.filter((rel) => batch.has(rel));
   const evaluation = conflicts.length > 0
-    ? { errors: conflicts.map(conflictError), finalFiles: [...files], ambiguousMentions: [], copy: null }
+    ? { errors: conflicts.map(conflictError), finalFiles: [...files], ambiguousMentions: [], shortNames: [], copy: null }
     : await evaluate(dir, { files, deletes, sources, tmpRoot });
   try {
     const ok = evaluation.errors.length === 0;
@@ -110,6 +114,7 @@ export async function checkBatch(root, options = {}) {
       draftsHash,
       finalFiles: evaluation.finalFiles,
       ambiguousMentions: evaluation.ambiguousMentions,
+      shortNames: evaluation.shortNames,
     };
   } finally {
     removeCopy(evaluation.copy);
@@ -123,7 +128,10 @@ export async function checkBatch(root, options = {}) {
  * @param {string} root campaign folder
  * @param {{ files?: string[], deletes?: string[], sources?: string[], message: string, note?: string }} options
  * @returns {Promise<{ ok: boolean, errors: object[], saved: { hash: string } | null, finalFiles: string[],
- *   manualChanges: string[], ambiguousMentions: object[], reviewRequired: boolean, layoutOnly: boolean }>}
+ *   manualChanges: string[], ambiguousMentions: object[], reviewRequired: boolean, layoutOnly: boolean,
+ *   shortNames: object[] }>}
+ *   shortNames: abbreviated names of the batch's Markdown drafts (see checkBatch). Informational only: it never
+ *   sets ok or adds to errors. file is the campaign-relative final path; empty when evaluation did not run.
  */
 export async function commitBatch(root, options = {}) {
   const { files, deletes, sources, message, note, tmpRoot } = readArgs(root, options, true);
@@ -137,6 +145,7 @@ export async function commitBatch(root, options = {}) {
     finalFiles: [...files],
     manualChanges: [],
     ambiguousMentions: [],
+    shortNames: [],
     reviewRequired,
     layoutOnly,
     ...extra,
@@ -184,6 +193,7 @@ export async function commitBatch(root, options = {}) {
         finalFiles: evaluation.finalFiles,
         manualChanges: dirty,
         ambiguousMentions: evaluation.ambiguousMentions,
+        shortNames: evaluation.shortNames,
         reviewRequired,
         layoutOnly,
       };
@@ -206,6 +216,7 @@ export async function commitBatch(root, options = {}) {
         finalFiles: evaluation.finalFiles,
         manualChanges: dirty,
         ambiguousMentions: evaluation.ambiguousMentions,
+        shortNames: evaluation.shortNames,
         reviewRequired,
         layoutOnly,
       };
@@ -218,6 +229,7 @@ export async function commitBatch(root, options = {}) {
       finalFiles: evaluation.finalFiles,
       manualChanges: dirty,
       ambiguousMentions: evaluation.ambiguousMentions,
+      shortNames: evaluation.shortNames,
       reviewRequired,
       layoutOnly,
     };
@@ -271,19 +283,19 @@ async function evaluate(dir, { files, deletes, sources, tmpRoot }) {
   const draftsHash = hashDrafts(dir, files, deletes, sources);
   const preflightErrors = preflight(dir, files, deletes, sources);
   if (preflightErrors.length > 0) {
-    return { errors: preflightErrors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map() };
+    return { errors: preflightErrors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map(), shortNames: [] };
   }
   const config = configChange(dir, files);
   if (config.errors.length > 0) {
-    return { errors: config.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map() };
+    return { errors: config.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map(), shortNames: [] };
   }
   const retired = planRetiredIds(dir, { files, deletes, draftRoot: path.join(dir, DRAFT_DIR) });
   if (retired.errors.length > 0) {
-    return { errors: retired.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map() };
+    return { errors: retired.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map(), shortNames: [] };
   }
 
   const copy = fs.mkdtempSync(path.join(tmpRoot, 'yllir-engine-'));
-  const result = { errors: [], finalFiles: [...files], ambiguousMentions: [], draftsHash, copy, externalLinks: new Map() };
+  const result = { errors: [], finalFiles: [...files], ambiguousMentions: [], draftsHash, copy, externalLinks: new Map(), shortNames: [] };
   try {
     const existing = files.filter((rel) => lstatOrNull(path.join(dir, rel)) !== null);
     const baseline = await validate(dir, scopesFor(dir, existing, deletes));
@@ -292,6 +304,7 @@ async function evaluate(dir, { files, deletes, sources, tmpRoot }) {
     result.externalLinks = transformed.externalLinks;
     result.finalFiles = transformed.finalFiles;
     result.ambiguousMentions = transformed.ambiguousMentions;
+    result.shortNames = shortNamesOf(dir, files, transformed);
     if (transformed.errors.length > 0) {
       result.errors = transformed.errors;
       return result;
@@ -308,6 +321,22 @@ async function evaluate(dir, { files, deletes, sources, tmpRoot }) {
     result.errors = [{ file: '', code: 'check-failed', message: error.message }];
   }
   return result;
+}
+
+/**
+ * Abbreviated names of the batch's Markdown drafts. The text is the draft (.campaign/drafts/<path>); the
+ * subjects are those of the evaluated copy, so subjects of the same batch count. file is the campaign-relative
+ * final path (after a layout move), not the draft path. Empty when the transform did not build the index.
+ */
+function shortNamesOf(dir, files, transformed) {
+  if (transformed.subjectIndex === null) return [];
+  const markdown = files.filter((rel) => rel.endsWith('.md'));
+  return findShortNamesInFiles(dir, transformed.subjectIndex, markdown, {
+    readText: (rel) => fs.readFileSync(path.join(dir, DRAFT_DIR, rel), 'utf8'),
+  }).map((hit) => ({
+    ...hit,
+    file: Object.hasOwn(transformed.pathMap, hit.file) ? transformed.pathMap[hit.file] : hit.file,
+  }));
 }
 
 /** Checks that do not need the copy. Returns error objects. */
@@ -398,7 +427,7 @@ function preflight(dir, files, deletes, sources) {
  * layout, links, plot maps, derived indexes. Errors returned here always block.
  */
 async function transform(dir, copy, { files, deletes, retired }) {
-  const out = { errors: [], finalFiles: [...files], pathMap: {}, ambiguousMentions: [], externalLinks: new Map() };
+  const out = { errors: [], finalFiles: [...files], pathMap: {}, ambiguousMentions: [], externalLinks: new Map(), subjectIndex: null };
   out.externalLinks = copyCampaign(dir, copy);
 
   const copyStructure = readStructure(copy).structure ?? [];
@@ -462,7 +491,8 @@ async function transform(dir, copy, { files, deletes, retired }) {
 
   // 4. Derived indexes.
   fs.mkdirSync(path.join(copy, '.campaign', 'cache'), { recursive: true });
-  fs.writeFileSync(path.join(copy, SUBJECTS_FILE), `${JSON.stringify(buildSubjectIndex(copy), null, 2)}\n`);
+  out.subjectIndex = buildSubjectIndex(copy);
+  fs.writeFileSync(path.join(copy, SUBJECTS_FILE), `${JSON.stringify(out.subjectIndex, null, 2)}\n`);
   writeWorldIndex(copy, buildWorldIndex(copy));
 
   return out;

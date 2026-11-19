@@ -91,6 +91,7 @@ Optional, before the first section: `![Lanterna di ottone con vetro annerito](im
 - Only relative Markdown links, spaces written `%20`, pointing to existing files inside the campaign.
 - A section anchor is the lowercase slug of the heading: `scheda.md#indicazioni-per-il-master`.
 - Authors write the names of other subjects as plain text. The engine adds the links when a batch is committed.
+- Write the full name of a subject with its own sheet, never a shortened form. See section 1.12.
 
 ### 1.7 Narrative italics
 
@@ -111,6 +112,34 @@ The prose register is `prose.register` in `campaign.yaml` (`elevated`, `plain`, 
 ### 1.11 Geographic layout
 
 A document sits in its category folder, at the nearest common ancestor of its `location` and of every place in its explicit `appearances`. A subject with no known location goes to the category's `Da collocare` folder (`Unplaced` in English). The author writes a new draft in the folder of its kind named by the context pack; the engine moves it to its place at commit.
+
+### 1.12 Names and spoken text
+
+**Names for the linker (all text).**
+
+- Write the full name of a subject that has its own sheet: its title, or one of its aliases. Never write only the first name or only the surname.
+- The engine links only full names. A shortened name stays unlinked.
+- Exception: inside a character's own spoken words, a character may call another by a short name.
+- The `check` output lists the shortened names it finds in `shortNames` (entries with `file`, `line`, `text`, `word` and `subjects`). Fix them. This list never blocks a batch.
+
+**Spoken and player text (no rhetorical tics).**
+
+This rule applies to read-aloud paragraphs (the italic ones), a character's spoken lines, and texts handed to the players (letters, notices, books). It does not apply to internal text: descriptions for the master, the master block, metadata and tables.
+
+Do not use these patterns. Each example is invented.
+
+- Negation-first reveal: "It is not a door. It is a mouth."
+- Significance designation: "It is the room that holds the answer."
+- Abstraction agency: "The silence hides it." / "The dust tells the story."
+- Deferred noun: "Five of the six statues face the sea. The sixth does not."
+- Coy or thesis-shaped header: a heading that teases or states a thesis instead of naming the content.
+- Aphoristic closer: "It is the kind of silence that looks like peace and is not."
+- Straw-man knockdown: "'It is only a storm' is the easy reading, and it is wrong."
+- Fragment cadence: "Three bells. One tower, one keeper, one rope."
+- Dressed metaphor: "That is fear wearing the costume of courtesy."
+- Label-first framing: "The left door of this hall."
+
+Say the thing directly instead, with concrete subjects and verbs, as a person would say it at the table.
 
 ## 2. Plot texts (sessions and activities)
 

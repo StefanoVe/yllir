@@ -156,6 +156,29 @@ _La nebbia sale dal molo prima dell'alba e si impiglia nelle reti stese._
 - Il testo integrale di un oggetto o di un annuncio non è narrazione: è prosa normale, senza corsivo e senza `>`.
 - I collegamenti escludono i corsivi narrativi.
 
+### 1.7bis Nomi e testo detto ai giocatori
+
+**Decisione dell'autore, 2026-11-19.** Due regole valgono per ogni testo scritto dal framework.
+
+**Nomi per il collegamento (ogni testo).** Il nome di un soggetto che ha una scheda è scritto per intero: il titolo o uno dei suoi alias. Mai solo il nome di battesimo, mai solo il cognome, perché il motore collega solo i nomi completi. Eccezione: nelle parole dette da un personaggio, un personaggio può chiamarne un altro con un nome breve. Il motore riporta i nomi abbreviati che trova nella lista `shortNames` dell'output di `check` (voci con `file`, `line`, `text`, `word` e `subjects`). La lista non è bloccante: il framework non si ferma, ma la riscrittura va fatta.
+
+**Testo detto ai giocatori (niente figure retoriche ricorrenti).** La regola vale per i paragrafi letti ad alta voce (in corsivo), per le battute dei personaggi e per i testi consegnati ai giocatori (lettere, avvisi, libri). Non vale per i testi interni: descrizioni per il master, blocco riservato, metadati e tabelle. I dieci schemi da evitare, ciascuno con un esempio inventato in inglese:
+
+- *Negation-first reveal* (negazione seguita dalla rivelazione): «Non è una porta. È una bocca.»
+- *Significance designation* (dichiarare che una cosa è importante): «È la stanza che contiene la risposta.»
+- *Abstraction agency* (un'astrazione o un oggetto come soggetto che nasconde o racconta): «The silence hides it.» / «The dust tells the story.»
+- *Deferred noun* (rinviare il soggetto con una struttura a sorpresa): «Five of the six statues face the sea. The sixth does not.»
+- *Coy or thesis-shaped header* (un titolo che allude o enuncia una tesi invece di nominare il contenuto).
+- *Aphoristic closer* (chiudere con una massima): «It is the kind of silence that looks like peace and is not.»
+- *Straw-man knockdown* (liquidare una lettura ovvia per poi smentirla): «'It is only a storm' is the easy reading, and it is wrong.»
+- *Fragment cadence* (sequenze di frammenti senza verbo): «Three bells. One tower, one keeper, one rope.»
+- *Dressed metaphor* (una metafora travestita da descrizione): «That is fear wearing the costume of courtesy.»
+- *Label-first framing* (partire dall'etichetta invece che dalla cosa): «The left door of this hall.»
+
+Al loro posto si dice la cosa direttamente, con soggetti e verbi concreti, come si direbbe al tavolo.
+
+La migrazione `prose-style-v1` passa una volta sui soli documenti con `provenance: generated` (mai `master` o `played`): completa i nomi abbreviati segnalati dal motore e riscrive i tic solo nei paragrafi letti ad alta voce, nelle battute dei personaggi e nei testi per i giocatori; poi aggiunge i collegamenti.
+
 ### 1.8 Note del master
 
 **Proposta.** Una nota personale del master sta nel blocco riservato (1.3). Fa eccezione `Trama/`: i suoi documenti sono per il master, e in essi le note in blocchi con tre backtick sono ammesse. In ogni altra scheda i blocchi con tre backtick sono ammessi solo dentro il blocco riservato: fuori da esso il validatore li segnala, perché lascerebbero una nota nella parte che le uscite leggono.

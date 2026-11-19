@@ -1,0 +1,7 @@
+id: prose-style-v1
+after: [metadata-comment-v1, links-review-v1, plot-flowchart-v1]
+introduced_in: 0.75.0
+needed: detect
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs
