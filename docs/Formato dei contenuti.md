@@ -177,7 +177,7 @@ _La nebbia sale dal molo prima dell'alba e si impiglia nelle reti stese._
 
 Al loro posto si dice la cosa direttamente, con soggetti e verbi concreti, come si direbbe al tavolo.
 
-La migrazione `prose-style-v1` passa una volta sui soli documenti con `provenance: generated` (mai `master` o `played`): completa i nomi abbreviati segnalati dal motore e riscrive i tic solo nei paragrafi letti ad alta voce, nelle battute dei personaggi e nei testi per i giocatori; poi aggiunge i collegamenti.
+La migrazione `prose-style-v1` passa una volta sui documenti con `provenance: generated`, `master` e `played`. Nei documenti `generated` completa i nomi e corregge i tic solo nei paragrafi letti ad alta voce, nelle battute dei personaggi e nei testi per i giocatori; nei documenti `master` completa solo i nomi, dopo un sì del master; i `played` non vengono toccati. Poi aggiunge i collegamenti.
 
 ### 1.8 Note del master
 

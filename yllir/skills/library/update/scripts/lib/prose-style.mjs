@@ -1,8 +1,9 @@
 // Resumable state of the prose pass of prose-style-v1 (run after a framework update).
 // It finds, in the documents the framework generated, the abbreviated names (findShortNamesInFiles)
-// and the lines that the player hears or reads (read-aloud paragraphs, direct speech). It plans them
-// once, groups the files into chunks, and keeps the chunks and their status in
-// .campaign/state/update/prose-style.json, so an interrupted pass resumes where it stopped.
+// and the lines that the player hears or reads (read-aloud paragraphs, direct speech). In the documents
+// the master wrote (provenance master) it finds only the abbreviated names, after a yes of the master.
+// It plans them once, groups the files into chunks of one kind, and keeps the chunks and their status
+// in .campaign/state/update/prose-style.json, so an interrupted pass resumes where it stopped.
 // It writes no campaign document: the guided part writes the drafts through the write cycle.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -24,12 +25,12 @@ const SPEECH_BLOCKS = new Set(['paragraph', 'quote', 'list']);
  * is written.
  * @param {string} root campaign folder
  * @param {{ persist?: boolean }} [options]
- * @returns {{ status: 'complete'|'pending', chunks: object[], pending: number } | { status: 'failed', errors: object[] }}
+ * @returns {{ status: 'complete'|'pending', masterConfirmation?: 'pending'|'yes'|'no', chunks: object[], pending: number } | { status: 'failed', errors: object[] }}
  */
 export function prepareProseStyle(root, { persist = true } = {}) {
   const campaign = path.resolve(root);
   const existing = readState(campaign);
-  if (existing !== null) return view(stateOf(existing.chunks));
+  if (existing !== null) return view(stateOf(existing.chunks, existing.masterConfirmation));
 
   let planned;
   try {
@@ -39,16 +40,17 @@ export function prepareProseStyle(root, { persist = true } = {}) {
   }
   if (planned.errors.length > 0) return { status: 'failed', errors: planned.errors };
 
-  const state = stateOf(planned.chunks);
+  const state = stateOf(planned.chunks, planned.masterConfirmation);
   if (persist) writeState(campaign, state);
   return view(state);
 }
 
 /**
  * Marks one chunk of the pass as done, recomputes the status and saves the state file.
+ * A master chunk is marked done only after the master said yes.
  * @param {string} root campaign folder
  * @param {string} chunkId for example c1
- * @returns {{ status: 'complete'|'pending', chunks: object[], pending: number } | { status: 'failed', errors: object[] }}
+ * @returns {{ status: 'complete'|'pending', masterConfirmation?: 'pending'|'yes'|'no', chunks: object[], pending: number } | { status: 'failed', errors: object[] }}
  */
 export function markChunkDone(root, chunkId) {
   const campaign = path.resolve(root);
@@ -60,13 +62,52 @@ export function markChunkDone(root, chunkId) {
   if (chunk === undefined) {
     return { status: 'failed', errors: [{ code: 'unknown-chunk', message: `no chunk ${chunkId} in the prose pass` }] };
   }
+  if (chunk.kind === 'master' && existing.masterConfirmation !== 'yes') {
+    return { status: 'failed', errors: [{ code: 'master-not-confirmed', message: `${chunkId} holds the master's documents and the master has not said yes` }] };
+  }
   chunk.status = 'done';
-  const state = stateOf(existing.chunks);
+  const state = stateOf(existing.chunks, existing.masterConfirmation);
   writeState(campaign, state);
   return view(state);
 }
 
-/** Plans the campaign: the generated documents with a short name or a spoken line, in chunks of CHUNK_SIZE files. */
+/**
+ * Records the master's answer to the question about the names in the documents the master wrote.
+ * On no, every master chunk is marked done. On yes, the master chunks stay pending.
+ * @param {string} root campaign folder
+ * @param {'yes'|'no'} answer
+ * @returns {{ status: 'complete'|'pending', masterConfirmation: 'yes'|'no', chunks: object[], pending: number } | { status: 'failed', errors: object[] }}
+ */
+export function recordMasterAnswer(root, answer) {
+  const campaign = path.resolve(root);
+  const existing = readState(campaign);
+  if (existing === null) {
+    return { status: 'failed', errors: [{ code: 'no-prose-style', message: 'the prose pass has not been prepared' }] };
+  }
+  if (answer !== 'yes' && answer !== 'no') {
+    return { status: 'failed', errors: [{ code: 'bad-answer', message: `the answer must be yes or no, not ${String(answer)}` }] };
+  }
+  if (existing.masterConfirmation === undefined) {
+    return { status: 'failed', errors: [{ code: 'no-master-chunks', message: 'the pass has no documents of the master to confirm' }] };
+  }
+  if (existing.masterConfirmation !== 'pending' && existing.masterConfirmation !== answer) {
+    return { status: 'failed', errors: [{ code: 'answer-already-recorded', message: `the master already said ${existing.masterConfirmation}` }] };
+  }
+  if (answer === 'no') {
+    for (const chunk of existing.chunks) {
+      if (chunk.kind === 'master') chunk.status = 'done';
+    }
+  }
+  const state = stateOf(existing.chunks, answer);
+  writeState(campaign, state);
+  return view(state);
+}
+
+/**
+ * Plans the campaign. Generated documents: the abbreviated names and the spoken lines. Master documents:
+ * only the abbreviated names, and only when there are some. Chunks hold one kind of document each,
+ * generated chunks first, in chunks of CHUNK_SIZE files.
+ */
 function planChunks(campaign) {
   const index = buildSubjectIndex(campaign);
   const configErrors = index.errors.filter((error) => error.file === 'campaign.yaml');
@@ -74,28 +115,42 @@ function planChunks(campaign) {
     return { errors: configErrors.map((error) => ({ code: 'prose-style-plan-failed', message: error.message, file: error.file })) };
   }
 
-  const items = new Map();
+  const generated = new Map();
+  const master = new Map();
   for (const file of candidateFiles(campaign)) {
     const text = fs.readFileSync(path.join(campaign, file), 'utf8');
-    if (!isGeneratedDocument(text)) continue;
+    const kind = documentKind(text);
+    if (kind === null) continue;
     const shortNames = findShortNamesInFiles(campaign, index, [file], { readText: () => text });
-    const spoken = spokenLines(text);
+    const spoken = kind === 'generated' ? spokenLines(text) : [];
     if (shortNames.length === 0 && spoken.length === 0) continue;
-    items.set(file, { shortNames, spoken });
+    (kind === 'generated' ? generated : master).set(file, { shortNames, spoken });
   }
 
+  const generatedChunks = chunksOf('generated', generated, 1);
+  const masterChunks = chunksOf('master', master, generatedChunks.length + 1);
+  return {
+    errors: [],
+    chunks: [...generatedChunks, ...masterChunks],
+    masterConfirmation: masterChunks.length > 0 ? 'pending' : undefined,
+  };
+}
+
+/** Groups the planned files of one kind into chunks of CHUNK_SIZE files, numbered from firstNumber. */
+function chunksOf(kind, items, firstNumber) {
   const files = [...items.keys()].sort(compareStrings);
   const chunks = [];
   for (let i = 0; i < files.length; i += CHUNK_SIZE) {
     const chunkFiles = files.slice(i, i + CHUNK_SIZE);
     chunks.push({
-      id: `c${chunks.length + 1}`,
+      id: `c${firstNumber + chunks.length}`,
+      kind,
       files: chunkFiles,
       status: 'pending',
       items: Object.fromEntries(chunkFiles.map((file) => [file, items.get(file)])),
     });
   }
-  return { errors: [], chunks };
+  return chunks;
 }
 
 /** Canonical documents of every category the pass scans, sorted. */
@@ -111,10 +166,15 @@ function candidateFiles(campaign) {
   return [...files].sort(compareStrings);
 }
 
-/** True when the document is generated by the framework (provenance generated) and not marked generated: true. */
-function isGeneratedDocument(text) {
+/**
+ * The kind of pass a document gets: 'generated' (provenance generated and not marked generated: true),
+ * 'master' (provenance master), or null for every other document (played, or no provenance).
+ */
+function documentKind(text) {
   const { data } = parseFrontmatter(text);
-  return data?.provenance === 'generated' && data?.generated !== 'true';
+  if (data?.provenance === 'master') return 'master';
+  if (data?.provenance === 'generated' && data?.generated !== 'true') return 'generated';
+  return null;
 }
 
 /** Line numbers (1-based, in the file) of the public lines that are read aloud or hold direct speech. */
@@ -140,13 +200,17 @@ function hasDirectSpeech(text) {
 }
 
 /** The status of a list of chunks: complete when every chunk is done (an empty list is complete). */
-function stateOf(chunks) {
-  return { status: chunks.every((chunk) => chunk.status === 'done') ? 'complete' : 'pending', chunks };
+function stateOf(chunks, masterConfirmation) {
+  const status = chunks.every((chunk) => chunk.status === 'done') ? 'complete' : 'pending';
+  return masterConfirmation === undefined ? { status, chunks } : { status, masterConfirmation, chunks };
 }
 
-/** What the callers get: the status, the chunks and how many are not done. */
+/** What the callers get: the status, the master's confirmation when there are master chunks, the chunks and how many are not done. */
 function view(state) {
-  return { status: state.status, chunks: state.chunks, pending: state.chunks.filter((chunk) => chunk.status !== 'done').length };
+  const pending = state.chunks.filter((chunk) => chunk.status !== 'done').length;
+  return state.masterConfirmation === undefined
+    ? { status: state.status, chunks: state.chunks, pending }
+    : { status: state.status, masterConfirmation: state.masterConfirmation, chunks: state.chunks, pending };
 }
 
 /** The saved state, or null when the file is missing or does not parse. */
