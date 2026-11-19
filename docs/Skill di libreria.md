@@ -399,7 +399,8 @@ Implementata in 0.61.0: il tipo «personaggio giocante» di `write-document` (ca
 - **Requisiti:**
   - lo stato dello scontro vive in un file dati, e un solo modulo lo tiene: la funzione di sessione non ne duplica la gestione;
   - la logica di regole passa nell'adattatore; per i PG la configurazione decide quali dati tenere (per esempio solo nome, iniziativa e posizione);
-  - un validatore controlla lo stato prima di ogni salvataggio.
+  - un validatore controlla lo stato prima di ogni salvataggio;
+  - prima di avviare lo scontro l'assistente cerca la scheda di ogni nemico; se non la trova non avvia lo scontro e chiede al master una sola domanda con tre scelte: cercarla meglio, darne lui i valori (usati così come sono, senza scheda) o inventare una nuova scheda di creatura con statistiche complete tramite `write-document`.
 - **Rischi da evitare:**
   - regole di un sistema scritte nella skill la legano a quel sistema: vanno nell'adattatore, D&D 2024 incluso;
   - due moduli che tengono lo stato dello stesso scontro divergono;

@@ -2,7 +2,7 @@
 name: combat-tracker
 description: Library skill. Keeps the state of a fight that the master runs during a game in progress: who is in the initiative order and who is up, hit points, conditions and the counters of the enemies. It never rolls dice and never chooses tactics. Invoked by the entry skill when the master declares a fight, or reports damage, healing, a condition or the next turn during a game in progress.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/combat-tracker/scripts/combat.mjs" *), Read, Glob, Grep
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/combat-tracker/scripts/combat.mjs" *), Read, Glob, Grep, Skill
 ---
 
 # Combat tracker
@@ -17,15 +17,20 @@ You keep the record of a fight. The master is the author: the master says what h
 
 ## Steps
 
-**1. Start the fight.** When the master declares a fight, run:
+**1. Find the enemy sheets first.** Before you start the fight, look for the creature sheet of every enemy the master names: search the campaign with `Glob` and `Grep` by the name and by its aliases, in every folder of sheets, not only one. Only when every enemy has a sheet, go to step 2. If you cannot find the sheet of an enemy, do not start the fight yet: ask the master ONE question that names the enemy and offers three choices, and wait for the answer. For example: "I cannot find the sheet of 'Bog Hag': shall I look for it better, will you give me its numbers, or shall I make up a new sheet?" Then:
+- **Look better:** ask nothing else; search again with other spellings, the singular or plural, and the names the master gives. If the sheet is still missing, ask the same question again without the first choice.
+- **The master gives the numbers:** use only the values the master states (hit points, armour class, initiative) when you add that enemy in step 3, and leave out `--sheet`. Never fill a missing value yourself.
+- **Make up a sheet:** invoke `yllir:write-document` with the Skill tool, asking for one creature sheet with full statistics for that enemy, from what the master said about it. When it is saved, read the new sheet and use it in step 3 like any other sheet.
+
+**2. Start the fight.** When the master declares a fight, run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/combat-tracker/scripts/combat.mjs" start <root>`
 If it exits `1` with `already-active`, ask the master ONE question: "A fight is already running: shall I end it and start a new one?", and wait.
 
-**2. Add the enemies.** For each enemy, read its creature sheet with `Read`, in the Statistics section (the table with AC and HP). Then run `add` with the name, `--side enemy`, `--hp` (the HP in the sheet), `--hp-max` (the same value when the sheet gives one), `--ac`, and `--sheet <path of the sheet, relative to the campaign>`. Use the master's initiative value when the master gives one with `--initiative`; never roll it. If the master gives no initiative, leave the option out. Add one enemy per command. If the master gives several identical enemies, add them one by one with a number in the name: "Goblin 1", "Goblin 2".
+**3. Add the enemies.** For each enemy, read its creature sheet with `Read`, in the Statistics section (the table with AC and HP). Then run `add` with the name, `--side enemy`, `--hp` (the HP in the sheet), `--hp-max` (the same value when the sheet gives one), `--ac`, and `--sheet <path of the sheet, relative to the campaign>`. For an enemy whose numbers the master gave in step 1, use only those numbers and no `--sheet`. Use the master's initiative value when the master gives one with `--initiative`; never roll it. If the master gives no initiative, leave the option out. Add one enemy per command. If the master gives several identical enemies, add them one by one with a number in the name: "Goblin 1", "Goblin 2".
 
-**3. Add the player characters.** Add each player character with `--side pc`, its name, and its initiative if the master gives one. Do not read the player character sheet beyond what the master gives, and never copy its details. Give `--hp` only when the master states it.
+**4. Add the player characters.** Add each player character with `--side pc`, its name, and its initiative if the master gives one. Do not read the player character sheet beyond what the master gives, and never copy its details. Give `--hp` only when the master states it.
 
-**4. Translate each master message into ONE operation.** Use this map:
+**5. Translate each master message into ONE operation.** Use this map:
 - damage to someone: `damage <root> --id <id> --amount <n>`
 - healing: `heal <root> --id <id> --amount <n>`
 - a condition: `condition-add <root> --id <id> --condition <name> [--duration <name>] [--rounds <n>]`. The condition name must be one of the adapter's `conditions` ids; the master's words are matched through `condition_labels` (the label in the campaign language). The duration is one of `condition_durations`, matched through `duration_labels`; `--rounds <n>` only with `rounds`.
@@ -38,15 +43,15 @@ If it exits `1` with `already-active`, ask the master ONE question: "A fight is 
 - a combatant leaves the fight: `remove <root> --id <id>`
 If one message holds more than one change, run one command per change, in the order the master said them, and read each result before the next. Ids are given by the tracker when a combatant is added: read them from the `combat` output (`combatants[].id`) or from the status table. Never invent an id.
 
-**5. Read the result and report.** After each change, read `exit:`.
+**6. Read the result and report.** After each change, read `exit:`.
 - On `0`: read `notices` in the output. For each notice, tell the master in one short plain sentence, in the campaign language, using the adapter's labels: a condition that ended (`condition-ended`), an enemy or ally that is defeated (`defeated`), a player character that falls unconscious (`unconscious`), and after `next` who is up and, when `newRound` is true, the new round (`turn`). Say nothing else technical. Give the state only when the master asks, or at the end of a round.
 - On `1` with `unknown-condition`: tell the master in plain words that the game does not know that condition, and ask ONE question naming the nearest known conditions from the adapter (for example "I do not know the condition 'scared': do you mean 'frightened'?"). Wait for the answer.
 - On `1` with another code: say in one plain sentence what could not be written, and ask ONE question about what to do. Never retry a change the master has not confirmed.
 - On `2`: fix the command and run it again. Do not tell the master.
 
-**6. Show the state as a short table** when the master asks for it, or at the end of each round. Columns: order (initiative), name, hit points (current / maximum, or a dash when unknown), conditions, and a mark for who is up. Use the campaign language. Do not show ids or internal words.
+**7. Show the state as a short table** when the master asks for it, or at the end of each round. Columns: order (initiative), name, hit points (current / maximum, or a dash when unknown), conditions, and a mark for who is up. Use the campaign language. Do not show ids or internal words.
 
-**7. End the fight.** When the master says the fight is over, run `end <root>`. Then tell the master in plain words that the master screen shows the same panel live, and that the fight stays in the record of the session.
+**8. End the fight.** When the master says the fight is over, run `end <root>`. Then tell the master in plain words that the master screen shows the same panel live, and that the fight stays in the record of the session.
 ## Rules
 
 - The master-only block of a sheet is never copied into the tracker `notes`, and never quoted to the master. Only the Statistics values you need (AC, HP) go into the command.
@@ -54,3 +59,4 @@ If one message holds more than one change, run one command per change, in the or
 - One command per change. Nothing before or after a command in the same message.
 - Do not roll, do not suggest tactics, do not say what an enemy will do, do not decide outcomes.
 - Ask ONE question at a time, and end it with a question mark.
+- Never make up the numbers of an enemy without a sheet: ask first, as step 1 says.
