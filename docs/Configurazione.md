@@ -74,7 +74,7 @@ structure:                       # facoltativo alla creazione. Categorie di docu
                                  # Una categoria compare quando nasce la prima scheda.
   - id: testo                    # obbligatorio. Id stabile, usato dai processi; non cambia con il nome della cartella.
     folder: testo                # obbligatorio. Percorso relativo alla radice della campagna.
-    type: plot | chronicle | places | subjects | objects | free | notes | sources | external | master-only
+    type: plot | chronicle | places | subjects | objects | free | notes | sources | external | master-only | atlas
                                  # obbligatorio. Determina quali regole di creazione e di collegamento si applicano.
                                  # subjects: personaggi, creature e fazioni.
                                  # notes: spunti e bozze, non canone (Appunti/). Non entrano nell'indice dei soggetti
@@ -99,6 +99,7 @@ modules:                         # facoltativo. Solo moduli veri, ciascuno attiv
   encyclopedia: false            # facoltativo. Enciclopedia pubblica della campagna.
   master_screen: false           # facoltativo. Strumento grafico locale del master.
   music: false                   # facoltativo. Ricerca di sottofondi e colonne sonore.
+  atlas: false                   # facoltativo. Atlante della campagna (Deciso 2026-11-19; vedi Atlante.md).
 
 encyclopedia:                    # facoltativo. Impostazioni dell'enciclopedia pubblica; si usano solo con modules.encyclopedia: true.
   title: testo                   # facoltativo. Titolo del sito. Se manca, si usa campaign.name (Proposta).

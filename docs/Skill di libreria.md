@@ -67,7 +67,7 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Deciso (indice). Prima implementazione (2026-11-12) come skill `cards`; il percorso con Photoshop MCP, predefinito, non è verificato nei test |
 | [Modelli 3D da stampare](#l24-modelli-3d-da-stampare) (`models-3d`) | Libreria, chiamata dal core | Creare il modello 3D, pronto per la stampa 3D, di un personaggio o di una creatura a partire dalla sua scheda. | Processo **Deciso** (2026-11-16), strumenti Proposta. Non implementata; vedi [Modelli 3D](Modelli%203D.md) |
 | [Mappe di luogo e di battaglia](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Creare mappe con livelli separati, per luoghi e scontri. | Deciso (indice; modalità `map` dello strumento `images`, Deciso 2026-11-11). Implementata in 0.41.0 per mappe di luogo e di battaglia |
-| [Mappe del mondo](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Modificare una carta del mondo senza alterarne la geometria. | Deciso (indice). Non implementata. Rinviata: la decisione sulle mappe di battaglia (indice, 2026-11-11) lascia fuori la carta del mondo, e `images` la rifiuta |
+| [Mappe del mondo](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Modificare una carta del mondo senza alterarne la geometria. | Superata dall'[atlante](#l25-atlante) (Deciso, 2026-11-19) |
 | [Scontri](#l12-scontri) (`combat-tracker`) | Libreria, con adattatore | Tenere lo stato di uno scontro per il master: iniziativa, PF, fasi, condizioni, risorse dei nemici. | Deciso (indice). Implementata (2026-11-12) |
 | [Bilanciamento degli incontri](#l15-bilanciamento-degli-incontri) (`encounter-balancer`) | Adattatore e motore (calcolo e censimento) più libreria sottile su richiesta | Ribilanciare scontri e prove quando il master lo chiede, per esempio se cambia il gruppo. | Deciso (indice). Implementata in 0.61.0 (skill `encounter-balancer`). Deciso (2026-11-13): `rate_encounter` nell'adattatore, query `encounters` nel motore, skill sottile per il piano |
 | [Economia](#l16-economia) (`economy-manager`) | Core (`write-document`) e motore | Mantenere il documento di economia del mondo e far sì che prezzi, salari e ricompense delle schede lo rispettino. | Deciso (indice). Implementata in 0.61.0: controlli dei prezzi nel motore e query `prices`. Deciso (2026-11-13): nessuna skill; controllo dei prezzi nel `commit` e query `prices` |
@@ -84,7 +84,7 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | Master screen | Strumento locale unico | Interfaccia locale unica per chat con l'agente, consultazione, sessione live, musica e stampa. Si costruisce dopo la prima versione. | Deciso (strumento unico); forma Proposta |
 | Stampa (`print`) | Modulo opzionale (output fisici) | Fogli di carte (5×7 o A4) e fogli-bacheca, con retro e codici QR, in RGB o CMYK. | Prima implementazione (2026-11-12) come skill `print` (L10), con renderer Node e PDF |
 | Enciclopedia pubblica | Modulo opzionale (output digitale) | Pagina statica consultabile dai giocatori, costruita da schede con segnaposto e da carte in formato compresso. | Deciso (2026-11-12, opzione A). Prima implementazione: skill `encyclopedia`, generazione locale con anteprima nel master screen, senza pubblicazione |
-| Atlante | Modulo opzionale (output digitale del master) | Indice dei luoghi su una carta, con dati scritti nella configurazione. | Proposta |
+| [Atlante](#l25-atlante) (`atlas`) | Libreria, chiamata dal core; modulo opzionale | Carta del mondo per livelli dai documenti, nel master screen e come sito statico. | Deciso (2026-11-19). Non implementata |
 | Musica | Modulo opzionale, nel master screen | Colonna sonora di scene e sessioni. | Proposta |
 | Stile per output web | Modulo opzionale | Profilo grafico per le pagine di enciclopedia e master screen. Una skill esterna di design per siti web (design-taste-frontend) è un candidato da valutare in quel contesto. | Proposta |
 | Vedute e carte nautiche | Da valutare | Output non ancora analizzati. Rientrano nella questione aperta sugli strumenti da confluire. | Da valutare |
@@ -356,6 +356,16 @@ Implementata in 0.61.0: il tipo «personaggio giocante» di `write-document` (ca
 - **Dipendenze:** strumento `images` (passo 1); strumenti locali per l'STL (passo 2); adattatore del sistema di gioco; motore.
 - **Requisiti e rischi:** nel documento [Modelli 3D](Modelli%203D.md).
 
+### L25. Atlante
+
+- **Stato:** processo e forma **Deciso** dall'autore (2026-11-19); formati e strumenti **Proposta**. Non implementata. Il documento dedicato è [Atlante](Atlante.md).
+- **Scopo:** costruire e tenere aggiornata la carta del mondo della campagna, per livelli, dai documenti; mostrarla nel master screen ed esportarla come sito statico.
+- **Avvio:** dal core o dal pulsante della sezione vuota del master screen, solo su richiesta del master. L'aggiornamento con i nuovi luoghi parte alla fine dei lotti di `build-world` e `write-document`, solo se l'atlante esiste.
+- **Deterministico:** coste e forme dai vincoli con un seme; confini da regole; controllo delle posizioni rispetto ai livelli; impronte dei livelli fissati e rifiuto delle modifiche non richieste; disegno; esportazione e controlli del sito dei giocatori.
+- **Giudizio:** estensione proposta, lettura dei documenti, vincoli di ogni livello, domande al master.
+- **Dipendenze:** motore; fornitori di immagini (solo per il pacchetto di timbri, una volta); controlli dell'enciclopedia per il sito dei giocatori.
+- **Requisiti e rischi:** nel documento [Atlante](Atlante.md).
+
 ### L11. Mappe
 
 - **Scopo:** modificare una carta del mondo senza alterarne la geometria, o creare una mappa di luogo o di battaglia con livelli separati.
@@ -365,7 +375,7 @@ Implementata in 0.61.0: il tipo «personaggio giocante» di `write-document` (ca
 - **Giudizio:** quali modifiche fare e con quale fonte; scrittura dei prompt; verifica visiva dei risultati.
 - **Modello:** superato dalla decisione 16.
 - **Dipendenze:** profilo di stile (carta antica o moderna); configurazione dello spazio di coordinate; adattatore del sistema di gioco per le mappe di battaglia (griglia, dimensione del quadretto).
-- **Stato (2026-11-11):** modalità `map` dello strumento `images`, implementata in 0.41.0, per le mappe di luogo e di battaglia. La decisione dell'autore per le sole mappe di battaglia supera «l'esportazione verso motori di gioco è scartata»: l'esportazione per Tiled e il file per i tavoli virtuali sono previsti. La carta del mondo resta fuori (indice, decisione sulle mappe di battaglia, 2026-11-11): `images` la rifiuta con un messaggio al master. Rinviata, non scartata.
+- **Stato (2026-11-11):** modalità `map` dello strumento `images`, implementata in 0.41.0, per le mappe di luogo e di battaglia. La decisione dell'autore per le sole mappe di battaglia supera «l'esportazione verso motori di gioco è scartata»: l'esportazione per Tiled e il file per i tavoli virtuali sono previsti. La carta del mondo passa all'[atlante](#l25-atlante) (Deciso, 2026-11-19).
 - **Requisiti:**
   - proposta: una sola skill con due modalità (mondo, luogo);
   - l'esportazione verso motori di gioco è scartata nel core; l'atlante passa al modulo di output;
@@ -572,6 +582,7 @@ Le tre skill seguenti sono **Deciso (2026-11-11)** come skill di libreria. Sono 
 - **Economia:** serve una sola valuta di riferimento per i confronti? **Risposta (2026-11-14, decisione 1):** più valute sono ammesse; ciascuna ha un'equivalenza verso l'unità di conto, e il controllo converte.
 - **Ricerca musicale:** fonti ammesse (solo YouTube o anche altre piattaforme) e lingua delle ricerche.
 - **Modelli 3D:** le questioni aperte sono nel documento [Modelli 3D](Modelli%203D.md).
+- **Atlante:** le questioni aperte sono nel documento [Atlante](Atlante.md).
 - **Mappe:** una skill con due modalità o due skill? La scelta incide sulla dimensione della skill, non sul risultato. **Risposta (2026-11-11):** modalità di `images` (Deciso, 2026-11-11).
 - **Stampa:** libreria attivata da un modulo, o modulo puro? Nel documento è trattata come modulo opzionale con una skill di esecuzione; confermare.
 - **Modelli:** Superata dalla Riprogettazione (2026-11-11): non c'è più un modello assegnato per skill. Quando delegare e a quale modello lo decide il framework, tarato con il testbench (decisione 16).
