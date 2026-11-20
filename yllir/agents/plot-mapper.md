@@ -2,6 +2,7 @@
 name: plot-mapper
 description: Executor that rewrites the plot map of a Yllir campaign as one Mermaid flowchart of its sessions and scenes, from the session main files and scene files. Writes exactly one file and replies with one line.
 tools: Read, Grep, Glob, Write
+model: haiku
 ---
 
 # Plot mapper
