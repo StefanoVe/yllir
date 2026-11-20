@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 // Repaints the atlas picture through the Codex provider. --mode crop sends a zoomed crop of the
-// current base as the reference image; --mode base makes a new base picture with no input.
-// The prompt is one fixed English wrapper, the public text of --prompt-file and one style
+// current base as the reference image; --mode base makes a new base picture with no input;
+// --mode sea makes a square, seamless tile of open sea water (optionally matched to a crop of the
+// real sea given as --input). The prompt is one fixed English wrapper, the public text of --prompt-file and one style
 // description. Nothing else from the campaign is ever sent, and this script never reads a campaign.
 // Consent: the caller must first run image-select.mjs --operation repaint, which asks the master
 // before an external service gets the picture. This script does not ask.
-// Usage: node atlas-repaint-job.mjs --mode base|crop --prompt-file <txt> --out <png> [--input <png>] [--size <WxH>] [--style <style id>] [--dry-run]
+// Usage: node atlas-repaint-job.mjs --mode base|crop|sea --prompt-file <txt> --out <png> [--input <png>] [--size <WxH>] [--style <style id>] [--dry-run]
+// Sea size defaults to 1024x1024 and must be square; --input is optional for sea.
 // Exit codes: 0 repainted (or dry run printed), 1 failed (result: failed, error: ..., message: ...), 2 usage error.
 
 import fs from 'node:fs';
@@ -17,10 +19,12 @@ import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 import { PNG_SIGNATURE } from './lib/png-signature.mjs';
 
 const USAGE =
-  'usage: node atlas-repaint-job.mjs --mode base|crop --prompt-file <txt> --out <png> [--input <png>] [--size <WxH>] [--style <style id>] [--dry-run]';
+  'usage: node atlas-repaint-job.mjs --mode base|crop|sea --prompt-file <txt> --out <png> [--input <png>] [--size <WxH>] [--style <style id>] [--dry-run]';
 
-const MODES = ['base', 'crop'];
+const MODES = ['base', 'crop', 'sea'];
 const DEFAULT_STYLE = 'fantasy-color';
+/** Sea tiles are square; this is the size used when --size is not given. */
+export const SEA_DEFAULT_SIZE = '1024x1024';
 /** The prompt file is refused above this many characters. */
 export const MAX_PROMPT_CHARS = 6000;
 /** A provider result smaller than this is not a usable picture. */
@@ -56,6 +60,36 @@ export const REPAINT_WRAPPER = [
   'REQUEST:',
 ].join('\n');
 
+/** The fixed English wrapper for sea mode. {STYLE} and {FRAME} are replaced; the request text follows REQUEST:. */
+export const SEA_WRAPPER = [
+  'TASK:',
+  'This is a square, top-down texture of open sea water for a tabletop-RPG map. Paint it in the style: {STYLE}.',
+  '',
+  'FRAME:',
+  '{FRAME}',
+  '',
+  'CONTENT:',
+  'Only open water. No land, no islands, no reefs, no ships, no boats, no coastline, no horizon, no sky, no clouds, ' +
+    'no fog, no creatures. Never write any text anywhere on the image: no letters, numbers, runes, names, labels, ' +
+    'compass rose, scale bar, coordinate grid, border, frame, margin or signature.',
+  '',
+  'SEAMLESS:',
+  'The picture must repeat endlessly as a tile: the left edge joins the right edge and the top edge joins the bottom edge ' +
+    'with no visible seam. Even lighting over the whole picture, no darker or lighter centre, no single strong feature, ' +
+    'no focal point, no vignette, no fade to white or black at any edge.',
+  '',
+  'UNIFORMITY:',
+  'One consistent light direction, one palette, one level of detail. Wave patterns repeat at one scale and one painting style.',
+  '',
+  'REQUEST:',
+].join('\n');
+
+const FRAME_SEA_REFERENCE =
+  'A reference image is attached: a crop of the real sea of the map. Match its water colour, brightness and wave style. ' +
+  'Paint no land, ship or feature from it; the picture is only water.';
+const FRAME_SEA_NONE =
+  'There is no reference image: choose a water colour, brightness and wave style that suit the chosen style.';
+
 const FRAME_CROP =
   'A reference image is attached: a zoomed crop of the current map. Keep its framing exactly: same canvas size ' +
   'and aspect ratio, no crop, no rotation, no zoom, no shift, no mirror, no perspective. Every coastline, shore, ' +
@@ -68,12 +102,15 @@ function frameForBase(width, height) {
 
 /**
  * The full prompt for one repaint. Returns null for an unknown style id.
- * @param {{ mode: 'base'|'crop', promptText: string, styleId: string, width: number, height: number }} options
+ * @param {{ mode: 'base'|'crop'|'sea', promptText: string, styleId: string, width: number, height: number, hasInput?: boolean }} options
  */
-export function buildRepaintPrompt({ mode, promptText, styleId, width, height }) {
+export function buildRepaintPrompt({ mode, promptText, styleId, width, height, hasInput = false }) {
   if (!Object.hasOwn(REPAINT_STYLES, styleId)) return null;
-  const frame = mode === 'crop' ? FRAME_CROP : frameForBase(width, height);
-  const head = REPAINT_WRAPPER
+  let frame;
+  if (mode === 'sea') frame = hasInput ? FRAME_SEA_REFERENCE : FRAME_SEA_NONE;
+  else frame = mode === 'crop' ? FRAME_CROP : frameForBase(width, height);
+  const wrapper = mode === 'sea' ? SEA_WRAPPER : REPAINT_WRAPPER;
+  const head = wrapper
     .replace('{STYLE}', () => REPAINT_STYLES[styleId])
     .replace('{FRAME}', () => frame);
   return `${head}\n${String(promptText).trim()}`;
@@ -121,9 +158,9 @@ function oneLine(text) {
 }
 
 /**
- * Builds the job folder (job.json, and input.png in crop mode), runs it through the provider and
+ * Builds the job folder (job.json, and input.png when there is a reference), runs it through the provider and
  * copies the picture to outPath. `runner` defaults to the Codex client and receives { jobDir };
- * tests pass a fake one.
+ * tests pass a fake one. `size` is required for base and sea (the output size); crop takes it from the input.
  * @returns {Promise<{ ok: true } | { ok: false, error: string, message: string }>}
  */
 export async function runRepaint({
@@ -137,13 +174,13 @@ export async function runRepaint({
   runner = runCodex,
 }) {
   let input = null;
-  if (mode === 'crop') {
+  if (mode === 'crop' || (mode === 'sea' && inputPath !== null)) {
     input = readPngFile(inputPath);
     if (input === null) return { ok: false, error: 'failed', message: 'the reference picture is not a readable PNG file' };
   }
-  const width = input ? input.width : size.width;
-  const height = input ? input.height : size.height;
-  const prompt = buildRepaintPrompt({ mode, promptText, styleId, width, height });
+  const width = mode === 'crop' ? input.width : size.width;
+  const height = mode === 'crop' ? input.height : size.height;
+  const prompt = buildRepaintPrompt({ mode, promptText, styleId, width, height, hasInput: input !== null });
   if (prompt === null) return { ok: false, error: 'failed', message: `unknown style ${styleId}` };
 
   fs.rmSync(jobDir, { recursive: true, force: true });
@@ -220,11 +257,16 @@ function shellWord(arg) {
 
 /** Checks the options that depend on each other. Throws (exit 2) with the reason. */
 function checkOptions(args) {
-  if (!MODES.includes(args.mode)) throw new Error(`--mode must be base or crop, not ${args.mode}; ${USAGE}`);
+  if (!MODES.includes(args.mode)) throw new Error(`--mode must be base or crop, or sea, not ${args.mode}; ${USAGE}`);
   if (args.mode === 'crop' && args.input === null) throw new Error(`--mode crop needs --input <png>; ${USAGE}`);
   if (args.mode === 'base' && args.input !== null) throw new Error(`--mode base takes no --input; ${USAGE}`);
   if (args.mode === 'base' && args.size === null) throw new Error(`--mode base needs --size <WxH>; ${USAGE}`);
   if (args.size !== null && parseSize(args.size) === null) throw new Error(`--size must be WxH, for example 1024x768; ${USAGE}`);
+  if (args.mode === 'sea') {
+    if (args.size === null) args.size = SEA_DEFAULT_SIZE;
+    const { width, height } = parseSize(args.size);
+    if (width !== height) throw new Error(`--mode sea needs a square --size, for example 1024x1024, not ${args.size}; ${USAGE}`);
+  }
   const style = args.style ?? DEFAULT_STYLE;
   if (!Object.hasOwn(REPAINT_STYLES, style)) {
     throw new Error(`unknown style ${style}; use one of ${Object.keys(REPAINT_STYLES).join(', ')}`);
@@ -246,17 +288,17 @@ async function main() {
   if (args.dryRun) {
     let width = size?.width;
     let height = size?.height;
-    if (args.mode === 'crop') {
+    if (inputPath !== null) {
       const input = readPngFile(inputPath);
       if (input === null) {
         process.stdout.write('result: failed\nerror: failed\nmessage: the reference picture is not a readable PNG file\n');
         exitWith(1);
         return;
       }
-      ({ width, height } = input);
+      if (args.mode === 'crop') ({ width, height } = input);
     }
-    const prompt = buildRepaintPrompt({ mode: args.mode, promptText, styleId, width, height });
-    const job = { operation: 'repaint', prompt, input: args.mode === 'crop' ? 'input.png' : null };
+    const prompt = buildRepaintPrompt({ mode: args.mode, promptText, styleId, width, height, hasInput: inputPath !== null });
+    const job = { operation: 'repaint', prompt, input: inputPath !== null ? 'input.png' : null };
     const argv = ['codex', ...codexArgs(job, jobDir, path.join(jobDir, 'result.png'))];
     process.stdout.write(`prompt: ${prompt}\ncommand: ${argv.map(shellWord).join(' ')}\n`);
     exitWith(0);

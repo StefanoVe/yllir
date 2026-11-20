@@ -27,6 +27,7 @@ import { pendingPlaces } from './lib/pending.mjs';
 import { listStyles, loadStyle, resolveStyleId } from './lib/styles.mjs';
 import { exportAtlas } from './lib/export.mjs';
 import { renderPreview } from './lib/preview.mjs';
+import { sampleSea, setSea } from './lib/sea.mjs';
 import { buildWorldIndex } from '../../../../scripts/lib/world-graph.mjs';
 import { parseYamlLite } from '../../../../scripts/lib/yaml-lite.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
@@ -52,12 +53,14 @@ const USAGE = [
   '  render <root> [--audience master|players] [--open] [--data-dir path]',
   '  preview <root> [--open] [--data-dir path]',
   '  set-style <root> <id|auto>',
+  '  sea-sample <root> --out png',
+  '  sea-set <root> --candidate png',
   '  report <root> [--placed id,id] [--ask "question"|none]',
 ].join('\n');
 
 const COMMANDS = [
   'status', 'validate', 'init', 'base-set', 'places', 'grid', 'crop', 'compose', 'verify', 'land', 'territories',
-  'accept', 'lock', 'labels-write', 'render', 'preview', 'styles', 'set-style', 'report',
+  'accept', 'lock', 'labels-write', 'render', 'preview', 'styles', 'set-style', 'sea-sample', 'sea-set', 'report',
 ];
 /** Number of positional arguments after <command> <root>: [min, max]. */
 const ARITY = { init: [1, 1], 'base-set': [1, 1], 'labels-write': [1, 1], 'set-style': [1, 1], lock: [1, 2] };
@@ -75,6 +78,8 @@ const COMMAND_OPTIONS = {
   lock: ['--unlock'],
   render: ['--audience', '--data-dir', '--open'],
   preview: ['--data-dir', '--open'],
+  'sea-sample': ['--out'],
+  'sea-set': ['--candidate'],
   report: ['--placed', '--ask'],
 };
 const VALUE_OPTIONS = new Set([
@@ -595,6 +600,23 @@ function printResult(result) {
   return result.ok ? 0 : 1;
 }
 
+/**
+ * Runs a sea operation and prints its result with `extra` fields. A known error (one with a code) is
+ * printed as a refusal and exits 1, nothing written; any other error is left to the CLI (exit 2).
+ */
+function seaCommand(operation, extra = {}) {
+  let result;
+  try {
+    result = operation();
+  } catch (err) {
+    if (!err.code) throw err;
+    print({ ok: false, code: err.code, message: err.message });
+    return 1;
+  }
+  print({ ok: true, ...extra, ...result });
+  return 0;
+}
+
 function territoriesCommand(root, outArg) {
   const loaded = loadBase(root);
   if (!loaded.ok) return printResult(loaded);
@@ -896,6 +918,14 @@ async function main() {
       break;
     case 'set-style':
       code = setStyleCommand(root, rest[0]);
+      break;
+    case 'sea-sample':
+      if (values['--out'] === undefined) throw usageError('--out is required');
+      code = seaCommand(() => sampleSea(root, path.resolve(values['--out'])), { out: path.resolve(values['--out']) });
+      break;
+    case 'sea-set':
+      if (values['--candidate'] === undefined) throw usageError('--candidate is required');
+      code = seaCommand(() => setSea(root, path.resolve(values['--candidate'])));
       break;
     case 'report':
       code = reportCommand(root, values['--placed'], values['--ask']);

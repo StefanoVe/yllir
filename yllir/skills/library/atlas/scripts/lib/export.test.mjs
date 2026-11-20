@@ -214,35 +214,42 @@ function seaCampaign(isLand) {
   return root;
 }
 
-test('a big sea area gives a sea texture in the site and in the page data', () => {
-  // Land on the left 40 columns; the sea is 80 columns wide and 90 high, so the largest sea square is 80x80.
+test('a sea.png in the atlas folder is copied to the site and sized to a third of the map width', () => {
   const root = seaCampaign((x) => x < 40);
+  writePngFile(path.join(root, 'Atlas', 'sea.png'), newImage(256, 256, [30, 70, 110, 255]));
   for (const audience of ['master', 'players']) {
     const result = exportAtlas(root, { audience });
     assert.equal(result.ok, true, JSON.stringify(result.problems));
     const dir = path.join(root, result.dir);
-    assert.equal(fs.existsSync(path.join(dir, 'assets', 'sea.png')), true, `${audience}: sea.png is written`);
+    assert.equal(fs.existsSync(path.join(dir, 'assets', 'sea.png')), true, `${audience}: sea.png is copied`);
+    assert.deepEqual(fs.readFileSync(path.join(dir, 'assets', 'sea.png')), fs.readFileSync(path.join(root, 'Atlas', 'sea.png')));
     const data = dataOf(dir);
     assert.equal(data.sea.file, 'assets/sea.png');
-    assert.equal(data.sea.width, 160, 'the tile is 2 x 80 canvas pixels');
-    assert.equal(data.sea.height, 160);
+    assert.equal(data.sea.width, Math.round(W / 3));
+    assert.equal(data.sea.height, Math.round(W / 3));
   }
 });
 
-test('a picture with no big sea area gets sea: null and no sea.png', () => {
-  // All land, then a sea strip of 20 columns (smaller than the 32 needed).
-  for (const isLand of [() => true, (x) => x < 100]) {
-    const root = seaCampaign(isLand);
-    const result = exportAtlas(root, { audience: 'master' });
-    assert.equal(result.ok, true, JSON.stringify(result.problems));
-    const dir = path.join(root, result.dir);
-    assert.equal(dataOf(dir).sea, null);
-    assert.equal(fs.existsSync(path.join(dir, 'assets', 'sea.png')), false);
-  }
+test('no sea.png in the atlas folder gives sea: null and no assets/sea.png', () => {
+  const root = seaCampaign((x) => x < 40);
+  const result = exportAtlas(root, { audience: 'master' });
+  assert.equal(result.ok, true, JSON.stringify(result.problems));
+  const dir = path.join(root, result.dir);
+  assert.equal(dataOf(dir).sea, null);
+  assert.equal(fs.existsSync(path.join(dir, 'assets', 'sea.png')), false);
+});
+
+test('a sea.png that is not a PNG refuses the export with bad-picture', () => {
+  const root = seaCampaign((x) => x < 40);
+  fs.writeFileSync(path.join(root, 'Atlas', 'sea.png'), 'not a picture');
+  const result = exportAtlas(root, { audience: 'master' });
+  assert.equal(result.ok, false);
+  assert.equal(result.problems[0].code, 'bad-picture');
 });
 
 test('the sea texture is the same bytes on two exports', () => {
   const root = seaCampaign((x) => x < 40);
+  writePngFile(path.join(root, 'Atlas', 'sea.png'), newImage(64, 64, [30, 70, 110, 255]));
   const a = exportAtlas(root, { audience: 'master' });
   const first = fs.readFileSync(path.join(root, a.dir, 'assets', 'sea.png'));
   const b = exportAtlas(root, { audience: 'master' });

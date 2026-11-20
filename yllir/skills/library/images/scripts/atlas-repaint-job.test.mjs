@@ -17,6 +17,7 @@ import {
   REPAINT_WRAPPER,
   repaintJobDir,
   runRepaint,
+  SEA_WRAPPER,
 } from './atlas-repaint-job.mjs';
 import { PNG_SIGNATURE } from './lib/png-signature.mjs';
 
@@ -114,6 +115,24 @@ test('a crop prompt names the attached reference, a base prompt names the aspect
   assert.ok(base.includes('There is no reference image'));
   assert.ok(base.includes('1024x768'));
   assert.equal(base.includes('A reference image is attached'), false);
+});
+
+test('a sea prompt is the sea wrapper, says whether a reference is attached, and ends with the request', () => {
+  const withRef = buildRepaintPrompt({ mode: 'sea', promptText: PROMPT_TEXT, styleId: 'fantasy-color', width: 1024, height: 1024, hasInput: true });
+  const noRef = buildRepaintPrompt({ mode: 'sea', promptText: PROMPT_TEXT, styleId: 'fantasy-color', width: 1024, height: 1024 });
+  for (const prompt of [withRef, noRef]) {
+    assert.ok(prompt.startsWith('TASK:\n'));
+    assert.ok(prompt.includes('top-down texture of open sea water'));
+    assert.ok(prompt.includes('in the style: colourful hand-painted fantasy map.'));
+    assert.equal(prompt.includes('{STYLE}'), false);
+    assert.equal(prompt.includes('{FRAME}'), false);
+    assert.ok(prompt.endsWith(`REQUEST:\n${PROMPT_TEXT}`));
+  }
+  assert.ok(withRef.includes('A reference image is attached') && withRef.includes('Match its water colour'));
+  assert.equal(withRef.includes('There is no reference image'), false);
+  assert.ok(noRef.includes('There is no reference image'));
+  assert.equal(noRef.includes('A reference image is attached'), false);
+  assert.ok(SEA_WRAPPER.includes('{STYLE}') && SEA_WRAPPER.includes('{FRAME}'));
 });
 
 test('the styles are the three descriptions of the earlier style table, and an unknown style has no prompt', () => {
@@ -245,6 +264,47 @@ test('a crop input that is not a PNG is refused before any run', async () => {
   assert.deepEqual(calls, []);
 });
 
+test('a sea repaint without input has no input picture and uses the given square size', async () => {
+  const dir = tempDir();
+  const out = path.join(dir, 'sea.png');
+  const jobDir = repaintJobDir(out);
+  const { runner, calls } = fakeRunner();
+
+  const result = await runRepaint({
+    mode: 'sea', promptText: PROMPT_TEXT, styleId: 'fantasy-color', size: { width: 1024, height: 1024 }, outPath: out, jobDir, runner,
+  });
+
+  assert.deepEqual(result, { ok: true });
+  assert.deepEqual(calls, [jobDir]);
+  const job = JSON.parse(fs.readFileSync(path.join(jobDir, 'job.json'), 'utf8'));
+  assert.equal(job.input, null);
+  assert.equal(job.width, 1024);
+  assert.equal(job.height, 1024);
+  assert.equal(fs.existsSync(path.join(jobDir, 'input.png')), false);
+  assert.ok(fs.existsSync(out));
+});
+
+test('a sea repaint with input sends the reference but keeps the requested output size', async () => {
+  const dir = tempDir();
+  const input = writeInput(dir, 640, 480);
+  const out = path.join(dir, 'sea.png');
+  const jobDir = repaintJobDir(out);
+  const { runner } = fakeRunner();
+
+  const result = await runRepaint({
+    mode: 'sea', promptText: PROMPT_TEXT, styleId: 'fantasy-color', inputPath: input,
+    size: { width: 1024, height: 1024 }, outPath: out, jobDir, runner,
+  });
+
+  assert.deepEqual(result, { ok: true });
+  const job = JSON.parse(fs.readFileSync(path.join(jobDir, 'job.json'), 'utf8'));
+  assert.equal(job.input, 'input.png');
+  assert.equal(job.width, 1024);
+  assert.equal(job.height, 1024);
+  assert.ok(fs.readFileSync(path.join(jobDir, 'input.png')).equals(pngBytes(640, 480)));
+  assert.ok(job.prompt.includes('A reference image is attached'));
+});
+
 // ---- the command line ----
 
 test('--dry-run prints the final prompt and the command, and writes nothing', () => {
@@ -334,6 +394,45 @@ process.exit(0);
   assert.equal(argv[i + 1], path.join(dir, 'out', 'repaint-job', 'input.png'));
   assert.equal(argv[i + 2], '--');
   assert.ok(argv[i + 3].startsWith(buildRepaintPrompt({ mode: 'crop', promptText: PROMPT_TEXT, styleId: 'antique-parchment', width: 640, height: 480 })));
+});
+
+test('--dry-run of a sea repaint without input prints the sea wrapper and the request, with no -i', () => {
+  const dir = tempDir();
+  const out = path.join(dir, 'sea.png');
+  const result = cli(['--mode', 'sea', '--prompt-file', writePrompt(dir), '--out', out, '--style', 'dark-fantasy', '--dry-run']);
+
+  assert.equal(result.status, 0, result.stderr);
+  const finalPrompt = buildRepaintPrompt({ mode: 'sea', promptText: PROMPT_TEXT, styleId: 'dark-fantasy', width: 1024, height: 1024 });
+  assert.ok(result.stdout.startsWith(`prompt: ${finalPrompt}\ncommand: codex exec `), result.stdout);
+  assert.ok(result.stdout.includes('top-down texture of open sea water'));
+  assert.ok(result.stdout.includes(`REQUEST:\n${PROMPT_TEXT}`));
+  assert.ok(result.stdout.includes('There is no reference image'));
+  const commandLine = result.stdout.split('\n').at(-3);
+  assert.equal(commandLine.includes(' -i '), false, commandLine);
+  assert.equal(fs.existsSync(path.join(dir, 'repaint-job')), false);
+  assert.equal(fs.existsSync(out), false);
+});
+
+test('--dry-run of a sea repaint with --input sends the reference, like crop does', () => {
+  const dir = tempDir();
+  const result = cli([
+    '--mode', 'sea', '--prompt-file', writePrompt(dir), '--input', writeInput(dir, 640, 480), '--out', path.join(dir, 'sea.png'), '--dry-run',
+  ]);
+
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stdout.includes('A reference image is attached'), result.stdout);
+  const commandLine = result.stdout.split('\n').at(-3);
+  assert.ok(commandLine.includes(` -i ${path.join(dir, 'repaint-job', 'input.png')} -- `), commandLine);
+});
+
+test('a sea tile must be square: a non-square --size is a usage error with exit 2', () => {
+  const dir = tempDir();
+  const out = path.join(dir, 'sea.png');
+  const result = cli(['--mode', 'sea', '--prompt-file', writePrompt(dir), '--out', out, '--size', '1024x768', '--dry-run']);
+
+  assert.equal(result.status, 2, result.stdout);
+  assert.ok(result.stderr.includes('needs a square --size'), result.stderr);
+  assert.equal(fs.existsSync(out), false);
 });
 
 test('a missing codex binary is a failed result with exit 1', () => {

@@ -484,3 +484,23 @@ test('a water point outside the picture is refused; a malformed --water-at is a 
   assert.equal(run('land', root, '--water-at', '70').code, 2);
   assert.equal(run('land', root, '--water-at', 'a,b').code, 2);
 });
+
+test('sea-sample and sea-set are accepted commands', () => {
+  const root = standardCampaign();
+  initWithBase(root);
+  const sample = path.join(WORK, 'sea-sample.png');
+  const sampled = run('sea-sample', root, '--out', sample);
+  assert.equal(sampled.code, 0, sampled.stdout);
+  assert.equal(lastLine(sampled), 'exit: 0');
+  assert.equal(json(sampled).ok, true);
+  const [sampledWidth] = json(sampled).size.split('x');
+  assert.equal(decodePng(fs.readFileSync(sample)).width, Number(sampledWidth));
+
+  const candidate = path.join(WORK, 'sea-candidate.png');
+  fs.writeFileSync(candidate, encodePngRgba(newImage(200, 150, [40, 90, 120, 255])));
+  const set = run('sea-set', root, '--candidate', candidate);
+  assert.equal(set.code, 0, set.stdout);
+  assert.equal(lastLine(set), 'exit: 0');
+  assert.equal(fs.existsSync(path.join(root, 'Atlas', 'sea.png')), true);
+  assert.equal(run('sea-set', root).code, 2, '--candidate is required');
+});

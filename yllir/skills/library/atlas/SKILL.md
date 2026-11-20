@@ -1,6 +1,6 @@
 ---
 name: atlas
-description: Library skill. Creates and keeps the atlas of the campaign, a map of the world or of a part of it, or a plan of a city or district, at any scale, as one painted base picture plus data (land and sea, labels, territories, places): it starts from a picture of the master, from the sources, or from one generation by the image service, changes the painted parts only through zoomed crops, and never changes approved land unless the master asks. Invoked by the entry skill when the master asks for the atlas or a map of the world or of a region, by the master screen's atlas button, and by build-world or write-document with the argument "update" after a batch that added places.
+description: Library skill. Creates and keeps the atlas of the campaign, a map of the world or of a part of it, or a plan of a city or district, at any scale, as one painted base picture plus data (land and sea, labels, territories, places), and the sea around the map: it starts from a picture of the master, from the sources, or from one generation by the image service, changes the painted parts only through zoomed crops, and never changes approved land unless the master asks. Invoked by the entry skill when the master asks for the atlas or a map of the world or of a region, by the master screen's atlas button, and by build-world or write-document with the argument "update" after a batch that added places.
 user-invocable: false
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" *), Bash(node */skills/library/atlas/scripts/atlas.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/atlas-repaint-job.mjs" *), Bash(node */skills/library/images/scripts/atlas-repaint-job.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-select.mjs" *), Bash(node */skills/library/images/scripts/image-select.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node */scripts/versions.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/rasterizer-setup.mjs" *), Bash(node */skills/library/atlas/scripts/rasterizer-setup.mjs *), Read, Write, Glob, Grep, WebSearch, WebFetch
 ---
@@ -39,7 +39,7 @@ Used in Step 4 (c) and Step 6. The atlas picture leaves the campaign only throug
 
 ## Step 0: mode
 
-The argument decides. `update` means the update mode, Step 8. Anything else, or nothing, means the normal flow from Step 1.
+The argument decides. `update` means the update mode, Step 8. `sea` means the sea mode, Step 11: the sea around the map is made, redone or changed. Anything else, or nothing, means the normal flow from Step 1.
 
 ## Step 1: state
 
@@ -49,6 +49,7 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" status .
 ```
 Read `exists`, `folder`, `layers`, `problems` and `pending`. Take the first case that matches:
 - The master asks for another look: Step 9.
+- The master asks about the sea around the map, asks why the map ends in a flat colour, or asks to redo the sea: Step 11.
 - The atlas exists and the master only asks to see it: run `render . --open` (outside the master screen only, rule 10) and say one sentence. Inside the master screen, say in one sentence that it is in the section Atlante, and stop.
   ```
   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render . --open
@@ -227,6 +228,7 @@ Use this for a change to the picture: a zone repainted, a coast moved on purpose
    ```
    node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "Atlante: approvato."
    ```
+   Then go on with Step 11 (the sea around the map).
 
 ## Step 8: update mode
 
@@ -290,6 +292,40 @@ Say nothing about the players' version unless asked. When asked, render it (outs
 ```
 node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render . --audience players --open
 ```
+
+## Step 11: the sea around the map
+
+The sea around the map is the water the site shows beyond the edge of the base picture. The image service makes it from a sample of the real open sea of the base, and the result is stored in the atlas folder. Without it the site shows a flat colour.
+
+It runs in three cases: at the end of a creation, after the whole atlas is approved in Step 7; when the master asks to redo or change the sea around the map; when the master asks why the map ends in a flat colour (then say in one sentence what is missing, and offer to make it). In a creation the master is not asked to approve the sea separately. On a request to redo it, show the render and ask whether it is fine.
+
+1. **Reference.** Take a sample of the real open sea of the base:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" sea-sample . --out .campaign/cache/atlas/work/sea-ref.png
+   ```
+   Read it with the Read tool. Exit `1` with the error `no-open-sea`: the base has no open sea. Then skip the reference and run point 4 without `--input`.
+2. **Prompt.** Write `.campaign/state/atlas/prompt-sea.txt` with the Write tool. It is one short English text: the water of this map in words (colour, calm or rough, climate, from the public geography), the style in one line, and the line «No land, no boat, no text, no frame.» Public text only: never a name, never master-only text.
+3. **Consent.** Run the consent procedure of «Outside image service». The question is asked once: after a yes, the procedure no longer asks.
+4. **Generate.** Run:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/atlas-repaint-job.mjs" --mode sea --prompt-file .campaign/state/atlas/prompt-sea.txt --out .campaign/cache/atlas/work/sea-1.png --input .campaign/cache/atlas/work/sea-ref.png
+   ```
+   Read the `result` line. `result: ok` goes on; anything else: «When something fails».
+5. **Check.** Read the picture with the Read tool, and the reference too. Accept it only when it is plain water with no land, boat, text, frame, vignette or strong feature, and its colour is close to the map's own sea as the reference shows it. Otherwise rewrite `prompt-sea.txt` as a whole new text (never corrections on top of the last text), and run point 4 again with the next `--out` number (`sea-2.png`, then `sea-3.png`). At most 3 attempts. After the third, leave the flat colour and say in one sentence: «Il mare attorno alla carta non è venuto bene: per ora resta un colore piatto.» Then stop.
+6. **Set.** On an accepted picture, store it as the sea of the atlas site, with the number of that picture:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" sea-set . --candidate .campaign/cache/atlas/work/sea-1.png
+   ```
+   Exit `1` with `bad-sea-size` or `not a PNG`: the picture is not usable. It counts as a failed attempt: go back to point 5.
+7. **Show.** Render for the master, and Read the picture of the render with the Read tool before showing it:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render . --open
+   ```
+   Outside the master screen, that is the line above; inside the master screen, `render .` without `--open` (rule 10). In a creation the sea belongs to the atlas the master already approved: say in one sentence «Ho aggiunto il mare attorno alla carta.» On a request to redo it, ask: «Ecco il mare attorno alla carta. Ti piace, o vuoi cambiare qualcosa?»
+8. **Save.** Save a version, in the campaign language:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "Atlante: mare attorno alla carta."
+   ```
 
 ## When something fails
 
