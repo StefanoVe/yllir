@@ -56,6 +56,13 @@ class FakeNode {
     this.children.push(...nodes);
   }
 
+  insertBefore(node, ref) {
+    const at = this.children.indexOf(ref);
+    if (at < 0) this.children.push(node);
+    else this.children.splice(at, 0, node);
+    return node;
+  }
+
   replaceChildren() {
     this.children = [];
   }
@@ -196,6 +203,15 @@ test('viewer sets the sea texture on the map when the data has one, and nothing 
     assert.match(map.style.backgroundImage, /assets\/sea\.png/);
     assert.match(map.style.backgroundSize, /^\d+(\.\d+)?px \d+(\.\d+)?px$/);
     assert.match(map.style.backgroundPosition, /^-?\d+(\.\d+)?px -?\d+(\.\d+)?px$/);
+    // The second sea layer: a child of the map, drawn under the stage, with its own size.
+    const layers = map.children.filter((n) => n.classes.has('sea-layer'));
+    assert.equal(layers.length, 1);
+    const sea2 = layers[0];
+    assert.match(sea2.style.backgroundImage, /assets\/sea\.png/);
+    assert.match(sea2.style.backgroundSize, /^\d+(\.\d+)?px \d+(\.\d+)?px$/);
+    assert.notEqual(sea2.style.backgroundSize, map.style.backgroundSize);
+    const stage = globalThis.document.getElementById('stage');
+    assert.ok(map.children.indexOf(sea2) < map.children.indexOf(stage), 'sea layer must sit before the stage');
   } finally {
     removeFakeDom();
   }
@@ -207,6 +223,7 @@ test('viewer sets the sea texture on the map when the data has one, and nothing 
     const map = globalThis.document.getElementById('map');
     assert.equal(map.style.backgroundImage, undefined);
     assert.equal(map.style.backgroundSize, undefined);
+    assert.equal(map.children.filter((n) => n.classes.has('sea-layer')).length, 0);
   } finally {
     removeFakeDom();
   }

@@ -33,7 +33,15 @@
   stage.style.width = `${W}px`;
   stage.style.height = `${H}px`;
   // The sea texture outside the painted map: the picture is set once, its size and position follow the view in render().
-  if (data.sea) map.style.backgroundImage = `url("${data.sea.file}")`;
+  // A second layer with another period, drawn over the first and under the stage, breaks the visible grid of the tile.
+  let seaLayer = null;
+  if (data.sea) {
+    const seaUrl = `url("${data.sea.file}")`;
+    map.style.backgroundImage = seaUrl;
+    seaLayer = el('div', 'sea-layer');
+    seaLayer.style.backgroundImage = seaUrl;
+    map.insertBefore(seaLayer, stage);
+  }
 
   // ---- Helpers --------------------------------------------------------------------------------
 
@@ -68,6 +76,11 @@
     if (data.sea) {
       map.style.backgroundSize = `${data.sea.width * s}px ${data.sea.height * s}px`;
       map.style.backgroundPosition = `${view.x}px ${view.y}px`;
+      // Layer 2 has its own period (0.61 of layer 1) and stays fixed to the map while panning.
+      const w = data.sea.width * s;
+      const h = data.sea.height * s;
+      seaLayer.style.backgroundSize = `${w * 0.61}px ${h * 0.61}px`;
+      seaLayer.style.backgroundPosition = `${view.x + 0.37 * w}px ${view.y + 0.23 * h}px`;
     }
     // Markers keep their size at every zoom: only their position follows the map.
     for (const marker of markers) {

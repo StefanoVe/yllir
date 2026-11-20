@@ -345,9 +345,14 @@ function prepare(root, { audience, pluginRoot }) {
     labelSvg.push(textElement({ text: item.text, x: item.x, y: item.y, size: item.size, family: style.fonts.feature, fill: L.featureFill, halo }));
   }
 
+  // With a sea texture, the base picture fades out at its four edges so it blends into the sea behind it.
+  const baseImage = `<image href="assets/base.png" x="0" y="0" width="${width}" height="${height}"/>`;
   const svg = [
     `<svg id="overlay" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">`,
-    `<image href="assets/base.png" x="0" y="0" width="${width}" height="${height}"/>`,
+    ...(seaPath === null ? [] : ['<defs>', ...featherDefs(width, height), '</defs>']),
+    seaPath === null
+      ? baseImage
+      : `<g mask="url(#feather-mx)"><g mask="url(#feather-my)">${baseImage}</g></g>`,
     '<g data-layer="borders">',
     ...borders,
     '</g>',
@@ -375,6 +380,32 @@ function prepare(root, { audience, pluginRoot }) {
       stats: { places: places.length, labels: labelSvg.length, territories: territoriesDrawn },
     },
   };
+}
+
+/** Width of the feathered edge of the base picture, as a fraction of its size on each axis. */
+const FEATHER = 0.015;
+
+/** The gradients and masks that feather the base picture's edges (horizontal and vertical), as SVG lines for a <defs> element. */
+function featherDefs(width, height) {
+  const edge = (axis) => {
+    const x2 = axis === 'x' ? 1 : 0;
+    const y2 = axis === 'y' ? 1 : 0;
+    const stop = (offset, opacity) => `<stop offset="${offset}" stop-color="#fff" stop-opacity="${opacity}"/>`;
+    return [
+      `<linearGradient id="feather-${axis}" x1="0" y1="0" x2="${x2}" y2="${y2}">`,
+      stop(0, 0),
+      stop(FEATHER, 1),
+      stop(1 - FEATHER, 1),
+      stop(1, 0),
+      '</linearGradient>',
+    ];
+  };
+  const mask = (axis) => [
+    `<mask id="feather-m${axis}" maskUnits="userSpaceOnUse" x="0" y="0" width="${width}" height="${height}">`,
+    `<rect x="0" y="0" width="${width}" height="${height}" fill="url(#feather-${axis})"/>`,
+    '</mask>',
+  ];
+  return [...edge('x'), ...edge('y'), ...mask('x'), ...mask('y')];
 }
 
 /** The reserved lines of every place sheet of the labels, master-only items included (they must not leak either). */

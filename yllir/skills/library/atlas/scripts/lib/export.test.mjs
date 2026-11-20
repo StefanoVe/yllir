@@ -256,3 +256,20 @@ test('the sea texture is the same bytes on two exports', () => {
   const second = fs.readFileSync(path.join(root, b.dir, 'assets', 'sea.png'));
   assert.equal(first.equals(second), true);
 });
+
+test('with a sea.png the overlay feathers the base picture into the sea with two masks', () => {
+  const root = seaCampaign((x) => x < 40);
+  writePngFile(path.join(root, 'Atlas', 'sea.png'), newImage(64, 64, [30, 70, 110, 255]));
+  const { svg } = buildOverlaySvg(root, { audience: 'master' });
+  assert.ok(svg.includes('feather-mx'), 'the horizontal feather mask is defined');
+  assert.ok(svg.includes('feather-my'), 'the vertical feather mask is defined');
+  assert.match(svg, /<g mask="url\(#feather-mx\)"><g mask="url\(#feather-my\)"><image href="assets\/base\.png"/);
+});
+
+test('without a sea.png the overlay has no feather masks and the base is not wrapped', () => {
+  const root = seaCampaign((x) => x < 40);
+  const { svg } = buildOverlaySvg(root, { audience: 'master' });
+  assert.equal(svg.includes('feather'), false);
+  assert.equal(svg.includes('mask='), false);
+  assert.ok(svg.includes('<image href="assets/base.png"'));
+});

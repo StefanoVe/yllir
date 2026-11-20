@@ -1,5 +1,6 @@
 /* Viewer of the atlas site: parchment and ink, to match the painted map. Phone width collapses the panels to icon
-   buttons. Outside the painted map a sea texture repeats when the export has one; the flat colour is the fallback.
+   buttons. Outside the painted map a sea texture repeats in two layers of different periods when the export has one;
+   the flat colour is the fallback.
    The markers take their colours and size from the custom properties below, so a theme can change them. */
 
 @font-face {
@@ -52,6 +53,15 @@ body {
 
 #map.dragging {
   cursor: grabbing;
+}
+
+/* The second sea layer: same texture, another period, drawn between the map and the stage. */
+.sea-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-repeat: repeat;
 }
 
 #stage {
