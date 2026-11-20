@@ -1,0 +1,3 @@
+interface:
+  display_name: "Issues"
+  short_description: "Triage, resolve, comment on and update the state of Yllir GitHub issues"
