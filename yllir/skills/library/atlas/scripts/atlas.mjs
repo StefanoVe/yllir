@@ -419,7 +419,11 @@ function initCommand(root, scopeFile, options) {
   return 0;
 }
 
-/** Puts a picture on base.png (only when the base and the land are not locked) and rebuilds land.png. */
+/**
+ * Puts a picture on base.png (only when the base and the land are not locked) and rebuilds land.png
+ * at the picture's size, so a picture of a new size is accepted. All or nothing: a refused base-set
+ * changes nothing, because base.png, land.png and atlas.json are restored to what they were.
+ */
 function baseSetCommand(root, imageArg, options) {
   const dir = atlasDir(root);
   if (dir === null) return refuse({}, [{ code: 'no-atlas', file: 'campaign.yaml', path: 'structure', message: 'campaign.yaml declares no atlas folder' }]);
@@ -447,6 +451,10 @@ function baseSetCommand(root, imageArg, options) {
   const problems = prefixProblems(folder, manifestProblems(next));
   if (problems.length > 0) return refuse({}, problems);
 
+  const kept = ['base.png', 'land.png', 'atlas.json'].map((name) => {
+    const file = path.join(dir, name);
+    return { file, bytes: fs.existsSync(file) ? fs.readFileSync(file) : null };
+  });
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'base.png'), picture.png);
   writeJson(path.join(dir, 'atlas.json'), next);
@@ -456,7 +464,13 @@ function baseSetCommand(root, imageArg, options) {
     waterPoints: options.waterPoints,
     clearWaters: options.clearWaters,
   });
-  if (!land.ok) return refuse({}, [{ code: land.code, file: relative, path: '', message: land.message }]);
+  if (!land.ok) {
+    for (const { file, bytes } of kept) {
+      if (bytes === null) fs.rmSync(file, { force: true });
+      else fs.writeFileSync(file, bytes);
+    }
+    return refuse({}, [{ code: land.code, file: relative, path: '', message: land.message }]);
+  }
   print({
     ok: true,
     base: { file: 'base.png', width: picture.width, height: picture.height, sha256: picture.sha256 },

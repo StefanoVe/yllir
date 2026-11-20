@@ -463,9 +463,12 @@ function writeLandFromImage(state, image, { box = null, sea }) {
     const read = readImage(state.landPath);
     if (read.error) return read.error;
     if (read.image.width !== image.width || read.image.height !== image.height) {
-      return fail('size-mismatch', 'land.png and the base picture differ in size');
+      // A partial rebuild needs the old mask of the same size; a whole rebuild does not, so it
+      // ignores the old land.png and builds the full mask from the image.
+      if (box) return fail('size-mismatch', 'land.png and the base picture differ in size');
+    } else {
+      existing = imageToMask(read.image, LAND_THRESHOLD);
     }
-    existing = imageToMask(read.image, LAND_THRESHOLD);
   }
   if (box && !existing) box = null;
   const mask = buildLandMask(image, sea, existing, box);

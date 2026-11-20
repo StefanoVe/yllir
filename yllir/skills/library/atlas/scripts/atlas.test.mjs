@@ -313,6 +313,52 @@ test('base-set is refused when the land is locked', () => {
   assert.equal(json(result).code, 'base-locked');
 });
 
+/** A 200x150 picture: sea, with one land block at 40..160 x 30..120. */
+function biggerScene() {
+  const image = newImage(200, 150, [...SEA, 255]);
+  paint(image, 40, 30, 160, 120, LAND);
+  return image;
+}
+
+test('base-set with a picture of a different size rebuilds land.png at the new size', () => {
+  const root = standardCampaign();
+  initWithBase(root);
+  const set = run('base-set', root, basePicture(biggerScene()), '--sea-color', SEA_HEX);
+  assert.equal(set.code, 0, set.stdout);
+  const land = decodePng(fs.readFileSync(path.join(root, 'Atlas', 'land.png')));
+  const base = decodePng(fs.readFileSync(path.join(root, 'Atlas', 'base.png')));
+  assert.equal(land.width, 200);
+  assert.equal(land.height, 150);
+  assert.equal(base.width, 200);
+  assert.equal(base.height, 150);
+  const manifest = JSON.parse(fs.readFileSync(path.join(root, 'Atlas', 'atlas.json'), 'utf8'));
+  assert.deepEqual(manifest.canvas, { width: 200, height: 150 });
+  const rebuilt = run('land', root, '--sea-color', SEA_HEX);
+  assert.equal(rebuilt.code, 0, rebuilt.stdout);
+});
+
+test('land rebuilds a land.png of the wrong size when no box is given', () => {
+  const root = standardCampaign();
+  initWithBase(root);
+  fs.writeFileSync(path.join(root, 'Atlas', 'base.png'), encodePngRgba(biggerScene()));
+  const result = run('land', root, '--sea-color', SEA_HEX);
+  assert.equal(result.code, 0, result.stdout);
+  const land = decodePng(fs.readFileSync(path.join(root, 'Atlas', 'land.png')));
+  assert.equal(land.width, 200);
+  assert.equal(land.height, 150);
+});
+
+test('a failed base-set leaves base.png, land.png and atlas.json unchanged', () => {
+  const root = standardCampaign();
+  initWithBase(root);
+  const files = ['base.png', 'land.png', 'atlas.json'].map((name) => path.join(root, 'Atlas', name));
+  const before = files.map((file) => fs.readFileSync(file));
+  const result = run('base-set', root, basePicture(biggerScene()), '--sea-color', 'nothex');
+  assert.equal(result.code, 1);
+  const after = files.map((file) => fs.readFileSync(file));
+  files.forEach((_, i) => assert.deepEqual(after[i], before[i]));
+});
+
 test('lock release needs --unlock and clears the flag', () => {
   const root = standardCampaign();
   initWithBase(root);
