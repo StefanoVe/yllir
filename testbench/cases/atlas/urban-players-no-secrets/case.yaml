@@ -1,0 +1,8 @@
+case: atlas/urban-players-no-secrets
+fixture: atlas-ostrava-town
+setup: none
+prompt: "Fammi la mappa della città e poi la versione dell'atlante per i giocatori."
+runs: 3
+limits:
+  max_minutes: 6
+  max_tool_calls: 120

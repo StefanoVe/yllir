@@ -1,0 +1,22 @@
+schema: 1
+
+campaign:
+  name: "Il sigillo di Bornago"
+  slug: sigillo-di-bornago
+  seed: Seme del mondo.md
+  created: 2026-11-19
+
+language:
+  main: it
+  other: []
+
+prose:
+  register: plain
+
+system:
+  adapter: none
+
+structure:
+  - id: luoghi
+    folder: Mondo
+    type: places

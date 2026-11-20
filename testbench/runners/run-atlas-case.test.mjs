@@ -16,6 +16,7 @@ import {
   loadCase,
   setupCopy,
   sheetTitles,
+  validateKey,
 } from './run-atlas-case.mjs';
 import { readAtlas, validateAtlas } from '../../yllir/skills/library/atlas/scripts/lib/model.mjs';
 import { buildWorldIndex } from '../../yllir/scripts/lib/world-graph.mjs';
@@ -23,8 +24,17 @@ import { listVersions, saveVersion } from '../../yllir/scripts/lib/versions.mjs'
 
 const CASES = path.join(REPO_ROOT, 'testbench', 'cases', 'atlas');
 const FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'atlas-morvalle', 'campaign');
+const URBAN_FIXTURE = path.join(REPO_ROOT, 'testbench', 'fixtures', 'atlas-ostrava-town', 'campaign');
 const ATLAS_CLI = path.join(REPO_ROOT, 'yllir', 'skills', 'library', 'atlas', 'scripts', 'atlas.mjs');
-const NAMES = ['create-asks', 'update-keeps-land', 'players-no-secrets'];
+const NAMES = [
+  'create-asks',
+  'update-keeps-land',
+  'players-no-secrets',
+  'urban-scale',
+  'urban-building-placed',
+  'urban-players-no-secrets',
+];
+const SECRET_SENTENCE = "Sotto l'altare di San Ottavio dorme il sigillo di Bornago, nella cripta chiamata Sala Nera.";
 const GOOD_ANSWER = 'I documenti non dicono dove si trova il Lago Grigio rispetto alla piazza. Il lago è a nord o a sud del borgo?';
 
 const kept = [];
@@ -239,4 +249,191 @@ test('the helpers: a question ends the text, and forbidden words match as whole 
   assert.equal(endsWithQuestion(null), false);
   assert.deepEqual(forbiddenIn('Il locked è un lock.', ['lock', 'seed']), ['lock']);
   assert.deepEqual(forbiddenIn('Il seme della valle.', ['seed']), []);
+});
+
+// ---------------------------------------------------------------- urban cases
+
+/** A setup copy of the urban fixture (no atlas yet), kept for the cleanup. */
+function setupUrban() {
+  const made = setupCopy({ fixtureDir: URBAN_FIXTURE, setup: 'none' });
+  kept.push(made.tmp);
+  return made;
+}
+
+/** Builds an atlas of the given scope through the atlas CLI init (a refused init throws). */
+function initScope(copy, scope) {
+  const file = path.join(path.dirname(copy), `scope-${scope.kind}.json`);
+  fs.writeFileSync(file, JSON.stringify({ scope }));
+  execFileSync(process.execPath, [ATLAS_CLI, 'init', copy, file], { encoding: 'utf8' });
+}
+
+/** Writes an atlas layer file directly (the grader reads the files; no write rule applies to the fake). */
+function writeAtlasFile(copy, fileName, value) {
+  const dir = path.join(copy, 'Atlante');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, fileName), JSON.stringify(value, null, 2));
+}
+
+const SETTLEMENT = { kind: 'settlement', places: ['il-gatto-borgo-vecchio'], note: 'Il borgo di Bornago.' };
+const TAVERN = (id, kind = 'tavern') => ({
+  id, place: id, at: [300, 300], kind, provenance: 'agent-choice', visibility: 'public', sources: [],
+});
+
+test('validateKey accepts the urban kinds and their fields, and refuses a missing or mistyped one', () => {
+  assert.equal(caseOf('urban-building-placed').key.kind, 'urban-building');
+  assert.equal(caseOf('urban-players-no-secrets').key.kind, 'urban-players');
+  assert.equal(caseOf('urban-scale').key.expect_scope_kind, 'settlement');
+  assert.deepEqual(caseOf('urban-scale').key.forbidden_layer_files.length, 7);
+  const building = { kind: 'urban-building', place_id: 'a', homonym_id: 'b', building_kind: 'tavern', validate_problem: 'building-not-on-block' };
+  assert.equal(validateKey(building), building);
+  assert.throws(() => validateKey({ ...building, validate_problem: undefined }), /validate_problem missing/);
+  assert.throws(() => validateKey({ kind: 'urban-players', secret_sentence: 'x' }), /master_building_ids missing/);
+  assert.throws(() => validateKey({ kind: 'urban-players', secret_sentence: 'x', master_building_ids: 'rocca' }), /must be a list/);
+  assert.throws(() => validateKey({ kind: 'create-asks', forbidden_words: [], expect_scope_kind: 5 }), /must be a string/);
+  assert.throws(() => validateKey({ kind: 'create-asks', forbidden_words: [], forbidden_layer_files: 'terrain.json' }), /must be a list/);
+  assert.throws(() => validateKey({ kind: 'nope' }), /kind must be one of/);
+});
+
+test('every atlas case loads with its key, the urban ones included', () => {
+  for (const name of NAMES) assert.ok(loadCase(path.join(CASES, name)).key.kind, name);
+});
+
+test('A5 and A6 are graded only when the key sets them, and pass trivially with no atlas', () => {
+  const made = setupUrban();
+  const key = caseOf('urban-scale').key;
+  const graded = gradeAtlasRun({ key, copy: made.copy, report: GOOD_ANSWER, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.deepEqual(Object.keys(graded.checks), ['A1', 'A2', 'A3', 'A4', 'A5', 'A6']);
+  assert.equal(graded.checks.A5, true);
+  assert.equal(graded.checks.A6, true);
+  assert.equal(graded.pass, true, graded.failures.join('; '));
+});
+
+test('A5 passes a settlement manifest and fails a region one', () => {
+  const settlement = setupUrban();
+  initScope(settlement.copy, SETTLEMENT);
+  const key = caseOf('urban-scale').key;
+  const good = gradeAtlasRun({ key, copy: settlement.copy, report: GOOD_ANSWER, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(good.checks.A5, true);
+  const region = setup('land');
+  const bad = gradeAtlasRun({ key, copy: region.copy, report: GOOD_ANSWER, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(bad.checks.A5, false);
+  assert.ok(bad.failures.some((line) => line.startsWith('A5 ')));
+});
+
+test('A6 fails on a forbidden layer file of a settlement atlas and passes without it', () => {
+  const made = setupUrban();
+  initScope(made.copy, SETTLEMENT);
+  const key = caseOf('urban-scale').key;
+  const clean = gradeAtlasRun({ key, copy: made.copy, report: GOOD_ANSWER, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(clean.checks.A6, true);
+  writeAtlasFile(made.copy, 'places.json', { layer: 'places', constraints: [], features: [] });
+  const seeded = gradeAtlasRun({ key, copy: made.copy, report: GOOD_ANSWER, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(seeded.checks.A6, false);
+  assert.equal(seeded.checks.A5, true);
+  assert.ok(seeded.failures.some((line) => line.includes('places.json')));
+});
+
+test('urban-building: B1 and B2 pass when the tavern of Borgo Vecchio is placed on its own', () => {
+  const made = setupUrban();
+  initScope(made.copy, SETTLEMENT);
+  writeAtlasFile(made.copy, 'buildings.json', { layer: 'buildings', constraints: [], features: [TAVERN('il-gatto-borgo-vecchio')] });
+  const key = caseOf('urban-building-placed').key;
+  const graded = gradeAtlasRun({ key, copy: made.copy, report: null, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(graded.pass, true, graded.failures.join('; '));
+  assert.deepEqual(graded.checks, { B1: true, B2: true });
+});
+
+test('urban-building: B1 fails when the homonym of Porto is placed, or the kind is wrong', () => {
+  const key = caseOf('urban-building-placed').key;
+  const homonym = setupUrban();
+  initScope(homonym.copy, SETTLEMENT);
+  writeAtlasFile(homonym.copy, 'buildings.json', { layer: 'buildings', constraints: [], features: [TAVERN('il-gatto-porto')] });
+  const wrongPlace = gradeAtlasRun({ key, copy: homonym.copy, report: null, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(wrongPlace.checks.B1, false);
+  assert.ok(wrongPlace.failures.some((line) => line.startsWith('B1 ')));
+
+  const wrongKind = setupUrban();
+  initScope(wrongKind.copy, SETTLEMENT);
+  writeAtlasFile(wrongKind.copy, 'buildings.json', { layer: 'buildings', constraints: [], features: [TAVERN('il-gatto-borgo-vecchio', 'inn')] });
+  const kindGraded = gradeAtlasRun({ key, copy: wrongKind.copy, report: null, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(kindGraded.checks.B1, false);
+});
+
+test('urban-building: B2 fails when the tavern stands off every block, and B1 and B2 fail with no buildings layer', () => {
+  const key = caseOf('urban-building-placed').key;
+  const off = setupUrban();
+  initScope(off.copy, SETTLEMENT);
+  writeAtlasFile(off.copy, 'buildings.json', { layer: 'buildings', constraints: [], features: [TAVERN('il-gatto-borgo-vecchio')] });
+  writeAtlasFile(off.copy, 'blocks.json', {
+    layer: 'blocks',
+    constraints: [],
+    features: [{
+      id: 'blocco-lontano',
+      type: 'block',
+      polygon: [[1000, 1000], [1100, 1000], [1100, 1100], [1000, 1100]],
+      character: 'common',
+      lots: [],
+      visibility: 'public',
+      provenance: 'agent-choice',
+      sources: [],
+    }],
+  });
+  const graded = gradeAtlasRun({ key, copy: off.copy, report: null, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(graded.checks.B1, true);
+  assert.equal(graded.checks.B2, false);
+
+  const none = setupUrban();
+  initScope(none.copy, SETTLEMENT);
+  const empty = gradeAtlasRun({ key, copy: none.copy, report: null, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.deepEqual(empty.checks, { B1: false, B2: false });
+});
+
+/** Writes the players export of a copy by hand: the index page and the given extra text files. */
+function writePlayers(copy, { html, extra = {} }) {
+  const dir = path.join(copy, '.campaign', 'cache', 'atlas', 'players');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'index.html'), html);
+  for (const [name, text] of Object.entries(extra)) fs.writeFileSync(path.join(dir, name), text);
+}
+
+const PLAYERS_PAGE = '<html><body><h1>Bornago</h1><script type="application/json" id="atlas-data">{"features":[{"id":"il-gatto-borgo-vecchio"}]}</script></body></html>';
+
+test('urban-players: P1 to P3 pass on a players version with no master sentence and no master building', () => {
+  const made = setupUrban();
+  writePlayers(made.copy, { html: PLAYERS_PAGE, extra: { 'data.json': '{"features":[{"id":"tempio-di-san-ottavio"}]}' } });
+  const key = caseOf('urban-players-no-secrets').key;
+  const graded = gradeAtlasRun({ key, copy: made.copy, report: null, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(graded.pass, true, graded.failures.join('; '));
+  assert.deepEqual(graded.checks, { P1: true, P2: true, P3: true });
+});
+
+test('urban-players: P1 fails with no players version, and P2 and P3 are not checked', () => {
+  const made = setupUrban();
+  const key = caseOf('urban-players-no-secrets').key;
+  const graded = gradeAtlasRun({ key, copy: made.copy, report: null, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.deepEqual(graded.checks, { P1: false, P2: false, P3: false });
+});
+
+test('urban-players: P2 fails when the master sentence is in any text file of the export', () => {
+  const made = setupUrban();
+  writePlayers(made.copy, { html: PLAYERS_PAGE, extra: { 'notes.txt': `Nota: ${SECRET_SENTENCE}` } });
+  const key = caseOf('urban-players-no-secrets').key;
+  const graded = gradeAtlasRun({ key, copy: made.copy, report: null, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(graded.checks.P2, false);
+  assert.equal(graded.checks.P3, true);
+  assert.ok(graded.failures.some((line) => line.startsWith('P2 ')));
+});
+
+test('urban-players: P3 fails on the id of a master building, as a whole id only', () => {
+  const key = caseOf('urban-players-no-secrets').key;
+  const leaked = setupUrban();
+  writePlayers(leaked.copy, { html: PLAYERS_PAGE, extra: { 'data.json': '{"id":"rocca-del-sigillo"}' } });
+  const bad = gradeAtlasRun({ key, copy: leaked.copy, report: null, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(bad.checks.P3, false);
+  assert.equal(bad.checks.P2, true);
+
+  const longer = setupUrban();
+  writePlayers(longer.copy, { html: PLAYERS_PAGE, extra: { 'data.json': '{"id":"rocca-del-sigillo-est"}' } });
+  const near = gradeAtlasRun({ key, copy: longer.copy, report: null, baseline: null, fixtureDir: URBAN_FIXTURE });
+  assert.equal(near.checks.P3, true);
 });

@@ -56,6 +56,15 @@ test('validateStyleJson refuses a bad colour, a negative size, a missing key and
   assert.deepEqual(paths({ ...good, fonts: { ...good.fonts, place: 'Comic Sans' } }), ['fonts.place']);
 });
 
+test('validateStyleJson refuses a style without the urban section, and a bad colour inside it', () => {
+  const good = readShipped('fantasy-color');
+  const paths = (obj) => validateStyleJson(obj).map((p) => p.path);
+  const { urban, ...withoutUrban } = good;
+  assert.deepEqual(paths(withoutUrban), ['urban']);
+  assert.deepEqual(paths({ ...good, urban: { ...good.urban, roof: { ...good.urban.roof, castle: 'grey' } } }), ['urban.roof.castle']);
+  assert.deepEqual(paths({ ...good, urban: { ...good.urban, district: { ...good.urban.district, labelOpacity: 2 } } }), ['urban.district.labelOpacity']);
+});
+
 test('listStyles shows the three styles sorted, all installed', () => {
   const list = listStyles();
   assert.deepEqual(list.map((s) => s.id), ['antique-parchment', 'dark-fantasy', 'fantasy-color']);

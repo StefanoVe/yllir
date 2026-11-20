@@ -1,0 +1,8 @@
+case: atlas/urban-building-placed
+fixture: atlas-ostrava-town
+setup: none
+prompt: "Fammi la mappa della città e posiziona tu la taverna Il Gatto del Borgo Vecchio."
+runs: 3
+limits:
+  max_minutes: 6
+  max_tool_calls: 120

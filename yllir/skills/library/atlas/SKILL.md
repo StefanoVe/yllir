@@ -1,6 +1,6 @@
 ---
 name: atlas
-description: Library skill. Creates the atlas of the campaign (a map of the world or of a part of it, drawn in layers from the documents in the look of a hand-painted fantasy map) only when the master asks, and keeps it up to date: places new places, adds new land outside the existing one, and never changes land already approved unless the master asks for it explicitly. Invoked by the entry skill when the master asks for the atlas or a map of the world or of a region, by the master screen's atlas button, and by build-world or write-document with the argument "update" after a batch that added places.
+description: Library skill. Creates the atlas of the campaign (a map of the world or of a part of it, drawn in layers from the documents in the look of a hand-painted fantasy map, and also a map of a settlement or a district: a city, a village, a quarter, when the world is that small or the master asks) only when the master asks, and keeps it up to date: places new places, adds new land outside the existing one, and never changes land already approved unless the master asks for it explicitly. Invoked by the entry skill when the master asks for the atlas or a map of the world or of a region, by the master screen's atlas button, and by build-world or write-document with the argument "update" after a batch that added places.
 user-invocable: false
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" *), Bash(node */skills/library/atlas/scripts/atlas.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node */scripts/versions.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Glob, Grep, WebSearch, WebFetch
 ---
@@ -18,7 +18,7 @@ You draw and keep the atlas. Its data lives in the atlas folder of the campaign:
 4. **The land never changes.** After the master approved the land, it is locked. You may add new land only outside it, by appending constraints. You use `--unlock` only when the master, in this conversation, explicitly asked to change the shape of land already drawn; before writing, tell the master what changes and get a clear yes. When a script refuses a write because a layer is locked, do not look for a way around it.
 5. **Outside sources.** When the world seed or the sheets say the campaign is set in a published setting (a known published world), search its geography with WebSearch and WebFetch, and use it as a source. The model accepts only campaign files as sources, so record outside facts in the constraint `note`, with the URL. Never put in a search any text from the reserved block (`<!-- master -->` onward), from the world seed, or from a master-only category. Search only public names.
 6. **Secrets.** A place or feature that the players must not know gets `visibility: "master"`. Its name and position then never reach the players' version.
-7. **Words.** Never say to the master: script, JSON, layer ids, constraint, seed, canvas, hash, lock, exit codes, file paths. Say «terre e mari», «montagne», «fiumi», «confini», «carta», «approvare la forma delle terre».
+7. **Words.** Never say to the master: script, JSON, layer ids, constraint, seed, canvas, hash, lock, exit codes, file paths. Say «terre e mari», «montagne», «fiumi», «confini», «carta», «approvare la forma delle terre». For a city map, also «mura», «strade», «isolati», «quartieri», «edifici».
 8. **Previews.** You look at every preview yourself with the Read tool before showing it. The master sees it through the preview and render commands with `--open` (rule 10 says where). Ask the master's approval twice in a creation: once for the land and sea, once for the whole atlas.
 9. **Style.** The look of the atlas has a style. The game system picks it (`auto`), or the master picks one.
    - When the master asks for a different look («fai l'atlante in stile pergamena», «più cupo»), list the installed styles, pick the one whose name matches, set it, render, and save a version:
@@ -67,9 +67,10 @@ and read `exists`, `layers` and `pending`. Then follow the first case that match
 - Propose the extent in one sentence: the whole world, one continent or one region, and which top places it contains. Base it on what exists. If the documents describe only one region, propose that region, and say the atlas can grow later.
 - Then ask, one at a time, only what you cannot derive: the extent, if more than one is plausible; the relative position of regions with no stated direction; names the map needs and nothing gives, only when the master wants them shown.
 - Ask in plain words, with concrete options when possible: «Il Lago Grigio è a nord o a sud di Borgo Cenere? I documenti non lo dicono.»
+- When the documents describe one city or village (or the master asks for a city map), the extent is `settlement` (whole town with surroundings) or `district` (a quarter, a harbour, a castle with its village), and the urban steps of the "Urban scale" section apply instead of Steps 5 and 6. If there is a world and a described capital, propose the wider map and offer the second in one sentence.
 
 **Step 4: create.**
-- Write `.campaign/state/atlas/scope.json` with the Write tool: `{ "scope": { "kind": "world"|"continent"|"region", "places": [<top place ids>], "note": "<one line>" } }`. Leave out `seed`, `canvas` and `style`: the script gives them.
+- Write `.campaign/state/atlas/scope.json` with the Write tool: `{ "scope": { "kind": "world"|"continent"|"region", "places": [<top place ids>], "note": "<one line>" } }`. Leave out `seed`, `canvas` and `style`: the script gives them. For a settlement or a district, follow "Urban scale" (a) instead.
 - Run the init command. It also sets up the campaign for the atlas (its folder and the module) when that is missing:
   ```
   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" init . .campaign/state/atlas/scope.json
@@ -188,6 +189,7 @@ Ask: «Ecco l'atlante. Vuoi cambiare qualcosa prima che lo fissi?»
 - which positions you chose yourself, in one sentence («ho scelto io dove mettere…»), so the master knows they can change them;
 - that the atlas will follow the world as it grows;
 - where to see it: in the master screen, section Atlante; outside the master screen, the window that just opened.
+- In the master screen, the bigger round synopsis markers (one symbol per kind) open the spoiler-free card of the place.
 - Mention the style in one sentence only if the master chose one.
 
 Say nothing about the players' version unless asked. When asked, render the players' version (outside the master screen, with `--open`) and report:
@@ -236,3 +238,127 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render . --a
    - `new-land: yes` or `new-land: no`
    - `ask: <one question for the master about the ambiguous places, or none>`
 5. Your last action is writing this file. Print nothing else.
+
+**Urban scale: settlement or district.** Used when Step 3 chose `settlement` or `district`. It replaces Steps 5 and 6; the other steps still apply. The canvas is 2400 wide and 1800 high, set by `init`; x grows to the east and y to the south. The urban layers are drawn in this order: `ground`, `green`, `walls`, `streets`, `blocks`, `buildings`, `districts`, `labels`. For each layer, write its candidate file with the Write tool, then write the layer, then generate it. Preview and render as in Step 5 and Step 6, and look at every preview yourself.
+
+(a) **Scope.** Write `.campaign/state/atlas/scope.json` as `{ "scope": { "kind": "settlement"|"district", "places": [<top place ids>], "note": "<one line>", "unit": "m"|"paces" } }`. `unit` is optional: take it from the documents when they give a hint. If they give none, ask the master in one question (metres or paces); with no clear answer, use metres. Leave out `seed`, `canvas` and `style`. Then run the init command of Step 4 and save a version as in Step 4.
+
+(b) **Ground: water.** Write `.campaign/state/atlas/ground.json` as `{ "layer": "ground", "constraints": [...], "features": [] }`. The land is the whole canvas, so the constraints are water only:
+- `river`: `id`, `source` [x,y], `mouth` [x,y], optional `via` [[x,y]...], `width` > 0, optional `meander` 0..1.
+- `coast`: `id`, `side` north|south|east|west, `depth` > 0 (how far the water enters from that canvas edge), optional `roughness` 0..1.
+- `pond`: `id`, `at` [x,y], `radius` > 0, optional `roughness`.
+- `canal`: `id`, `path` [[x,y]...] with at least 2 points, `width` > 0.
+
+Every constraint has `id` (kebab-case, unique in the layer), `provenance`, `sources`, and optional `note` and `visibility`. Add only the water that the documents mention or the master asks for; a position you choose is `agent-choice`. Then:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" write-layer . ground .campaign/state/atlas/ground.json
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" generate . ground
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" preview .
+```
+Look at `.campaign/cache/atlas/preview.png` with the Read tool, check the water against the documents, and fix it at most 3 rounds. Then show it (outside the master screen only, rule 10):
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" preview . --open
+```
+Ask the master for approval of the water: «Ecco l'acqua della città: fiume, costa e canali. Ti va bene, o vuoi cambiare qualcosa?» On a yes, lock the layer and save a version:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" lock . ground
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "Atlante: acqua della città approvata."
+```
+On a change request, adjust, write, generate and ask again.
+
+(c) **Walls and streets.** Write `.campaign/state/atlas/walls.json` as `{ "layer": "walls", "constraints": [...], "features": [] }`, with one constraint `wall`:
+- `id`, and exactly one of `ring` [[x,y]...] with at least 3 points (a closed perimeter, only when the documents say the town is walled all around) or `path` [[x,y]...] with at least 2 points (an open wall);
+- `thickness` > 0;
+- `towers`: corners|spaced|none (default corners); optional `towerSpacing` > 0 (default 120, used by spaced);
+- optional `gates`: a list of `{ "at": [x,y], "width": optional }`.
+
+Write the walls layer and generate it, then write `.campaign/state/atlas/streets.json` as `{ "layer": "streets", "constraints": [...], "features": [] }`, with these constraints:
+- `street`: `id`, `rank` main|secondary|lane, `path` [[x,y]...] with at least 2 points, optional `width` > 0 (default by rank: main 14, secondary 9, lane 5);
+- `square`: `id`, `at` [x,y], `size` [w,h] with both > 0, optional `angle` in radians;
+- `grid`: `id`, `area` [[x,y]...] polygon with at least 3 points, `spacing` > 0, optional `angle` in radians (default 0), optional `jitter` 0..1 (default 0.15), optional `rank` secondary|lane (default lane).
+
+Main streets follow the documents (the roads to the gates, the way to the market). Use a `grid` only where the documents describe a regular quarter. The script adds a bridge by itself wherever a main or secondary street crosses water. Then:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" write-layer . walls .campaign/state/atlas/walls.json
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" generate . walls
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" write-layer . streets .campaign/state/atlas/streets.json
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" generate . streets
+```
+Run the preview command, look at it yourself and fix what is wrong (at most 3 rounds), show it with `preview . --open` (outside the master screen only), and ask: «Ecco le mura e le strade. Ti vanno bene, o vuoi cambiare qualcosa?» On a yes, lock both layers and save a version:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" lock . walls
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" lock . streets
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "Atlante: mura e strade approvate."
+```
+
+(d) **Green and districts.** Green is not locked yet. Write `.campaign/state/atlas/green.json` as `{ "layer": "green", "constraints": [...], "features": [] }`, with one constraint `park` per green area: `id`, `type` park|garden|field|wood|orchard, `at` [x,y], `radius` > 0, optional `roughness`. Use only the green that the documents or the master give, plus `agent-choice` fields where the documents are silent. Then:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" write-layer . green .campaign/state/atlas/green.json
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" generate . green
+```
+Districts are not locked yet either. Write `.campaign/state/atlas/districts.json` as `{ "layer": "districts", "constraints": [...], "features": [] }`, with one constraint `district` per quarter: `id`, `color` #rrggbb, `seeds` [[x,y]...] with at least 1 point, optional `cuts` and `reach`, `place` (the id of its place sheet) or `name`, optional `character` poor|common|rich. Take `character` from the district's sheet when it says poor, common or rich; if the sheet says nothing, leave it out. A `name` comes only from a document or from the master: a district with no name in the documents gets none, and the map shows none (rule 2). Then:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" write-layer . districts .campaign/state/atlas/districts.json
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" generate . districts
+```
+
+(e) **Blocks.** Write `.campaign/state/atlas/blocks.json` as `{ "layer": "blocks", "constraints": [ { "kind": "fill", "id": "<id>", "character": "common" } ], "features": [] }`. A `fill` takes an optional `area` [[x,y]...] with at least 3 points (default: the whole canvas), `character` poor|common|rich (default common), and an optional `district` (the id of a district constraint: its character applies inside). One fill for the whole town is usually enough; add a second fill with `area` only where the documents describe the character of a quarter, and set `district` when that quarter is a district. Then:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" write-layer . blocks .campaign/state/atlas/blocks.json
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" generate . blocks
+```
+The blocks are the free regions left by the streets and walls: do not draw them. Blocks are never locked.
+
+(f) **Buildings.** Each named building of the documents gets one feature, written directly like places, with no generation step. Write `.campaign/state/atlas/buildings.json` as `{ "layer": "buildings", "constraints": [], "features": [ { "id": <place id>, "place": <place id>, "at": [x,y], "kind": <kind>, "size": optional [w,h], "angle": optional, "provenance", "visibility", "sources" } ] }`. `id` equals `place`, and the place must have a sheet in the world. `kind` is one of tavern|inn|temple|shrine|palace|castle|keep|tower|mill|warehouse|market|guildhall|smithy|house|shop|gatehouse|landmark. `at` must be on a block or a square, never in a street or in water: the script refuses those. Provenance and sources follow Rule 3, and a secret building gets `visibility: "master"` as in Rule 6. Then:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" write-layer . buildings .campaign/state/atlas/buildings.json
+```
+Buildings are never locked by you. A building added later never changes the locked layers.
+
+(g) **Labels.** As in the other scales: write the labels layer with the write command for `labels`, each label's `target` as `<layer>/<id>` on any existing layer. Labels are never locked.
+
+(h) **Approval of the whole map.** Run the preview command, look at it yourself, show the render (outside the master screen only, rule 10), and ask the single approval of the whole map: «Ecco la città intera. Vuoi cambiare qualcosa prima che lo fissi?»
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" preview .
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render . --open
+```
+On a yes, lock green and districts, render again, and save a version:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" lock . green
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" lock . districts
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render .
+```
+```
+node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "Atlante: città approvata."
+```
+A change to approved ground, walls or streets follows Step 8 and rule 4.
+
+(i) **Update mode for an urban atlas.** In Step 9, replace point 2 with this, and keep the other points. Pending places are placed as buildings, or as a district when the sheet describes a quarter; ground, walls and streets never change. A place whose building would stand on a street or in water is refused by the script, and a place whose layer is locked is not forced (rule 4): both go to the report. Write the new features into `buildings.json` with the existing ones, then write the layer; for a district, append a `district` constraint to `districts.json` and generate it. Then render, save the version and write the report with `new-land: no`.

@@ -6,6 +6,7 @@
 
   const MIN_Z = 1 / 1.5; // zoom relative to fit-to-window
   const MAX_Z = 12;
+  const URBAN_ZOOM = 8; // an urban map zooms in about 8 times further than a geographic one
   const FOCUS_Z = 3;
   const DRAG_PX = 6;
   const TAP_MS = 300;
@@ -29,8 +30,11 @@
   const svg = stage.querySelector('svg');
   const places = new Map(data.places.map((p) => [p.id, p]));
   const nodes = new Map();
+  // An urban map has no infinite sea: the page shows its neutral colour outside the map, and zooms in further.
+  const urban = data.scale === 'urban';
+  const maxZ = urban ? MAX_Z * URBAN_ZOOM : MAX_Z;
 
-  sea.style.backgroundImage = `url("${ASSET_BASE}${data.seaTexture}")`;
+  if (!urban) sea.style.backgroundImage = `url("${ASSET_BASE}${data.seaTexture}")`;
   stage.style.width = `${W}px`;
   stage.style.height = `${H}px`;
 
@@ -56,16 +60,20 @@
   let anim = null;
   let lastSize = null;
   const scale = () => view.fit * view.z;
-  const clampZ = (z) => Math.min(MAX_Z, Math.max(MIN_Z, z));
+  const clampZ = (z) => Math.min(maxZ, Math.max(MIN_Z, z));
   const mapSize = () => ({ w: map.clientWidth, h: map.clientHeight });
 
   function render() {
     frame = null;
     const s = scale();
     stage.style.transform = `translate(${view.x}px, ${view.y}px) scale(${s})`;
-    const tile = data.seaTile * s;
-    sea.style.backgroundSize = `${tile}px ${tile}px`;
-    sea.style.backgroundPosition = `${view.x}px ${view.y}px`;
+    if (!urban) {
+      const tile = data.seaTile * s;
+      sea.style.backgroundSize = `${tile}px ${tile}px`;
+      sea.style.backgroundPosition = `${view.x}px ${view.y}px`;
+    } else {
+      placeMarkers(s);
+    }
   }
 
   function schedule() {
@@ -117,6 +125,14 @@
     const target = clampZ(z);
     const s = mapSize();
     const to = { z: target, x: s.w / 2 - cx * view.fit * target, y: s.h / 2 - cy * view.fit * target };
+    // A duration of zero (reduced motion) jumps to the place at once.
+    if (ms <= 0) {
+      view.z = to.z;
+      view.x = to.x;
+      view.y = to.y;
+      schedule();
+      return;
+    }
     const from = { z: view.z, x: view.x, y: view.y };
     const started = performance.now();
     const step = (now) => {
@@ -146,10 +162,14 @@
   function onDown(e) {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     stopAnimation();
-    try {
-      map.setPointerCapture(e.pointerId);
-    } catch (err) {
-      // Capture is an aid for drags that leave the map; a failure changes nothing else.
+    // A press on a marker is left to the marker's own click; a drag that starts there still pans the map.
+    const onMarker = Boolean(e.target && e.target.closest && e.target.closest('.marker'));
+    if (!onMarker) {
+      try {
+        map.setPointerCapture(e.pointerId);
+      } catch (err) {
+        // Capture is an aid for drags that leave the map; a failure changes nothing else.
+      }
     }
     pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, sx: e.clientX, sy: e.clientY });
     if (pointers.size > 1) {
@@ -205,6 +225,9 @@
   }
 
   function tap(e) {
+    const hit = document.elementFromPoint(e.clientX, e.clientY);
+    // A marker opens its own card on click, so a tap on it is not a map tap (and not a double tap either).
+    if (hit && hit.closest && hit.closest('.marker')) return;
     const now = performance.now();
     if (lastTap && now - lastTap.t < TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < TAP_PX) {
       lastTap = null;
@@ -213,7 +236,6 @@
       return;
     }
     lastTap = { t: now, x: e.clientX, y: e.clientY };
-    const hit = document.elementFromPoint(e.clientX, e.clientY);
     const place = hit && hit.closest ? hit.closest('g.place') : null;
     if (place) openPlace(place.getAttribute('data-place'), place);
   }
@@ -300,7 +322,10 @@
 
   // Layers: one switch per layer present. Terrain is always shown. Stamps carry their layer, so they follow.
   function setLayer(name, on) {
-    svg.querySelectorAll(`[data-layer="${name}"]`).forEach((node) => node.classList.toggle('is-off', !on));
+    const scopes = markerBox ? [svg, markerBox] : [svg];
+    for (const scope of scopes) {
+      scope.querySelectorAll(`[data-layer="${name}"]`).forEach((node) => node.classList.toggle('is-off', !on));
+    }
   }
 
   function setLayersOpen(open) {
@@ -441,18 +466,112 @@
     const link = linkNode(place);
     if (link) card.append(link);
     card.classList.add('is-open');
+    markPressed(id);
     title.focus({ preventScroll: true });
   }
 
   function closeCard(returnFocus) {
     const wasOpen = card.classList.contains('is-open');
     card.classList.remove('is-open');
+    markPressed(null);
     if (returnFocus && wasOpen && origin && typeof origin.focus === 'function') {
       origin.focus({ preventScroll: true });
     }
   }
 
-  // ---- Keyboard -------------------------------------------------------------------------------
+  // ---- Urban markers --------------------------------------------------------------------------
+
+  // One button per notable place (a place record with an anchor), drawn over the map. Its size and symbol are the
+  // same at every zoom: only its position follows the map. A symbol is a few stroked paths on a 24-unit grid;
+  // a kind without one is a plain dot.
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const TOWER = 'M8 20V8h8v12 M6 8h12 M8 8V5h2v3 M14 8V5h2v3 M11 20v-4h2v4';
+  const MUG = 'M5 7h10v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z M15 9h2a2 2 0 0 1 0 4h-2';
+  const CROSS = 'M12 5v14 M7 10h10';
+  const SYMBOLS = new Map([
+    ['tavern', MUG],
+    ['inn', MUG],
+    ['temple', CROSS],
+    ['shrine', CROSS],
+    ['palace', 'M4 17L3.5 8 8 11l4-6 4 6 4.5-3L20 17z'],
+    ['castle', TOWER],
+    ['keep', TOWER],
+    ['tower', TOWER],
+    ['mill', 'M12 6a6 6 0 1 0 0 12 6 6 0 1 0 0-12z M12 6v12 M6 12h12'],
+    ['market', 'M4 9h16 M5 9v10h14V9 M4 9l2-4h12l2 4 M9 19v-5h6v5'],
+    ['warehouse', 'M4 8l8-4 8 4v10H4z M4 8l8 4 8-4 M12 12v8'],
+    ['guildhall', 'M6 5h12v7c0 3.5-3 6-6 7-3-1-6-3.5-6-7z'],
+    ['smithy', 'M3 8h13 M16 8h4 M6 8v3h7V8 M9 11v4 M6 15h7'],
+    ['gatehouse', 'M6 20V11a6 6 0 0 1 12 0v9 M10 20v-5a2 2 0 0 1 4 0v5'],
+    ['district', 'M6 20V4 M6 5h11l-2.5 3.5L17 12H6'],
+  ]);
+  const DOT = 'M12 12h.01';
+
+  let markerBox = null;
+  let markerList = []; // { id, at, node } for each marker
+
+  function symbolNode(kind) {
+    const icon = document.createElementNS(SVG_NS, 'svg');
+    icon.setAttribute('class', 'marker-icon');
+    icon.setAttribute('viewBox', '0 0 24 24');
+    icon.setAttribute('aria-hidden', 'true');
+    icon.setAttribute('focusable', 'false');
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', SYMBOLS.get(kind) || DOT);
+    icon.append(path);
+    return icon;
+  }
+
+  function markerNode(place) {
+    const district = place.kind === 'district';
+    const button = el('button', district ? 'marker is-district' : 'marker', {
+      type: 'button',
+      'aria-label': place.title,
+      'aria-pressed': 'false',
+      'data-place': place.id,
+      'data-layer': district ? 'districts' : 'buildings',
+    });
+    const disc = el('span', 'marker-disc');
+    disc.append(symbolNode(place.kind));
+    // The name is shown on hover and focus only; the button's aria-label already names it for a screen reader.
+    button.append(disc, el('span', 'marker-name', { 'aria-hidden': 'true' }, place.title));
+    button.addEventListener('click', () => openFromMarker(place, button));
+    return button;
+  }
+
+  function buildMarkers() {
+    markerBox = el('div', 'markers', { role: 'group', 'aria-label': S.notablePlaces });
+    for (const place of data.places) {
+      if (!Array.isArray(place.at)) continue;
+      const node = markerNode(place);
+      markerBox.append(node);
+      markerList.push({ id: place.id, at: place.at, node });
+    }
+    map.append(markerBox);
+  }
+
+  // Positions every marker at its canvas point under the current pan and zoom (the stage's own transform).
+  function placeMarkers(s) {
+    for (const marker of markerList) {
+      const x = view.x + marker.at[0] * s;
+      const y = view.y + marker.at[1] * s;
+      marker.node.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+    }
+  }
+
+  // The card of the marker's place opens and the map centres softly on it; reduced motion means no glide.
+  function openFromMarker(place, button) {
+    const reduce = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    animateCentre(Math.max(view.z, FOCUS_Z), place.at[0], place.at[1], reduce ? 0 : 600);
+    openPlace(place.id, button);
+  }
+
+  // The marker of the open card reports aria-pressed; every other marker reports it released.
+  function markPressed(id) {
+    for (const marker of markerList) marker.node.setAttribute('aria-pressed', String(marker.id === id));
+  }
+
+  // ---- Keyboard-------------------------------------------------------------------------------
 
   // A click or tap outside an open panel closes it. The layers panel remembers that choice.
   document.addEventListener('pointerdown', (e) => {
@@ -490,8 +609,11 @@
       const id = node.getAttribute('data-place');
       const place = places.get(id);
       nodes.set(id, node);
-      node.setAttribute('tabindex', '0');
-      node.setAttribute('role', 'button');
+      // On an urban map the markers are the keyboard path to a building, so the drawn places are not in the tab order.
+      if (!urban) {
+        node.setAttribute('tabindex', '0');
+        node.setAttribute('role', 'button');
+      }
       node.setAttribute('aria-label', place ? place.title : id);
       node.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -504,6 +626,11 @@
 
   function start() {
     setUpPlaces();
+    if (urban) {
+      document.documentElement.classList.add('is-urban');
+      document.body.classList.add('is-urban');
+      buildMarkers();
+    }
     // Panels, zoom buttons and the card sit outside the map, so the map's pointer capture never takes their clicks.
     document.body.append(vignetteNode(), zoom, layersPanel.box, searchPanel.box, card);
     fitToWindow();

@@ -70,6 +70,21 @@ const SHAPE = {
   icons: { capital: 'nonneg', city: 'nonneg', other: 'nonneg' },
   vignette: { color: 'colour', opacity: 'unit' },
   forestTint: { color: 'colour', opacity: 'unit' },
+  // Urban scale (settlement, district): the colours of the ground, the water, the green areas, the
+  // streets, the walls and every building or lot kind, and the opacities of the district layer.
+  urban: {
+    ground: 'colour', water: 'colour', waterEdge: 'colour', outline: 'colour', square: 'colour', block: 'colour',
+    green: { park: 'colour', garden: 'colour', field: 'colour', wood: 'colour', orchard: 'colour' },
+    street: { casing: 'colour', main: 'colour', secondary: 'colour', lane: 'colour' },
+    wall: { stone: 'colour', outline: 'colour' },
+    roof: {
+      house: 'colour', rowhouse: 'colour', shop: 'colour', barn: 'colour', tavern: 'colour', inn: 'colour',
+      temple: 'colour', shrine: 'colour', palace: 'colour', castle: 'colour', keep: 'colour', tower: 'colour',
+      mill: 'colour', warehouse: 'colour', market: 'colour', guildhall: 'colour', smithy: 'colour',
+      gatehouse: 'colour', landmark: 'colour',
+    },
+    district: { fillOpacity: 'unit', labelOpacity: 'unit' },
+  },
 };
 
 /**

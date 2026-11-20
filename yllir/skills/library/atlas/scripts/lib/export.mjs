@@ -7,8 +7,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readAtlas, validateAtlas, isPlainObject } from './model.mjs';
+import { readAtlas, validateAtlas, isPlainObject, isUrbanScope } from './model.mjs';
 import { renderAtlasSvg, escapeXml } from './render.mjs';
+import { renderUrbanSvg } from './render-urban.mjs';
 import { loadStyle, resolveStyleId } from './styles.mjs';
 import { runAtlasChecks, reservedLinesOf, masterIdsOf } from './checks.mjs';
 import { stringsFor } from './strings.mjs';
@@ -26,6 +27,8 @@ const DEFAULT_BASE_URL = 'http://localhost/';
 const SUMMARY_MAX = 400;
 // The order of the layer switches in the viewer. Labels are always listed, even when no label layer exists.
 const LAYER_ORDER = ['terrain', 'relief', 'biomes', 'water', 'political', 'routes', 'places', 'labels'];
+// The same for an urban atlas (settlement or district): ground, green, walls, streets, blocks, buildings, districts, labels.
+const URBAN_LAYER_ORDER = ['ground', 'green', 'walls', 'streets', 'blocks', 'buildings', 'districts', 'labels'];
 const VIEWER_FILES = ['viewer.js', 'viewer.css'];
 // The viewer's own display font (viewer.css), copied even when the map does not reference it.
 const VIEWER_FONT = 'fonts/IMFellEnglish-Regular.ttf';
@@ -79,6 +82,20 @@ export function summaryOf(body) {
   const space = cut.lastIndexOf(' ');
   if (space > 0) cut = cut.slice(0, space);
   return `${cut.trimEnd()}…`;
+}
+
+/**
+ * The point a search centres on for an urban place feature: its `at` (a building), else its first seed
+ * (a district), else the mean of the vertices of its first ring (1 decimal), else [0, 0].
+ */
+function anchorOf(feature) {
+  if (Array.isArray(feature.at)) return feature.at;
+  if (Array.isArray(feature.seeds) && Array.isArray(feature.seeds[0])) return feature.seeds[0];
+  const ring = Array.isArray(feature.polygon) ? feature.polygon : (Array.isArray(feature.polygons?.[0]) ? feature.polygons[0] : []);
+  const points = ring.filter((p) => Array.isArray(p) && Number.isFinite(p[0]) && Number.isFinite(p[1]));
+  if (points.length === 0) return [0, 0];
+  const sum = points.reduce((acc, p) => [acc[0] + p[0], acc[1] + p[1]], [0, 0]);
+  return [Math.round((sum[0] / points.length) * 10) / 10, Math.round((sum[1] / points.length) * 10) / 10];
 }
 
 /** Relative paths under assets/ that the SVG references (`assets/<path>`). */
@@ -173,37 +190,58 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     .filter((f) => isPlainObject(f) && (!players || f.visibility !== 'master'));
   const allFeatures = (name) => (Array.isArray(atlas.layers[name]?.features) ? atlas.layers[name].features : []).filter(isPlainObject);
 
-  // 3. One place record per surviving place feature whose sheet may be shown to this audience.
+  // 3. One place record per surviving place feature whose sheet may be shown to this audience. On an urban
+  // atlas the place features are the buildings and the districts with a place; their card id is the place id,
+  // which is also the `data-place` of the element the renderer draws, so a click opens the card.
+  // An urban record also carries `kind`: the building kind, or 'district' for a district. The summary is
+  // always the PUBLIC body (the text before the master marker), for both audiences: the card never shows
+  // the master-only part, and the master build's data holds no more than the players' data does.
+  const urban = isUrbanScope(atlas.manifest.scope?.kind);
+  const placeFeatures = urban
+    ? [
+      ...survivors('buildings').map((feature) => ({ feature, kind: feature.kind })),
+      ...survivors('districts').map((feature) => ({ feature, kind: 'district' })),
+    ].filter(({ feature }) => typeof feature.place === 'string')
+    : survivors('places').map((feature) => ({ feature, kind: null }));
   const records = [];
-  for (const feature of survivors('places')) {
+  const seen = new Set();
+  for (const { feature, kind } of placeFeatures) {
+    const id = urban ? feature.place : feature.id;
+    if (seen.has(id)) continue;
     const subject = byId.get(feature.place);
     if (subject === undefined) continue;
     if (players && !isPublicDocument(subject.file, config)) continue;
-    const text = fs.readFileSync(path.join(root, subject.file), 'utf8');
-    const body = players ? publicBody(text) : parseFrontmatter(text).body;
+    seen.add(id);
+    const body = publicBody(fs.readFileSync(path.join(root, subject.file), 'utf8'));
     let link = null;
     if (players) {
-      link = encyclopediaOn ? { kind: 'url', href: `${baseUrl}e/${feature.id}/` } : null;
+      link = encyclopediaOn ? { kind: 'url', href: `${baseUrl}e/${id}/` } : null;
     } else {
       link = { kind: 'document', path: subject.file };
     }
-    records.push({ id: feature.id, title: subject.title, icon: feature.icon ?? null, at: feature.at, summary: summaryOf(body), link });
+    const record = { id, title: subject.title, icon: feature.icon ?? null, at: urban ? anchorOf(feature) : feature.at, summary: summaryOf(body), link };
+    if (urban) record.kind = kind;
+    records.push(record);
   }
   const kept = new Set(records.map((r) => r.id));
-  const renderLayers = {
-    ...atlas.layers,
-    places: { ...atlas.layers.places, features: allFeatures('places').filter((f) => kept.has(f.id) && (!players || f.visibility !== 'master')) },
-  };
+  const renderLayers = { ...atlas.layers };
+  if (urban) {
+    if (atlas.layers.buildings !== undefined) {
+      renderLayers.buildings = { ...atlas.layers.buildings, features: allFeatures('buildings').filter((f) => kept.has(f.place) && (!players || f.visibility !== 'master')) };
+    }
+  } else {
+    renderLayers.places = { ...atlas.layers.places, features: allFeatures('places').filter((f) => kept.has(f.id) && (!players || f.visibility !== 'master')) };
+  }
 
-  // 4. Names: the surviving places, and the realms' places (for players, only when the sheet is public).
+  // 4. Names: the surviving places, and the realms' and districts' places (for players, only when the sheet is public).
   const names = {};
   for (const record of records) names[record.id] = record.title;
-  for (const realm of survivors('political')) {
-    if (typeof realm.place !== 'string') continue;
-    const subject = byId.get(realm.place);
+  for (const named of [...survivors('political'), ...survivors('districts')]) {
+    if (typeof named.place !== 'string') continue;
+    const subject = byId.get(named.place);
     if (subject === undefined) continue;
     if (players && !isPublicDocument(subject.file, config)) continue;
-    names[realm.place] ??= subject.title;
+    names[named.place] ??= subject.title;
   }
 
   // 5. Style and drawing.
@@ -212,7 +250,8 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
   try {
     const resolved = resolveStyleId({ atlasStyle: atlas.manifest.style, campaignConfig: config, pluginRoot });
     bundle = loadStyle(resolved.id);
-    svgResult = renderAtlasSvg({ manifest: atlas.manifest, layers: renderLayers, style: bundle, names, audience, assetBase: ASSET_BASE, vignette: false });
+    const draw = urban ? renderUrbanSvg : renderAtlasSvg;
+    svgResult = draw({ manifest: atlas.manifest, layers: renderLayers, style: bundle, names, audience, assetBase: ASSET_BASE, vignette: false });
   } catch (err) {
     return refused([{ code: err.code ?? 'render', file: 'atlas.json', path: 'style', message: err.message }]);
   }
@@ -228,8 +267,9 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     seaTile: Math.max(width, height) / 9,
     seaTexture: `styles/${bundle.style.id}/${deepSea.file}`,
     vignette: { color: bundle.style.vignette.color, opacity: bundle.style.vignette.opacity },
+    scale: urban ? 'urban' : 'geo',
     places: records,
-    layers: LAYER_ORDER.filter((name) => name === 'labels' || atlas.layers[name] !== undefined),
+    layers: (urban ? URBAN_LAYER_ORDER : LAYER_ORDER).filter((name) => name === 'labels' || atlas.layers[name] !== undefined),
     strings,
   };
   const html = pageHtml({
@@ -270,6 +310,8 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     const referenced = new Set([
       ...allFeatures('places').map((f) => f.place),
       ...allFeatures('political').map((f) => f.place),
+      ...allFeatures('buildings').map((f) => f.place),
+      ...allFeatures('districts').map((f) => f.place),
     ].filter((id) => typeof id === 'string'));
     for (const id of referenced) {
       const subject = byId.get(id);

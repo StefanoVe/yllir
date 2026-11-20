@@ -4,7 +4,7 @@ import { folderOfPlace, inScope, pendingPlaces } from './pending.mjs';
 import { readAtlas } from './model.mjs';
 import { buildWorldIndex } from '../../../../../scripts/lib/world-graph.mjs';
 import {
-  cleanupCampaigns, standardCampaign, baseManifest, placesLayer, writeAtlas,
+  cleanupCampaigns, standardCampaign, baseManifest, placesLayer, writeAtlas, urbanManifest, buildingsLayer,
 } from './test-support.mjs';
 
 after(cleanupCampaigns);
@@ -50,4 +50,39 @@ test('inScope: a listed id that is not in the index matches only itself', () => 
 test('pendingPlaces: no manifest, no pending places', () => {
   const root = standardCampaign();
   assert.deepEqual(pendingPlaces(root, { manifest: undefined, layers: {} }, buildWorldIndex(root)), []);
+});
+
+test('pendingPlaces, urban: a building or a district places a town; a places feature does not', () => {
+  const root = standardCampaign();
+  writeAtlas(root, {
+    manifest: urbanManifest({ scope: { kind: 'settlement', places: [] } }),
+    layers: {
+      buildings: buildingsLayer([['north', [500, 500], 'tavern']]),
+      districts: {
+        layer: 'districts',
+        constraints: [],
+        features: [{
+          id: 'south', type: 'district', color: '#3366aa', seeds: [[400, 400]], place: 'south',
+          polygon: [[300, 300], [900, 300], [900, 900]], provenance: 'master', visibility: 'public', sources: [],
+        }],
+      },
+      places: placesLayer([['port-ash', [500, 500]]]),
+    },
+  });
+  const pending = pendingPlaces(root, readAtlas(root), buildWorldIndex(root));
+  assert.deepEqual(pending.map((p) => p.id), ['port-ash']);
+});
+
+test('pendingPlaces, urban: a place listed in scope.places is not pending; its folder places are still in scope', () => {
+  const root = standardCampaign();
+  writeAtlas(root, { manifest: urbanManifest({ scope: { kind: 'settlement', places: ['north'] } }) });
+  const pending = pendingPlaces(root, readAtlas(root), buildWorldIndex(root));
+  assert.deepEqual(pending.map((p) => p.id), ['port-ash']);
+});
+
+test('pendingPlaces, urban: with no scope places, every place is pending until something places it', () => {
+  const root = standardCampaign();
+  writeAtlas(root, { manifest: urbanManifest({ scope: { kind: 'district', places: [] } }) });
+  const pending = pendingPlaces(root, readAtlas(root), buildWorldIndex(root));
+  assert.deepEqual(pending.map((p) => p.id), ['north', 'port-ash', 'south']);
 });

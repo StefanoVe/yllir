@@ -5,6 +5,7 @@ import path from 'node:path';
 import { exportAtlas, summaryOf } from './export.mjs';
 import {
   cleanupCampaigns, makeCampaign, campaignYaml, baseManifest, terrainLayer, placesLayer, writeAtlas,
+  urbanManifest, groundLayer, buildingsLayer,
 } from './test-support.mjs';
 
 after(cleanupCampaigns);
@@ -243,4 +244,137 @@ test('the viewer data carries the vignette colour and opacity, the sea tile, and
   assert.equal(typeof data.vignette.opacity, 'number');
   assert.equal(data.seaTile, Math.max(data.canvas.width, data.canvas.height) / 9);
   assert.ok(data.layers.includes('labels'));
+});
+
+/**
+ * An urban campaign (settlement scope): a ground layer with no water, buildings, and optional districts.
+ * Each building entry is `[place id, point, kind]`; the north sheet has a master block, like the geographic one.
+ */
+function urbanCampaign({
+  yaml,
+  buildings = [['north', [500, 500], 'tavern'], ['south', [600, 600], 'house']],
+  extraBuildings = [],
+  districts = [],
+} = {}) {
+  const root = makeCampaign({
+    'World/North/North.md': sheet({ id: 'north', title: 'North', body: 'The northern quarter keeps the old market.', master: `Secret: ${SECRET}.` }),
+    'World/South.md': sheet({ id: 'south', title: 'South', body: 'A quiet row of houses.' }),
+    'World/Keep.md': sheet({ id: 'keep', title: 'Keep', body: 'A keep of grey stone.' }),
+  }, yaml ? { yaml } : {});
+  const layers = { ground: groundLayer(), buildings: buildingsLayer(buildings) };
+  layers.buildings.features.push(...extraBuildings);
+  if (districts.length > 0) layers.districts = { layer: 'districts', constraints: [], features: districts };
+  writeAtlas(root, { manifest: urbanManifest({ style: 'fantasy-color' }), layers });
+  return root;
+}
+
+const district = (id, place, seed, polygon) => ({
+  id, type: 'district', color: '#aa3322', seeds: [seed], polygon, place, provenance: 'master', visibility: 'public', sources: [],
+});
+
+test('an urban export lists its urban layers in drawing order, is marked urban, and has a card for each building', () => {
+  const root = urbanCampaign();
+  const result = exportAtlas(root, { audience: 'master' });
+  assert.equal(result.ok, true, JSON.stringify(result.problems));
+  const data = dataOf(readHtml(root, 'master'));
+  assert.equal(data.scale, 'urban');
+  assert.deepEqual(data.layers, ['ground', 'buildings', 'labels']);
+  assert.deepEqual(data.places.map((p) => p.id), ['north', 'south']);
+  assert.deepEqual(data.places.find((p) => p.id === 'north').at, [500, 500]);
+  assert.deepEqual(data.places.find((p) => p.id === 'north').link, { kind: 'document', path: 'World/North/North.md' });
+  assert.ok(readHtml(root, 'master').includes('data-place="north"'), 'the building is clickable by its place');
+});
+
+test('an urban players export has no master-visibility building, and its card and mark are gone', () => {
+  const root = urbanCampaign({
+    extraBuildings: [{ id: 'keep', place: 'keep', at: [900, 900], kind: 'keep', provenance: 'master', visibility: 'master', sources: [] }],
+  });
+  const master = exportAtlas(root, { audience: 'master' });
+  assert.equal(master.ok, true, JSON.stringify(master.problems));
+  assert.ok(readHtml(root, 'master').includes('data-place="keep"'));
+  const players = exportAtlas(root, { audience: 'players' });
+  assert.equal(players.ok, true, JSON.stringify(players.problems));
+  assert.ok(players.checks.every((c) => c.status === 'pass'));
+  const html = readHtml(root, 'players');
+  assert.ok(!html.includes('data-place="keep"'));
+  assert.ok(!dataOf(html).places.some((p) => p.id === 'keep'));
+  assert.equal(dataOf(html).scale, 'urban');
+  assert.ok(!html.includes(SECRET));
+});
+
+test('a district with a place gives a card: one card per place, the building wins its point, a district alone takes its seed', () => {
+  const root = urbanCampaign({
+    buildings: [['north', [500, 500], 'tavern']],
+    districts: [
+      district('old-town', 'north', [300, 300], [[200, 200], [800, 200], [800, 800], [200, 800]]),
+      district('south-ward', 'south', [700, 700], [[600, 600], [900, 600], [900, 900], [600, 900]]),
+    ],
+  });
+  const result = exportAtlas(root, { audience: 'master' });
+  assert.equal(result.ok, true, JSON.stringify(result.problems));
+  const data = dataOf(readHtml(root, 'master'));
+  assert.deepEqual(data.layers, ['ground', 'buildings', 'districts', 'labels']);
+  assert.deepEqual(data.places.map((p) => p.id), ['north', 'south']);
+  assert.deepEqual(data.places.find((p) => p.id === 'north').at, [500, 500]);
+  assert.deepEqual(data.places.find((p) => p.id === 'south').at, [700, 700]);
+  assert.equal(result.stats.places, 2);
+});
+
+test('the urban layer names and the campaign language: an Italian urban atlas gets Italian layer names', () => {
+  const root = urbanCampaign({ yaml: `${campaignYaml()}language:\n  main: it\n` });
+  assert.equal(exportAtlas(root, { audience: 'master' }).ok, true);
+  const data = dataOf(readHtml(root, 'master'));
+  assert.equal(data.strings.layerNames.buildings, 'Edifici');
+  assert.equal(data.strings.layerNames.ground, 'Terreno e acque');
+  assert.equal(data.strings.layerNames.districts, 'Quartieri');
+});
+
+test('a geographic export is marked geo', () => {
+  const root = campaign();
+  assert.equal(exportAtlas(root, { audience: 'master' }).ok, true);
+  assert.equal(dataOf(readHtml(root, 'master')).scale, 'geo');
+});
+
+test('an urban place record carries its building kind, or the kind district for a district, and its anchor', () => {
+  const root = urbanCampaign({
+    buildings: [['north', [500, 500], 'tavern']],
+    districts: [district('south-ward', 'south', [700, 700], [[600, 600], [900, 600], [900, 900], [600, 900]])],
+  });
+  assert.equal(exportAtlas(root, { audience: 'master' }).ok, true);
+  const places = dataOf(readHtml(root, 'master')).places;
+  assert.deepEqual(places.find((p) => p.id === 'north'), {
+    id: 'north',
+    title: 'North',
+    icon: null,
+    at: [500, 500],
+    summary: 'The northern quarter keeps the old market.',
+    link: { kind: 'document', path: 'World/North/North.md' },
+    kind: 'tavern',
+  });
+  const ward = places.find((p) => p.id === 'south');
+  assert.equal(ward.kind, 'district');
+  assert.deepEqual(ward.at, [700, 700], 'a district is anchored at its first seed');
+  assert.equal(places.length, 2);
+});
+
+test('the card summary is the public part of the sheet: the master block of a building reaches no output of either build', () => {
+  const root = urbanCampaign({ buildings: [['north', [500, 500], 'tavern']] });
+  // The public part is empty: the master text sits right under the marker. A summary that did not stop at the
+  // marker would take the secret as the first paragraph.
+  fs.writeFileSync(path.join(root, 'World/North/North.md'), [
+    '<!-- yllir', 'id: north', 'kind: place', 'provenance: master', '-->',
+    '# North', '', '## Description', '', '<!-- master -->', `Secret: ${SECRET}.`, '',
+  ].join('\n'));
+  assert.ok(fs.readFileSync(path.join(root, 'World/North/North.md'), 'utf8').includes(SECRET));
+  assert.equal(exportAtlas(root, { audience: 'master' }).ok, true);
+  assert.equal(exportAtlas(root, { audience: 'players' }).ok, true);
+  for (const audience of ['master', 'players']) {
+    for (const file of listFiles(path.join(root, SITE, audience))) {
+      const text = fs.readFileSync(path.join(root, SITE, audience, file), 'utf8');
+      assert.ok(!text.includes(SECRET), `${audience}/${file} holds the master block`);
+      assert.ok(!text.includes('Secret:'), `${audience}/${file} holds the master block`);
+    }
+  }
+  const summary = dataOf(readHtml(root, 'master')).places.find((p) => p.id === 'north').summary;
+  assert.equal(summary, '');
 });

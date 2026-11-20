@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { atlasFolderFor, defaultSeed, ensureAtlasSetup, planAtlasSetup } from './setup.mjs';
+import {
+  atlasFolderFor, defaultSeed, ensureAtlasSetup, planAtlasSetup, defaultCanvasFor, DEFAULT_CANVAS, DEFAULT_URBAN_CANVAS,
+} from './setup.mjs';
 import { cleanupCampaigns, makeCampaign } from './test-support.mjs';
 
 after(cleanupCampaigns);
@@ -118,4 +120,15 @@ test('ensureAtlasSetup refuses when the id atlas is already used by another cate
   assert.equal(result.ok, false);
   assert.equal(result.categoryAdded, false);
   assert.equal(readYaml(root), before);
+});
+
+test('defaultCanvasFor: the urban canvas for a settlement or district, the geographic one otherwise; a fresh copy', () => {
+  assert.deepEqual(DEFAULT_URBAN_CANVAS, { width: 2400, height: 1800 });
+  assert.deepEqual(defaultCanvasFor('settlement'), { width: 2400, height: 1800 });
+  assert.deepEqual(defaultCanvasFor('district'), { width: 2400, height: 1800 });
+  assert.deepEqual(defaultCanvasFor('region'), DEFAULT_CANVAS);
+  assert.deepEqual(defaultCanvasFor(undefined), DEFAULT_CANVAS);
+  const copy = defaultCanvasFor('settlement');
+  copy.width = 1;
+  assert.equal(defaultCanvasFor('settlement').width, 2400);
 });

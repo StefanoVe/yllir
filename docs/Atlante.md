@@ -1,6 +1,6 @@
 # Atlante
 
-**Stato:** processo, forma e principi **Deciso** dall'autore (2026-11-19); prima implementazione in 0.78.0 (skill `atlas`, sezione Atlante del master screen 0.19.0), con formati e strumenti come descritti qui. Le carte di scala più piccola (decisione 12, sezione 2b) non sono implementate.
+**Stato:** processo, forma e principi **Deciso** dall'autore (2026-11-19); prima implementazione in 0.78.0 (skill `atlas`, sezione Atlante del master screen 0.19.0), con formati e strumenti come descritti qui. La scala `settlement`/`district` (decisione 12, sezione 2b) è implementata nella versione 0.79.0 del framework, con le differenze indicate in sezione 2b.
 **Parte di:** [Skill di libreria](Skill%20di%20libreria.md) (scheda [L25](Skill%20di%20libreria.md#l25-atlante)) e [Master screen](Master%20screen.md)
 
 ## Scopo del documento
@@ -36,7 +36,12 @@ Supera, per la carta del mondo, la frase «La carta del mondo resta fuori» dell
 
 ## 2b. Scale e carte più piccole
 
-**Proposta**, salvo la decisione 12.
+**Implementata in 0.79.0** (decisione 12), con le differenze elencate qui sotto. Il resto della sezione resta **Proposta** dove indicato.
+
+**Differenze rispetto alla proposta (0.79.0):**
+- una sola carta per campagna: le carte annidate **non** sono implementate;
+- asset urbani disegnati da script in vettoriale: il pacchetto bitmap con fornitore di immagini **non** è fatto;
+- costanti scelte: tela predefinita 2400x1800; isolati su griglia da 4 unità; lotti generati dallo script e nascosti sotto gli edifici nominati; marcatori tondi con simbolo per tipo che aprono la sinossi pubblica (scheda senza spoiler).
 
 - **Scale.** All'estensione geografica (`world`, `continent`, `region`) si aggiunge l'estensione di un abitato: `settlement` (città o villaggio intero, con i dintorni) e `district` (un quartiere, un porto, un castello con il borgo). L'estensione decide quali livelli, timbri e unità di misura usare. La pianta di un singolo edificio o di uno scontro resta una mappa di luogo di `images` (decisione sulle mappe di battaglia, indice 2026-11-11).
 - **Livelli della scala urbana**, nell'ordine di disegno:
@@ -49,13 +54,13 @@ Supera, per la carta del mondo, la frase «La carta del mondo resta fuori» dell
   - `districts`: confini dei quartieri, al posto di `political`;
   - `labels`, come nelle altre scale.
 - **Generazione.** Come nelle altre scale: l'assistente scrive i vincoli (andamento del fiume, perimetro delle mura, assi delle strade principali, posizione delle piazze, edifici nominati); gli script generano reticolo stradale, isolati e riempimento con un seme fisso; il master approva; i livelli `ground`, `walls` e `streets` vengono fissati. Gli edifici nominati crescono con il mondo come i luoghi.
-- **Asset urbani.** Ogni stile deve avere anche un pacchetto per la scala urbana, generato come quello geografico (decisione 9), con lo stesso stile visivo:
+- **Asset urbani** (in 0.79.0 disegnati da script in vettoriale; il pacchetto bitmap descritto qui non è fatto). Ogni stile deve avere anche un pacchetto per la scala urbana, generato come quello geografico (decisione 9), con lo stesso stile visivo:
   - edifici generici visti dall'alto o in prospettiva a tre quarti, in varianti di dimensione (casa, casa a schiera, bottega, fienile);
   - edifici notevoli (tempio, palazzo, castello o mastio, torre, taverna, mulino, magazzino, mercato coperto);
   - mura: tratti, torri, porte, con raccordi che si ripetono senza giunte;
   - superfici: lastricato, terra battuta, acciottolato, acqua di canale, prato, campo arato;
   - elementi minori: ponti, moli, barche, alberi isolati, fontane, bancarelle, recinti.
-- **Carte annidate.** Una campagna può avere più carte, ciascuna con la propria estensione (per esempio il mondo e la sua capitale). Ogni carta ha la propria cartella e il proprio manifesto (`Atlante/<carta>/atlas.json`). Il segnaposto di una città sulla carta del mondo apre la carta della città quando esiste. I dati di una carta non si copiano nell'altra: la gerarchia viene dalle cartelle dei luoghi.
+- **Carte annidate** (non implementate in 0.79.0: una sola carta per campagna). Una campagna può avere più carte, ciascuna con la propria estensione (per esempio il mondo e la sua capitale). Ogni carta ha la propria cartella e il proprio manifesto (`Atlante/<carta>/atlas.json`). Il segnaposto di una città sulla carta del mondo apre la carta della città quando esiste. I dati di una carta non si copiano nell'altra: la gerarchia viene dalle cartelle dei luoghi.
 - **Unità.** A scala urbana la tela usa metri o passi, dichiarati nella configurazione, e i controlli sulle posizioni cambiano: un edificio sta su un isolato o su una piazza, mai in strada o in acqua; una porta sta sulle mura.
 
 ## 3. Generazione per livelli
@@ -111,9 +116,13 @@ Campagne sintetiche con risposte fuori dalla cartella che l'agente legge. Casi m
 - **Allargare la tela:** chi decide dove si attacca una terra nuova, e se il master vuole vedere più proposte.
 - **Scala e distanze:** l'atlante deve dichiarare una scala e controllare le distanze scritte nei documenti (giorni di viaggio, leghe)?
 - **Griglia esagonale:** serve un livello facoltativo con esagoni per i viaggi?
-- **Carte di dettaglio:** in parte risolta dalla decisione 12 (le scale più piccole esistono). Resta da decidere se anche una regione può avere una propria carta più dettagliata dentro quella del mondo (Proposta: sì, con le carte annidate della sezione 2b).
+- **Carte di dettaglio:** in parte risolta dalla decisione 12 (le scale più piccole esistono). Resta da decidere se anche una regione può avere una propria carta più dettagliata dentro quella del mondo (Proposta: sì, con le carte annidate della sezione 2b). Le carte annidate restano **aperte e non implementate** in 0.79.0.
 - **Scelta della scala:** quando il mondo è una sola città la scala è ovvia; quando ci sono un mondo e una capitale descritta in dettaglio, l'assistente propone le due carte o chiede quale serve prima? Proposta: propone la carta più ampia e offre la seconda in una frase.
+  *Risposta provvisoria adottata (0.79.0):* l'assistente propone la carta più ampia e offre la seconda in una frase.
 - **Edifici generici:** il riempimento degli isolati è sempre generato dallo script (`agent-choice`), oppure il master può chiedere un quartiere «povero» o «ricco» che cambia densità e tipi di edifici? Proposta: un parametro di carattere per quartiere, dal documento del quartiere.
+  *Risposta provvisoria adottata (0.79.0):* parametro `character` poor|common|rich, preso dalla scheda del quartiere; se la scheda non lo dice, il valore è common.
 - **Interni:** la pianta interna di un edificio nominato resta una mappa di luogo di `images`; un collegamento dalla carta della città a quella pianta è utile?
+  *Risposta provvisoria adottata (0.79.0):* nessun collegamento.
 - **Vedute e carte nautiche:** si ricavano dai livelli dell'atlante (la maschera di terra e mare c'è già) o restano fuori?
+- **Pacchetto bitmap urbano:** quando e con quale fornitore di immagini generare i timbri e le texture della scala urbana (sezione 2b, decisione 9), oltre al disegno vettoriale di 0.79.0? Resta aperto.
 - **Pubblicazione:** il sito dei giocatori resta locale come l'enciclopedia finché non c'è un hosting.

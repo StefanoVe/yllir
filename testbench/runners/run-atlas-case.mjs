@@ -11,8 +11,10 @@
 // --setup-only builds the setup, prints the folder and runs nothing (no agent). --keep keeps the copy
 // and saves the agent's final message, cost, duration and tool calls as <tmp>/run.json. --grade-only
 // grades a saved run again without running the agent and does not append to the results file.
-// Checks by kind: create-asks A1 to A4 (no agent-built atlas is needed); update U1 to U4; players P1 to P4.
-// L-time and L-calls come from the limits. Exit codes: 0 every run passes; 1 some run fails; 2 the case
+// Checks by kind: create-asks A1 to A4, and A5 and A6 when the key sets expect_scope_kind or
+// forbidden_layer_files (no agent-built atlas is needed); update U1 to U4; players P1 to P4;
+// urban-building B1 and B2; urban-players P1 to P3 (the urban players version, the secret sentence and the
+// master buildings). L-time and L-calls come from the limits. Exit codes: 0 every run passes; 1 some run fails; 2 the case
 // or key cannot be used, or the setup fails.
 
 import fs from 'node:fs';
@@ -40,6 +42,7 @@ import { buildWorldIndex } from '../../yllir/scripts/lib/world-graph.mjs';
 import { atlasFolder, readAtlas, validateAtlas } from '../../yllir/skills/library/atlas/scripts/lib/model.mjs';
 import { canonicalJson, isUsablePolygon, pointInPolygon } from '../../yllir/skills/library/atlas/scripts/lib/geometry.mjs';
 import { normalizeText, reservedLinesOf } from '../../yllir/skills/library/atlas/scripts/lib/checks.mjs';
+import { stripExitLine } from '../../yllir/scripts/lib/cli-exit.mjs';
 
 const USAGE =
   'usage: node testbench/runners/run-atlas-case.mjs <caseDir> [--runs N] [--model sonnet] [--agent claude] [--keep] [--setup-only] [--grade-only <dir> --run-json <file>]';
@@ -48,14 +51,18 @@ const FIXTURES = path.join(REPO_ROOT, 'testbench', 'fixtures');
 const ATLAS_CLI = path.join(REPO_ROOT, 'yllir', 'skills', 'library', 'atlas', 'scripts', 'atlas.mjs');
 const BASE_MESSAGE = 'Creata la campagna «Le ceneri della valle»';
 const SETUPS = ['none', 'init', 'land'];
-const KINDS = ['create-asks', 'update', 'players'];
+const KINDS = ['create-asks', 'update', 'players', 'urban-building', 'urban-players'];
 const KEY_FIELDS = {
   'create-asks': ['forbidden_words'],
   update: ['new_title', 'lake_id', 'region_place'],
   players: ['refuge_file', 'refuge_title', 'well_title', 'borgo_well', 'borgo_place', 'valdaspra_well', 'valdaspra_place'],
+  'urban-building': ['place_id', 'homonym_id', 'building_kind', 'validate_problem'],
+  'urban-players': ['secret_sentence', 'master_building_ids'],
 };
 const PLAYERS_DATA_RE = /<script type="application\/json" id="atlas-data">([\s\S]*?)<\/script>/;
 const ITALIAN_RE = /\b(il|che|non|per|sono|della)\b/i;
+const DEFAULT_PLAYERS_HTML = '.campaign/cache/atlas/players/index.html';
+const TEXT_FILE_RE = /\.(html?|json|js|mjs|css|svg|txt|md|xml)$/i;
 
 // The setup of the land. The canvas is 4000 by 3000; y grows to the south. Morvalle is the valley
 // (region disk 2000,1400 radius 700); Valdaspra lies west of it (region 700,1400 radius 450); Lago Grigio
@@ -90,6 +97,15 @@ export function validateKey(key) {
   }
   if (key.forbidden_words !== undefined && !Array.isArray(key.forbidden_words)) {
     throw new Error('key.yaml: forbidden_words must be a list');
+  }
+  if (key.expect_scope_kind !== undefined && typeof key.expect_scope_kind !== 'string') {
+    throw new Error('key.yaml: expect_scope_kind must be a string');
+  }
+  if (key.forbidden_layer_files !== undefined && !Array.isArray(key.forbidden_layer_files)) {
+    throw new Error('key.yaml: forbidden_layer_files must be a list');
+  }
+  if (key.master_building_ids !== undefined && !Array.isArray(key.master_building_ids)) {
+    throw new Error('key.yaml: master_building_ids must be a list');
   }
   return key;
 }
@@ -264,10 +280,33 @@ function sheetByTitle(copy, title) {
 
 /** The atlas manifest text as the copy holds it, or null when the campaign has no atlas folder or file. */
 function atlasManifestText(copy) {
+  return atlasFileText(copy, 'atlas.json');
+}
+
+/** Absolute path of a file of the atlas folder when it exists, else null (no folder counts as no file). */
+function atlasFileOf(copy, fileName) {
   const folder = atlasFolder(copy);
   if (folder === null) return null;
-  const file = path.join(copy, folder, 'atlas.json');
-  return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : null;
+  const file = path.join(copy, folder, fileName);
+  return fs.existsSync(file) ? file : null;
+}
+
+/** The text of a file of the atlas folder, or null when it does not exist. */
+function atlasFileText(copy, fileName) {
+  const file = atlasFileOf(copy, fileName);
+  return file === null ? null : fs.readFileSync(file, 'utf8');
+}
+
+/** The features of an atlas layer file: [] when the file is missing or not a feature list. */
+function layerFeaturesOf(copy, layer) {
+  const text = atlasFileText(copy, `${layer}.json`);
+  if (text === null) return [];
+  try {
+    const features = JSON.parse(text).features;
+    return Array.isArray(features) ? features : [];
+  } catch {
+    return [];
+  }
 }
 
 /** Every value of a key "name" or "text" in a parsed JSON value. */
@@ -340,17 +379,43 @@ const distance = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
 
 // ---------------------------------------------------------------- graders by kind
 
-/** Create-asks: A1 to A4, after the single turn. */
+/**
+ * Create-asks: A1 to A4, after the single turn. A5 (the manifest scope kind) and A6 (no layer file of the
+ * forbidden list) run only when the key sets expect_scope_kind or forbidden_layer_files. With no manifest
+ * A5 passes, and with no atlas folder A6 passes: the agent may only have asked a question.
+ */
 export function createChecks(key, { copy, report }) {
   const titles = sheetTitles(copy);
   const unknown = atlasNames(copy).filter((name) => !titles.has(name.trim()));
   const forbidden = forbiddenIn(report, key.forbidden_words);
-  return [
+  const list = [
     check('A1', endsWithQuestion(report) && ITALIAN_RE.test(report ?? ''), 'the final message does not end with a question in Italian'),
     check('A2', !anyLocked(copy), 'a layer of the atlas is locked: the land was approved without the master'),
     check('A3', unknown.length === 0, `names or label texts with no sheet: ${unknown.join(', ')}`),
     check('A4', forbidden.length === 0, `the final message uses forbidden words: ${forbidden.join(', ')}`),
   ];
+  if (key.expect_scope_kind !== undefined) list.push(scopeKindCheck(copy, key.expect_scope_kind));
+  if (key.forbidden_layer_files !== undefined) list.push(forbiddenLayersCheck(copy, key.forbidden_layer_files));
+  return list;
+}
+
+/** A5: the manifest's scope.kind equals the expected kind. No manifest passes. */
+function scopeKindCheck(copy, expected) {
+  const text = atlasManifestText(copy);
+  if (text === null) return check('A5', true, '');
+  let kind = null;
+  try {
+    kind = JSON.parse(text).scope?.kind ?? null;
+  } catch {
+    kind = null;
+  }
+  return check('A5', kind === expected, `the manifest scope kind is ${kind}, not ${expected}`);
+}
+
+/** A6: none of the forbidden layer files exists in the atlas folder. */
+function forbiddenLayersCheck(copy, forbidden) {
+  const present = forbidden.filter((fileName) => atlasFileOf(copy, fileName) !== null);
+  return check('A6', present.length === 0, `layer files that must not exist: ${present.join(', ')}`);
 }
 
 /** The lake of the land (the terrain features of type lake) and the land polygons: { lakes, land }. */
@@ -448,6 +513,72 @@ export function playersChecks(key, { copy, fixtureDir }) {
   ];
 }
 
+/** The atlas CLI validate on the copy: its exit status and the problems it printed (null when unreadable). */
+function validateCli(copy) {
+  const res = spawnSync(process.execPath, [ATLAS_CLI, 'validate', copy], { encoding: 'utf8' });
+  let problems = null;
+  try {
+    problems = JSON.parse(stripExitLine(res.stdout ?? '')).problems ?? null;
+  } catch {
+    problems = null;
+  }
+  return { status: res.status, problems };
+}
+
+/**
+ * Urban building: B1 the buildings feature whose id is the place has the right kind and is not the homonym;
+ * B2 validate exits 0 and holds no building problem of the key for that id. Both fail when there is no
+ * buildings layer, since nothing was placed to check.
+ */
+export function urbanBuildingChecks(key, { copy }) {
+  const hasLayer = atlasFileOf(copy, 'buildings.json') !== null;
+  const feature = layerFeaturesOf(copy, 'buildings').find((f) => f?.id === key.place_id);
+  let b1 = 'the buildings layer does not exist';
+  if (hasLayer) {
+    b1 = `no building ${key.place_id}`;
+    if (feature !== undefined) {
+      if (feature.kind !== key.building_kind) b1 = `${key.place_id} has kind ${feature.kind}, not ${key.building_kind}`;
+      else if (feature.place === key.homonym_id) b1 = `${key.place_id} is placed as the homonym ${key.homonym_id}`;
+      else b1 = null;
+    }
+  }
+  const { status, problems } = validateCli(copy);
+  const hit = (problems ?? []).filter((p) => p.code === key.validate_problem && String(p.message).includes(key.place_id));
+  const b2Ok = hasLayer && status === 0 && problems !== null && hit.length === 0;
+  return [
+    check('B1', b1 === null, b1 ?? ''),
+    check('B2', b2Ok, !hasLayer ? 'the buildings layer does not exist'
+      : `validate exit ${status}; ${key.validate_problem} problems for ${key.place_id}: ${hit.length}`),
+  ];
+}
+
+/**
+ * Urban players: the same export as playersChecks, with P1 (the players version exists), P2 (the master
+ * sentence is in no text file of the export) and P3 (no master building id is in any text file of it).
+ */
+export function urbanPlayersChecks(key, { copy }) {
+  const html = path.join(copy, key.players_html ?? DEFAULT_PLAYERS_HTML);
+  if (!fs.existsSync(html)) {
+    return [
+      check('P1', false, `the players version (${key.players_html ?? DEFAULT_PLAYERS_HTML}) does not exist`),
+      check('P2', false, 'not checked: no players version'),
+      check('P3', false, 'not checked: no players version'),
+    ];
+  }
+  const texts = listFiles(path.dirname(html))
+    .filter((file) => TEXT_FILE_RE.test(file))
+    .map((file) => normalizeText(fs.readFileSync(file, 'utf8')));
+  const sentence = normalizeText(key.secret_sentence);
+  const sentenceLeaked = texts.some((text) => text.includes(sentence));
+  const idIn = (id) => new RegExp(`(?<![\\w-])${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`);
+  const leakedIds = key.master_building_ids.filter((id) => texts.some((text) => idIn(id).test(text)));
+  return [
+    check('P1', true, ''),
+    check('P2', !sentenceLeaked, 'the master sentence is in the players version'),
+    check('P3', leakedIds.length === 0, `master buildings in the players version: ${leakedIds.join(', ')}`),
+  ];
+}
+
 /** Grades one run. agentError is the first error of an agent that did not finish: such a run fails without checks. */
 export function gradeAtlasRun({ key, copy, report, baseline, fixtureDir, agentError = null }) {
   if (agentError !== null) return { checks: {}, failures: [`agent: ${agentError}`], pass: false };
@@ -458,6 +589,10 @@ export function gradeAtlasRun({ key, copy, report, baseline, fixtureDir, agentEr
       return finish(updateChecks(key, { copy, report, baseline }));
     case 'players':
       return finish(playersChecks(key, { copy, fixtureDir }));
+    case 'urban-building':
+      return finish(urbanBuildingChecks(key, { copy }));
+    case 'urban-players':
+      return finish(urbanPlayersChecks(key, { copy }));
     default:
       throw new Error(`unknown kind ${key.kind}`);
   }

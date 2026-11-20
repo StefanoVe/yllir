@@ -22,5 +22,18 @@
   "masks": { "blur": 3 },
   "icons": { "capital": 26, "city": 21, "other": 17 },
   "vignette": { "color": "#2a1d0f", "opacity": 0.35 },
-  "forestTint": { "color": "#2f5a1f", "opacity": 0.12 }
+  "forestTint": { "color": "#2f5a1f", "opacity": 0.12 },
+  "urban": {
+    "ground": "#e6d6a0", "water": "#4a8fc2", "waterEdge": "#2f5f8a", "outline": "#3b2f22", "square": "#d9c08a", "block": "#d8c7a0",
+    "green": { "park": "#7fb35a", "garden": "#a6c96b", "field": "#c8d27a", "wood": "#4f8a3c", "orchard": "#8fbf5f" },
+    "street": { "casing": "#6b4a2b", "main": "#f3e6c4", "secondary": "#e9dcb4", "lane": "#dccfa6" },
+    "wall": { "stone": "#b8a88c", "outline": "#4a3b2a" },
+    "roof": {
+      "house": "#c0563a", "rowhouse": "#b5482f", "shop": "#d98b3a", "barn": "#9c5a2e", "tavern": "#a8442c", "inn": "#c2703a",
+      "temple": "#e8d7b0", "shrine": "#d6b25e", "palace": "#e0b44a", "castle": "#8c7a64", "keep": "#7d6a55", "tower": "#9a8a72",
+      "mill": "#c9a46a", "warehouse": "#8a6a48", "market": "#e07a5f", "guildhall": "#7a4a7a", "smithy": "#6e4b3c",
+      "gatehouse": "#a0896a", "landmark": "#b8863c"
+    },
+    "district": { "fillOpacity": 0.12, "labelOpacity": 0.8 }
+  }
 }

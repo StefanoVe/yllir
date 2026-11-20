@@ -9,9 +9,11 @@ import { stripExitLine } from '../../../../scripts/lib/cli-exit.mjs';
 import { pngSize } from '../../../../scripts/lib/png.mjs';
 import {
   cleanupCampaigns, standardCampaign, makeCampaign, campaignYaml, terrainLayer, placesLayer,
-  landFeature, square, readAtlasFile, placeSheet, writeAtlas, baseManifest,
+  landFeature, square, readAtlasFile, placeSheet, writeAtlas, baseManifest, buildingsLayer,
 } from './lib/test-support.mjs';
 import { listStyles } from './lib/styles.mjs';
+import { URBAN_LAYERS } from './lib/model.mjs';
+import { pointInPolygon } from './lib/geometry.mjs';
 
 after(cleanupCampaigns);
 
@@ -533,4 +535,100 @@ test('set-style to a listed style that is not installed exits 1 style-not-instal
   assert.equal(result.code, 1);
   assert.equal(json(result.stdout).problems[0].code, 'style-not-installed');
   assert.equal(readAtlasFile(root, 'atlas.json'), atlasBefore);
+});
+
+/** A point inside a polygon: the first point of a 5-unit grid over its bounding box that pointInPolygon accepts. */
+function insideOf(polygon) {
+  const xs = polygon.map((p) => p[0]);
+  const ys = polygon.map((p) => p[1]);
+  for (let y = Math.min(...ys); y <= Math.max(...ys); y += 5) {
+    for (let x = Math.min(...xs); x <= Math.max(...xs); x += 5) {
+      if (pointInPolygon([x, y], polygon)) return [x, y];
+    }
+  }
+  return null;
+}
+
+test('an urban atlas: init at the urban canvas, generate its layers with an empty blocks list, place a building, and refuse a change to locked ground', () => {
+  const root = standardCampaign();
+  const scope = writeJsonFile(path.join(root, 'scope.json'), { scope: { kind: 'settlement', places: ['north'] } });
+  const init = run('init', root, scope);
+  assert.equal(init.code, 0, init.stdout);
+  assert.deepEqual(JSON.parse(readAtlasFile(root, 'atlas.json')).canvas, { width: 2400, height: 1800 });
+
+  const candidate = (name, constraints) => writeJsonFile(path.join(root, `${name}-candidate.json`), { layer: name, constraints, features: [] });
+  const river = { kind: 'river', id: 'river-main', source: [0, 900], mouth: [2400, 1000], via: [[1200, 950]], width: 60, provenance: 'master', sources: [] };
+  const mainStreet = { kind: 'street', id: 'main-street', rank: 'main', path: [[200, 600], [2200, 600]], provenance: 'master', sources: [] };
+  const marketSquare = { kind: 'square', id: 'market-square', at: [1200, 1200], size: [160, 120], provenance: 'master', sources: [] };
+  const townWall = {
+    kind: 'wall',
+    id: 'town-wall',
+    ring: [[300, 300], [2100, 300], [2100, 1500], [300, 1500]],
+    thickness: 12,
+    towers: 'corners',
+    gates: [{ at: [1200, 300], width: 30 }],
+    provenance: 'master',
+    sources: [],
+  };
+  assert.equal(run('write-layer', root, 'ground', candidate('ground', [river])).code, 0);
+  assert.equal(run('write-layer', root, 'streets', candidate('streets', [mainStreet, marketSquare])).code, 0);
+  assert.equal(run('write-layer', root, 'walls', candidate('walls', [townWall])).code, 0);
+  assert.equal(run('write-layer', root, 'green', candidate('green', [])).code, 0);
+  assert.equal(run('write-layer', root, 'blocks', candidate('blocks', [])).code, 0);
+  assert.equal(run('write-layer', root, 'districts', candidate('districts', [])).code, 0);
+
+  for (const name of ['ground', 'green', 'walls', 'streets', 'blocks', 'districts']) {
+    const result = run('generate', root, name);
+    assert.equal(result.code, 0, `${name}: ${result.stdout}`);
+    assert.equal(json(result.stdout).ok, true);
+  }
+  const blocks = JSON.parse(readAtlasFile(root, 'blocks.json'));
+  assert.deepEqual(blocks.constraints, []);
+  assert.ok(blocks.features.length > 0);
+  const spot = insideOf(blocks.features[0].polygon);
+  assert.ok(spot, 'a block with a point inside');
+
+  const buildings = writeJsonFile(path.join(root, 'buildings-candidate.json'), buildingsLayer([['north', spot, 'tavern']]));
+  assert.equal(run('write-layer', root, 'buildings', buildings).code, 0);
+
+  const valid = run('validate', root);
+  assert.equal(valid.code, 0, valid.stdout);
+  assert.equal(json(valid.stdout).ok, true);
+
+  const status = run('status', root);
+  assert.equal(status.code, 0);
+  const out = json(status.stdout);
+  assert.deepEqual(Object.keys(out.layers), URBAN_LAYERS);
+  assert.equal(out.layers.ground.present, true);
+  assert.equal(out.layers.buildings.features, 1);
+  assert.deepEqual(out.pending.map((p) => p.id), ['port-ash']);
+
+  const places = run('places', root);
+  assert.equal(places.code, 0);
+  const listed = json(places.stdout).places;
+  const north = listed.find((p) => p.id === 'north');
+  assert.deepEqual(
+    { placed: north.placed, at: north.at, icon: north.icon },
+    { placed: true, at: spot, icon: 'tavern' },
+  );
+  assert.equal(listed.find((p) => p.id === 'port-ash').placed, false);
+
+  assert.equal(run('lock', root, 'ground').code, 0);
+  const before = readAtlasFile(root, 'ground.json');
+  const widened = writeJsonFile(path.join(root, 'ground-changed.json'), { layer: 'ground', constraints: [{ ...river, width: 80 }], features: [] });
+  const refused = run('write-layer', root, 'ground', widened);
+  assert.equal(refused.code, 1);
+  assert.equal(json(refused.stdout).ok, false);
+  assert.equal(readAtlasFile(root, 'ground.json'), before);
+});
+
+test('generate terrain on an urban atlas is refused with wrong-scale-layer', () => {
+  const root = standardCampaign();
+  const scope = writeJsonFile(path.join(root, 'scope.json'), { scope: { kind: 'settlement', places: ['north'] } });
+  assert.equal(run('init', root, scope).code, 0);
+  const result = run('generate-terrain', root);
+  assert.equal(result.code, 1);
+  assert.equal(json(result.stdout).problems[0].code, 'wrong-scale-layer');
+  assert.equal(lastLine(result.stdout), 'exit: 1');
+  assert.equal(fs.existsSync(path.join(root, 'Atlas', 'terrain.json')), false);
 });

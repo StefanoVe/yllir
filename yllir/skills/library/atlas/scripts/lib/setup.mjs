@@ -9,11 +9,17 @@ import crypto from 'node:crypto';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { addCategory, stringifyConfig } from '../../../../../scripts/lib/config-write.mjs';
 import { validateConfig } from '../../../../../scripts/lib/config.mjs';
-import { atlasFolder } from './model.mjs';
+import { atlasFolder, isUrbanScope } from './model.mjs';
 
 const FILE = 'campaign.yaml';
 export const DEFAULT_CANVAS = { width: 4000, height: 3000 };
+export const DEFAULT_URBAN_CANVAS = { width: 2400, height: 1800 };
 export const DEFAULT_STYLE = 'fantasy-color';
+
+/** A new copy of the default canvas for a scope kind: the urban one for a settlement or district. */
+export function defaultCanvasFor(kind) {
+  return { ...(isUrbanScope(kind) ? DEFAULT_URBAN_CANVAS : DEFAULT_CANVAS) };
+}
 
 const isMapping = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 

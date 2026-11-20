@@ -2,11 +2,14 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { atlasDir, readAtlas, validateAtlas, manifestProblems } from './model.mjs';
+import {
+  atlasDir, readAtlas, validateAtlas, manifestProblems, LAYERS, GEO_LAYERS, URBAN_LAYERS, SCOPE_KINDS,
+  isUrbanScope, layersForScope,
+} from './model.mjs';
 import { buildWorldIndex } from '../../../../../scripts/lib/world-graph.mjs';
 import {
   cleanupCampaigns, standardCampaign, makeCampaign, campaignYaml, baseManifest, terrainLayer, landFeature,
-  placesLayer, square, writeAtlas, readAtlasFile,
+  placesLayer, square, writeAtlas, readAtlasFile, urbanManifest, groundLayer, blocksLayer, buildingsLayer,
 } from './test-support.mjs';
 
 after(cleanupCampaigns);
@@ -315,4 +318,308 @@ test('a forest biome may carry a variant of conifer or broadleaf; other variants
   assert.deepEqual(check(layerWith(biome({ variant: 'broadleaf' }))), []);
   assert.ok(codes(check(layerWith(biome({ variant: 'palm' })))).includes('bad-feature'));
   assert.ok(codes(check(layerWith(biome({ type: 'swamp', variant: 'conifer' })))).includes('bad-feature'));
+});
+
+// Urban scale (settlement, district): layers, constraints, features, wrong-scale-layer, building checks.
+
+const urbanRoot = (layers = {}, manifest = urbanManifest()) => {
+  const root = standardCampaign();
+  writeAtlas(root, { manifest, layers });
+  return root;
+};
+const layer = (name, { constraints = [], features = [] } = {}) => ({ layer: name, constraints, features });
+const master = { provenance: 'master', sources: [] };
+const shown = { provenance: 'master', visibility: 'public', sources: [] };
+/** The problems of an urban atlas with these layers, as `code path` (no file: the path is enough here). */
+const problemsOf = (layers) => check(urbanRoot(layers)).map((p) => `${p.code} ${p.path}`);
+
+test('layer lists: every layer once, labels last, geographic order kept, urban layers in drawing order', () => {
+  assert.equal(new Set(LAYERS).size, LAYERS.length);
+  assert.equal(LAYERS.filter((name) => name === 'labels').length, 1);
+  assert.equal(LAYERS.at(-1), 'labels');
+  assert.deepEqual(GEO_LAYERS, ['terrain', 'relief', 'water', 'biomes', 'political', 'places', 'routes', 'labels']);
+  assert.deepEqual(URBAN_LAYERS, ['ground', 'green', 'walls', 'streets', 'blocks', 'buildings', 'districts', 'labels']);
+  assert.deepEqual(LAYERS.filter((name) => GEO_LAYERS.includes(name)), GEO_LAYERS);
+  assert.deepEqual(LAYERS.filter((name) => URBAN_LAYERS.includes(name)), URBAN_LAYERS);
+  assert.equal(LAYERS.length, 15);
+});
+
+test('settlement and district are urban scopes; the other scope kinds are geographic', () => {
+  assert.deepEqual(SCOPE_KINDS, ['world', 'continent', 'region', 'settlement', 'district']);
+  assert.equal(isUrbanScope('settlement'), true);
+  assert.equal(isUrbanScope('district'), true);
+  assert.equal(isUrbanScope('region'), false);
+  assert.equal(isUrbanScope('world'), false);
+  assert.deepEqual(layersForScope('district'), URBAN_LAYERS);
+  assert.deepEqual(layersForScope('continent'), GEO_LAYERS);
+});
+
+test('scope.unit is optional; m and paces are accepted, anything else is bad-manifest', () => {
+  assert.deepEqual(manifestProblems(urbanManifest({ scope: { kind: 'settlement', places: [], unit: 'paces' } })), []);
+  assert.deepEqual(manifestProblems(urbanManifest({ scope: { kind: 'settlement', places: [], unit: 'm' } })), []);
+  const bad = manifestProblems(urbanManifest({ scope: { kind: 'settlement', places: [], unit: 'feet' } }));
+  assert.ok(bad.some((p) => p.code === 'bad-manifest' && p.path === 'scope.unit'));
+});
+
+test('a geographic layer in an urban atlas, or an urban layer in a geographic one, gives wrong-scale-layer', () => {
+  const urban = check(urbanRoot({ terrain: terrainLayer(), ground: groundLayer() }));
+  const found = urban.find((p) => p.code === 'wrong-scale-layer');
+  assert.equal(found.file, 'Atlas/terrain.json');
+  assert.equal(found.path, '');
+  assert.equal(urban.some((p) => p.code === 'wrong-scale-layer' && p.file === 'Atlas/ground.json'), false);
+
+  const geo = check(validRoot({ layers: { terrain: terrainLayer(), ground: groundLayer() } }));
+  const wrong = geo.filter((p) => p.code === 'wrong-scale-layer');
+  assert.deepEqual(wrong.map((p) => p.file), ['Atlas/ground.json']);
+  assert.equal(wrong[0].path, '');
+});
+
+test('labels is shared: an urban atlas may have labels, and so may a geographic one', () => {
+  const labels = layer('labels');
+  assert.equal(check(urbanRoot({ labels })).some((p) => p.code === 'wrong-scale-layer'), false);
+  assert.equal(check(validRoot({ layers: { labels } })).some((p) => p.code === 'wrong-scale-layer'), false);
+});
+
+test('a complete urban atlas has zero problems', () => {
+  const root = urbanRoot({
+    ground: layer('ground', {
+      constraints: [{ kind: 'pond', id: 'mill-pond', at: [1200, 400], radius: 60, ...master }],
+      features: [{ id: 'mill-pond', type: 'water', kind: 'pond', polygon: square(1140, 340, 1260, 460), ...shown }],
+    }),
+    streets: layer('streets', {
+      constraints: [{ kind: 'street', id: 'high-street', rank: 'main', path: [[0, 900], [2400, 900]], ...master }],
+      features: [
+        { id: 'high-street', type: 'street', rank: 'main', width: 14, path: [[0, 900], [2400, 900]], ...shown },
+        { id: 'market-square', type: 'square', polygon: square(300, 300, 400, 400), ...shown },
+      ],
+    }),
+    blocks: layer('blocks', {
+      constraints: [{ kind: 'fill', id: 'old-town', character: 'poor', ...master }],
+      features: [{
+        id: 'block-1', type: 'block', polygon: square(200, 200, 800, 800), character: 'common',
+        lots: [{ kind: 'house', at: [250, 250], size: [10, 8], angle: 0 }], ...shown,
+      }],
+    }),
+    buildings: buildingsLayer([['north', [500, 500], 'tavern']]),
+    districts: layer('districts', {
+      features: [{
+        id: 'docks', type: 'district', color: '#3366aa', seeds: [[400, 1200]], name: 'The Docks',
+        polygon: square(300, 1000, 900, 1500), character: 'poor', ...shown,
+      }],
+    }),
+    labels: layer('labels', {
+      features: [{ id: 'label-market', target: 'streets/market-square', text: 'Market', ...shown }],
+    }),
+  });
+  assert.deepEqual(check(root), []);
+});
+
+test('ground constraints: each kind is checked field by field', () => {
+  const river = { kind: 'river', id: 'silver', source: [0, 900], mouth: [2400, 900], width: 30, ...master };
+  const coast = { kind: 'coast', id: 'harbour', side: 'south', depth: 300, roughness: 0.4, ...master };
+  const pond = { kind: 'pond', id: 'mill-pond', at: [1200, 400], radius: 60, ...master };
+  const canal = { kind: 'canal', id: 'east-cut', path: [[1800, 0], [1800, 1800]], width: 12, ...master };
+  assert.deepEqual(problemsOf({ ground: layer('ground', { constraints: [river, coast, pond, canal] }) }), []);
+
+  const ground = (constraint) => problemsOf({ ground: layer('ground', { constraints: [constraint] }) });
+  assert.deepEqual(ground({ ...river, width: 0 }), ['bad-constraint constraints[0].width']);
+  assert.deepEqual(ground({ ...river, meander: 2 }), ['bad-constraint constraints[0].meander']);
+  assert.deepEqual(ground({ ...coast, side: 'up' }), ['bad-constraint constraints[0].side']);
+  assert.deepEqual(ground({ ...coast, depth: 0 }), ['bad-constraint constraints[0].depth']);
+  assert.deepEqual(ground({ ...pond, radius: -1 }), ['bad-constraint constraints[0].radius']);
+  assert.deepEqual(ground({ ...pond, roughness: 3 }), ['bad-constraint constraints[0].roughness']);
+  assert.deepEqual(ground({ ...canal, path: [[1800, 0]] }), ['bad-constraint constraints[0].path']);
+  assert.deepEqual(ground({ ...canal, id: 'East Cut' }), ['bad-constraint constraints[0].id']);
+  assert.deepEqual(ground({ ...canal, visibility: 'secret' }), ['bad-constraint constraints[0].visibility']);
+  assert.deepEqual(ground({ ...canal, kind: 'lake' }), ['bad-constraint constraints[0].kind']);
+});
+
+test('ground features: water polygons need a type of water and at least three points', () => {
+  const pond = (extra) => ({ id: 'mill-pond', type: 'water', kind: 'pond', polygon: square(1140, 340, 1260, 460), ...shown, ...extra });
+  assert.deepEqual(problemsOf({ ground: layer('ground', { features: [pond({})] }) }), []);
+  assert.deepEqual(problemsOf({ ground: layer('ground', { features: [pond({ type: 'land' })] }) }), ['bad-feature features[0].type']);
+  assert.deepEqual(
+    problemsOf({ ground: layer('ground', { features: [pond({ polygon: [[0, 0], [10, 10]] })] }) }),
+    ['bad-feature features[0].polygon'],
+  );
+});
+
+test('green constraints need a park type, a point and a radius; green features need a green type and a polygon', () => {
+  const park = { kind: 'park', id: 'green-park', type: 'garden', at: [600, 600], radius: 150, ...master };
+  assert.deepEqual(problemsOf({ green: layer('green', { constraints: [park] }) }), []);
+  const green = (constraint) => problemsOf({ green: layer('green', { constraints: [constraint] }) });
+  assert.deepEqual(green({ ...park, type: 'forest' }), ['bad-constraint constraints[0].type']);
+  assert.deepEqual(green({ ...park, radius: 0 }), ['bad-constraint constraints[0].radius']);
+  assert.deepEqual(green({ ...park, at: [600] }), ['bad-constraint constraints[0].at']);
+
+  const feature = (extra) => ({ id: 'green-park', type: 'garden', polygon: square(450, 450, 750, 750), ...shown, ...extra });
+  assert.deepEqual(problemsOf({ green: layer('green', { features: [feature({})] }) }), []);
+  assert.deepEqual(problemsOf({ green: layer('green', { features: [feature({ type: 'lake' })] }) }), ['bad-feature features[0].type']);
+  assert.deepEqual(
+    problemsOf({ green: layer('green', { features: [feature({ polygon: [[0, 0]] })] }) }),
+    ['bad-feature features[0].polygon'],
+  );
+});
+
+test('walls constraints: exactly one of ring or path, a thickness, towers and gates are checked', () => {
+  const wall = {
+    kind: 'wall', id: 'town-wall', ring: [[300, 300], [2100, 300], [2100, 1500], [300, 1500]],
+    thickness: 8, towers: 'corners', gates: [{ at: [1200, 300], width: 20 }], ...master,
+  };
+  assert.deepEqual(problemsOf({ walls: layer('walls', { constraints: [wall] }) }), []);
+  const walls = (constraint) => problemsOf({ walls: layer('walls', { constraints: [constraint] }) });
+  assert.deepEqual(walls({ ...wall, path: [[300, 300], [900, 300]] }), ['bad-constraint constraints[0].ring']);
+  const neither = { ...wall };
+  delete neither.ring;
+  assert.deepEqual(walls(neither), ['bad-constraint constraints[0].ring']);
+  assert.deepEqual(walls({ ...wall, ring: [[300, 300], [900, 300]] }), ['bad-constraint constraints[0].ring']);
+  assert.deepEqual(walls({ ...wall, thickness: 0 }), ['bad-constraint constraints[0].thickness']);
+  assert.deepEqual(walls({ ...wall, towers: 'dense' }), ['bad-constraint constraints[0].towers']);
+  assert.deepEqual(walls({ ...wall, towerSpacing: -5 }), ['bad-constraint constraints[0].towerSpacing']);
+  assert.deepEqual(walls({ ...wall, gates: [{ at: [1200, 300], width: 0 }] }), ['bad-constraint constraints[0].gates[0].width']);
+  assert.deepEqual(walls({ ...wall, gates: [{ width: 20 }] }), ['bad-constraint constraints[0].gates[0].at']);
+});
+
+test('walls features: a wall line, a tower and a gate each have their own fields', () => {
+  const line = { id: 'town-wall', type: 'wall', path: [[300, 300], [2100, 300]], closed: false, thickness: 8, ...shown };
+  const tower = { id: 'town-wall-tower-1', type: 'tower', at: [300, 300], radius: 12, ...shown };
+  const gate = { id: 'town-wall-gate-1', type: 'gate', at: [1200, 300], angle: 0, width: 20, ...shown };
+  assert.deepEqual(problemsOf({ walls: layer('walls', { features: [line, tower, gate] }) }), []);
+  const walls = (feature) => problemsOf({ walls: layer('walls', { features: [feature] }) });
+  assert.deepEqual(walls({ ...line, path: [[300, 300]] }), ['bad-feature features[0].path']);
+  assert.deepEqual(walls({ ...line, closed: 'yes' }), ['bad-feature features[0].closed']);
+  assert.deepEqual(walls({ ...line, thickness: undefined }), ['bad-feature features[0].thickness']);
+  assert.deepEqual(walls({ ...tower, radius: undefined }), ['bad-feature features[0].radius']);
+  assert.deepEqual(walls({ ...gate, angle: undefined }), ['bad-feature features[0].angle']);
+  assert.deepEqual(walls({ ...gate, width: 0 }), ['bad-feature features[0].width']);
+  assert.deepEqual(walls({ ...gate, type: 'moat' }), ['bad-feature features[0].type']);
+});
+
+test('streets constraints: rank, square size, grid spacing, jitter and rank are checked', () => {
+  const street = { kind: 'street', id: 'high-street', rank: 'main', path: [[0, 900], [2400, 900]], ...master };
+  const square_ = { kind: 'square', id: 'market-square', at: [1200, 900], size: [120, 90], angle: 0, ...master };
+  const grid = { kind: 'grid', id: 'north-grid', area: square(300, 300, 900, 900), spacing: 60, jitter: 0.2, rank: 'lane', ...master };
+  assert.deepEqual(problemsOf({ streets: layer('streets', { constraints: [street, square_, grid] }) }), []);
+  const streets = (constraint) => problemsOf({ streets: layer('streets', { constraints: [constraint] }) });
+  assert.deepEqual(streets({ ...street, rank: 'avenue' }), ['bad-constraint constraints[0].rank']);
+  assert.deepEqual(streets({ ...street, path: [[0, 900]] }), ['bad-constraint constraints[0].path']);
+  assert.deepEqual(streets({ ...square_, size: [0, 90] }), ['bad-constraint constraints[0].size']);
+  assert.deepEqual(streets({ ...square_, angle: 'north' }), ['bad-constraint constraints[0].angle']);
+  assert.deepEqual(streets({ ...grid, spacing: 0 }), ['bad-constraint constraints[0].spacing']);
+  assert.deepEqual(streets({ ...grid, jitter: 2 }), ['bad-constraint constraints[0].jitter']);
+  assert.deepEqual(streets({ ...grid, rank: 'main' }), ['bad-constraint constraints[0].rank']);
+  assert.deepEqual(streets({ ...grid, area: [[0, 0], [1, 1]] }), ['bad-constraint constraints[0].area']);
+});
+
+test('streets features: a street, a square polygon and a two-point bridge', () => {
+  const street = { id: 'high-street', type: 'street', rank: 'main', width: 14, path: [[0, 900], [2400, 900]], ...shown };
+  const square_ = { id: 'market-square', type: 'square', polygon: square(1100, 800, 1300, 1000), ...shown };
+  const bridge = { id: 'bridge-high-street-1', type: 'bridge', path: [[1150, 900], [1250, 900]], width: 14, ...shown };
+  assert.deepEqual(problemsOf({ streets: layer('streets', { features: [street, square_, bridge] }) }), []);
+  const streets = (feature) => problemsOf({ streets: layer('streets', { features: [feature] }) });
+  assert.deepEqual(streets({ ...street, rank: 'alley' }), ['bad-feature features[0].rank']);
+  assert.deepEqual(streets({ ...street, width: 0 }), ['bad-feature features[0].width']);
+  assert.deepEqual(streets({ ...square_, polygon: [[0, 0], [1, 1]] }), ['bad-feature features[0].polygon']);
+  assert.deepEqual(
+    streets({ ...bridge, path: [[1150, 900], [1200, 900], [1250, 900]] }),
+    ['bad-feature features[0].path'],
+  );
+  assert.deepEqual(streets({ ...bridge, width: undefined }), ['bad-feature features[0].width']);
+  assert.deepEqual(streets({ ...bridge, type: 'road' }), ['bad-feature features[0].type']);
+});
+
+test('blocks constraint: a fill with a known character and an optional area', () => {
+  const fill = { kind: 'fill', id: 'old-town', character: 'poor', area: square(200, 200, 800, 800), district: 'docks', ...master };
+  assert.deepEqual(problemsOf({ blocks: layer('blocks', { constraints: [fill] }) }), []);
+  assert.deepEqual(problemsOf({ blocks: layer('blocks', { constraints: [{ ...fill, character: 'royal' }] }) }),
+    ['bad-constraint constraints[0].character']);
+  assert.deepEqual(problemsOf({ blocks: layer('blocks', { constraints: [{ ...fill, district: 'Old Docks' }] }) }),
+    ['bad-constraint constraints[0].district']);
+});
+
+test('blocks features: a block needs a character, a polygon and a list of lots with kind, point, size and angle', () => {
+  const lots = [
+    { kind: 'house', at: [250, 250], size: [10, 8], angle: 0 },
+    { kind: 'barn', at: [700, 700], size: [20, 12], angle: 1.5707 },
+  ];
+  const block = (extra) => ({ id: 'block-1', type: 'block', polygon: square(200, 200, 800, 800), character: 'common', lots, ...shown, ...extra });
+  assert.deepEqual(problemsOf({ blocks: blocksLayer([block({})]) }), []);
+  const blocks = (extra) => problemsOf({ blocks: blocksLayer([block(extra)]) });
+  assert.deepEqual(blocks({ character: undefined }), ['bad-feature features[0].character']);
+  assert.deepEqual(blocks({ polygon: [[0, 0], [1, 1]] }), ['bad-feature features[0].polygon']);
+  assert.deepEqual(blocks({ lots: undefined }), ['bad-feature features[0].lots']);
+  assert.deepEqual(blocks({ lots: [{ ...lots[0], kind: 'castle' }] }), ['bad-feature features[0].lots[0].kind']);
+  assert.deepEqual(blocks({ lots: [{ ...lots[0], size: [0, 3] }] }), ['bad-feature features[0].lots[0].size']);
+  assert.deepEqual(blocks({ lots: [{ ...lots[0], angle: undefined }] }), ['bad-feature features[0].lots[0].angle']);
+  assert.deepEqual(blocks({ lots: [{ ...lots[0], at: [2500, 10] }] }), ['out-of-canvas features[0].lots[0].at']);
+});
+
+test('buildings: no constraints; the id equals the place, the place is a place sheet, the kind is known', () => {
+  assert.deepEqual(problemsOf({ buildings: buildingsLayer([['north', [500, 500], 'tavern']]) }), []);
+  const withConstraint = {
+    layer: 'buildings', constraints: [{ kind: 'fill', id: 'x', ...master }], features: [],
+  };
+  assert.deepEqual(problemsOf({ buildings: withConstraint }), ['bad-constraint constraints[0].kind']);
+
+  const mismatch = buildingsLayer([['north', [500, 500], 'tavern']]);
+  mismatch.features[0].id = 'port-ash';
+  assert.deepEqual(problemsOf({ buildings: mismatch }), ['bad-feature features[0].id']);
+  assert.deepEqual(problemsOf({ buildings: buildingsLayer([['north', [500, 500], 'dragon']]) }),
+    ['bad-feature features[0].kind']);
+  assert.deepEqual(problemsOf({ buildings: buildingsLayer([['ghost', [500, 500], 'house']]) }),
+    ['unknown-place features[0].place']);
+  assert.deepEqual(problemsOf({ buildings: buildingsLayer([['mara', [500, 500], 'house']]) }),
+    ['id-not-place features[0].place']);
+  const sized = buildingsLayer([['north', [500, 500], 'tavern']]);
+  sized.features[0].size = [0, 4];
+  assert.deepEqual(problemsOf({ buildings: sized }), ['bad-feature features[0].size']);
+});
+
+test('buildings: a building in water gives building-in-water; off every block or square, building-not-on-block', () => {
+  const pond = layer('ground', {
+    features: [{ id: 'mill-pond', type: 'water', kind: 'pond', polygon: square(400, 400, 600, 600), ...shown }],
+  });
+  const blocks = blocksLayer([{ id: 'block-1', type: 'block', polygon: square(200, 200, 800, 800), character: 'common', lots: [], ...shown }]);
+  const inWater = check(urbanRoot({ ground: pond, blocks, buildings: buildingsLayer([['north', [500, 500], 'tavern']]) }));
+  assert.ok(inWater.some((p) => p.code === 'building-in-water' && p.file === 'Atlas/buildings.json' && p.path === 'features[0].at'));
+  assert.equal(inWater.some((p) => p.code === 'building-not-on-block'), false);
+
+  const off = check(urbanRoot({ blocks, buildings: buildingsLayer([['north', [50, 50], 'house']]) }));
+  assert.ok(off.some((p) => p.code === 'building-not-on-block' && p.path === 'features[0].at'));
+  assert.equal(off.some((p) => p.code === 'building-in-water'), false);
+});
+
+test('buildings: a square counts as a place to stand; with no blocks and no squares the check is skipped', () => {
+  const squares = layer('streets', {
+    features: [{ id: 'market-square', type: 'square', polygon: square(300, 300, 400, 400), ...shown }],
+  });
+  assert.deepEqual(problemsOf({ streets: squares, buildings: buildingsLayer([['north', [350, 350], 'shop']]) }), []);
+  assert.deepEqual(
+    problemsOf({ streets: squares, buildings: buildingsLayer([['north', [900, 900], 'shop']]) }),
+    ['building-not-on-block features[0].at'],
+  );
+  assert.deepEqual(problemsOf({ buildings: buildingsLayer([['north', [900, 900], 'shop']]) }), []);
+});
+
+test('districts: the realm rules, a character, and the district type', () => {
+  const district = { kind: 'district', id: 'docks', color: '#3366aa', seeds: [[400, 1200]], character: 'poor', place: 'north', ...master };
+  assert.deepEqual(problemsOf({ districts: layer('districts', { constraints: [district] }) }), []);
+  const districts = (constraint) => problemsOf({ districts: layer('districts', { constraints: [constraint] }) });
+  assert.deepEqual(districts({ ...district, color: 'blue' }), ['bad-constraint constraints[0].color']);
+  assert.deepEqual(districts({ ...district, seeds: [] }), ['bad-constraint constraints[0].seeds']);
+  assert.deepEqual(districts({ ...district, character: 'royal' }), ['bad-constraint constraints[0].character']);
+  assert.deepEqual(districts({ ...district, place: 'ghost' }), ['unknown-place constraints[0].place']);
+  assert.deepEqual(districts({ ...district, kind: 'realm' }), ['bad-constraint constraints[0].kind']);
+
+  const feature = {
+    id: 'docks', type: 'district', color: '#3366aa', seeds: [[400, 1200]], name: 'The Docks',
+    polygon: square(300, 1000, 900, 1500), character: 'poor', ...shown,
+  };
+  assert.deepEqual(problemsOf({ districts: layer('districts', { features: [feature] }) }), []);
+  assert.deepEqual(problemsOf({ districts: layer('districts', { features: [{ ...feature, type: 'realm' }] }) }),
+    ['bad-feature features[0].type']);
+  assert.deepEqual(problemsOf({ districts: layer('districts', { features: [{ ...feature, character: 'royal' }] }) }),
+    ['bad-feature features[0].character']);
+  assert.deepEqual(problemsOf({ districts: layer('districts', { features: [{ ...feature, name: 3 }] }) }),
+    ['bad-feature features[0].name']);
 });

@@ -132,6 +132,42 @@ export function placesLayer(entries) {
   };
 }
 
+/** A valid urban manifest: settlement scope, 2400x1800 canvas; overrides replace top-level fields. */
+export function urbanManifest(overrides = {}) {
+  return baseManifest({
+    scope: { kind: 'settlement', places: [], note: 'test' },
+    canvas: { width: 2400, height: 1800 },
+    ...overrides,
+  });
+}
+
+/** A ground layer (water only) with the given features; no features means dry land. */
+export function groundLayer(features = []) {
+  return { layer: 'ground', constraints: [], features };
+}
+
+/** A blocks layer with the given features. */
+export function blocksLayer(features = []) {
+  return { layer: 'blocks', constraints: [], features };
+}
+
+/** A buildings layer with one feature per entry `[place id, point, kind?]`; the kind defaults to house. */
+export function buildingsLayer(entries) {
+  return {
+    layer: 'buildings',
+    constraints: [],
+    features: entries.map(([id, at, kind = 'house']) => ({
+      id,
+      place: id,
+      at,
+      kind,
+      provenance: 'master',
+      visibility: 'public',
+      sources: [],
+    })),
+  };
+}
+
 /** Writes Atlas/atlas.json and the layer files, from objects. Layers with a null value are not written. */
 export function writeAtlas(root, { manifest = baseManifest(), layers = {} } = {}) {
   const dir = path.join(root, 'Atlas');

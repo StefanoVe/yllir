@@ -59,6 +59,16 @@ body {
   will-change: transform;
 }
 
+/* An urban map has no sea (viewer.js adds the classes): outside the map is the page's neutral paper colour. */
+html.is-urban,
+html.is-urban body {
+  background: var(--paper);
+}
+
+body.is-urban #sea {
+  display: none;
+}
+
 /* The last 3% of the map fades into the sea. */
 #stage svg {
   display: block;
@@ -316,6 +326,120 @@ button:hover {
 .card code {
   font-size: 0.9rem;
   word-break: break-all;
+}
+
+/* Urban markers: one button per notable place, over the map. The size is the same at every zoom (viewer.js sets
+   the position). The disc is 28 px; on a phone the button, the touch target, is 44 px around it. */
+.markers {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  z-index: 1;
+}
+
+.marker,
+.marker:hover {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.marker.is-off {
+  display: none;
+}
+
+.marker-disc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2px solid var(--line);
+  box-shadow: var(--shadow);
+  color: var(--ink);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+/* A district is an outlined disc: the paper shows through, and the outline is the accent colour. */
+.marker.is-district .marker-disc {
+  background: rgba(243, 234, 210, 0.6);
+  border: 2px solid var(--accent);
+}
+
+.marker:hover .marker-disc,
+.marker[aria-pressed="true"] .marker-disc {
+  border-color: var(--accent);
+  background: #fbf6e6;
+}
+
+.marker-icon {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.marker:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.marker-name {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translate(-50%, 4px);
+  display: none;
+  padding: 2px 6px;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  line-height: 1.3;
+  color: var(--ink);
+  background: rgba(243, 234, 210, 0.95);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: var(--shadow);
+  pointer-events: none;
+}
+
+.marker:hover .marker-name,
+.marker:focus-visible .marker-name {
+  display: block;
+}
+
+@media (max-width: 480px) {
+  .marker,
+  .marker:hover {
+    width: 44px;
+    height: 44px;
+    margin: -22px 0 0 -22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marker-disc {
+    transition: none;
+  }
 }
 
 /* Wide screens: the search box is always open, with no toggle. */

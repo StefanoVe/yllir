@@ -3,6 +3,23 @@
 
 import { encodePng } from '../../../../../scripts/lib/png.mjs';
 import { isFinitePoint, isUsablePolygon } from './geometry.mjs';
+import { defaultSize } from './urban-assets.mjs';
+import { rectCorners } from './urban/shapes.mjs';
+
+// Urban layers: an urban atlas has any of these with features, and is drawn with plain colours.
+const URBAN_LAYERS = ['ground', 'green', 'walls', 'streets', 'blocks', 'buildings', 'districts'];
+const URBAN_COLOURS = {
+  ground: '#e8dcb5',
+  water: '#7fa7c9',
+  green: '#9dbd7a',
+  street: '#ffffff',
+  square: '#f4e9c8',
+  block: '#c9b98a',
+  lot: '#a8664b',
+  wall: '#555555',
+  building: '#222222',
+};
+const URBAN_STREET_WIDTH = { main: 14, secondary: 9, lane: 5 };
 
 const COLOURS = {
   sea: '#7fa7c9',
@@ -83,6 +100,85 @@ export function renderPreview({ canvas, layers = {}, width = 1024 }) {
       }
     }
   };
+
+  // Coordinate grid: every tenth of the width, white at 50 percent over the colour.
+  const drawGrid = () => {
+    const step = canvas.width / 10;
+    const blend = (index) => {
+      for (let c = 0; c < 3; c++) rgb[index * 3 + c] = (rgb[index * 3 + c] + 255) >> 1;
+    };
+    for (let x = step; x < canvas.width; x += step) {
+      const px = Math.min(w - 1, Math.round(x * scale));
+      for (let py = 0; py < h; py++) blend(py * w + px);
+    }
+    for (let y = step; y < canvas.height; y += step) {
+      const py = Math.min(h - 1, Math.round(y * scale));
+      for (let px = 0; px < w; px++) blend(py * w + px);
+    }
+  };
+
+  // Urban atlas: plain colours, drawn in the order of the urban layers. Lines are brushed as discs.
+  if (URBAN_LAYERS.some((name) => features(name).length > 0)) {
+    const URBAN_RGB = Object.fromEntries(Object.entries(URBAN_COLOURS).map(([k, v]) => [k, rgbOf(v)]));
+    const brush = (path, width, colour) => {
+      const radius = Math.max(0.5, (width * scale) / 2);
+      for (let k = 0; k + 1 < path.length; k++) {
+        const [a, b] = [path[k], path[k + 1]];
+        if (!isFinitePoint(a) || !isFinitePoint(b)) continue;
+        const length = Math.hypot(b[0] - a[0], b[1] - a[1]) * scale;
+        const steps = Math.max(1, Math.ceil(length * 2));
+        for (let s = 0; s <= steps; s++) {
+          const x = (a[0] + ((b[0] - a[0]) * s) / steps) * scale;
+          const y = (a[1] + ((b[1] - a[1]) * s) / steps) * scale;
+          for (let py = Math.floor(y - radius); py <= Math.ceil(y + radius); py++) {
+            for (let px = Math.floor(x - radius); px <= Math.ceil(x + radius); px++) {
+              if (px < 0 || py < 0 || px >= w || py >= h) continue;
+              if ((px + 0.5 - x) ** 2 + (py + 0.5 - y) ** 2 <= radius * radius) setPixel(py * w + px, colour, false);
+            }
+          }
+        }
+      }
+    };
+    const isLine = (path) => Array.isArray(path) && path.length >= 2 && path.every(isFinitePoint);
+
+    for (let index = 0; index < w * h; index++) setPixel(index, URBAN_RGB.ground, false);
+    for (const f of features('ground')) if (f.type === 'water') paint(f.polygon, URBAN_RGB.water, false);
+    for (const f of features('green')) paint(f.polygon, URBAN_RGB.green, false);
+    for (const f of features('walls')) {
+      if (f.type === 'wall' && isLine(f.path)) {
+        const path = f.closed === true ? [...f.path, f.path[0]] : f.path;
+        brush(path, Number.isFinite(f.thickness) && f.thickness > 0 ? f.thickness : 1, URBAN_RGB.wall);
+      } else if (f.type === 'tower' && isFinitePoint(f.at)) {
+        const radius = Number.isFinite(f.radius) && f.radius > 0 ? f.radius : 1;
+        brush([f.at, f.at], radius * 2, URBAN_RGB.wall);
+      }
+    }
+    for (const f of features('streets')) {
+      if (f.type === 'street' && isLine(f.path)) {
+        brush(f.path, Number.isFinite(f.width) && f.width > 0 ? f.width : (URBAN_STREET_WIDTH[f.rank] ?? URBAN_STREET_WIDTH.lane), URBAN_RGB.street);
+      } else if (f.type === 'bridge' && isLine(f.path)) {
+        brush(f.path, Number.isFinite(f.width) && f.width > 0 ? f.width : URBAN_STREET_WIDTH.main, URBAN_RGB.street);
+      } else if (f.type === 'square') {
+        paint(f.polygon, URBAN_RGB.square, false);
+      }
+    }
+    for (const f of features('blocks')) {
+      if (f.type !== 'block') continue;
+      paint(f.polygon, URBAN_RGB.block, false);
+      for (const lot of Array.isArray(f.lots) ? f.lots : []) {
+        if (!isFinitePoint(lot?.at) || typeof lot.kind !== 'string') continue;
+        const size = Array.isArray(lot.size) ? lot.size : defaultSize(lot.kind);
+        paint(rectCorners({ at: lot.at, size, angle: lot.angle ?? 0 }), URBAN_RGB.lot, false);
+      }
+    }
+    for (const f of features('buildings')) {
+      if (!isFinitePoint(f.at) || typeof f.kind !== 'string') continue;
+      const size = Array.isArray(f.size) ? f.size : defaultSize(f.kind);
+      paint(rectCorners({ at: f.at, size, angle: f.angle ?? 0 }), URBAN_RGB.building, false);
+    }
+    drawGrid();
+    return encodePng(w, h, rgb);
+  }
 
   // Sea background.
   for (let index = 0; index < w * h; index++) setPixel(index, COLOUR_RGB.sea, false);
@@ -185,19 +281,7 @@ export function renderPreview({ canvas, layers = {}, width = 1024 }) {
     else if (f.type === 'sea-route') stroke(f.path, 1, COLOUR_RGB.seaRoute, true);
   }
 
-  // Coordinate grid: every tenth of the width, white at 50 percent over the colour.
-  const step = canvas.width / 10;
-  const blend = (index) => {
-    for (let c = 0; c < 3; c++) rgb[index * 3 + c] = (rgb[index * 3 + c] + 255) >> 1;
-  };
-  for (let x = step; x < canvas.width; x += step) {
-    const px = Math.min(w - 1, Math.round(x * scale));
-    for (let py = 0; py < h; py++) blend(py * w + px);
-  }
-  for (let y = step; y < canvas.height; y += step) {
-    const py = Math.min(h - 1, Math.round(y * scale));
-    for (let px = 0; px < w; px++) blend(py * w + px);
-  }
+  drawGrid();
 
   return encodePng(w, h, rgb);
 }
