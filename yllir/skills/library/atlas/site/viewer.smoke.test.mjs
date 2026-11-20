@@ -178,6 +178,10 @@ test('viewer creates one marker per place without errors', () => {
     const markers = dom.created.filter((n) => n.tag === 'button' && n.classes.has('marker'));
     assert.equal(markers.length, 3);
     assert.match(markers[0].style.transform, /^translate\(/);
+    for (const marker of markers) {
+      const place = DATA.places.find((p) => p.id === marker.getAttribute('data-place'));
+      assert.equal(marker.getAttribute('data-kind'), place.kind);
+    }
   } finally {
     removeFakeDom();
   }

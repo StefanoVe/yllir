@@ -297,7 +297,9 @@ button:hover {
 }
 
 /* Markers: one round button per place, over the map. Its size is the same at every zoom (viewer.js sets the
-   position). On a phone the touch target grows through --marker-size. */
+   position). On a phone the touch target grows through --marker-size. Each kind of place draws its own glyph
+   (capital star, city skyline, town house, village roof, fort tower, ruin column, landmark diamond, port anchor)
+   as a mask over the button, in --marker-stroke, and in --accent when the marker is hovered or pressed. */
 .markers {
   position: absolute;
   left: 0;
@@ -337,6 +339,100 @@ button:hover {
 .marker:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Kind icons: a monochrome glyph centred in the marker, drawn with a mask so it takes the marker's colours. */
+.marker[data-kind="capital"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--marker-stroke);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6'/%3E%3C/svg%3E") center / 60% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6'/%3E%3C/svg%3E") center / 60% no-repeat;
+  transition: background-color 0.15s ease;
+}
+
+.marker[data-kind="city"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--marker-stroke);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='10' width='5' height='12'/%3E%3Crect x='9' y='4' width='6' height='18'/%3E%3Crect x='17' y='8' width='5' height='14'/%3E%3C/svg%3E") center / 60% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='10' width='5' height='12'/%3E%3Crect x='9' y='4' width='6' height='18'/%3E%3Crect x='17' y='8' width='5' height='14'/%3E%3C/svg%3E") center / 60% no-repeat;
+  transition: background-color 0.15s ease;
+}
+
+.marker[data-kind="town"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--marker-stroke);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 22,11 19,11 19,21 5,21 5,11 2,11'/%3E%3C/svg%3E") center / 60% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 22,11 19,11 19,21 5,21 5,11 2,11'/%3E%3C/svg%3E") center / 60% no-repeat;
+  transition: background-color 0.15s ease;
+}
+
+.marker[data-kind="village"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--marker-stroke);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,4 22,20 2,20'/%3E%3C/svg%3E") center / 60% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,4 22,20 2,20'/%3E%3C/svg%3E") center / 60% no-repeat;
+  transition: background-color 0.15s ease;
+}
+
+.marker[data-kind="fort"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--marker-stroke);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 22V6H7V3H10V6H14V3H17V6H20V22Z'/%3E%3C/svg%3E") center / 60% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 22V6H7V3H10V6H14V3H17V6H20V22Z'/%3E%3C/svg%3E") center / 60% no-repeat;
+  transition: background-color 0.15s ease;
+}
+
+.marker[data-kind="ruin"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--marker-stroke);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='7,22 7,9 10,7 12,10 14,6 17,9 17,22'/%3E%3C/svg%3E") center / 60% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='7,22 7,9 10,7 12,10 14,6 17,9 17,22'/%3E%3C/svg%3E") center / 60% no-repeat;
+  transition: background-color 0.15s ease;
+}
+
+.marker[data-kind="landmark"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--marker-stroke);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 22,12 12,22 2,12'/%3E%3C/svg%3E") center / 60% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 22,12 12,22 2,12'/%3E%3C/svg%3E") center / 60% no-repeat;
+  transition: background-color 0.15s ease;
+}
+
+.marker[data-kind="port"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: var(--marker-stroke);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='4' r='2.3' fill='none' stroke='black' stroke-width='1.6'/%3E%3Crect x='11' y='7' width='2' height='14'/%3E%3Crect x='7' y='8' width='10' height='2'/%3E%3Cpath d='M4 14Q4 21 12 21Q20 21 20 14H17.5Q17.5 18 12 18Q6.5 18 6.5 14Z'/%3E%3C/svg%3E") center / 60% no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='4' r='2.3' fill='none' stroke='black' stroke-width='1.6'/%3E%3Crect x='11' y='7' width='2' height='14'/%3E%3Crect x='7' y='8' width='10' height='2'/%3E%3Cpath d='M4 14Q4 21 12 21Q20 21 20 14H17.5Q17.5 18 12 18Q6.5 18 6.5 14Z'/%3E%3C/svg%3E") center / 60% no-repeat;
+  transition: background-color 0.15s ease;
+}
+
+.marker:hover::before,
+.marker[aria-pressed="true"]::before {
+  background-color: var(--accent);
 }
 
 .marker-name {

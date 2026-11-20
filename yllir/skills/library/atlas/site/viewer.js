@@ -455,13 +455,16 @@
 
   function buildMarkers() {
     for (const place of data.places) {
-      const button = el('button', 'marker', {
+      const attrs = {
         type: 'button',
         'aria-label': place.name,
         'aria-pressed': 'false',
         'data-place': place.id,
         'data-layer': 'places',
-      });
+      };
+      // The kind picks the icon drawn by viewer.css.
+      if (place.kind) attrs['data-kind'] = place.kind;
+      const button = el('button', 'marker', attrs);
       // The name shows on hover and focus only; the button's aria-label already names it for a screen reader.
       button.append(el('span', 'marker-name', { 'aria-hidden': 'true' }, place.name));
       button.addEventListener('click', () => openFromMarker(place, button));
