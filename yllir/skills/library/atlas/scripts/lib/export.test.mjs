@@ -5,7 +5,7 @@ import path from 'node:path';
 import { exportAtlas, summaryOf } from './export.mjs';
 import {
   cleanupCampaigns, makeCampaign, campaignYaml, baseManifest, terrainLayer, placesLayer, writeAtlas,
-  urbanManifest, groundLayer, buildingsLayer,
+  urbanManifest, groundLayer, buildingsLayer, blocksLayer, square,
 } from './test-support.mjs';
 
 after(cleanupCampaigns);
@@ -377,4 +377,107 @@ test('the card summary is the public part of the sheet: the master block of a bu
   }
   const summary = dataOf(readHtml(root, 'master')).places.find((p) => p.id === 'north').summary;
   assert.equal(summary, '');
+});
+
+/**
+ * An atlas with urban layers and, unless `withTerrain` is false, a terrain (land): the city of the north sheet
+ * (a tavern on a block), and a place `south` in the places layer (no kind, it is not a building).
+ * `extraBuildings` adds buildings; `biomes` is an optional biomes layer.
+ */
+function cityCampaign({ withTerrain = true, extraBuildings = [], biomes = null } = {}) {
+  const root = makeCampaign({
+    'World/North/North.md': sheet({ id: 'north', title: 'North', body: 'The northern quarter keeps the old market.', master: `Secret: ${SECRET}.` }),
+    'World/South.md': sheet({ id: 'south', title: 'South', body: 'A quiet fishing village.' }),
+    'World/Keep.md': sheet({ id: 'keep', title: 'Keep', body: 'A keep of grey stone.' }),
+  });
+  const buildings = buildingsLayer([['north', [500, 500], 'tavern']]);
+  buildings.features.push(...extraBuildings);
+  const layers = {
+    ground: groundLayer(),
+    blocks: blocksLayer([{
+      id: 'block-1', type: 'block', polygon: square(400, 400, 600, 600), character: 'common', lots: [],
+      provenance: 'agent-choice', visibility: 'public', sources: [],
+    }]),
+    buildings,
+  };
+  if (withTerrain) {
+    layers.terrain = terrainLayer();
+    layers.places = placesLayer([['south', [700, 700]]]);
+  }
+  if (biomes) layers.biomes = biomes;
+  writeAtlas(root, { manifest: baseManifest({ style: 'fantasy-color' }), layers });
+  return root;
+}
+
+test('a mixed atlas (terrain with a city) is scale mixed: terrain and blocks are drawn, the sea stays, the city has its cards', () => {
+  const root = cityCampaign({
+    extraBuildings: [{ id: 'keep', place: 'keep', at: [560, 560], kind: 'keep', provenance: 'master', visibility: 'master', sources: [] }],
+  });
+  const master = exportAtlas(root, { audience: 'master' });
+  assert.equal(master.ok, true, JSON.stringify(master.problems));
+  const html = readHtml(root, 'master');
+  const data = dataOf(html);
+  assert.equal(data.scale, 'mixed');
+  assert.ok(html.includes('data-layer="terrain"'), 'the terrain group is drawn');
+  assert.ok(html.includes('data-layer="blocks"'), 'the blocks group is drawn');
+  assert.equal(typeof data.seaTexture, 'string', 'the sea is drawn');
+  assert.deepEqual(data.layers, ['terrain', 'places', 'ground', 'blocks', 'buildings', 'labels']);
+  const north = data.places.find((p) => p.id === 'north');
+  assert.equal(north.kind, 'tavern');
+  assert.equal(north.summary, 'The northern quarter keeps the old market.');
+  assert.ok(html.includes('data-place="north"'));
+  // A place of the places layer has no kind, so it is a card without a marker.
+  assert.equal('kind' in data.places.find((p) => p.id === 'south'), false);
+
+  const players = exportAtlas(root, { audience: 'players' });
+  assert.equal(players.ok, true, JSON.stringify(players.problems));
+  const playersHtml = readHtml(root, 'players');
+  assert.equal(dataOf(playersHtml).scale, 'mixed');
+  assert.ok(!playersHtml.includes('data-place="keep"'), 'a master-visibility building is not in the players build');
+  assert.ok(!dataOf(playersHtml).places.some((p) => p.id === 'keep'));
+  assert.ok(!playersHtml.includes(SECRET));
+});
+
+test('an urban atlas with a forest in biomes is mixed, not urban: the forest is drawn by the geographic renderer', () => {
+  const forest = {
+    layer: 'biomes',
+    constraints: [],
+    features: [{ id: 'wood', type: 'forest', polygon: [[100, 100], [300, 100], [300, 300], [100, 300]], provenance: 'master', visibility: 'public', sources: [] }],
+  };
+  const root = cityCampaign({ withTerrain: false, biomes: forest });
+  const result = exportAtlas(root, { audience: 'master' });
+  assert.equal(result.ok, true, JSON.stringify(result.problems));
+  const html = readHtml(root, 'master');
+  const data = dataOf(html);
+  assert.equal(data.scale, 'mixed');
+  assert.ok(html.includes('data-layer="biomes"'), 'the forest is drawn');
+  assert.ok(html.includes('data-layer="blocks"'), 'the urban blocks are drawn too');
+  assert.deepEqual(data.layers, ['biomes', 'ground', 'blocks', 'buildings', 'labels']);
+  assert.equal(typeof data.seaTexture, 'string');
+});
+
+test('a purely urban atlas, with no geographic feature, is still scale urban: no sea, markers for its buildings', () => {
+  const root = cityCampaign({ withTerrain: false });
+  assert.equal(exportAtlas(root, { audience: 'master' }).ok, true);
+  const data = dataOf(readHtml(root, 'master'));
+  assert.equal(data.scale, 'urban');
+  assert.equal(data.places.find((p) => p.id === 'north').kind, 'tavern');
+});
+
+test('the scale ignores the scope: a region scope with only urban features is urban, a settlement scope with terrain is mixed', () => {
+  const setScope = (root, kind) => {
+    const file = path.join(root, 'Atlas', 'atlas.json');
+    const manifest = JSON.parse(fs.readFileSync(file, 'utf8'));
+    manifest.scope.kind = kind;
+    fs.writeFileSync(file, JSON.stringify(manifest));
+  };
+  const urbanOnly = cityCampaign({ withTerrain: false });
+  setScope(urbanOnly, 'region');
+  assert.equal(exportAtlas(urbanOnly, { audience: 'master' }).ok, true);
+  assert.equal(dataOf(readHtml(urbanOnly, 'master')).scale, 'urban');
+
+  const withTerrain = cityCampaign();
+  setScope(withTerrain, 'settlement');
+  assert.equal(exportAtlas(withTerrain, { audience: 'master' }).ok, true);
+  assert.equal(dataOf(readHtml(withTerrain, 'master')).scale, 'mixed');
 });

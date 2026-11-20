@@ -30,11 +30,16 @@
   const svg = stage.querySelector('svg');
   const places = new Map(data.places.map((p) => [p.id, p]));
   const nodes = new Map();
-  // An urban map has no infinite sea: the page shows its neutral colour outside the map, and zooms in further.
+  // The scale of the atlas (set by export.mjs): 'urban' is a purely urban map, with no infinite sea, and it zooms in
+  // further; 'mixed' is a geographic map with urban layers, so it has the sea, the notable-place markers and the
+  // high zoom; 'geo' is a geographic map. Markers are for the places that have a kind (buildings and districts).
   const urban = data.scale === 'urban';
-  const maxZ = urban ? MAX_Z * URBAN_ZOOM : MAX_Z;
+  const mixed = data.scale === 'mixed';
+  const hasSea = !urban;
+  const hasMarkers = urban || mixed;
+  const maxZ = urban || mixed ? MAX_Z * URBAN_ZOOM : MAX_Z;
 
-  if (!urban) sea.style.backgroundImage = `url("${ASSET_BASE}${data.seaTexture}")`;
+  if (hasSea) sea.style.backgroundImage = `url("${ASSET_BASE}${data.seaTexture}")`;
   stage.style.width = `${W}px`;
   stage.style.height = `${H}px`;
 
@@ -67,13 +72,12 @@
     frame = null;
     const s = scale();
     stage.style.transform = `translate(${view.x}px, ${view.y}px) scale(${s})`;
-    if (!urban) {
+    if (hasSea) {
       const tile = data.seaTile * s;
       sea.style.backgroundSize = `${tile}px ${tile}px`;
       sea.style.backgroundPosition = `${view.x}px ${view.y}px`;
-    } else {
-      placeMarkers(s);
     }
+    if (hasMarkers) placeMarkers(s);
   }
 
   function schedule() {
@@ -481,9 +485,9 @@
 
   // ---- Urban markers --------------------------------------------------------------------------
 
-  // One button per notable place (a place record with an anchor), drawn over the map. Its size and symbol are the
-  // same at every zoom: only its position follows the map. A symbol is a few stroked paths on a 24-unit grid;
-  // a kind without one is a plain dot.
+  // One button per notable place (a place record with an anchor and a kind: a building or a district), drawn over
+  // the map. Its size and symbol are the same at every zoom: only its position follows the map. A symbol is a few
+  // stroked paths on a 24-unit grid; a kind without one is a plain dot.
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const TOWER = 'M8 20V8h8v12 M6 8h12 M8 8V5h2v3 M14 8V5h2v3 M11 20v-4h2v4';
   const MUG = 'M5 7h10v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z M15 9h2a2 2 0 0 1 0 4h-2';
@@ -542,7 +546,7 @@
   function buildMarkers() {
     markerBox = el('div', 'markers', { role: 'group', 'aria-label': S.notablePlaces });
     for (const place of data.places) {
-      if (!Array.isArray(place.at)) continue;
+      if (!Array.isArray(place.at) || !place.kind) continue;
       const node = markerNode(place);
       markerBox.append(node);
       markerList.push({ id: place.id, at: place.at, node });
@@ -609,8 +613,10 @@
       const id = node.getAttribute('data-place');
       const place = places.get(id);
       nodes.set(id, node);
-      // On an urban map the markers are the keyboard path to a building, so the drawn places are not in the tab order.
-      if (!urban) {
+      // A place with a marker (a building or a district, on an urban or a mixed map) is reached through the marker,
+      // so the drawn place is not in the tab order. The other places are.
+      const marked = urban || Boolean(place && place.kind);
+      if (!marked) {
         node.setAttribute('tabindex', '0');
         node.setAttribute('role', 'button');
       }
@@ -629,8 +635,8 @@
     if (urban) {
       document.documentElement.classList.add('is-urban');
       document.body.classList.add('is-urban');
-      buildMarkers();
     }
+    if (hasMarkers) buildMarkers();
     // Panels, zoom buttons and the card sit outside the map, so the map's pointer capture never takes their clicks.
     document.body.append(vignetteNode(), zoom, layersPanel.box, searchPanel.box, card);
     fitToWindow();

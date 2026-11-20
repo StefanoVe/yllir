@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { fitArcLabel, renderAtlasSvg } from './render.mjs';
@@ -226,4 +227,150 @@ test('labels: every place name sits in the labels group, never inside a place ic
   for (const place of svg.matchAll(/<g class="place"[^>]*>([\s\S]*?)<\/g>/g)) {
     assert.ok(!place[1].includes('<text'), 'a place icon holds no text');
   }
+});
+
+// Snapshots taken from the renderer before the urban layers were added to it: a geographic atlas must still render
+// byte for byte the same (master and players audiences).
+const GEOGRAPHIC_SNAPSHOT = 'c96f5546d752037d7aaef55dec542631bdaa7d6a0c51b7a397d5d939a2664d10';
+const GEOGRAPHIC_PLAYERS_SNAPSHOT = '359573e1b1239d36991261a7405e6f27da9c91653e8de1348bd70e656ad5f2c2';
+const sha256 = (text) => createHash('sha256').update(text).digest('hex');
+
+test('a geographic atlas renders byte for byte as before the urban layers (snapshot)', () => {
+  assert.equal(sha256(render().svg), GEOGRAPHIC_SNAPSHOT);
+  assert.equal(sha256(render({}, { audience: 'players' }).svg), GEOGRAPHIC_PLAYERS_SNAPSHOT);
+  assert.deepEqual(render().stats, { stamps: 644, places: 2, labels: 3, lots: 0, buildings: 0, districts: 0 });
+});
+
+// A mixed atlas: terrain land with relief and a forest that covers the city, and a walled city inside them.
+const CITY_WALL = [[560, 140], [840, 140], [840, 420], [560, 420]];
+const CITY_BLOCKS = [
+  [[580, 160], [820, 160], [820, 260], [580, 260]],
+  [[580, 280], [820, 280], [820, 400], [580, 400]],
+];
+const PARK = [[580, 262], [820, 262], [820, 278], [580, 278]];
+
+function mixed() {
+  return {
+    manifest: { canvas: { width: 1000, height: 1000 }, seed: 11 },
+    layers: {
+      terrain: { features: [{ id: 'main', type: 'land', polygon: LAND }] },
+      relief: { features: [{ id: 'ridge', type: 'mountains', polygon: [[120, 600], [380, 600], [380, 860], [120, 860]] }] },
+      biomes: { features: [{ id: 'wood', type: 'forest', polygon: [[450, 100], [950, 100], [950, 880], [450, 880]] }] },
+      places: { features: [
+        { id: 'north', place: 'north', at: [300, 700], icon: 'town', visibility: 'public' },
+        { id: 'hall', place: 'hall', at: [700, 200], icon: 'town', visibility: 'public' },
+      ] },
+      ground: { features: [
+        { id: 'mill-canal', type: 'water', kind: 'canal', polygon: [[560, 405], [840, 405], [840, 415], [560, 415]] },
+        { id: 'sea-piece', type: 'water', kind: 'sea', polygon: [[0, 0], [50, 0], [50, 50]] },
+      ] },
+      green: { features: [{ id: 'orchard', type: 'park', polygon: PARK }] },
+      walls: { features: [
+        { id: 'city-wall', type: 'wall', path: CITY_WALL, closed: true, thickness: 4 },
+        { id: 'city-wall-tower-1', type: 'tower', at: [560, 140], radius: 6 },
+        { id: 'city-wall-gate-1', type: 'gate', at: [700, 140], angle: 0, width: 8 },
+      ] },
+      streets: { features: [{ id: 'high', type: 'street', rank: 'main', width: 12, path: [[700, 140], [700, 420]] }] },
+      blocks: { features: [
+        { id: 'block-1', type: 'block', character: 'common', polygon: CITY_BLOCKS[0], lots: [{ kind: 'house', at: [600, 180], size: [12, 9], angle: 0 }] },
+        { id: 'block-2', type: 'block', character: 'common', polygon: CITY_BLOCKS[1], lots: [{ kind: 'shop', at: [600, 300], size: [12, 9], angle: 0 }] },
+      ] },
+      buildings: { features: [{ id: 'hall', place: 'hall', at: [700, 200], kind: 'tavern', provenance: 'master', visibility: 'public' }] },
+    },
+    names: { north: 'Northwatch', hall: 'The Gilded Hall' },
+  };
+}
+
+const renderMixed = (extra = {}) => {
+  const f = mixed();
+  return renderAtlasSvg({ manifest: f.manifest, layers: f.layers, style: STYLE, names: f.names, assetBase: ASSET_BASE, ...extra });
+};
+
+// The SVG of one layer group: from its opening tag to the next group.
+const groupOf = (svg, name) => {
+  const start = svg.indexOf(`<g id="layer-${name}"`);
+  const end = svg.indexOf('\n<g id="layer-', start + 1);
+  return svg.slice(start, end === -1 ? undefined : end);
+};
+
+test('a mixed atlas has the geographic and the urban groups in one canvas, every id once', () => {
+  const { svg, stats } = renderMixed();
+  for (const name of ['terrain', 'biomes', 'places', 'ground', 'green', 'walls', 'streets', 'blocks', 'buildings']) {
+    assert.ok(svg.includes(`data-layer="${name}"`), `missing ${name}`);
+  }
+  const ids = [...svg.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]);
+  assert.equal(new Set(ids).size, ids.length, 'ids are unique');
+  assert.equal(ids.filter((id) => id === 'layer-labels').length, 1);
+  assert.equal(stats.lots, 2);
+  assert.equal(stats.buildings, 1);
+  assert.equal(stats.districts, 0);
+});
+
+test('the urban groups come after the places and before the labels, in the urban order', () => {
+  const { svg } = renderMixed();
+  const at = (s) => svg.indexOf(s);
+  const order = ['data-layer="places"', 'data-layer="ground"', 'data-layer="green"', 'data-layer="walls"', 'data-layer="streets"',
+    'data-layer="blocks"', 'data-layer="buildings"', 'id="layer-labels"'];
+  for (let i = 1; i < order.length; i++) assert.ok(at(order[i - 1]) < at(order[i]), `${order[i - 1]} before ${order[i]}`);
+});
+
+test('the ground of a mixed map is water only: no canvas fill, no sea piece, the canal is drawn', () => {
+  const ground = groupOf(renderMixed().svg, 'ground');
+  assert.ok(!ground.includes('<rect'), 'the canvas is not filled');
+  assert.ok(!ground.includes('M0 0 L50 0'), 'the sea piece is left out');
+  assert.ok(ground.includes('M560 405'), 'the canal is drawn');
+});
+
+test('stamps keep off the city: no stamp anchor lies in a block, the park or the walled ring, and stamps still cover the land outside', () => {
+  const { svg, stats } = renderMixed();
+  const anchors = [...svg.matchAll(/data-layer="(relief|biomes)" data-anchor="([-\d.]+),([-\d.]+)"/g)]
+    .map((m) => [Number(m[2]), Number(m[3])]);
+  assert.ok(anchors.length > 0);
+  assert.equal(stats.stamps, anchors.length);
+  for (const p of anchors) {
+    for (const block of [...CITY_BLOCKS, PARK]) assert.ok(!pointInPolygon(p, block), `stamp ${p} is in a block`);
+    assert.ok(!pointInPolygon(p, CITY_WALL), `stamp ${p} is inside the walls`);
+  }
+  assert.ok(anchors.some(([x, y]) => x > 450 && y > 430 && !pointInPolygon([x, y], CITY_WALL)), 'the forest outside the city has stamps');
+});
+
+test('a place inside a block has no icon, a place outside keeps it, and its building name is drawn once', () => {
+  const { svg } = renderMixed();
+  assert.ok(!svg.includes('data-place="hall" data-layer="places"'));
+  assert.ok(svg.includes('data-place="north" data-layer="places"'));
+  assert.ok(!svg.includes('data-target="places/hall"'), 'the place name is not drawn twice');
+  assert.equal(svg.split('>The Gilded Hall<').length - 1, 2, 'one label: its halo and its fill');
+  assert.ok(svg.includes('data-target="buildings/hall"'));
+});
+
+test('a labels-layer override can hide an urban label in a mixed atlas', () => {
+  const f = mixed();
+  f.layers.labels = { features: [{ id: 'hide-hall', target: 'buildings/hall', hidden: true }] };
+  const { svg } = renderAtlasSvg({ manifest: f.manifest, layers: f.layers, style: STYLE, names: f.names, assetBase: ASSET_BASE });
+  assert.ok(!svg.includes('The Gilded Hall'));
+  assert.ok(svg.includes('>Northwatch<'));
+});
+
+test('an urban atlas with a forest layer and no terrain renders stamps on the urban ground, none in the blocks', () => {
+  const { svg, stats } = renderAtlasSvg({
+    manifest: { canvas: { width: 1000, height: 1000 }, seed: 5 },
+    layers: {
+      ground: { features: [{ id: 'isle', type: 'land', kind: 'island', polygon: LAND }] },
+      biomes: { features: [{ id: 'wood', type: 'forest', polygon: [[450, 100], [950, 100], [950, 880], [450, 880]] }] },
+      blocks: { features: [{ id: 'block-1', type: 'block', polygon: CITY_BLOCKS[0], lots: [] }] },
+    },
+    names: {},
+    style: STYLE,
+    assetBase: ASSET_BASE,
+  });
+  assert.ok(stats.stamps > 0);
+  const anchors = [...svg.matchAll(/data-layer="(relief|biomes)" data-anchor="([-\d.]+),([-\d.]+)"/g)]
+    .map((m) => [Number(m[2]), Number(m[3])]);
+  assert.equal(anchors.length, stats.stamps);
+  for (const p of anchors) {
+    assert.ok(pointInPolygon(p, LAND), `stamp ${p} is off the island`);
+    assert.ok(!pointInPolygon(p, CITY_BLOCKS[0]), `stamp ${p} is in the block`);
+  }
+  assert.ok(svg.indexOf('id="layer-ground"') < svg.indexOf('id="layer-biomes"'), 'the urban ground is the base under the biomes');
+  assert.ok(svg.indexOf('id="layer-biomes"') < svg.indexOf('id="layer-stamps"'));
 });

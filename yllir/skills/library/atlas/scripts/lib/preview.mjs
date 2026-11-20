@@ -1,5 +1,7 @@
 // Preview of the atlas as a PNG: a plain, deterministic drawing of the layers, for the agent to
 // read coordinates and check the shape before the master approves a layer. Not the final map.
+// A geographic layer set is drawn as before; an urban one with plain colours; a mixed one (both) draws the
+// geography first and the urban features on top, the way render.mjs puts them in one canvas.
 
 import { encodePng } from '../../../../../scripts/lib/png.mjs';
 import { isFinitePoint, isUsablePolygon } from './geometry.mjs';
@@ -8,6 +10,9 @@ import { rectCorners } from './urban/shapes.mjs';
 
 // Urban layers: an urban atlas has any of these with features, and is drawn with plain colours.
 const URBAN_LAYERS = ['ground', 'green', 'walls', 'streets', 'blocks', 'buildings', 'districts'];
+const GEOGRAPHIC_LAYERS = ['terrain', 'relief', 'water', 'biomes', 'political', 'places', 'routes'];
+// Water kinds of the ground layer that are drawn over the geography of a mixed map (sea pieces are not).
+const GEOGRAPHIC_WATER = ['river', 'canal', 'pond', 'coast'];
 const URBAN_COLOURS = {
   ground: '#e8dcb5',
   water: '#7fa7c9',
@@ -41,6 +46,7 @@ function rgbOf(hex) {
 }
 
 const COLOUR_RGB = Object.fromEntries(Object.entries(COLOURS).map(([k, v]) => [k, rgbOf(v)]));
+const URBAN_RGB = Object.fromEntries(Object.entries(URBAN_COLOURS).map(([k, v]) => [k, rgbOf(v)]));
 
 function boundingBox(polygon) {
   let minX = Infinity;
@@ -117,35 +123,49 @@ export function renderPreview({ canvas, layers = {}, width = 1024 }) {
     }
   };
 
-  // Urban atlas: plain colours, drawn in the order of the urban layers. Lines are brushed as discs.
-  if (URBAN_LAYERS.some((name) => features(name).length > 0)) {
-    const URBAN_RGB = Object.fromEntries(Object.entries(URBAN_COLOURS).map(([k, v]) => [k, rgbOf(v)]));
-    const brush = (path, width, colour) => {
-      const radius = Math.max(0.5, (width * scale) / 2);
-      for (let k = 0; k + 1 < path.length; k++) {
-        const [a, b] = [path[k], path[k + 1]];
-        if (!isFinitePoint(a) || !isFinitePoint(b)) continue;
-        const length = Math.hypot(b[0] - a[0], b[1] - a[1]) * scale;
-        const steps = Math.max(1, Math.ceil(length * 2));
-        for (let s = 0; s <= steps; s++) {
-          const x = (a[0] + ((b[0] - a[0]) * s) / steps) * scale;
-          const y = (a[1] + ((b[1] - a[1]) * s) / steps) * scale;
-          for (let py = Math.floor(y - radius); py <= Math.ceil(y + radius); py++) {
-            for (let px = Math.floor(x - radius); px <= Math.ceil(x + radius); px++) {
-              if (px < 0 || py < 0 || px >= w || py >= h) continue;
-              if ((px + 0.5 - x) ** 2 + (py + 0.5 - y) ** 2 <= radius * radius) setPixel(py * w + px, colour, false);
-            }
+  // Lines are brushed as discs.
+  const brush = (path, width, colour) => {
+    const radius = Math.max(0.5, (width * scale) / 2);
+    for (let k = 0; k + 1 < path.length; k++) {
+      const [a, b] = [path[k], path[k + 1]];
+      if (!isFinitePoint(a) || !isFinitePoint(b)) continue;
+      const length = Math.hypot(b[0] - a[0], b[1] - a[1]) * scale;
+      const steps = Math.max(1, Math.ceil(length * 2));
+      for (let s = 0; s <= steps; s++) {
+        const x = (a[0] + ((b[0] - a[0]) * s) / steps) * scale;
+        const y = (a[1] + ((b[1] - a[1]) * s) / steps) * scale;
+        for (let py = Math.floor(y - radius); py <= Math.ceil(y + radius); py++) {
+          for (let px = Math.floor(x - radius); px <= Math.ceil(x + radius); px++) {
+            if (px < 0 || py < 0 || px >= w || py >= h) continue;
+            if ((px + 0.5 - x) ** 2 + (py + 0.5 - y) ** 2 <= radius * radius) setPixel(py * w + px, colour, false);
           }
         }
       }
-    };
-    const isLine = (path) => Array.isArray(path) && path.length >= 2 && path.every(isFinitePoint);
+    }
+  };
+  const isLine = (path) => Array.isArray(path) && path.length >= 2 && path.every(isFinitePoint);
 
-    // Without an island the land is the whole canvas; with one, the canvas is water and the island is painted over it.
-    const island = features('ground').some((f) => f.type === 'land' && isUsablePolygon(f.polygon));
-    for (let index = 0; index < w * h; index++) setPixel(index, island ? URBAN_RGB.water : URBAN_RGB.ground, false);
-    for (const f of features('ground')) if (f.type === 'water') paint(f.polygon, URBAN_RGB.water, false);
-    for (const f of features('ground')) if (f.type === 'land') paint(f.polygon, URBAN_RGB.ground, false);
+  const hasGeographic = GEOGRAPHIC_LAYERS.some((name) => features(name).length > 0);
+  const hasUrban = URBAN_LAYERS.some((name) => features(name).length > 0);
+  const terrainLand = features('terrain').some((f) => f.type === 'land' && isUsablePolygon(f.polygon));
+  // The island of the urban ground; without one the canvas itself is the land.
+  const islands = features('ground').filter((f) => f.type === 'land' && isUsablePolygon(f.polygon));
+
+  // Urban layers, in the order of the urban layers. `over` is the mixed case: the geography is already
+  // drawn, so the canvas is not filled, the island is the geography's land, and the ground keeps only
+  // its geographic water when there is terrain land.
+  const drawUrban = (over) => {
+    if (!over) {
+      // Without an island the land is the whole canvas; with one, the canvas is water and the island is painted over it.
+      const island = islands.length > 0;
+      for (let index = 0; index < w * h; index++) setPixel(index, island ? URBAN_RGB.water : URBAN_RGB.ground, false);
+    }
+    for (const f of features('ground')) {
+      if (f.type !== 'water') continue;
+      if (over && terrainLand && !GEOGRAPHIC_WATER.includes(f.kind)) continue;
+      paint(f.polygon, URBAN_RGB.water, false);
+    }
+    if (!over) for (const f of islands) paint(f.polygon, URBAN_RGB.ground, false);
     for (const f of features('green')) paint(f.polygon, URBAN_RGB.green, false);
     for (const f of features('walls')) {
       if (f.type === 'wall' && isLine(f.path)) {
@@ -179,109 +199,125 @@ export function renderPreview({ canvas, layers = {}, width = 1024 }) {
       const size = Array.isArray(f.size) ? f.size : defaultSize(f.kind);
       paint(rectCorners({ at: f.at, size, angle: f.angle ?? 0 }), URBAN_RGB.building, false);
     }
-    drawGrid();
-    return encodePng(w, h, rgb);
-  }
+  };
 
-  // Sea background.
-  for (let index = 0; index < w * h; index++) setPixel(index, COLOUR_RGB.sea, false);
+  // The geography: sea, land, biomes, relief, lakes, coast, rivers, places, realm borders and routes.
+  // `base` are the polygons of land painted under everything (the urban ground of a map without terrain land).
+  const drawGeographic = (base) => {
+    // Sea background.
+    for (let index = 0; index < w * h; index++) setPixel(index, COLOUR_RGB.sea, false);
+    for (const polygon of base) paint(polygon, COLOUR_RGB.land, true);
 
-  // Drawing order: terrain land, biomes, relief, terrain lakes, water lakes.
-  for (const f of features('terrain')) if (f.type === 'land') paint(f.polygon, COLOUR_RGB.land, true);
-  for (const f of features('biomes')) paint(f.polygon, COLOUR_RGB[f.type === 'forest' ? 'forest' : 'biome'], true);
-  for (const f of features('relief')) paint(f.polygon, COLOUR_RGB.relief, true);
-  for (const f of features('terrain')) if (f.type === 'lake') paint(f.polygon, COLOUR_RGB.lake, false);
-  for (const f of features('water')) if (f.type === 'lake') paint(f.polygon, COLOUR_RGB.lake, false);
+    // Drawing order: terrain land, biomes, relief, terrain lakes, water lakes.
+    for (const f of features('terrain')) if (f.type === 'land') paint(f.polygon, COLOUR_RGB.land, true);
+    for (const f of features('biomes')) paint(f.polygon, COLOUR_RGB[f.type === 'forest' ? 'forest' : 'biome'], true);
+    for (const f of features('relief')) paint(f.polygon, COLOUR_RGB.relief, true);
+    for (const f of features('terrain')) if (f.type === 'lake') paint(f.polygon, COLOUR_RGB.lake, false);
+    for (const f of features('water')) if (f.type === 'lake') paint(f.polygon, COLOUR_RGB.lake, false);
 
-  // Coast: a land pixel with a sea neighbour. Found first, so painting does not cascade.
-  const coast = [];
-  for (let py = 0; py < h; py++) {
-    for (let px = 0; px < w; px++) {
-      const index = py * w + px;
-      if (land[index] !== 1) continue;
-      const neighbours = [[px - 1, py], [px + 1, py], [px, py - 1], [px, py + 1]];
-      if (neighbours.some(([nx, ny]) => nx < 0 || ny < 0 || nx >= w || ny >= h || land[ny * w + nx] === 0)) {
-        coast.push(index);
-      }
-    }
-  }
-  for (const index of coast) setPixel(index, COLOUR_RGB.coast, true);
-
-  // Rivers: two pixels wide.
-  for (const f of features('water')) {
-    if (f.type !== 'river' || !Array.isArray(f.path)) continue;
-    for (let k = 0; k + 1 < f.path.length; k++) {
-      const [a, b] = [f.path[k], f.path[k + 1]];
-      if (!isFinitePoint(a) || !isFinitePoint(b)) continue;
-      const length = Math.hypot(b[0] - a[0], b[1] - a[1]) * scale;
-      const steps = Math.max(1, Math.ceil(length * 2));
-      for (let s = 0; s <= steps; s++) {
-        const x = (a[0] + ((b[0] - a[0]) * s) / steps) * scale;
-        const y = (a[1] + ((b[1] - a[1]) * s) / steps) * scale;
-        for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
-          const px = Math.floor(x) + dx;
-          const py = Math.floor(y) + dy;
-          if (px >= 0 && py >= 0 && px < w && py < h) setPixel(py * w + px, COLOUR_RGB.river, land[py * w + px] === 1);
+    // Coast: a land pixel with a sea neighbour. Found first, so painting does not cascade.
+    const coast = [];
+    for (let py = 0; py < h; py++) {
+      for (let px = 0; px < w; px++) {
+        const index = py * w + px;
+        if (land[index] !== 1) continue;
+        const neighbours = [[px - 1, py], [px + 1, py], [px, py - 1], [px, py + 1]];
+        if (neighbours.some(([nx, ny]) => nx < 0 || ny < 0 || nx >= w || ny >= h || land[ny * w + nx] === 0)) {
+          coast.push(index);
         }
       }
     }
-  }
+    for (const index of coast) setPixel(index, COLOUR_RGB.coast, true);
 
-  // Places: a 5x5 dark square.
-  for (const f of features('places')) {
-    if (!isFinitePoint(f.at)) continue;
-    const cx = Math.round(f.at[0] * scale);
-    const cy = Math.round(f.at[1] * scale);
-    for (let dy = -2; dy <= 2; dy++) {
-      for (let dx = -2; dx <= 2; dx++) {
-        const px = cx + dx;
-        const py = cy + dy;
-        if (px >= 0 && py >= 0 && px < w && py < h) setPixel(py * w + px, COLOUR_RGB.place, land[py * w + px] === 1);
-      }
-    }
-  }
-
-  // Realm borders: the boundary pixels of each realm, in its colour, two pixels wide.
-  const HEX = /^#[0-9a-f]{6}$/i;
-  const stroke = (points, width, colour, dotted = false) => {
-    let travelled = 0;
-    for (let k = 0; k + 1 < points.length; k++) {
-      const [a, b] = [points[k], points[k + 1]];
-      if (!isFinitePoint(a) || !isFinitePoint(b)) continue;
-      const length = Math.hypot(b[0] - a[0], b[1] - a[1]) * scale;
-      const steps = Math.max(1, Math.ceil(length * 2));
-      for (let s = 0; s <= steps; s++) {
-        const along = travelled + (length * s) / steps;
-        // Dotted: four pixels on, four off.
-        if (dotted && Math.floor(along / 4) % 2 === 1) continue;
-        const x = (a[0] + ((b[0] - a[0]) * s) / steps) * scale;
-        const y = (a[1] + ((b[1] - a[1]) * s) / steps) * scale;
-        const size = width === 2 ? [[0, 0], [1, 0], [0, 1], [1, 1]] : [[0, 0]];
-        for (const [dx, dy] of size) {
-          const px = Math.floor(x) + dx;
-          const py = Math.floor(y) + dy;
-          if (px >= 0 && py >= 0 && px < w && py < h) setPixel(py * w + px, colour, land[py * w + px] === 1);
+    // Rivers: two pixels wide.
+    for (const f of features('water')) {
+      if (f.type !== 'river' || !Array.isArray(f.path)) continue;
+      for (let k = 0; k + 1 < f.path.length; k++) {
+        const [a, b] = [f.path[k], f.path[k + 1]];
+        if (!isFinitePoint(a) || !isFinitePoint(b)) continue;
+        const length = Math.hypot(b[0] - a[0], b[1] - a[1]) * scale;
+        const steps = Math.max(1, Math.ceil(length * 2));
+        for (let s = 0; s <= steps; s++) {
+          const x = (a[0] + ((b[0] - a[0]) * s) / steps) * scale;
+          const y = (a[1] + ((b[1] - a[1]) * s) / steps) * scale;
+          for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+            const px = Math.floor(x) + dx;
+            const py = Math.floor(y) + dy;
+            if (px >= 0 && py >= 0 && px < w && py < h) setPixel(py * w + px, COLOUR_RGB.river, land[py * w + px] === 1);
+          }
         }
       }
-      travelled += length;
+    }
+
+    // Places: a 5x5 dark square.
+    for (const f of features('places')) {
+      if (!isFinitePoint(f.at)) continue;
+      const cx = Math.round(f.at[0] * scale);
+      const cy = Math.round(f.at[1] * scale);
+      for (let dy = -2; dy <= 2; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const px = cx + dx;
+          const py = cy + dy;
+          if (px >= 0 && py >= 0 && px < w && py < h) setPixel(py * w + px, COLOUR_RGB.place, land[py * w + px] === 1);
+        }
+      }
+    }
+
+    // Realm borders: the boundary pixels of each realm, in its colour, two pixels wide.
+    const HEX = /^#[0-9a-f]{6}$/i;
+    const stroke = (points, width, colour, dotted = false) => {
+      let travelled = 0;
+      for (let k = 0; k + 1 < points.length; k++) {
+        const [a, b] = [points[k], points[k + 1]];
+        if (!isFinitePoint(a) || !isFinitePoint(b)) continue;
+        const length = Math.hypot(b[0] - a[0], b[1] - a[1]) * scale;
+        const steps = Math.max(1, Math.ceil(length * 2));
+        for (let s = 0; s <= steps; s++) {
+          const along = travelled + (length * s) / steps;
+          // Dotted: four pixels on, four off.
+          if (dotted && Math.floor(along / 4) % 2 === 1) continue;
+          const x = (a[0] + ((b[0] - a[0]) * s) / steps) * scale;
+          const y = (a[1] + ((b[1] - a[1]) * s) / steps) * scale;
+          const size = width === 2 ? [[0, 0], [1, 0], [0, 1], [1, 1]] : [[0, 0]];
+          for (const [dx, dy] of size) {
+            const px = Math.floor(x) + dx;
+            const py = Math.floor(y) + dy;
+            if (px >= 0 && py >= 0 && px < w && py < h) setPixel(py * w + px, colour, land[py * w + px] === 1);
+          }
+        }
+        travelled += length;
+      }
+    };
+    for (const f of features('political')) {
+      if (f.type !== 'realm' || typeof f.color !== 'string' || !HEX.test(f.color)) continue;
+      const colour = rgbOf(f.color);
+      const polygons = Array.isArray(f.polygons) ? f.polygons : [f.polygon];
+      for (const polygon of polygons) {
+        if (!isUsablePolygon(polygon)) continue;
+        stroke([...polygon, polygon[0]], 2, colour);
+      }
+    }
+
+    // Routes: roads and trails on land, sea routes dotted on the sea.
+    for (const f of features('routes')) {
+      if (!Array.isArray(f.path)) continue;
+      if (f.type === 'road') stroke(f.path, 2, COLOUR_RGB.road);
+      else if (f.type === 'trail') stroke(f.path, 1, COLOUR_RGB.road);
+      else if (f.type === 'sea-route') stroke(f.path, 1, COLOUR_RGB.seaRoute, true);
     }
   };
-  for (const f of features('political')) {
-    if (f.type !== 'realm' || typeof f.color !== 'string' || !HEX.test(f.color)) continue;
-    const colour = rgbOf(f.color);
-    const polygons = Array.isArray(f.polygons) ? f.polygons : [f.polygon];
-    for (const polygon of polygons) {
-      if (!isUsablePolygon(polygon)) continue;
-      stroke([...polygon, polygon[0]], 2, colour);
-    }
-  }
 
-  // Routes: roads and trails on land, sea routes dotted on the sea.
-  for (const f of features('routes')) {
-    if (!Array.isArray(f.path)) continue;
-    if (f.type === 'road') stroke(f.path, 2, COLOUR_RGB.road);
-    else if (f.type === 'trail') stroke(f.path, 1, COLOUR_RGB.road);
-    else if (f.type === 'sea-route') stroke(f.path, 1, COLOUR_RGB.seaRoute, true);
+  if (hasUrban && !hasGeographic) {
+    drawUrban(false);
+  } else if (hasUrban) {
+    // Mixed: without terrain land the urban ground is the base (the island, or the whole canvas).
+    const base = terrainLand ? [] : (islands.length > 0
+      ? islands.map((f) => f.polygon)
+      : [[[0, 0], [canvas.width, 0], [canvas.width, canvas.height], [0, canvas.height]]]);
+    drawGeographic(base);
+    drawUrban(true);
+  } else {
+    drawGeographic([]);
   }
 
   drawGrid();

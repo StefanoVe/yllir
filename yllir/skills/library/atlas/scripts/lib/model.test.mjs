@@ -320,7 +320,7 @@ test('a forest biome may carry a variant of conifer or broadleaf; other variants
   assert.ok(codes(check(layerWith(biome({ type: 'swamp', variant: 'conifer' })))).includes('bad-feature'));
 });
 
-// Urban scale (settlement, district): layers, constraints, features, wrong-scale-layer, building checks.
+// Urban scale (settlement, district): layers, constraints, features, building checks, and mixed atlases.
 
 const urbanRoot = (layers = {}, manifest = urbanManifest()) => {
   const root = standardCampaign();
@@ -350,8 +350,8 @@ test('settlement and district are urban scopes; the other scope kinds are geogra
   assert.equal(isUrbanScope('district'), true);
   assert.equal(isUrbanScope('region'), false);
   assert.equal(isUrbanScope('world'), false);
-  assert.deepEqual(layersForScope('district'), URBAN_LAYERS);
-  assert.deepEqual(layersForScope('continent'), GEO_LAYERS);
+  assert.deepEqual(layersForScope('district'), LAYERS);
+  assert.deepEqual(layersForScope('continent'), LAYERS);
 });
 
 test('scope.unit is optional; m and paces are accepted, anything else is bad-manifest', () => {
@@ -361,23 +361,27 @@ test('scope.unit is optional; m and paces are accepted, anything else is bad-man
   assert.ok(bad.some((p) => p.code === 'bad-manifest' && p.path === 'scope.unit'));
 });
 
-test('a geographic layer in an urban atlas, or an urban layer in a geographic one, gives wrong-scale-layer', () => {
-  const urban = check(urbanRoot({ terrain: terrainLayer(), ground: groundLayer() }));
-  const found = urban.find((p) => p.code === 'wrong-scale-layer');
-  assert.equal(found.file, 'Atlas/terrain.json');
-  assert.equal(found.path, '');
-  assert.equal(urban.some((p) => p.code === 'wrong-scale-layer' && p.file === 'Atlas/ground.json'), false);
-
-  const geo = check(validRoot({ layers: { terrain: terrainLayer(), ground: groundLayer() } }));
-  const wrong = geo.filter((p) => p.code === 'wrong-scale-layer');
-  assert.deepEqual(wrong.map((p) => p.file), ['Atlas/ground.json']);
-  assert.equal(wrong[0].path, '');
+test('every layer is allowed in every scope kind: a city inside a region and hills around a city both validate', () => {
+  assert.deepEqual(check(urbanRoot({ terrain: terrainLayer(), biomes: layer('biomes'), ground: groundLayer() })), []);
+  assert.deepEqual(check(validRoot({ layers: { terrain: terrainLayer(), ground: groundLayer(), streets: layer('streets') } })), []);
+  assert.equal(check(validRoot({ layers: { terrain: terrainLayer(), ground: groundLayer() } })).some((p) => p.code === 'wrong-scale-layer'), false);
 });
 
-test('labels is shared: an urban atlas may have labels, and so may a geographic one', () => {
+test('labels is shared: an urban atlas and a geographic one may both have labels', () => {
   const labels = layer('labels');
-  assert.equal(check(urbanRoot({ labels })).some((p) => p.code === 'wrong-scale-layer'), false);
-  assert.equal(check(validRoot({ layers: { labels } })).some((p) => p.code === 'wrong-scale-layer'), false);
+  assert.deepEqual(check(urbanRoot({ labels })), []);
+  assert.deepEqual(check(validRoot({ layers: { labels } })), []);
+});
+
+test('a mixed atlas (terrain land, a river on ground, buildings) validates; a tavern in the river is caught by the urban check', () => {
+  const river = { id: 'river-main', type: 'water', kind: 'river', polygon: square(1000, 380, 1100, 420), ...shown };
+  const mixed = (at) => ({
+    terrain: terrainLayer(),
+    ground: layer('ground', { features: [river] }),
+    buildings: buildingsLayer([['north', at, 'tavern']]),
+  });
+  assert.deepEqual(problemsOf(mixed([500, 500])), []);
+  assert.deepEqual(problemsOf(mixed([1050, 400])), ['building-in-water features[0].at']);
 });
 
 test('a complete urban atlas has zero problems', () => {

@@ -12,7 +12,7 @@ import {
   landFeature, square, readAtlasFile, placeSheet, writeAtlas, baseManifest, buildingsLayer,
 } from './lib/test-support.mjs';
 import { listStyles } from './lib/styles.mjs';
-import { URBAN_LAYERS } from './lib/model.mjs';
+import { LAYERS } from './lib/model.mjs';
 import { pointInPolygon } from './lib/geometry.mjs';
 
 after(cleanupCampaigns);
@@ -147,7 +147,7 @@ test('write-layer refuses a new land overlapping locked land, unless unlocked', 
   assert.deepEqual(json(result.stdout).overlaps, ['land-clash']);
 });
 
-test('status shows the places in scope that have no feature yet', () => {
+test('status shows the places in scope that have no feature yet; a listed place counts as placed', () => {
   const root = standardCampaign();
   run('init', root, scopeFile(root, { kind: 'region', places: ['north'] }));
   const result = run('status', root);
@@ -155,7 +155,7 @@ test('status shows the places in scope that have no feature yet', () => {
   const status = json(result.stdout);
   assert.equal(status.folder, 'Atlas');
   assert.equal(status.exists, true);
-  assert.deepEqual(status.pending.map((p) => p.id), ['north', 'port-ash']);
+  assert.deepEqual(status.pending.map((p) => p.id), ['port-ash']);
   assert.equal(status.layers.terrain.present, false);
   assert.equal(lastLine(result.stdout), 'exit: 0');
 });
@@ -598,7 +598,7 @@ test('an urban atlas: init at the urban canvas, generate its layers with an empt
   const status = run('status', root);
   assert.equal(status.code, 0);
   const out = json(status.stdout);
-  assert.deepEqual(Object.keys(out.layers), URBAN_LAYERS);
+  assert.deepEqual(Object.keys(out.layers), LAYERS);
   assert.equal(out.layers.ground.present, true);
   assert.equal(out.layers.buildings.features, 1);
   assert.deepEqual(out.pending.map((p) => p.id), ['port-ash']);
@@ -622,13 +622,65 @@ test('an urban atlas: init at the urban canvas, generate its layers with an empt
   assert.equal(readAtlasFile(root, 'ground.json'), before);
 });
 
-test('generate terrain on an urban atlas is refused with wrong-scale-layer', () => {
+test('generate-terrain on an urban atlas is allowed: the terrain layer is a layer of every atlas', () => {
   const root = standardCampaign();
   const scope = writeJsonFile(path.join(root, 'scope.json'), { scope: { kind: 'settlement', places: ['north'] } });
   assert.equal(run('init', root, scope).code, 0);
+  assert.equal(run('write-layer', root, 'terrain', writeConstraints(root, [landmassConstraint('main', [1200, 900], [900, 700])])).code, 0);
   const result = run('generate-terrain', root);
-  assert.equal(result.code, 1);
-  assert.equal(json(result.stdout).problems[0].code, 'wrong-scale-layer');
-  assert.equal(lastLine(result.stdout), 'exit: 1');
+  assert.equal(result.code, 0, result.stdout);
+  assert.equal(readTerrain(root).features[0].id, 'land-1');
+  assert.equal(lastLine(result.stdout), 'exit: 0');
+});
+
+/** A layer file (constraints only) for write-layer, for any layer name. */
+function writeLayerConstraints(root, name, constraints) {
+  return writeJsonFile(path.join(root, `${name}-constraints.json`), { layer: name, constraints, features: [] });
+}
+
+test('a region with a generated terrain takes a river, streets and blocks in a small area; validate is ok and status lists every layer', () => {
+  const root = standardCampaign();
+  assert.equal(run('init', root, scopeFile(root)).code, 0);
+  assert.equal(run('write-layer', root, 'terrain', writeConstraints(root, [landmassConstraint('main', [500, 500], [300, 300])])).code, 0);
+  assert.equal(run('generate', root, 'terrain').code, 0);
+
+  const river = { kind: 'river', id: 'river-small', source: [420, 200], mouth: [560, 260], width: 12, provenance: 'master', sources: [] };
+  const street = { kind: 'street', id: 'small-street', rank: 'main', path: [[400, 520], [600, 520]], provenance: 'master', sources: [] };
+  const fill = { kind: 'fill', id: 'town', character: 'common', provenance: 'master', sources: [] };
+  assert.equal(run('write-layer', root, 'ground', writeLayerConstraints(root, 'ground', [river])).code, 0);
+  assert.equal(run('write-layer', root, 'streets', writeLayerConstraints(root, 'streets', [street])).code, 0);
+  for (const name of ['ground', 'streets']) {
+    const generated = run('generate', root, name);
+    assert.equal(generated.code, 0, `${name}: ${generated.stdout}`);
+  }
+  assert.equal(run('write-layer', root, 'blocks', writeLayerConstraints(root, 'blocks', [fill])).code, 0);
+  const blocks = run('generate', root, 'blocks');
+  assert.equal(blocks.code, 0, blocks.stdout);
+  assert.ok(json(blocks.stdout).features > 0);
+
+  const valid = run('validate', root);
+  assert.equal(valid.code, 0, valid.stdout);
+  assert.equal(json(valid.stdout).ok, true);
+
+  const status = json(run('status', root).stdout);
+  assert.deepEqual(Object.keys(status.layers), LAYERS);
+  assert.equal(status.layers.terrain.features, 1);
+  assert.equal(status.layers.ground.features, 1);
+  assert.equal(status.layers.streets.features, 1);
+  assert.ok(status.layers.blocks.features > 0);
+  assert.equal(status.layers.biomes.present, false);
+});
+
+test('an urban atlas with only urban layers: generate biomes works on a synthetic terrain, which is not written to disk', () => {
+  const root = standardCampaign();
+  const scope = writeJsonFile(path.join(root, 'scope.json'), { scope: { kind: 'settlement', places: [] } });
+  assert.equal(run('init', root, scope).code, 0);
+  const forest = { kind: 'biome', id: 'woods', type: 'forest', at: [1800, 1200], radius: 300, provenance: 'master', sources: [] };
+  assert.equal(run('write-layer', root, 'biomes', writeLayerConstraints(root, 'biomes', [forest])).code, 0);
+  const result = run('generate', root, 'biomes');
+  assert.equal(result.code, 0, result.stdout);
+  assert.equal(json(result.stdout).ok, true);
+  assert.ok(json(result.stdout).features >= 1);
   assert.equal(fs.existsSync(path.join(root, 'Atlas', 'terrain.json')), false);
+  assert.equal(run('validate', root).code, 0);
 });

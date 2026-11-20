@@ -19,6 +19,10 @@
 // - Opacities keep three decimals (one decimal would turn 0.12 into 0.1).
 // - An island (a land feature of ground) is drawn over a water canvas: sea pieces are filled without an edge,
 //   the island has a soft shore (a 6-unit water stroke at 0.35 opacity, under the land fill) and its own edge.
+// - Mixed map (the layers also have terrain land, see render.mjs): the canvas is not filled, the ground
+//   draws only its water of kind river|canal|pond|coast, and the island and the sea pieces are left out.
+// - urbanLayerGroups returns the groups as strings, so render.mjs can put them in one SVG with the geography.
+//   Its `stats.counts` tell how many pieces each group has (render.mjs skips the empty groups).
 
 import { escapeXml } from './render.mjs';
 import { isFinitePoint, isUsablePolygon } from './geometry.mjs';
@@ -81,26 +85,28 @@ function visibleFeatures(layer, audience) {
 const group = (name, inner) => [`<g id="layer-${name}" data-layer="${name}">`, ...inner, '</g>'];
 
 /**
- * Renders the urban atlas to SVG.
+ * The urban layers as SVG strings: one group per layer, the defs they need and the labels (as a list,
+ * not yet in their group). Used alone by renderUrbanSvg and inside the atlas by render.mjs.
  * @param {object} options
- * @param {{ canvas: { width: number, height: number }, seed: number }} options.manifest the atlas.json object
- * @param {Record<string, { features?: object[] }>} [options.layers] urban layer objects by name; any may be missing
- * @param {{ style: object, manifest: object, dir: string }} [options.style] the result of loadStyle (default: fantasy-color)
+ * @param {Record<string, { features?: object[] }>} [options.layers] layer objects by name; the terrain is read too (for the mixed map)
+ * @param {object} [options.style] the result of loadStyle (default: fantasy-color)
  * @param {Record<string, string>} [options.names] place id -> display title
  * @param {'master'|'players'} [options.audience]
+ * @param {{ width: number, height: number }} options.canvas
  * @param {string} [options.assetBase] URL prefix of the styles and fonts
- * @param {boolean} [options.vignette] accepted for parity with renderAtlasSvg and ignored: the urban map has no vignette
- * @returns {{ svg: string, stats: { lots: number, buildings: number, districts: number, labels: number } }}
+ * @returns {{ defs: string[], groups: Record<string, string>, labels: string[], stats: object }}
  */
-export function renderUrbanSvg({ manifest, layers = {}, style, names = {}, audience = 'master', assetBase = 'assets/', vignette: _vignette }) {
+export function urbanLayerGroups({ layers = {}, style, names = {}, audience = 'master', canvas, assetBase = 'assets/' }) {
   if (!AUDIENCES.includes(audience)) throw new Error(`audience must be one of ${AUDIENCES.join(', ')}`);
   const bundle = style ?? loadStyle(DEFAULT_STYLE);
   const S = bundle.style;
   const M = bundle.manifest;
   const U = S.urban;
   const L = S.labels;
-  const W = manifest.canvas.width;
-  const H = manifest.canvas.height;
+  const W = canvas.width;
+  const H = canvas.height;
+  // With terrain land the geography is the base of the map: the ground does not fill the canvas.
+  const hasTerrainLand = visibleFeatures(layers.terrain, audience).some((f) => f?.type === 'land' && isUsablePolygon(f.polygon));
   const cell = Math.max(W, H) / 512;
   const tile = Math.max(W, H) / 9;
   const base = escapeXml(assetBase);
@@ -135,21 +141,26 @@ export function renderUrbanSvg({ manifest, layers = {}, style, names = {}, audie
   // a soft shore, the land fill, and its outline.
   const islands = features.ground.filter((f) => f.type === 'land' && isUsablePolygon(f.polygon));
   const ground = [];
-  if (islands.length > 0) {
+  // Water kinds drawn over the geography of a mixed map (the sea pieces are left to the island case).
+  const GEOGRAPHIC_WATER = ['river', 'canal', 'pond', 'coast'];
+  const baseIslands = hasTerrainLand ? [] : islands;
+  // Without terrain land the canvas is the base: water with an island on it, or land. With terrain land there is no fill.
+  if (!hasTerrainLand && islands.length > 0) {
     ground.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${colour(U.water)}"/>`);
     if (textured.sea) ground.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${textured.sea}"/>`);
-  } else {
+  } else if (!hasTerrainLand) {
     ground.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${colour(U.ground)}"/>`);
     if (textured.land) ground.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${textured.land}"/>`);
   }
   for (const f of features.ground) {
     if (f.type !== 'water' || !isUsablePolygon(f.polygon)) continue;
+    if (hasTerrainLand && !GEOGRAPHIC_WATER.includes(f.kind)) continue;
     const d = ringD(f.polygon);
     ground.push(`<path d="${d}" fill="${colour(U.water)}"/>`);
     if (textured.sea) ground.push(`<path d="${d}" fill="${textured.sea}"/>`);
     if (f.kind !== 'sea') ground.push(`<path d="${d}" fill="none" stroke="${colour(U.waterEdge)}" stroke-width="0.8" stroke-linejoin="round"/>`);
   }
-  for (const f of islands) {
+  for (const f of baseIslands) {
     const d = ringD(f.polygon);
     ground.push(`<path d="${d}" fill="none" stroke="${colour(U.water)}" stroke-width="${SHORE_WIDTH}" stroke-linejoin="round" opacity="${fmt(SHORE_OPACITY)}"/>`);
     ground.push(`<path d="${d}" fill="${colour(U.ground)}"/>`);
@@ -375,25 +386,50 @@ export function renderUrbanSvg({ manifest, layers = {}, style, names = {}, audie
     return out;
   };
 
+  const pieces = { ground, green, walls, streets, blocks, buildings, districts };
+  return {
+    defs,
+    groups: Object.fromEntries(URBAN_LAYERS.map((name) => [name, group(name, pieces[name]).join('\n')])),
+    labels: finalLabels.map(labelSvg),
+    stats: {
+      lots: lotCount,
+      buildings: buildingCount,
+      districts: districts.length,
+      labels: finalLabels.length,
+      counts: Object.fromEntries(URBAN_LAYERS.map((name) => [name, pieces[name].length])),
+    },
+  };
+}
+
+/**
+ * Renders the urban atlas to SVG.
+ * @param {object} options
+ * @param {{ canvas: { width: number, height: number }, seed: number }} options.manifest the atlas.json object
+ * @param {Record<string, { features?: object[] }>} [options.layers] urban layer objects by name; any may be missing
+ * @param {{ style: object, manifest: object, dir: string }} [options.style] the result of loadStyle (default: fantasy-color)
+ * @param {Record<string, string>} [options.names] place id -> display title
+ * @param {'master'|'players'} [options.audience]
+ * @param {string} [options.assetBase] URL prefix of the styles and fonts
+ * @param {boolean} [options.vignette] accepted for parity with renderAtlasSvg and ignored: the urban map has no vignette
+ * @returns {{ svg: string, stats: { lots: number, buildings: number, districts: number, labels: number } }}
+ */
+export function renderUrbanSvg({ manifest, layers = {}, style, names = {}, audience = 'master', assetBase = 'assets/', vignette: _vignette }) {
+  if (!AUDIENCES.includes(audience)) throw new Error(`audience must be one of ${AUDIENCES.join(', ')}`);
+  const bundle = style ?? loadStyle(DEFAULT_STYLE);
+  const W = manifest.canvas.width;
+  const H = manifest.canvas.height;
+  const urban = urbanLayerGroups({ layers, style: bundle, names, audience, canvas: manifest.canvas, assetBase });
   const svg = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`,
     '<defs>',
-    ...defs,
+    ...urban.defs,
     '</defs>',
-    ...group('ground', ground),
-    ...group('green', green),
-    ...group('walls', walls),
-    ...group('streets', streets),
-    ...group('blocks', blocks),
-    ...group('buildings', buildings),
-    ...group('districts', districts),
-    ...group('labels', finalLabels.map(labelSvg)),
+    ...URBAN_LAYERS.map((name) => urban.groups[name]),
+    group('labels', urban.labels).join('\n'),
     '</svg>',
     '',
   ].join('\n');
-  return {
-    svg,
-    stats: { lots: lotCount, buildings: buildingCount, districts: districts.length, labels: finalLabels.length },
-  };
+  const { lots, buildings, districts, labels } = urban.stats;
+  return { svg, stats: { lots, buildings, districts, labels } };
 }

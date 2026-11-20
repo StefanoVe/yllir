@@ -86,9 +86,12 @@ export function isUrbanScope(kind) {
   return URBAN_SCOPE_KINDS.includes(kind);
 }
 
-/** The layers that a scope kind may have: the urban ones for a settlement or district, the geographic ones otherwise. */
-export function layersForScope(kind) {
-  return isUrbanScope(kind) ? URBAN_LAYERS : GEO_LAYERS;
+/**
+ * The layers an atlas of this scope kind may have. Every layer, whatever the kind: the scope only sets the
+ * defaults (the canvas at init), a region can hold a city drawn in detail and a city plan can hold hills.
+ */
+export function layersForScope() {
+  return LAYERS;
 }
 
 export const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -957,16 +960,6 @@ export function validateAtlas(root, atlas, { worldIndex } = {}) {
     placeIds: new Set((Array.isArray(layers.places?.features) ? layers.places.features : []).map((f) => f?.id)),
     featureIds: featureIdsOf(layers),
   };
-
-  const kind = manifest?.scope?.kind;
-  if (SCOPE_KINDS.includes(kind)) {
-    const allowed = layersForScope(kind);
-    for (const name of LAYERS) {
-      if (layers[name] !== undefined && !allowed.includes(name)) {
-        problems.push(problem('wrong-scale-layer', `${name}.json`, '', `${name} is not a layer of a ${kind} atlas`));
-      }
-    }
-  }
 
   for (const name of LAYERS) {
     if (layers[name] !== undefined) problems.push(...layerProblems(name, layers[name], ctx));

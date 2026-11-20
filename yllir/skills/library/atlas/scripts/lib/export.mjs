@@ -7,7 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readAtlas, validateAtlas, isPlainObject, isUrbanScope } from './model.mjs';
+import { readAtlas, validateAtlas, isPlainObject } from './model.mjs';
 import { renderAtlasSvg, escapeXml } from './render.mjs';
 import { renderUrbanSvg } from './render-urban.mjs';
 import { loadStyle, resolveStyleId } from './styles.mjs';
@@ -25,10 +25,12 @@ const ASSETS_DIR = fileURLToPath(new URL('../../assets/', import.meta.url));
 const ASSET_BASE = 'assets/';
 const DEFAULT_BASE_URL = 'http://localhost/';
 const SUMMARY_MAX = 400;
-// The order of the layer switches in the viewer. Labels are always listed, even when no label layer exists.
-const LAYER_ORDER = ['terrain', 'relief', 'biomes', 'water', 'political', 'routes', 'places', 'labels'];
-// The same for an urban atlas (settlement or district): ground, green, walls, streets, blocks, buildings, districts, labels.
-const URBAN_LAYER_ORDER = ['ground', 'green', 'walls', 'streets', 'blocks', 'buildings', 'districts', 'labels'];
+// The geographic and the urban layers: an atlas that has a feature in any of them is geographic or urban (or both).
+const GEO_LAYERS = ['terrain', 'relief', 'water', 'biomes', 'political', 'routes', 'places'];
+const URBAN_LAYERS = ['ground', 'green', 'walls', 'streets', 'blocks', 'buildings', 'districts'];
+// The order of the layer switches in the viewer, the union of both kinds in drawing order. Labels are always
+// listed, even when no label layer exists. Only the layers the atlas has are listed.
+const LAYER_ORDER = ['terrain', 'relief', 'biomes', 'water', 'political', 'routes', 'places', ...URBAN_LAYERS, 'labels'];
 const VIEWER_FILES = ['viewer.js', 'viewer.css'];
 // The viewer's own display font (viewer.css), copied even when the map does not reference it.
 const VIEWER_FONT = 'fonts/IMFellEnglish-Regular.ttf';
@@ -190,28 +192,40 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     .filter((f) => isPlainObject(f) && (!players || f.visibility !== 'master'));
   const allFeatures = (name) => (Array.isArray(atlas.layers[name]?.features) ? atlas.layers[name].features : []).filter(isPlainObject);
 
-  // 3. One place record per surviving place feature whose sheet may be shown to this audience. On an urban
-  // atlas the place features are the buildings and the districts with a place; their card id is the place id,
-  // which is also the `data-place` of the element the renderer draws, so a click opens the card.
-  // An urban record also carries `kind`: the building kind, or 'district' for a district. The summary is
-  // always the PUBLIC body (the text before the master marker), for both audiences: the card never shows
-  // the master-only part, and the master build's data holds no more than the players' data does.
-  const urban = isUrbanScope(atlas.manifest.scope?.kind);
-  const placeFeatures = urban
-    ? [
-      ...survivors('buildings').map((feature) => ({ feature, kind: feature.kind })),
-      ...survivors('districts').map((feature) => ({ feature, kind: 'district' })),
-    ].filter(({ feature }) => typeof feature.place === 'string')
-    : survivors('places').map((feature) => ({ feature, kind: null }));
+  // 3. The scale of the atlas, from its features and not from its scope: a geographic layer with a feature makes
+  // the map geographic, an urban one makes it urban. Both kinds at once make it 'mixed'. The features are the
+  // atlas's own (the same for both audiences), so a master-only layer still decides the scale of the players' build.
+  const hasGeo = GEO_LAYERS.some((name) => allFeatures(name).length > 0);
+  const hasUrban = URBAN_LAYERS.some((name) => allFeatures(name).length > 0);
+  const scale = hasUrban && !hasGeo ? 'urban' : (hasUrban && hasGeo ? 'mixed' : 'geo');
+
+  // One place record per surviving place feature whose sheet may be shown to this audience. The place features
+  // are the places layer, and the buildings and districts with a place (in every atlas). A building or district
+  // card id is its place id, which is also the `data-place` of the element the renderer draws, so a click opens
+  // the card. Such a record also carries `kind`: the building kind, or 'district' for a district; a place
+  // record has no kind. The summary is always the PUBLIC body (the text before the master marker), for both
+  // audiences: the card never shows the master-only part, and the master build's data holds no more than the
+  // players' data does.
+  const placeFeatures = [
+    ...survivors('places').map((feature) => ({ feature, kind: null, id: feature.id, place: feature.place, at: feature.at })),
+    ...survivors('buildings').filter((f) => typeof f.place === 'string')
+      .map((feature) => ({ feature, kind: feature.kind, id: feature.place, place: feature.place, at: anchorOf(feature) })),
+    ...survivors('districts').filter((f) => typeof f.place === 'string')
+      .map((feature) => ({ feature, kind: 'district', id: feature.place, place: feature.place, at: anchorOf(feature) })),
+  ];
   const records = [];
   const seen = new Set();
-  for (const { feature, kind } of placeFeatures) {
-    const id = urban ? feature.place : feature.id;
-    if (seen.has(id)) continue;
-    const subject = byId.get(feature.place);
+  const keptFeatures = new Set();
+  for (const { feature, kind, id, place, at } of placeFeatures) {
+    if (seen.has(id)) {
+      keptFeatures.add(feature);
+      continue;
+    }
+    const subject = byId.get(place);
     if (subject === undefined) continue;
     if (players && !isPublicDocument(subject.file, config)) continue;
     seen.add(id);
+    keptFeatures.add(feature);
     const body = publicBody(fs.readFileSync(path.join(root, subject.file), 'utf8'));
     let link = null;
     if (players) {
@@ -219,18 +233,16 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     } else {
       link = { kind: 'document', path: subject.file };
     }
-    const record = { id, title: subject.title, icon: feature.icon ?? null, at: urban ? anchorOf(feature) : feature.at, summary: summaryOf(body), link };
-    if (urban) record.kind = kind;
+    const record = { id, title: subject.title, icon: feature.icon ?? null, at, summary: summaryOf(body), link };
+    if (kind !== null) record.kind = kind;
     records.push(record);
   }
-  const kept = new Set(records.map((r) => r.id));
   const renderLayers = { ...atlas.layers };
-  if (urban) {
-    if (atlas.layers.buildings !== undefined) {
-      renderLayers.buildings = { ...atlas.layers.buildings, features: allFeatures('buildings').filter((f) => kept.has(f.place) && (!players || f.visibility !== 'master')) };
-    }
-  } else {
-    renderLayers.places = { ...atlas.layers.places, features: allFeatures('places').filter((f) => kept.has(f.id) && (!players || f.visibility !== 'master')) };
+  if (atlas.layers.places !== undefined) {
+    renderLayers.places = { ...atlas.layers.places, features: allFeatures('places').filter((f) => keptFeatures.has(f) && (!players || f.visibility !== 'master')) };
+  }
+  if (atlas.layers.buildings !== undefined) {
+    renderLayers.buildings = { ...atlas.layers.buildings, features: allFeatures('buildings').filter((f) => keptFeatures.has(f) && (!players || f.visibility !== 'master')) };
   }
 
   // 4. Names: the surviving places, and the realms' and districts' places (for players, only when the sheet is public).
@@ -250,7 +262,9 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
   try {
     const resolved = resolveStyleId({ atlasStyle: atlas.manifest.style, campaignConfig: config, pluginRoot });
     bundle = loadStyle(resolved.id);
-    const draw = urban ? renderUrbanSvg : renderAtlasSvg;
+    // A purely urban atlas uses the urban renderer; a geographic or a mixed one uses the geographic renderer,
+    // which appends the urban groups when there are any.
+    const draw = scale === 'urban' ? renderUrbanSvg : renderAtlasSvg;
     svgResult = draw({ manifest: atlas.manifest, layers: renderLayers, style: bundle, names, audience, assetBase: ASSET_BASE, vignette: false });
   } catch (err) {
     return refused([{ code: err.code ?? 'render', file: 'atlas.json', path: 'style', message: err.message }]);
@@ -267,9 +281,9 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     seaTile: Math.max(width, height) / 9,
     seaTexture: `styles/${bundle.style.id}/${deepSea.file}`,
     vignette: { color: bundle.style.vignette.color, opacity: bundle.style.vignette.opacity },
-    scale: urban ? 'urban' : 'geo',
+    scale,
     places: records,
-    layers: (urban ? URBAN_LAYER_ORDER : LAYER_ORDER).filter((name) => name === 'labels' || atlas.layers[name] !== undefined),
+    layers: LAYER_ORDER.filter((name) => name === 'labels' || atlas.layers[name] !== undefined),
     strings,
   };
   const html = pageHtml({

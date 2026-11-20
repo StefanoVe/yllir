@@ -1,6 +1,6 @@
 # Atlante
 
-**Stato:** processo, forma e principi **Deciso** dall'autore (2026-11-19); prima implementazione in 0.78.0 (skill `atlas`, sezione Atlante del master screen 0.19.0), con formati e strumenti come descritti qui. La scala `settlement`/`district` (decisione 12, sezione 2b) è implementata nella versione 0.79.0 del framework, con le differenze indicate in sezione 2b.
+**Stato:** processo, forma e principi **Deciso** dall'autore (2026-11-19); prima implementazione in 0.78.0 (skill `atlas`, sezione Atlante del master screen 0.19.0), con formati e strumenti come descritti qui. La scala `settlement`/`district` (decisione 12, sezione 2b) è implementata nella versione 0.79.0 del framework, con le differenze indicate in sezione 2b. Le scale mescolate (sezione 2b) sono implementate nella versione 0.81.0.
 **Parte di:** [Skill di libreria](Skill%20di%20libreria.md) (scheda [L25](Skill%20di%20libreria.md#l25-atlante)) e [Master screen](Master%20screen.md)
 
 ## Scopo del documento
@@ -43,7 +43,7 @@ Supera, per la carta del mondo, la frase «La carta del mondo resta fuori» dell
 - asset urbani disegnati da script in vettoriale: il pacchetto bitmap con fornitore di immagini **non** è fatto;
 - costanti scelte: tela predefinita 2400x1800; isolati su griglia da 4 unità; lotti generati dallo script e nascosti sotto gli edifici nominati; marcatori tondi con simbolo per tipo che aprono la sinossi pubblica (scheda senza spoiler).
 
-- **Scale.** All'estensione geografica (`world`, `continent`, `region`) si aggiunge l'estensione di un abitato: `settlement` (città o villaggio intero, con i dintorni) e `district` (un quartiere, un porto, un castello con il borgo). L'estensione decide quali livelli, timbri e unità di misura usare. La pianta di un singolo edificio o di uno scontro resta una mappa di luogo di `images` (decisione sulle mappe di battaglia, indice 2026-11-11).
+- **Scale.** All'estensione geografica (`world`, `continent`, `region`) si aggiunge l'estensione di un abitato: `settlement` (città o villaggio intero, con i dintorni) e `district` (un quartiere, un porto, un castello con il borgo). L'estensione decide la tela predefinita e l'unità di misura, ma non limita i livelli. La pianta di un singolo edificio o di uno scontro resta una mappa di luogo di `images` (decisione sulle mappe di battaglia, indice 2026-11-11).
 - **Livelli della scala urbana**, nell'ordine di disegno:
   - `ground`: terreno, acqua (fiume, costa, canali), con lo stesso principio di `terrain`;
   - `green`: parchi, giardini, orti, campi e boschi dei dintorni;
@@ -63,6 +63,7 @@ Supera, per la carta del mondo, la frase «La carta del mondo resta fuori» dell
 - **Carte annidate** (non implementate in 0.79.0: una sola carta per campagna). Una campagna può avere più carte, ciascuna con la propria estensione (per esempio il mondo e la sua capitale). Ogni carta ha la propria cartella e il proprio manifesto (`Atlante/<carta>/atlas.json`). Il segnaposto di una città sulla carta del mondo apre la carta della città quando esiste. I dati di una carta non si copiano nell'altra: la gerarchia viene dalle cartelle dei luoghi.
 - **Città-isola.** Quando il mondo della campagna è una città su un'isola, l'estensione è `settlement` con un'isola, non una carta geografica con un solo punto: la carta urbana copre l'isola, con i suoi quartieri e gli edifici nominati. Il vincolo `island` nel livello `ground` disegna il mare intorno e una sola isola (un'isola per carta), che deve stare dentro la tela con un margine. Le mura seguono la costa dell'isola, con un anello di 10–16 punti preso dal contorno dell'isola e spostato verso l'interno; fuori dalle mura restano campi e riva. *Implementata in 0.79.0 come le altre voci della sezione 2b* (approvazione dell'acqua insieme all'isola, poi livello fissato).
 - **Unità.** A scala urbana la tela usa metri o passi, dichiarati nella configurazione, e i controlli sulle posizioni cambiano: un edificio sta su un isolato o su una piazza, mai in strada o in acqua; una porta sta sulle mura.
+- **Scale mescolate (implementata in 0.81.0).** Livelli geografici e urbani possono stare nella stessa carta, con una sola tela e un solo sistema di coordinate: l'estensione fissa solo la tela di partenza. Una città dettagliata può stare dentro una carta di regione, disegnata più grande della scala reale perché sia leggibile; attorno a una pianta urbana si possono mettere rilievi e biomi con timbri webp (colline, montagne, foreste). I timbri evitano isolati, verde, piazze e l'interno delle mura. Le unità della tela sono condivise tra i livelli geografici e urbani. Nella carta di regione, mare e isola vengono solo quando manca il livello del terreno; i luoghi dentro un isolato non si disegnano, perché al loro posto ci sono gli edifici.
 
 ## 3. Generazione per livelli
 

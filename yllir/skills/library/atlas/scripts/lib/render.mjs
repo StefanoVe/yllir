@@ -4,11 +4,14 @@
 // style; the stamps and textures come from the style's manifest. The URLs are built under
 // `assetBase`: `<assetBase>styles/<id>/<file>` and `<assetBase>fonts/<file>`.
 
-import { isFinitePoint, isUsablePolygon } from './geometry.mjs';
+import { isFinitePoint, isUsablePolygon, pointInPolygon } from './geometry.mjs';
 import { planStamps, sortStamps } from './scatter.mjs';
 import { DEFAULT_STYLE, FONT_FILES, loadStyle } from './styles.mjs';
+import { urbanLayerGroups } from './render-urban.mjs';
 
 const AUDIENCES = ['master', 'players'];
+// Urban layers in drawing order (the same order as render-urban.mjs). The labels come after them.
+const URBAN_LAYERS = ['ground', 'green', 'walls', 'streets', 'blocks', 'buildings', 'districts'];
 // Texture roles of a style (style.json `textures`) and the pattern id of each.
 const TEXTURE_ROLES = ['land', 'sand', 'snow', 'sea', 'deepSea'];
 // Average advance of a character of the label font, in em (a crude estimate, good enough for fitting).
@@ -184,7 +187,12 @@ const iconKind = (icon) => (icon === 'capital' || icon === 'city' ? icon : 'othe
  * @param {'master'|'players'} [options.audience]
  * @param {string} [options.assetBase] URL prefix of the styles and fonts
  * @param {boolean} [options.vignette=true] draw the vignette inside the SVG; the viewer draws it itself when false
- * @returns {{ svg: string, stats: { stamps: number, places: number, labels: number } }}
+ * Urban layers, when present, are drawn in the same canvas: their groups go after the places and before
+ * the labels (the ground goes right after the sea when there is no terrain land, as the base of the map).
+ * Stamps keep off the urban footprint (blocks, green, squares, closed walls, ground water). A place inside
+ * a block has no icon. Ambiguity resolved: the urban ground without terrain land is the land of the stamps,
+ * and an island or the whole canvas, as in the urban map.
+ * @returns {{ svg: string, stats: { stamps: number, places: number, labels: number, lots: number, buildings: number, districts: number } }}
  */
 export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audience = 'master', assetBase = 'assets/', vignette: withVignette = true }) {
   if (!AUDIENCES.includes(audience)) throw new Error(`audience must be one of ${AUDIENCES.join(', ')}`);
@@ -225,6 +233,28 @@ export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audie
   const rivers = features.water.filter((f) => f.type === 'river' && Array.isArray(f.path) && f.path.length >= 2 && f.path.every(isFinitePoint));
   const places = features.places.filter((f) => isFinitePoint(f.at));
   const iconStamps = new Map((M.stamps ?? []).map((s) => [s.id, s]));
+
+  // Urban layers (settlement and district scale) in the same canvas, when the atlas has any.
+  // Mixed map: the terrain is the base. Without terrain land, the urban ground is the base (an island or the
+  // whole canvas), and it is also the land the stamps may stand on.
+  const urbanFeatures = Object.fromEntries(URBAN_LAYERS.map((name) => [name, visibleFeatures(layers[name], audience)]));
+  const hasUrban = URBAN_LAYERS.some((name) => urbanFeatures[name].length > 0);
+  const polygonsOf = (name, keep = () => true) => urbanFeatures[name]
+    .filter((f) => keep(f) && isUsablePolygon(f.polygon))
+    .map((f) => f.polygon);
+  const urbanBlocks = polygonsOf('blocks', (f) => f.type === 'block');
+  const canvasRect = [[0, 0], [W, 0], [W, H], [0, H]];
+  const urbanLand = polygonsOf('ground', (f) => f.type === 'land');
+  const stampLand = landPolygons.length > 0 ? landPolygons : (hasUrban ? (urbanLand.length > 0 ? urbanLand : [canvasRect]) : []);
+  // Stamps keep off the urban footprint: blocks, green, squares, the inside of closed walls, and the water of the ground.
+  const urbanFootprint = hasUrban ? [
+    ...urbanBlocks,
+    ...polygonsOf('green'),
+    ...polygonsOf('streets', (f) => f.type === 'square'),
+    ...urbanFeatures.walls.filter((f) => f.type === 'wall' && f.closed === true && isUsablePolygon(f.path)).map((f) => f.path),
+    ...polygonsOf('ground', (f) => f.type === 'water'),
+  ] : [];
+  const buildingPlaces = new Set(urbanFeatures.buildings.map((f) => f.place));
 
   const defs = [];
   const sea = [];
@@ -424,8 +454,8 @@ export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audie
     seed: manifest.seed,
     relief: features.relief,
     biomes: features.biomes,
-    land: landPolygons,
-    water: [...terrainLakes, ...waterLakes],
+    land: stampLand,
+    water: [...terrainLakes, ...waterLakes, ...urbanFootprint],
     places: places.map((p) => p.at),
     stampScale: S.stamps.scale,
     mirrorTrees: S.stamps.mirrorTrees,
@@ -447,12 +477,18 @@ export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audie
   // 9. Places: an icon on each place, centred on its point.
   placeGroup.push('<g id="layer-places" data-layer="places">');
   const placeIcons = new Map();
+  const hiddenIcons = new Set();
   for (const place of places) {
     const icon = iconStamps.get(`icons-${place.icon}`);
     const aspect = icon ? icon.height / icon.width : 1;
     const width = cell * S.icons[iconKind(place.icon)];
     const height = width * aspect;
     placeIcons.set(place.id, height);
+    // A place inside a block is drawn by its buildings instead of by an icon.
+    if (urbanBlocks.some((block) => pointInPolygon(place.at, block))) {
+      hiddenIcons.add(place.id);
+      continue;
+    }
     const x = place.at[0] - width / 2;
     const y = place.at[1] - height / 2;
     const href = icon ? icon.file : `stamps/icons/${place.icon}.webp`;
@@ -464,11 +500,31 @@ export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audie
   }
   placeGroup.push('</g>');
 
+  // 9b. Urban groups and their defs. The geographic defs already hold the fonts and the textures they share
+  // with the urban ones (same ids, same files), so only the new ids are added.
+  const urban = hasUrban ? urbanLayerGroups({ layers, style: bundle, names, audience, canvas: manifest.canvas, assetBase }) : null;
+  if (urban) {
+    const known = new Set(defs.map((d) => /^<pattern id="([^"]+)"/.exec(d)?.[1]).filter((id) => id !== undefined));
+    for (const d of urban.defs) {
+      if (d === '<style>' || d === '</style>' || d.startsWith('@font-face')) continue;
+      const id = /^<pattern id="([^"]+)"/.exec(d)?.[1];
+      if (id !== undefined && known.has(id)) continue;
+      defs.push(d);
+    }
+  }
+  // The urban ground is drawn right after the sea when it is the base (no terrain land); otherwise with the
+  // other urban layers. Empty groups are left out.
+  const urbanSvg = (wanted) => (urban ? wanted.filter((name) => urban.stats.counts[name] > 0).map((name) => urban.groups[name]) : []);
+  const groundIsBase = landPolygons.length === 0;
+  const underlayGroups = groundIsBase ? urbanSvg(['ground']) : [];
+  const overGroups = urbanSvg(groundIsBase ? URBAN_LAYERS.slice(1) : URBAN_LAYERS);
+
   // 10. Labels: computed ones first, then the overrides of the labels layer.
   const computed = new Map();
   for (const place of places) {
     const title = names[place.place];
     if (typeof title !== 'string' || title.length === 0) continue;
+    if (hiddenIcons.has(place.id) && buildingPlaces.has(place.place)) continue;
     const size = cell * L.placeSize[iconKind(place.icon)];
     const iconHeight = placeIcons.get(place.id);
     computed.set(`places/${place.id}`, {
@@ -538,6 +594,13 @@ export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audie
     labelCount++;
     labelGroup.push(labelSvg(label, defs, () => ++uid, { family: familyOf(label.font), labels: L }));
   }
+  // The urban labels (building names, district names and the labels-layer overrides for urban targets) follow the geographic ones.
+  if (urban) {
+    for (const label of urban.labels) {
+      labelCount++;
+      labelGroup.push(label);
+    }
+  }
   labelGroup.push('</g>');
 
   // 11. Vignette.
@@ -554,6 +617,7 @@ export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audie
     '<g id="layer-sea"><g mask="url(#sea-fade-x)"><g mask="url(#sea-fade-y)">',
     ...sea,
     '</g></g></g>',
+    ...underlayGroups,
     ...terrain,
     ...biomes,
     ...water,
@@ -561,12 +625,24 @@ export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audie
     ...routes,
     ...stampGroup,
     ...placeGroup,
+    ...overGroups,
     ...labelGroup,
     ...vignette,
     '</svg>',
     '',
   ].join('\n');
-  return { svg, stats: { stamps: stamps.length, places: places.length, labels: labelCount } };
+  const urbanStats = urban?.stats ?? { lots: 0, buildings: 0, districts: 0 };
+  return {
+    svg,
+    stats: {
+      stamps: stamps.length,
+      places: places.length,
+      labels: labelCount,
+      lots: urbanStats.lots,
+      buildings: urbanStats.buildings,
+      districts: urbanStats.districts,
+    },
+  };
 }
 
 /** Polygons of a realm: `polygons` (a list) or a single `polygon`, usable ones only. */

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { renderUrbanSvg } from './render-urban.mjs';
+import { renderUrbanSvg, urbanLayerGroups } from './render-urban.mjs';
 import { loadStyle } from './styles.mjs';
 import { generateGround } from './urban/ground.mjs';
 import { generateGreen } from './urban/green.mjs';
@@ -388,4 +388,46 @@ test('the lots of a block are grouped by kind: at most 10 paths for 300 lots of 
   // The former output was one lotSvg fragment per lot: the whole group is now smaller than those fragments alone.
   const before = lots.reduce((sum, lot) => sum + lotSvg({ ...lot, urban: U }).length, 0);
   assert.ok(group.length < before, `grouped ${group.length} is not smaller than ${before}`);
+});
+
+test('urbanLayerGroups: one group string per urban layer, the labels as a list, the piece counts and the defs', () => {
+  const f = fixture();
+  const out = urbanLayerGroups({ layers: f.layers, style: STYLE, names: f.names, canvas: f.manifest.canvas, assetBase: ASSET_BASE });
+  for (const name of GROUPS.slice(0, -1)) {
+    assert.ok(out.groups[name].startsWith(`<g id="layer-${name}" data-layer="${name}">`), name);
+    assert.ok(out.groups[name].endsWith('</g>'), name);
+    assert.ok(out.stats.counts[name] > 0, `${name} has pieces`);
+  }
+  assert.equal(out.labels.length, out.stats.labels);
+  assert.ok(out.defs.includes('<style>'));
+  const { svg } = renderUrbanSvg({ manifest: f.manifest, layers: f.layers, names: f.names, style: STYLE, assetBase: ASSET_BASE });
+  for (const name of GROUPS.slice(0, -1)) assert.ok(svg.includes(out.groups[name]), `${name} is in the urban svg as it is`);
+  assert.ok(svg.includes(out.labels[0]));
+});
+
+test('urbanLayerGroups with terrain land: the ground is water only (no canvas fill, no island, no sea piece)', () => {
+  const layers = {
+    terrain: { features: [{ id: 'main', type: 'land', polygon: [[0, 0], [1000, 0], [1000, 800], [0, 800]] }] },
+    ground: { features: [
+      { id: 'sea-1', type: 'water', kind: 'sea', polygon: [[0, 0], [50, 0], [50, 50]] },
+      { id: 'canal-1', type: 'water', kind: 'canal', polygon: [[300, 300], [600, 300], [600, 320]] },
+      { id: 'isle', type: 'land', kind: 'island', polygon: [[100, 100], [200, 100], [200, 200]] },
+    ] },
+  };
+  const { groups, stats } = urbanLayerGroups({ layers, style: STYLE, canvas: { width: 1000, height: 800 }, assetBase: ASSET_BASE });
+  assert.ok(!groups.ground.includes('<rect'));
+  assert.ok(groups.ground.includes('M300 300'), 'the canal is drawn');
+  assert.ok(!groups.ground.includes('M0 0 L50 0'), 'the sea piece is left out');
+  assert.ok(!groups.ground.includes('M100 100'), 'the island is left out');
+  assert.ok(stats.counts.ground > 0, 'the canal is counted as a drawn piece');
+});
+
+test('urbanLayerGroups without terrain land: the ground fills the canvas and the island is drawn over the sea', () => {
+  const layers = { ground: { features: [
+    { id: 'sea-1', type: 'water', kind: 'sea', polygon: [[0, 0], [50, 0], [50, 50]] },
+    { id: 'isle', type: 'land', kind: 'island', polygon: [[100, 100], [200, 100], [200, 200]] },
+  ] } };
+  const { groups } = urbanLayerGroups({ layers, style: STYLE, canvas: { width: 1000, height: 800 }, assetBase: ASSET_BASE });
+  assert.ok(groups.ground.includes('<rect x="0" y="0" width="1000" height="800"'));
+  assert.ok(groups.ground.includes('M100 100'), 'the island is drawn');
 });

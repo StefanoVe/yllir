@@ -9,8 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import {
-  LAYERS, SCOPE_KINDS, atlasDir, atlasFolder, readAtlas, validateAtlas, manifestProblems, prefixProblems, writeJson,
-  isPlainObject, isUrbanScope, layersForScope,
+  LAYERS, atlasDir, atlasFolder, readAtlas, validateAtlas, manifestProblems, prefixProblems, writeJson, isPlainObject,
 } from './lib/model.mjs';
 import { ensureAtlasSetup, planAtlasSetup, defaultCanvasFor, DEFAULT_STYLE } from './lib/setup.mjs';
 import { exportAtlas } from './lib/export.mjs';
@@ -30,6 +29,7 @@ import { generateWalls } from './lib/urban/walls.mjs';
 import { generateStreets } from './lib/urban/streets.mjs';
 import { generateBlocks } from './lib/urban/blocks.mjs';
 import { generateDistricts } from './lib/urban/districts.mjs';
+import { withTerrain } from './lib/urban/synthetic-terrain.mjs';
 import { renderPreview } from './lib/preview.mjs';
 import { buildWorldIndex } from '../../../../scripts/lib/world-graph.mjs';
 import { parseYamlLite } from '../../../../scripts/lib/yaml-lite.mjs';
@@ -53,6 +53,8 @@ const GENERATORS = {
   blocks: generateBlocks,
   districts: generateDistricts,
 };
+// The generators that read the terrain. An atlas without a terrain layer (an urban one) gets a synthetic one for them.
+const TERRAIN_READERS = new Set(['relief', 'biomes', 'water', 'political', 'routes']);
 const PREVIEW_FILE = '.campaign/cache/atlas/preview.png';
 
 function print(value) {
@@ -82,11 +84,8 @@ function status(root) {
   const atlas = readAtlas(root);
   const worldIndex = buildWorldIndex(root);
   const dir = atlasDir(root);
-  const scopeKind = atlas.manifest?.scope?.kind;
-  // With a manifest of a known scope, only the layers of that scope are listed.
-  const names = isPlainObject(atlas.manifest) && SCOPE_KINDS.includes(scopeKind) ? layersForScope(scopeKind) : LAYERS;
   const layers = {};
-  for (const name of names) {
+  for (const name of LAYERS) {
     const features = atlas.layers[name]?.features;
     layers[name] = {
       present: dir !== null && fs.existsSync(path.join(dir, `${name}.json`)),
@@ -197,25 +196,25 @@ function places(root) {
 }
 
 /**
- * Where each placed place is, and its icon, keyed by place id. A geographic atlas counts its places layer;
- * an urban one counts its buildings (at and kind) and its districts (no point, icon district).
+ * Where each placed place is, and its icon, keyed by place id. A place is placed by a feature in the places
+ * layer (its point and icon), in the buildings layer (its point, icon the building kind), or in the districts
+ * layer (no point, icon district, only when nothing else placed it). Every scope kind is read the same way.
  */
 function placementsOf(atlas) {
   const featuresOf = (name) => (Array.isArray(atlas.layers[name]?.features) ? atlas.layers[name].features.filter(isPlainObject) : []);
   const byPlace = new Map();
-  if (isUrbanScope(atlas.manifest?.scope?.kind)) {
-    for (const feature of featuresOf('buildings')) {
-      if (typeof feature.place === 'string') {
-        byPlace.set(feature.place, { at: Array.isArray(feature.at) ? feature.at : null, icon: feature.kind ?? null });
-      }
-    }
-    for (const feature of featuresOf('districts')) {
-      if (typeof feature.place === 'string' && !byPlace.has(feature.place)) byPlace.set(feature.place, { at: null, icon: 'district' });
-    }
-    return byPlace;
-  }
   for (const feature of featuresOf('places')) {
-    byPlace.set(feature.place, { at: Array.isArray(feature.at) ? feature.at : null, icon: feature.icon ?? null });
+    if (typeof feature.place === 'string') {
+      byPlace.set(feature.place, { at: Array.isArray(feature.at) ? feature.at : null, icon: feature.icon ?? null });
+    }
+  }
+  for (const feature of featuresOf('buildings')) {
+    if (typeof feature.place === 'string') {
+      byPlace.set(feature.place, { at: Array.isArray(feature.at) ? feature.at : null, icon: feature.kind ?? null });
+    }
+  }
+  for (const feature of featuresOf('districts')) {
+    if (typeof feature.place === 'string' && !byPlace.has(feature.place)) byPlace.set(feature.place, { at: null, icon: 'district' });
   }
   return byPlace;
 }
@@ -308,11 +307,6 @@ function generateCommand(root, name) {
   if (!isPlainObject(atlas.manifest) || manifestErrors.length > 0) {
     return refuse(empty, manifestErrors.length > 0 ? prefixProblems(folder, manifestErrors) : [{ code: 'bad-manifest', file: path.posix.join(folder, 'atlas.json'), path: '', message: 'atlas.json is missing or invalid' }]);
   }
-  // The manifest is valid here, so its scope kind is known: the layer must belong to that scale.
-  const scopeKind = atlas.manifest.scope.kind;
-  if (!layersForScope(scopeKind).includes(name)) {
-    return refuse(empty, [{ code: 'wrong-scale-layer', file: relative, path: 'scope.kind', message: `${name} is not a layer of a ${scopeKind} atlas` }]);
-  }
   const current = atlas.layers[name];
   if (current === undefined) {
     return refuse(empty, [{ code: 'missing-layer', file: relative, path: '', message: `${name}.json must hold the constraints first` }]);
@@ -338,7 +332,7 @@ function generateCommand(root, name) {
     canvas: atlas.manifest.canvas,
     seed: atlas.manifest.seed,
     constraints,
-    layers: atlas.layers,
+    layers: TERRAIN_READERS.has(name) ? withTerrain(atlas.layers, atlas.manifest.canvas) : atlas.layers,
     locked,
   });
   if (problems.length > 0) return refuse(empty, prefixProblems(folder, problems));
