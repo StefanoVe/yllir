@@ -25,6 +25,7 @@ Questo file è l’indice: raccoglie le decisioni dell’autore, che sono vincol
 | [Atlante](Atlante.md) | Carta del mondo dipinta con dati, dai documenti: vista del master screen e sito statico; il territorio non cambia senza richiesta |
 | [Modelli 3D](Modelli%203D.md) | Modelli STL da stampare di personaggi e creature: immagine monocromatica in posa adatta, poi strumenti locali |
 | [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md) | Adattatori dei sistemi di gioco e profili di stile visivo |
+| [Adattatore Fabula Ultima](Adattatore%20Fabula%20Ultima.md) | Scaffold del secondo adattatore di sistema (Proposta) |
 | [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md) | Agente principale, esecutori economici, revisori, Claude e Codex |
 | [Esperienza utente](Esperienza%20utente.md) | Uso da parte di chi non programma: ingresso, onboarding, lessico, versioni, dialoghi d’esempio |
 | [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md) | Versioni, controllo all’avvio, migrazioni, skill di update |
