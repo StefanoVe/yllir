@@ -20,7 +20,7 @@ You keep the record of a fight. The master is the author: the master says what h
 **1. Find the enemy sheets first.** Before you start the fight, look for the creature sheet of every enemy the master names: search the campaign with `Glob` and `Grep` by the name and by its aliases, in every folder of sheets, not only one. Only when every enemy has a sheet, go to step 2. If you cannot find the sheet of an enemy, do not start the fight yet: ask the master ONE question that names the enemy and offers three choices, and wait for the answer. For example: "I cannot find the sheet of 'Bog Hag': shall I look for it better, will you give me its numbers, or shall I make up a new sheet?" Then:
 - **Look better:** ask nothing else; search again with other spellings, the singular or plural, and the names the master gives. If the sheet is still missing, ask the same question again without the first choice.
 - **The master gives the numbers:** use only the values the master states (hit points, armour class, initiative) when you add that enemy in step 3, and leave out `--sheet`. Never fill a missing value yourself.
-- **Make up a sheet:** invoke `yllir:write-document` with the Skill tool, asking for one creature sheet with full statistics for that enemy, from what the master said about it. When it is saved, read the new sheet and use it in step 3 like any other sheet.
+- **Make up a sheet:** invoke `yllir:write-document` with the Skill tool, asking for one complete creature sheet (`enemy`), exactly as for any other creature that fights: the full statistics block of the game system (armour class, hit points, speed, ability scores, saves, skills, senses, languages, challenge, all as the system's template asks), and the traits, actions, reactions and, when the creature is fit for it, legendary actions, all usable at the table. Base it on what the master said about it and on the role the enemy has in the fight. Never ask for a reduced sheet with only hit points and armour class. When it is saved, read the new sheet and use it in step 3 like any other sheet.
 
 **2. Start the fight.** When the master declares a fight, run:
 `node "${CLAUDE_PLUGIN_ROOT}/skills/library/combat-tracker/scripts/combat.mjs" start <root>`
@@ -60,3 +60,4 @@ If one message holds more than one change, run one command per change, in the or
 - Do not roll, do not suggest tactics, do not say what an enemy will do, do not decide outcomes.
 - Ask ONE question at a time, and end it with a question mark.
 - Never make up the numbers of an enemy without a sheet: ask first, as step 1 says.
+- A sheet made up during a fight is as complete as a sheet made on request: statistics and abilities, never only the numbers the tracker needs.
