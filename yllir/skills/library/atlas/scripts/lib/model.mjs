@@ -12,7 +12,10 @@ import { buildWorldIndex } from '../../../../../scripts/lib/world-graph.mjs';
 export const PROVENANCES = ['master', 'document', 'agent-choice'];
 export const VISIBILITIES = ['public', 'master'];
 export const SCOPE_KINDS = ['world', 'continent', 'region', 'settlement', 'district'];
-export const ICONS = ['capital', 'city', 'town', 'village', 'fort', 'ruin', 'landmark', 'port'];
+export const ICONS = [
+  'capital', 'city', 'town', 'village', 'fort', 'ruin', 'landmark', 'port',
+  'shop', 'market', 'inn', 'workshop', 'mine', 'arena', 'tower', 'government', 'temple', 'warehouse', 'pier', 'district', 'wasteland',
+];
 export const LABEL_GROUPS = ['lands', 'regions', 'nature', 'places', 'territories'];
 
 const MANIFEST_FILE = 'atlas.json';

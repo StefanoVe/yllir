@@ -260,6 +260,21 @@ test('labels-write accepts a port within 12 pixels of land, and refuses one fart
   assert.equal(json(far).problems[0].code, 'place-not-on-land');
 });
 
+test('labels-write accepts a pier within 12 pixels of land, and refuses one farther away', () => {
+  const root = standardCampaign();
+  initWithBase(root);
+  const near = writeLabels(root, emptyLabelSet({
+    places: [{ id: 'p1', place: 'north', x: 125, y: 60, kind: 'pier', ...MASTER }],
+  }));
+  assert.equal(near.code, 0, near.stdout);
+  const far = writeLabels(root, emptyLabelSet({
+    places: [{ id: 'p1', place: 'north', x: 150, y: 60, kind: 'pier', ...MASTER }],
+  }));
+  assert.equal(far.code, 1);
+  assert.equal(json(far).problems[0].code, 'place-not-on-land');
+  assert.match(json(far).problems[0].message, /\(a pier may be 12 pixels from land\)/);
+});
+
 test('labels-write refuses a place that is not a place of the world', () => {
   const root = standardCampaign();
   initWithBase(root);

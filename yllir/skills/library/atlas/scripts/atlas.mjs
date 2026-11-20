@@ -94,8 +94,9 @@ const LOCKABLE_NAMES = ['base', 'land'];
 const ZERO_HASH = '0'.repeat(64);
 const CANVAS_PLACEHOLDER = { width: 1024, height: 1024 };
 const MIN_SIDE = 16;
-/** A port may sit this far (in pixels) from the land. */
+/** A port or a pier may sit this far (in pixels) from the land. */
 const PORT_REACH = 12;
+const WATERSIDE_KINDS = ['port', 'pier'];
 const WORK_DIR = '.campaign/cache/atlas/work';
 const REPORT_FILE = '.campaign/state/atlas/report.txt';
 const CONFIG_FILE = 'campaign.yaml';
@@ -529,14 +530,14 @@ function placesCommand(root) {
   return 0;
 }
 
-/** Whether the canvas pixel (x, y) is land; a port may also be within PORT_REACH pixels of land. */
+/** Whether the canvas pixel (x, y) is land; a port or a pier may also be within PORT_REACH pixels of land. */
 function onLand(loaded, x, y, kind) {
   const { width, height } = loaded.base;
   const land = loaded.land.data;
   const px = Math.min(Math.max(Math.floor(x), 0), width - 1);
   const py = Math.min(Math.max(Math.floor(y), 0), height - 1);
   if (land[py * width + px] === 1) return true;
-  if (kind !== 'port') return false;
+  if (!WATERSIDE_KINDS.includes(kind)) return false;
   for (let dy = -PORT_REACH; dy <= PORT_REACH; dy++) {
     for (let dx = -PORT_REACH; dx <= PORT_REACH; dx++) {
       if (dx * dx + dy * dy > PORT_REACH * PORT_REACH) continue;
@@ -581,7 +582,7 @@ function labelsWriteCommand(root, candidateFile) {
             code: 'place-not-on-land',
             file: relative,
             path: `places[${i}]`,
-            message: `${item.place} at ${item.x},${item.y} is not on land${item.kind === 'port' ? ` (a port may be ${PORT_REACH} pixels from land)` : ''}`,
+            message: `${item.place} at ${item.x},${item.y} is not on land${WATERSIDE_KINDS.includes(item.kind) ? ` (a ${item.kind} may be ${PORT_REACH} pixels from land)` : ''}`,
           });
         }
       });

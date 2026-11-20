@@ -300,8 +300,10 @@ button:hover {
 
 /* Markers: one round button per place, over the map. Its size is the same at every zoom (viewer.js sets the
    position). On a phone the touch target grows through --marker-size. Each kind of place draws its own glyph
-   (capital star, city skyline, town house, village roof, fort tower, ruin column, landmark diamond, port anchor)
-   as a mask over the button, in --marker-stroke, and in --accent when the marker is hovered or pressed. */
+   as a mask over the button, in --marker-stroke, and in --accent when the marker is hovered or pressed. Glyphs:
+   capital star, city skyline, town house, village roof, fort tower, ruin column, landmark diamond, port anchor,
+   shop front, market stall, inn mug, workshop hammer, mine cave, arena ring, narrow tower, government hall,
+   temple dome, warehouse barn, pier piles, district blocks, wasteland tree. */
 .markers {
   position: absolute;
   left: 0;
@@ -343,93 +345,143 @@ button:hover {
   outline-offset: 2px;
 }
 
-/* Kind icons: a monochrome glyph centred in the marker, drawn with a mask so it takes the marker's colours. */
-.marker[data-kind="capital"]::before {
+/* Kind icons: one shared rule draws the glyph, and each kind sets only its --glyph (an SVG image) on the
+   ::before. The glyph is monochrome, centred in the marker and takes the marker's colours. */
+.marker[data-kind]::before {
   content: '';
   position: absolute;
   inset: 0;
   pointer-events: none;
   background-color: var(--marker-stroke);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6'/%3E%3C/svg%3E") center / 60% no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6'/%3E%3C/svg%3E") center / 60% no-repeat;
+  -webkit-mask: var(--glyph) center / 60% no-repeat;
+  mask: var(--glyph) center / 60% no-repeat;
   transition: background-color 0.15s ease;
+}
+
+.marker[data-kind="capital"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 14.9,8.6 22,9.3 16.6,14 18.2,21 12,17.3 5.8,21 7.4,14 2,9.3 9.1,8.6'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
 }
 
 .marker[data-kind="city"]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-color: var(--marker-stroke);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='10' width='5' height='12'/%3E%3Crect x='9' y='4' width='6' height='18'/%3E%3Crect x='17' y='8' width='5' height='14'/%3E%3C/svg%3E") center / 60% no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='10' width='5' height='12'/%3E%3Crect x='9' y='4' width='6' height='18'/%3E%3Crect x='17' y='8' width='5' height='14'/%3E%3C/svg%3E") center / 60% no-repeat;
-  transition: background-color 0.15s ease;
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='10' width='5' height='12'/%3E%3Crect x='9' y='4' width='6' height='18'/%3E%3Crect x='17' y='8' width='5' height='14'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
 }
 
 .marker[data-kind="town"]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-color: var(--marker-stroke);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 22,11 19,11 19,21 5,21 5,11 2,11'/%3E%3C/svg%3E") center / 60% no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 22,11 19,11 19,21 5,21 5,11 2,11'/%3E%3C/svg%3E") center / 60% no-repeat;
-  transition: background-color 0.15s ease;
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 22,11 19,11 19,21 5,21 5,11 2,11'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
 }
 
 .marker[data-kind="village"]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-color: var(--marker-stroke);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,4 22,20 2,20'/%3E%3C/svg%3E") center / 60% no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,4 22,20 2,20'/%3E%3C/svg%3E") center / 60% no-repeat;
-  transition: background-color 0.15s ease;
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,4 22,20 2,20'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
 }
 
 .marker[data-kind="fort"]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-color: var(--marker-stroke);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 22V6H7V3H10V6H14V3H17V6H20V22Z'/%3E%3C/svg%3E") center / 60% no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 22V6H7V3H10V6H14V3H17V6H20V22Z'/%3E%3C/svg%3E") center / 60% no-repeat;
-  transition: background-color 0.15s ease;
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 22V6H7V3H10V6H14V3H17V6H20V22Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
 }
 
 .marker[data-kind="ruin"]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-color: var(--marker-stroke);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='7,22 7,9 10,7 12,10 14,6 17,9 17,22'/%3E%3C/svg%3E") center / 60% no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='7,22 7,9 10,7 12,10 14,6 17,9 17,22'/%3E%3C/svg%3E") center / 60% no-repeat;
-  transition: background-color 0.15s ease;
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='7,22 7,9 10,7 12,10 14,6 17,9 17,22'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
 }
 
 .marker[data-kind="landmark"]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-color: var(--marker-stroke);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 22,12 12,22 2,12'/%3E%3C/svg%3E") center / 60% no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 22,12 12,22 2,12'/%3E%3C/svg%3E") center / 60% no-repeat;
-  transition: background-color 0.15s ease;
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,2 22,12 12,22 2,12'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
 }
 
 .marker[data-kind="port"]::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background-color: var(--marker-stroke);
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='4' r='2.3' fill='none' stroke='black' stroke-width='1.6'/%3E%3Crect x='11' y='7' width='2' height='14'/%3E%3Crect x='7' y='8' width='10' height='2'/%3E%3Cpath d='M4 14Q4 21 12 21Q20 21 20 14H17.5Q17.5 18 12 18Q6.5 18 6.5 14Z'/%3E%3C/svg%3E") center / 60% no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='4' r='2.3' fill='none' stroke='black' stroke-width='1.6'/%3E%3Crect x='11' y='7' width='2' height='14'/%3E%3Crect x='7' y='8' width='10' height='2'/%3E%3Cpath d='M4 14Q4 21 12 21Q20 21 20 14H17.5Q17.5 18 12 18Q6.5 18 6.5 14Z'/%3E%3C/svg%3E") center / 60% no-repeat;
-  transition: background-color 0.15s ease;
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='12' cy='4' r='2.3' fill='none' stroke='black' stroke-width='1.6'/%3E%3Crect x='11' y='7' width='2' height='14'/%3E%3Crect x='7' y='8' width='10' height='2'/%3E%3Cpath d='M4 14Q4 21 12 21Q20 21 20 14H17.5Q17.5 18 12 18Q6.5 18 6.5 14Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="shop"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='3' width='20' height='5'/%3E%3Cpath d='M2 8a2.5 2.5 0 0 0 5 0Z M7 8a2.5 2.5 0 0 0 5 0Z M12 8a2.5 2.5 0 0 0 5 0Z M17 8a2.5 2.5 0 0 0 5 0Z'/%3E%3Cpath fill-rule='evenodd' d='M4 12H20V21H4Z M7 14H17V18H7Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="market"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='1,10 12,3 23,10'/%3E%3Crect x='4' y='10' width='2' height='11'/%3E%3Crect x='18' y='10' width='2' height='11'/%3E%3Crect x='3' y='17' width='18' height='3'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="inn"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 5H17V21H4Z'/%3E%3Cpath fill-rule='evenodd' d='M16 8H21V18H16Z M18 10.5H19V15.5H18Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="workshop"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='13' height='5'/%3E%3Cpolygon points='9,8 13,8 20,21 16,22'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="mine"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M2 21V13A10 10 0 0 1 22 13V21Z M7 21V14A5 5 0 0 1 17 14V21Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="arena"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M2 12A10 7 0 1 0 22 12A10 7 0 1 0 2 12Z M6.5 12A5.5 3.5 0 1 0 17.5 12A5.5 3.5 0 1 0 6.5 12Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="tower"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M8 22V3H10V6H11.5V3H13V6H14.5V3H16V22Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="government"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='2,8 12,2 22,8'/%3E%3Crect x='3' y='8' width='18' height='2'/%3E%3Crect x='6.5' y='10' width='2' height='9'/%3E%3Crect x='9.5' y='10' width='2' height='9'/%3E%3Crect x='12.5' y='10' width='2' height='9'/%3E%3Crect x='15.5' y='10' width='2' height='9'/%3E%3Crect x='2' y='19' width='20' height='3'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="temple"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M5 13A7 7 0 0 1 19 13Z'/%3E%3Crect x='4' y='13' width='16' height='2'/%3E%3Crect x='2' y='15' width='20' height='3'/%3E%3Crect x='11.5' y='2' width='1' height='5'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="warehouse"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M2 10L12 4L22 10V21H2Z M8 21V12H16V21Z'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="pier"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='5' width='20' height='3'/%3E%3Crect x='5' y='8' width='2' height='13'/%3E%3Crect x='11' y='8' width='2' height='13'/%3E%3Crect x='17' y='8' width='2' height='13'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="district"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='3' y='3' width='8' height='8'/%3E%3Crect x='13' y='3' width='8' height='8'/%3E%3Crect x='3' y='13' width='8' height='8'/%3E%3Crect x='13' y='13' width='8' height='8'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
+}
+
+.marker[data-kind="wasteland"]::before {
+  --glyph: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='19' width='20' height='2'/%3E%3Crect x='11' y='7' width='2' height='12'/%3E%3Cpolygon points='11,11 6,6 7,5 12,9.5'/%3E%3Cpolygon points='13,8 18,3 19,4 14,10'/%3E%3C/svg%3E");
+  -webkit-mask-image: var(--glyph);
+  mask-image: var(--glyph);
 }
 
 .marker:hover::before,

@@ -197,7 +197,13 @@ Use this for a change to the picture: a zone repainted, a coast moved on purpose
 
 1. Read the current labels with the Read tool, from the atlas folder the status command named (`<folder>/labels.json`), if it exists. Write `.campaign/state/atlas/labels.json` with the Write tool as the WHOLE content: the existing items, unchanged, plus your additions. Shape:
    - `lands`, `regions`, `nature`: `{ "id", "text", "x", "y", "size", "provenance", "sources", "visibility" }`, with `x`, `y` in canvas pixels (origin top-left, read from the grid of Step 6).
-   - `places`: `{ "id", "place", "x", "y", "kind", "provenance", "sources", "visibility" }`. The `place` is the id of the sheet; there is no name here, the name comes from the sheet. `kind`: capital, city, town, village, fort, ruin, landmark or port. A port lies within 12 px of the sea; any other place lies on land.
+   - `places`: `{ "id", "place", "x", "y", "kind", "provenance", "sources", "visibility" }`. The `place` is the id of the sheet; there is no name here, the name comes from the sheet. `kind`: one of capital, city, town, village, fort, ruin, landmark, port, shop, market, inn, workshop, mine, arena, tower, government, temple, warehouse, pier, district or wasteland.
+     - Pick the kind from the sheet: what the place is, in its title or its In brief section.
+     - Settlements: capital, city, town, village. Defence: fort. Old or broken: ruin. Water: port (a harbour town), pier (a single pier or jetty).
+     - Inside a settlement or district plan: shop (any store), market (square or bazaar), inn (inn or tavern), workshop (workshop, forge or laboratory), temple (temple, shrine or church), tower (tower, castle or palace), government (town hall, court, consulate, guild hall of the rulers), warehouse (warehouse, store-house or dock), arena (arena or theatre), district (a quarter or neighbourhood shown as one point).
+     - In the open: mine (mine or cave entrance), wasteland (wasteland, swamp or blighted land).
+     - landmark only when none of the others fits.
+     - A port or a pier lies within 12 px of the sea; any other place lies on land.
    - `territories`: `{ "id", "color", "seeds", "separate", "add", "remove", "subtract", "provenance", "sources", "visibility" }`. A seed (a point on the land) is inside the territory it names; a seed in the sea is an error. `separate` cuts polygons out of the land, `add` and `remove` change the polygons, and `subtract` lists territories that come earlier in the list and are taken out of this one.
    - `legend`: `{ "show": true, "corner": "top-left" }`.
    Every item has a unique `id`. A name comes only from a document (listed in `sources`) or from the master. A sea, a range or a continent with no name gets no label. Outside facts go in `note`.

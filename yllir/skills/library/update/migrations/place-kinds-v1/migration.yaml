@@ -1,0 +1,9 @@
+# place-kinds-v1: re-classifies the atlas places that still have the generic landmark symbol.
+# The guided part reads each sheet and picks the kind it states; the master is not asked.
+id: place-kinds-v1
+after: [metadata-comment-v1, atlas-site-v1]
+introduced_in: 0.94.0
+needed: detect
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs

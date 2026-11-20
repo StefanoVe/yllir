@@ -46,7 +46,10 @@ test('the exported vocabulary is the one of the design', () => {
   assert.deepEqual(PROVENANCES, ['master', 'document', 'agent-choice']);
   assert.deepEqual(VISIBILITIES, ['public', 'master']);
   assert.deepEqual(SCOPE_KINDS, ['world', 'continent', 'region', 'settlement', 'district']);
-  assert.deepEqual(ICONS, ['capital', 'city', 'town', 'village', 'fort', 'ruin', 'landmark', 'port']);
+  assert.deepEqual(ICONS, [
+    'capital', 'city', 'town', 'village', 'fort', 'ruin', 'landmark', 'port',
+    'shop', 'market', 'inn', 'workshop', 'mine', 'arena', 'tower', 'government', 'temple', 'warehouse', 'pier', 'district', 'wasteland',
+  ]);
   assert.deepEqual(LABEL_GROUPS, ['lands', 'regions', 'nature', 'places', 'territories']);
 });
 
