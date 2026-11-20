@@ -2,7 +2,7 @@
 name: atlas
 description: Library skill. Creates and keeps the atlas of the campaign, a map of the world or of a part of it, or a plan of a city or district, at any scale, as one painted base picture plus data (land and sea, labels, territories, places): it starts from a picture of the master, from the sources, or from one generation by the image service, changes the painted parts only through zoomed crops, and never changes approved land unless the master asks. Invoked by the entry skill when the master asks for the atlas or a map of the world or of a region, by the master screen's atlas button, and by build-world or write-document with the argument "update" after a batch that added places.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" *), Bash(node */skills/library/atlas/scripts/atlas.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/atlas-repaint-job.mjs" *), Bash(node */skills/library/images/scripts/atlas-repaint-job.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-select.mjs" *), Bash(node */skills/library/images/scripts/image-select.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node */scripts/versions.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Glob, Grep, WebSearch, WebFetch
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" *), Bash(node */skills/library/atlas/scripts/atlas.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/atlas-repaint-job.mjs" *), Bash(node */skills/library/images/scripts/atlas-repaint-job.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-select.mjs" *), Bash(node */skills/library/images/scripts/image-select.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node */scripts/versions.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/rasterizer-setup.mjs" *), Bash(node */skills/library/atlas/scripts/rasterizer-setup.mjs *), Read, Write, Glob, Grep, WebSearch, WebFetch
 ---
 
 # Atlas
@@ -112,11 +112,17 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "Atlante: est
    ```
    If the sea is not recognised, rerun with `--sea-color <#hex>` (the colour of the sea in the picture, read by eye) and `--tolerance <n>` (more tolerance takes in more shades of the shore). At most 3 rounds.
 2. Read the preview with the Read tool. Check it against the documents: every coast, island, lake and direction stated in Step 2. A bay filled in, a missing island or a coast on the wrong side is wrong: correct the parameters and rerun.
-3. Show the approved shape: outside the master screen, `preview . --open`; inside, `preview .` and Read. Ask: «Ecco la forma di terre e mari. Ti va bene, o vuoi cambiare qualcosa?»
+3. If the preview shows a lake or a river as land (white), find a point inside it on the grid view and rerun `land` with `--water-at <x,y>` (repeatable, canvas pixels); `--clear-waters` forgets them. A lake or river drawn on the map is water, not land.
+4. Before the first `preview` of the conversation, run once, in its own block:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/rasterizer-setup.mjs"
+   ```
+   If it prints `unavailable`, the preview has no names on it: say nothing technical about it; the master sees the full map in the Atlante section anyway.
+5. Show the approved shape: outside the master screen, `preview . --open`; inside, `preview .` and Read. Ask: «Ecco la forma di terre e mari. Ti va bene, o vuoi cambiare qualcosa?»
    ```
    node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" preview . --open
    ```
-4. On a yes, lock the land and the base, then save a version:
+6. On a yes, lock the land and the base, then save a version:
    ```
    node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" lock . land
    ```
@@ -126,7 +132,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "Atlante: est
    ```
    node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "Atlante: terre e mari approvate."
    ```
-5. On a change request, adjust and repeat from point 1.
+7. On a change request, adjust and repeat from point 1.
 
 ## Step 6: painted changes
 
@@ -204,7 +210,12 @@ Use this for a change to the picture: a zone repainted, a coast moved on purpose
    node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" territories . --out .campaign/cache/atlas/work/territories.png
    ```
    Each territory must be one area, with its seed inside it, and its borders where the documents put them. At most 3 rounds.
-4. Preview and render the whole atlas, read the preview yourself, and show it:
+4. Before the first `preview` of the conversation, run once, in its own block:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/rasterizer-setup.mjs"
+   ```
+   If it prints `unavailable`, the preview has no names on it: say nothing technical about it; the master sees the full map in the Atlante section anyway.
+5. Preview and render the whole atlas, read the preview yourself, and show it:
    ```
    node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" preview .
    ```
@@ -212,7 +223,7 @@ Use this for a change to the picture: a zone repainted, a coast moved on purpose
    node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render . --open
    ```
    Outside the master screen, `--open` is included; inside, drop it. Ask the whole approval: «Ecco l'atlante intero. Vuoi cambiare qualcosa prima che lo fissi?»
-5. On a yes, save a version. Labels, territories and places are not locked: they grow with the world.
+6. On a yes, save a version. Labels, territories and places are not locked: they grow with the world.
    ```
    node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "Atlante: approvato."
    ```

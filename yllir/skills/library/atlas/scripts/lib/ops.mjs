@@ -15,7 +15,7 @@ import {
 } from './image.mjs';
 import {
   newMask, cropMask, featherMask, landMaskFromImage, seaColorFromBorder, maskToImage,
-  imageToMask, diffMasks, countOnes,
+  imageToMask, diffMasks, countOnes, waterColorsFromPoints,
 } from './mask.mjs';
 import { checkLandChange } from './lock.mjs';
 
@@ -26,6 +26,7 @@ const MIN_BOX = 16;
 const GRID_CANVAS_STEP = Math.round(50 / 10) * 10;
 const GRID_MAX_SCALE = 4;
 const DEFAULT_TOLERANCE = 40;
+const DEFAULT_WATER_TOLERANCE = 30;
 /** A difference block smaller than this is noise (same threshold as the verify report). */
 const MIN_BLOCK = 30;
 /** Width, in pixels, of the before | after | diff strip. */
@@ -103,12 +104,23 @@ function providerScale(longer) {
   return 1;
 }
 
-/** Sea colour and tolerance of the atlas, or the ones estimated from the base when absent. */
+/** The extra water colours stored in land.sea.waters, as { color: [r, g, b], tolerance } entries. */
+function waterSpecs(sea) {
+  if (!Array.isArray(sea?.waters)) return [];
+  const out = [];
+  for (const entry of sea.waters) {
+    const color = parseHex(entry?.color);
+    if (color) out.push({ color, tolerance: Number.isFinite(entry.tolerance) ? entry.tolerance : DEFAULT_WATER_TOLERANCE });
+  }
+  return out;
+}
+
+/** Sea colour, tolerance and extra waters of the atlas, or the sea estimated from the base when absent. */
 function seaSpec(atlas, image) {
   const sea = atlas?.land?.sea;
   const color = parseHex(sea?.color) ?? seaColorFromBorder(image).color;
   const tolerance = Number.isInteger(sea?.tolerance) ? sea.tolerance : DEFAULT_TOLERANCE;
-  return { color, tolerance };
+  return { color, tolerance, waters: waterSpecs(sea) };
 }
 
 function fileName(entry, fallback) {
@@ -363,7 +375,9 @@ function evaluateCandidate(loaded, candidatePath, box) {
     return fail('size-mismatch', `the candidate is ${candidate.width}x${candidate.height}, the canvas is ${base.width}x${base.height}`);
   }
   const sea = seaSpec(atlas, base);
-  const candidateLand = landMaskFromImage(candidate, { seaColor: sea.color, tolerance: sea.tolerance });
+  const candidateLand = landMaskFromImage(candidate, {
+    seaColor: sea.color, tolerance: sea.tolerance, waterColors: sea.waters,
+  });
   const diff = diffMasks(land, candidateLand, MIN_BLOCK);
   return {
     ok: true,
@@ -430,7 +444,7 @@ export function verifyCandidate(root, { candidatePath, box, outPath } = {}) {
  * existing one (the rest of the existing land is kept).
  */
 function buildLandMask(image, sea, existing, box) {
-  const full = landMaskFromImage(image, { seaColor: sea.color, tolerance: sea.tolerance });
+  const full = landMaskFromImage(image, { seaColor: sea.color, tolerance: sea.tolerance, waterColors: sea.waters });
   if (!box || !existing) return full;
   const out = { width: existing.width, height: existing.height, data: new Uint8Array(existing.data) };
   for (let y = box.y0; y < box.y1; y++) {
@@ -461,10 +475,15 @@ function writeLandFromImage(state, image, { box = null, sea }) {
 
 /**
  * Rebuilds land.png from the base (or from another picture), whole or in a box, and records the
- * sea colour in atlas.json when one is given. Refuses when the land is locked unless unlock is set.
- * @returns {{ ok: true, landPixels: number, seaColor: string, tolerance: number } | { ok: false, code: string, message: string }}
+ * sea colour and the extra waters in atlas.json when one is given. Refuses when the land is locked
+ * unless unlock is set.
+ * waterPoints ([x, y] inside the picture, e.g. a point in a lake) add the colour of each point to
+ * land.sea.waters (duplicates by colour are dropped); clearWaters empties the list first.
+ * @returns {{ ok: true, landPixels: number, seaColor: string, tolerance: number, waters: object[] } | { ok: false, code: string, message: string }}
  */
-export function deriveLand(root, { from, box, seaColor, tolerance, unlock = false } = {}) {
+export function deriveLand(root, {
+  from, box, seaColor, tolerance, unlock = false, waterPoints, clearWaters = false,
+} = {}) {
   const state = readAtlasState(root);
   if (!state.ok) return state;
   if (state.atlas.land?.locked === true && !unlock) {
@@ -476,7 +495,7 @@ export function deriveLand(root, { from, box, seaColor, tolerance, unlock = fals
   if (read.error) return read.error;
   const image = read.image;
 
-  const given = seaColor !== undefined || tolerance !== undefined;
+  const given = seaColor !== undefined || tolerance !== undefined || waterPoints !== undefined || clearWaters;
   if (seaColor !== undefined && !parseHex(seaColor)) return fail('bad-sea-color', 'the sea colour must be #rrggbb');
   if (tolerance !== undefined && !(Number.isInteger(tolerance) && tolerance >= 0 && tolerance <= 255)) {
     return fail('bad-tolerance', 'the tolerance must be a whole number from 0 to 255');
@@ -485,16 +504,28 @@ export function deriveLand(root, { from, box, seaColor, tolerance, unlock = fals
     const bad = checkBox(box, image.width, image.height);
     if (bad) return bad;
   }
+  if (waterPoints !== undefined) {
+    const valid = Array.isArray(waterPoints) && waterPoints.every((p) => Array.isArray(p) && p.length === 2
+      && Number.isInteger(p[0]) && Number.isInteger(p[1]) && p[0] >= 0 && p[1] >= 0
+      && p[0] < image.width && p[1] < image.height);
+    if (!valid) return fail('bad-water-point', `a water point must be x,y inside the ${image.width}x${image.height} picture`);
+  }
   const fallback = seaSpec(state.atlas, image);
+  const storedWaters = clearWaters ? [] : fallback.waters;
+  const added = waterPoints?.length ? waterColorsFromPoints(image, waterPoints) : [];
   const sea = {
     color: parseHex(seaColor) ?? fallback.color,
     tolerance: tolerance ?? fallback.tolerance,
+    waters: mergeWaters(storedWaters, added),
   };
   const written = writeLandFromImage(state, image, { box: box ?? null, sea });
   if (!written.ok) return written;
 
+  const waters = sea.waters.map((w) => ({ color: toHex(w.color), tolerance: w.tolerance }));
   if (given) {
-    const manifest = { ...state.atlas, land: { ...state.atlas.land, sha256: written.sha, sea: { color: toHex(sea.color), tolerance: sea.tolerance } } };
+    const seaOut = { color: toHex(sea.color), tolerance: sea.tolerance };
+    if (waters.length > 0) seaOut.waters = waters;
+    const manifest = { ...state.atlas, land: { ...state.atlas.land, sha256: written.sha, sea: seaOut } };
     writeJson(state.atlasPath, manifest);
   } else {
     writeJson(state.atlasPath, { ...state.atlas, land: { ...state.atlas.land, sha256: written.sha } });
@@ -504,7 +535,21 @@ export function deriveLand(root, { from, box, seaColor, tolerance, unlock = fals
     landPixels: countOnes(written.mask),
     seaColor: toHex(sea.color),
     tolerance: sea.tolerance,
+    waters,
   };
+}
+
+/** Existing waters followed by the added ones, one entry per colour (the first one wins). */
+function mergeWaters(existing, added) {
+  const seen = new Set();
+  const out = [];
+  for (const entry of [...existing, ...added]) {
+    const key = toHex(entry.color);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(entry);
+  }
+  return out;
 }
 
 /**

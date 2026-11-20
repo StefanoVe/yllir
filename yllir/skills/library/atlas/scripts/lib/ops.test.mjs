@@ -301,3 +301,69 @@ function resizeImageTo(image, width, height) {
   }
   return out;
 }
+
+const LAKE = { x0: 90, y0: 60, x1: 120, y1: 90 };
+const LAKE_COLOR = [90, 120, 150, 255];
+
+/** A campaign whose base holds the sea, the green island and a grey-blue lake inside it. No land yet. */
+function campaignWithLake() {
+  const root = makeCampaign({});
+  const dir = writeAtlas(root, {
+    manifest: baseManifest({ canvas: { width: W, height: H } }),
+    labels: null,
+    pictures: [],
+  });
+  const base = newImage(W, H, SEA);
+  fillRect(base, ISLAND, GREEN);
+  fillRect(base, LAKE, LAKE_COLOR);
+  writePngFile(path.join(dir, 'base.png'), base);
+  return { root, landPath: path.join(dir, 'land.png') };
+}
+
+/** Red value of one pixel of land.png: true when the pixel is land. */
+function isLandAt(landPath, x, y) {
+  return imageFromFile(landPath).data[(y * W + x) * 4] >= 128;
+}
+
+test('deriveLand with waterPoints stores the lake colour and the lake is water in land.png', () => {
+  const { root, landPath } = campaignWithLake();
+  const result = deriveLand(root, { waterPoints: [[105, 75]] });
+  assert.equal(result.ok, true, result.message);
+  assert.deepEqual(result.waters, [{ color: '#5a7896', tolerance: 30 }]);
+  assert.equal(isLandAt(landPath, 105, 75), false, 'the lake is water');
+  assert.equal(isLandAt(landPath, 70, 50), true, 'the island around it stays land');
+  assert.equal(isLandAt(landPath, 5, 5), false, 'the sea stays sea');
+  const sea = readAtlas(root).manifest.land.sea;
+  assert.deepEqual(sea.waters, [{ color: '#5a7896', tolerance: 30 }]);
+});
+
+test('deriveLand: a second call keeps the stored waters and does not duplicate a colour', () => {
+  const { root, landPath } = campaignWithLake();
+  deriveLand(root, { waterPoints: [[105, 75]] });
+  const again = deriveLand(root, { waterPoints: [[100, 80]] });
+  assert.equal(again.ok, true, again.message);
+  assert.equal(again.waters.length, 1, 'same colour, one entry');
+  const plain = deriveLand(root, {});
+  assert.equal(plain.ok, true, plain.message);
+  assert.equal(readAtlas(root).manifest.land.sea.waters.length, 1);
+  assert.equal(isLandAt(landPath, 105, 75), false, 'the lake is still water');
+});
+
+test('deriveLand with clearWaters empties the list and the lake becomes land again', () => {
+  const { root, landPath } = campaignWithLake();
+  deriveLand(root, { waterPoints: [[105, 75]] });
+  const cleared = deriveLand(root, { clearWaters: true });
+  assert.equal(cleared.ok, true, cleared.message);
+  assert.deepEqual(cleared.waters, []);
+  assert.equal(readAtlas(root).manifest.land.sea.waters, undefined);
+  assert.equal(isLandAt(landPath, 105, 75), true, 'the lake is land again');
+});
+
+test('deriveLand refuses a water point outside the picture and changes nothing', () => {
+  const { root, landPath } = campaignWithLake();
+  const result = deriveLand(root, { waterPoints: [[500, 5]] });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, 'bad-water-point');
+  assert.equal(readAtlas(root).manifest.land.sea.waters, undefined, 'nothing stored');
+  assert.equal(fs.existsSync(landPath), false, 'no land written');
+});

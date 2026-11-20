@@ -35,13 +35,15 @@ const USAGE = [
   'usage: node atlas.mjs <command> <campaign root> [args]',
   '  status | validate | places | styles',
   '  init <root> <scope.json> [--base <image>] [--sea-color #hex] [--tolerance n]',
-  '  base-set <root> <image> [--sea-color #hex] [--tolerance n]',
+  '          [--water-at x,y]... [--clear-waters]',
+  '  base-set <root> <image> [--sea-color #hex] [--tolerance n] [--water-at x,y]... [--clear-waters]',
   '  grid <root> --box x0,y0,x1,y1 [--out png]',
   '  crop <root> --box x0,y0,x1,y1 [--out png]',
   '  compose <root> --raw png --box x0,y0,x1,y1 [--mode land|box|mask] [--mask png] [--margin n]',
   '          [--zone x0,y0,x1,y1]... [--restore x0,y0,x1,y1]... [--no-color-match] [--out png]',
   '  verify <root> --after png --box x0,y0,x1,y1 [--out png]',
   '  land <root> [--from png] [--box x0,y0,x1,y1] [--sea-color #hex] [--tolerance n] [--unlock] [--out png]',
+  '          [--water-at x,y]... [--clear-waters]',
   '  territories <root> [--out png]',
   '  accept <root> --candidate png --box x0,y0,x1,y1 [--extend] [--unlock]',
   '  lock <root> base|land|all',
@@ -61,13 +63,13 @@ const COMMANDS = [
 const ARITY = { init: [1, 1], 'base-set': [1, 1], 'labels-write': [1, 1], 'set-style': [1, 1], lock: [1, 2] };
 /** The options each command accepts. Any other option is a usage error. */
 const COMMAND_OPTIONS = {
-  init: ['--base', '--sea-color', '--tolerance'],
-  'base-set': ['--sea-color', '--tolerance'],
+  init: ['--base', '--sea-color', '--tolerance', '--water-at', '--clear-waters'],
+  'base-set': ['--sea-color', '--tolerance', '--water-at', '--clear-waters'],
   grid: ['--box', '--out'],
   crop: ['--box', '--out'],
   compose: ['--raw', '--box', '--mode', '--mask', '--margin', '--zone', '--restore', '--no-color-match', '--out'],
   verify: ['--after', '--box', '--out'],
-  land: ['--from', '--box', '--sea-color', '--tolerance', '--unlock', '--out'],
+  land: ['--from', '--box', '--sea-color', '--tolerance', '--unlock', '--out', '--water-at', '--clear-waters'],
   territories: ['--out'],
   accept: ['--candidate', '--box', '--extend', '--unlock'],
   lock: ['--unlock'],
@@ -77,10 +79,10 @@ const COMMAND_OPTIONS = {
 };
 const VALUE_OPTIONS = new Set([
   '--base', '--sea-color', '--tolerance', '--box', '--out', '--raw', '--mode', '--mask', '--margin', '--zone',
-  '--restore', '--from', '--candidate', '--after', '--placed', '--ask', '--audience', '--data-dir',
+  '--restore', '--from', '--candidate', '--after', '--placed', '--ask', '--audience', '--data-dir', '--water-at',
 ]);
-const REPEATABLE = new Set(['--zone', '--restore']);
-const FLAG_OPTIONS = new Set(['--extend', '--unlock', '--open', '--no-color-match']);
+const REPEATABLE = new Set(['--zone', '--restore', '--water-at']);
+const FLAG_OPTIONS = new Set(['--extend', '--unlock', '--open', '--no-color-match', '--clear-waters']);
 const AUDIENCES = ['master', 'players'];
 const LOCK_TARGETS = ['base', 'land', 'all'];
 const LOCKABLE_NAMES = ['base', 'land'];
@@ -120,7 +122,7 @@ function readJsonArg(file) {
 function parseArgv(argv) {
   const positional = [];
   const values = {};
-  const lists = { '--zone': [], '--restore': [] };
+  const lists = { '--zone': [], '--restore': [], '--water-at': [] };
   const flags = new Set();
   const seen = new Set();
   for (let i = 0; i < argv.length; i++) {
@@ -157,6 +159,23 @@ function parseBox(value, name) {
   if (!match) throw usageError(`${name} must be x0,y0,x1,y1 with whole numbers`);
   const [x0, y0, x1, y1] = match.slice(1).map(Number);
   return { x0, y0, x1, y1 };
+}
+
+/** A canvas point given as x,y (whole numbers, not negative). */
+function parsePoint(value, name) {
+  const match = /^(\d+),(\d+)$/.exec(value);
+  if (!match) throw usageError(`${name} must be x,y with whole numbers`);
+  return [Number(match[1]), Number(match[2])];
+}
+
+/** The --water-at points, in the order given. */
+function waterPointsOf(list) {
+  return list.map((value) => parsePoint(value, '--water-at'));
+}
+
+/** The --water-at points, or undefined when none was given (so that nothing is written for them). */
+function waterPointsOptional(list) {
+  return list.length === 0 ? undefined : waterPointsOf(list);
 }
 
 function requiredBox(values, name = '--box') {
@@ -340,6 +359,10 @@ function initCommand(root, scopeFile, options) {
     }
   }
 
+  if (picture === null && options.waterPoints !== undefined) {
+    return refuse({}, [{ code: 'no-base', file: relative, path: '', message: '--water-at samples the base picture: give --base' }]);
+  }
+
   const manifest = picture === null
     ? draft
     : {
@@ -363,7 +386,12 @@ function initCommand(root, scopeFile, options) {
     fs.writeFileSync(basePath, picture.png);
     created.push(basePath, landPath);
     writeJson(file, manifest);
-    land = deriveLand(root, { seaColor: options.seaColor, tolerance: options.tolerance });
+    land = deriveLand(root, {
+      seaColor: options.seaColor,
+      tolerance: options.tolerance,
+      waterPoints: options.waterPoints,
+      clearWaters: options.clearWaters,
+    });
     if (!land.ok) {
       removeFiles(created);
       return refuse({ categoryAdded: setup.categoryAdded }, [{ code: land.code, file: relative, path: '', message: land.message }]);
@@ -378,7 +406,9 @@ function initCommand(root, scopeFile, options) {
     categoryAdded: setup.categoryAdded,
     moduleEnabled: setup.moduleEnabled,
     base: picture === null ? null : { file: 'base.png', width: picture.width, height: picture.height, sha256: picture.sha256 },
-    land: land === null ? null : { landPixels: land.landPixels, seaColor: land.seaColor, tolerance: land.tolerance },
+    land: land === null ? null : {
+      landPixels: land.landPixels, seaColor: land.seaColor, tolerance: land.tolerance, waters: land.waters,
+    },
     problems: [],
   });
   return 0;
@@ -415,12 +445,17 @@ function baseSetCommand(root, imageArg, options) {
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'base.png'), picture.png);
   writeJson(path.join(dir, 'atlas.json'), next);
-  const land = deriveLand(root, { seaColor: options.seaColor, tolerance: options.tolerance });
+  const land = deriveLand(root, {
+    seaColor: options.seaColor,
+    tolerance: options.tolerance,
+    waterPoints: options.waterPoints,
+    clearWaters: options.clearWaters,
+  });
   if (!land.ok) return refuse({}, [{ code: land.code, file: relative, path: '', message: land.message }]);
   print({
     ok: true,
     base: { file: 'base.png', width: picture.width, height: picture.height, sha256: picture.sha256 },
-    land: { landPixels: land.landPixels, seaColor: land.seaColor, tolerance: land.tolerance },
+    land: { landPixels: land.landPixels, seaColor: land.seaColor, tolerance: land.tolerance, waters: land.waters },
     problems: [],
   });
   return 0;
@@ -754,12 +789,16 @@ async function main() {
         base: values['--base'],
         seaColor: values['--sea-color'],
         tolerance: wholeNumber(values['--tolerance'], '--tolerance'),
+        waterPoints: waterPointsOptional(lists['--water-at']),
+        clearWaters: flags.has('--clear-waters'),
       });
       break;
     case 'base-set':
       code = baseSetCommand(root, rest[0], {
         seaColor: values['--sea-color'],
         tolerance: wholeNumber(values['--tolerance'], '--tolerance'),
+        waterPoints: waterPointsOptional(lists['--water-at']),
+        clearWaters: flags.has('--clear-waters'),
       });
       break;
     case 'places':
@@ -802,6 +841,8 @@ async function main() {
         seaColor: values['--sea-color'],
         tolerance: wholeNumber(values['--tolerance'], '--tolerance'),
         unlock: flags.has('--unlock'),
+        waterPoints: waterPointsOptional(lists['--water-at']),
+        clearWaters: flags.has('--clear-waters'),
       });
       if (!result.ok) {
         code = printResult(result);

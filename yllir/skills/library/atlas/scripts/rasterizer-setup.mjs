@@ -1,14 +1,14 @@
 #!/usr/bin/env node
-// Installs the rasterizer of the atlas bake (@resvg/resvg-js and @jsquash/webp, pinned in assets/bake-tools.json) outside every
+// Installs the rasterizer of the atlas rasterizer (@resvg/resvg-js and @jsquash/webp, pinned in assets/rasterizer-tools.json) outside every
 // campaign, on first use. Idempotent: an installed pinned version is only checked.
-// Usage: node bake-setup.mjs [--data-dir <path>]
+// Usage: node rasterizer-setup.mjs [--data-dir <path>]
 // Exit codes: 0 ready, 1 unavailable, 2 usage error.
 
 import { spawn } from 'node:child_process';
 import { installRasterizer, resolveDataDir } from './lib/rasterize.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
-const USAGE = 'usage: node bake-setup.mjs [--data-dir <path>]';
+const USAGE = 'usage: node rasterizer-setup.mjs [--data-dir <path>]';
 
 function parseArgs(argv) {
   const opts = { dataDir: undefined };

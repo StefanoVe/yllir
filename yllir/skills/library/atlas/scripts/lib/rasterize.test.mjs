@@ -17,7 +17,7 @@ after(() => {
 });
 
 function tempData() {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-bake-rasterize-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-rasterize-test-'));
   tmpRoots.push(dir);
   return dir;
 }
@@ -155,7 +155,7 @@ test('resolveDataDir: the given folder, else CLAUDE_PLUGIN_DATA, else the OS def
   assert.equal(toolsDirOf('/x/data'), path.join(path.resolve('/x/data'), 'atlas-tools'));
 });
 
-test('the pins are the exact packages and versions of assets/bake-tools.json: the renderer and the WebP decoder', () => {
+test('the pins are the exact packages and versions of assets/rasterizer-tools.json: the renderer and the WebP decoder', () => {
   assert.deepEqual(loadPins(), PINS);
 });
 
@@ -246,10 +246,10 @@ test('rasterizeSvg removes the folder of the WebP files it wrote, even when the 
   const dataDir = tempData();
   fakeInstall(dataDir);
   const svg = `<svg xmlns="http://www.w3.org/2000/svg"><image href="${TEXTURE}"/></svg>`;
-  const before = new Set(fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('yllir-bake-')));
+  const before = new Set(fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('yllir-rasterize-')));
   const failing = { Resvg: class { constructor() {} imagesToResolve() { return []; } render() { throw new Error('bad svg'); } } };
   await assert.rejects(rasterizeSvg(svg, { width: 100, dataDir, loader: async (entry) => (entry.endsWith('decode.js') ? fakeWebpModule() : failing) }), /bad svg/);
-  const after = fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('yllir-bake-') && !before.has(name));
+  const after = fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith('yllir-rasterize-') && !before.has(name));
   assert.deepEqual(after, []);
 });
 

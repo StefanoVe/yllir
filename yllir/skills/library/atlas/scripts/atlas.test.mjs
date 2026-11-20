@@ -420,3 +420,67 @@ test('usage errors exit 2', () => {
     assert.match(result.stderr, /usage: node atlas\.mjs/);
   }
 });
+
+const LAKE_RGB = [110, 130, 170];
+/** The scene with a grey-blue lake of 20x20 inside the land block. */
+function sceneWithLake() {
+  const image = scene();
+  paint(image, 60, 50, 80, 70, LAKE_RGB);
+  return image;
+}
+/** Whether the pixel of land.png at (x, y) is land. */
+function landAt(root, x, y) {
+  const land = decodePng(fs.readFileSync(path.join(root, 'Atlas', 'land.png')));
+  return land.data[(y * land.width + x) * 4] >= 128;
+}
+
+test('init with --water-at keeps the lake out of the land and stores its colour', () => {
+  const root = standardCampaign();
+  const picture = basePicture(sceneWithLake());
+  const result = run('init', root, scopeFile(), '--base', picture, '--sea-color', SEA_HEX, '--water-at', '70,60');
+  assert.equal(result.code, 0, result.stdout);
+  assert.deepEqual(json(result).land.waters, [{ color: '#6e82aa', tolerance: 30 }]);
+  assert.equal(landAt(root, 70, 60), false, 'the lake is water');
+  assert.equal(landAt(root, 50, 40), true, 'the land around it stays land');
+  const sea = JSON.parse(fs.readFileSync(path.join(root, 'Atlas', 'atlas.json'), 'utf8')).land.sea;
+  assert.deepEqual(sea.waters, [{ color: '#6e82aa', tolerance: 30 }]);
+});
+
+test('land --water-at adds a lake, a second run keeps it, and --clear-waters empties it', () => {
+  const root = standardCampaign();
+  initWithBase(root);
+  assert.equal(landAt(root, 70, 60), true, 'without water the grey-blue lake is land');
+
+  const withLake = run('base-set', root, basePicture(sceneWithLake()), '--water-at', '70,60');
+  assert.equal(withLake.code, 0, withLake.stdout);
+  assert.equal(json(withLake).land.waters.length, 1);
+  assert.equal(landAt(root, 70, 60), false, 'the lake is water');
+
+  const kept = run('land', root);
+  assert.equal(kept.code, 0, kept.stdout);
+  assert.equal(json(kept).waters.length, 1, 'the stored waters are kept');
+  assert.equal(landAt(root, 70, 60), false);
+
+  const cleared = run('land', root, '--clear-waters');
+  assert.equal(cleared.code, 0, cleared.stdout);
+  assert.deepEqual(json(cleared).waters, []);
+  assert.equal(landAt(root, 70, 60), true, 'the lake is land again');
+});
+
+test('init --water-at without --base is refused and changes nothing', () => {
+  const root = standardCampaign();
+  const result = run('init', root, scopeFile(), '--water-at', '70,60');
+  assert.equal(result.code, 1);
+  assert.match(result.stdout, /no-base/);
+  assert.equal(fs.existsSync(path.join(root, 'Atlas', 'atlas.json')), false);
+});
+
+test('a water point outside the picture is refused; a malformed --water-at is a usage error', () => {
+  const root = standardCampaign();
+  initWithBase(root);
+  const outside = run('land', root, '--water-at', '900,5');
+  assert.equal(outside.code, 1);
+  assert.equal(json(outside).code, 'bad-water-point');
+  assert.equal(run('land', root, '--water-at', '70').code, 2);
+  assert.equal(run('land', root, '--water-at', 'a,b').code, 2);
+});

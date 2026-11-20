@@ -1,6 +1,6 @@
-// Rasterizer of the bake: turns the players' SVG of the atlas into a PNG with the pinned packages. The packages
+// Rasterizer of the atlas: turns the players' SVG of the atlas into a PNG with the pinned packages. The packages
 // live outside the campaign and outside the framework, in <data dir>/atlas-tools, and are installed on first use
-// by bake-setup.mjs. Nothing here is imported from the framework's own dependencies.
+// by rasterizer-setup.mjs. Nothing here is imported from the framework's own dependencies.
 // Two packages: @resvg/resvg-js renders the SVG, and @jsquash/webp decodes the WebP files of the style textures
 // and stamps, which resvg cannot read. The WebP images are decoded here and handed to resvg as PNG files.
 
@@ -11,7 +11,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const PINS_FILE = fileURLToPath(new URL('../../assets/bake-tools.json', import.meta.url));
+const PINS_FILE = fileURLToPath(new URL('../../assets/rasterizer-tools.json', import.meta.url));
 const TOOLS_SUBDIR = 'atlas-tools';
 const MESSAGE_LIMIT = 200;
 const RENDERER = '@resvg/resvg-js';
@@ -23,7 +23,7 @@ const WEBP_WASM = path.join('codec', 'dec', 'webp_dec.wasm');
 const WEBP_HREF = /(\s(?:xlink:)?href=")([^"]+\.webp)"/gi;
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
-/** The pinned packages (assets/bake-tools.json): `{ packages: [{ package, version }] }`. */
+/** The pinned packages (assets/rasterizer-tools.json): `{ packages: [{ package, version }] }`. */
 export function loadPins(file = PINS_FILE) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
@@ -236,7 +236,7 @@ export async function prepareSvgImages(svg, { workDir, loader = defaultLoader, d
 
 /**
  * Renders an SVG to a PNG of the given width. WebP images are converted first (prepareSvgImages). Local image
- * hrefs of the SVG resolve against `resourcesDir`; system fonts are not loaded (the bake input has no text). Throws
+ * hrefs of the SVG resolve against `resourcesDir`; system fonts are not loaded (the atlas input has no text). Throws
  * an error with code `rasterizer-unavailable` when a package is not installed or cannot be loaded.
  * @param {string} svg
  * @param {{ width: number, dataDir?: string, resourcesDir?: string, loader?: (entry: string) => Promise<object> }} options
@@ -252,7 +252,7 @@ export async function rasterizeSvg(svg, { width, dataDir, resourcesDir, loader =
     }
   }
   const Resvg = await loadResvg(packageEntry(tools, RENDERER), loader);
-  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-bake-'));
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-rasterize-'));
   try {
     const prepared = await prepareSvgImages(svg, { workDir, loader, dataDir });
     const options = {

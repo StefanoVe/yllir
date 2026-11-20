@@ -4,7 +4,7 @@ import {
   newMask, dilate, erode, open, close, fillHoles, components, removeSmall, fillSmallHoles,
   unionMasks, subtractMasks, intersectMasks, invertMask, countOnes, cropMask, polygonMask,
   featherMask, seaColorFromBorder, landMaskFromImage, maskToImage, imageToMask, diffMasks,
-  maskOutline,
+  maskOutline, waterColorsFromPoints,
 } from './mask.mjs';
 
 /** A mask with the given rectangles [x0, y0, x1, y1) set to 1. */
@@ -277,4 +277,69 @@ test('performance: dilate and erode radius 3 on 2000x1500 under 3 seconds', () =
   const elapsed = performance.now() - started;
   assert.ok(elapsed < 3000, `took ${Math.round(elapsed)} ms`);
   assert.equal(at(result, 1000, 700), 1);
+});
+
+/** Sea blue, land green, a grey-blue lake 40x40 inside the land, 3x3 dark speckles at sea colour. */
+function lakeScene() {
+  const sea = [28, 58, 128];
+  const image = solidImage(200, 160, sea);
+  paint(image, [40, 30, 160, 130], [60, 130, 60]); // island 120x100
+  paint(image, [70, 60, 110, 100], [90, 120, 150]); // lake 40x40, far from the sea colour
+  paint(image, [48, 38, 51, 41], sea); // 3x3 shadow speckle
+  paint(image, [140, 110, 143, 113], sea); // second speckle
+  return image;
+}
+
+test('landMaskFromImage: without extra water the grey-blue lake is land, speckles are filled', () => {
+  const land = landMaskFromImage(lakeScene(), { seaColor: [28, 58, 128] });
+  assert.equal(at(land, 90, 80), 1, 'lake is land');
+  assert.equal(at(land, 49, 39), 1, 'speckle filled');
+  assert.equal(at(land, 5, 5), 0, 'sea is sea');
+});
+
+test('landMaskFromImage: extra water keeps a big lake out of the land and fills the speckles', () => {
+  const waterColors = [{ color: [90, 120, 150], tolerance: 30 }];
+  const land = landMaskFromImage(lakeScene(), { seaColor: [28, 58, 128], waterColors });
+  assert.equal(at(land, 90, 80), 0, 'lake is water');
+  assert.equal(at(land, 49, 39), 1, 'speckle filled');
+  assert.equal(at(land, 141, 111), 1, 'second speckle filled');
+  assert.equal(at(land, 50, 35), 1, 'land around the lake stays land');
+  assert.equal(components(land).count, 1);
+  assert.equal(countOnes(land), 12000 - 1600);
+});
+
+test('landMaskFromImage: a small extra-water speck inside the land is filled, not kept as a hole', () => {
+  const image = lakeScene();
+  paint(image, [120, 40, 123, 43], [90, 120, 150]); // 3x3 water-coloured speck
+  const waterColors = [{ color: [90, 120, 150], tolerance: 30 }];
+  const land = landMaskFromImage(image, { seaColor: [28, 58, 128], waterColors });
+  assert.equal(at(land, 121, 41), 1, 'small water speck filled');
+  assert.equal(at(land, 90, 80), 0, 'lake still water');
+});
+
+test('landMaskFromImage: default speck thresholds scale with a big canvas', () => {
+  const image = solidImage(1536, 1024, [28, 58, 128]);
+  paint(image, [100, 100, 110, 120], [60, 130, 60]); // 10x20 = 200 px
+  paint(image, [300, 300, 320, 320], [60, 130, 60]); // 20x20 = 400 px
+  const land = landMaskFromImage(image, { seaColor: [28, 58, 128] });
+  assert.equal(at(land, 105, 110), 0, '200 px island is below the scaled minimum of 315');
+  assert.equal(at(land, 310, 310), 1, '400 px island is kept');
+});
+
+test('landMaskFromImage: the same 200 px island is kept on a small canvas', () => {
+  const image = solidImage(200, 160, [28, 58, 128]);
+  paint(image, [100, 100, 110, 120], [60, 130, 60]);
+  const land = landMaskFromImage(image, { seaColor: [28, 58, 128] });
+  assert.equal(at(land, 105, 110), 1);
+});
+
+test('waterColorsFromPoints: the 5x5 average around each point, clamped inside the picture', () => {
+  const image = paint(solidImage(40, 30, [0, 0, 0]), [0, 0, 40, 30], [90, 120, 150]);
+  paint(image, [0, 0, 1, 1], [200, 0, 0]);
+  const [inside, corner, outside] = waterColorsFromPoints(image, [[20, 15], [0, 0], [500, -9]]);
+  assert.deepEqual(inside, { color: [90, 120, 150], tolerance: 30 });
+  assert.equal(corner.color[0] > 90, true, 'the corner average includes the red pixels');
+  assert.deepEqual(outside.color, [90, 120, 150], 'a point outside is clamped to the picture');
+  assert.equal(outside.tolerance, 30);
+  assert.equal(waterColorsFromPoints(image, [[20, 15]], 12)[0].tolerance, 12);
 });

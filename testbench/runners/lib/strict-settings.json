@@ -15,6 +15,7 @@
       "Bash(node \"*/skills/library/artwork-search/scripts/artwork-query.mjs\" *)",
       "Bash(node \"*/skills/library/artwork-search/scripts/artwork-screen.mjs\" *)",
       "Bash(node \"*/skills/library/atlas/scripts/atlas.mjs\" *)",
+      "Bash(node \"*/skills/library/atlas/scripts/rasterizer-setup.mjs\" *)",
       "Bash(node \"*/skills/library/combat-tracker/scripts/combat.mjs\" *)",
       "Bash(node \"*/skills/library/continuity-audit/scripts/audit-cache.mjs\" *)",
       "Bash(node \"*/skills/library/continuity-audit/scripts/audit-compare.mjs\" *)",

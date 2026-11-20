@@ -10,6 +10,19 @@ const FRAME = 12;
 const COLOR_STEP = 8;
 /** Default distance, in RGB units, within which a pixel is sea. */
 const SEA_TOLERANCE = 40;
+/** Default distance, in RGB units, within which a pixel is extra water (a lake of another colour). */
+const WATER_TOLERANCE = 30;
+/** Half side of the square averaged around a water sample point (5x5). */
+const WATER_SAMPLE_RADIUS = 2;
+/** Smallest land island and smallest lake, as shares of the canvas (default thresholds). */
+const MIN_LAND_SHARE = 0.0002;
+const MIN_LAKE_SHARE = 0.0004;
+/** The thresholds never go below this many pixels. */
+const MIN_SPECK_PIXELS = 40;
+/** A hole is a lake when at least this share of its pixels is extra-water colour... */
+const LAKE_WATER_SHARE = 0.5;
+/** ...and it is at least this fraction of minLakePixels in size. */
+const LAKE_KEEP_DIVISOR = 4;
 
 /** A mask of the given size, filled with 0 or 1. */
 export function newMask(width, height, fill = 0) {
@@ -170,13 +183,23 @@ export function components(mask) {
   return { labels, count, sizes, boxes };
 }
 
-/** Fills the 0-regions (4-connectivity) that do not touch the image border and satisfy `shouldFill(size)`. */
-function fillZeroRegions(mask, shouldFill) {
+/**
+ * Fills the 0-regions (4-connectivity) that do not touch the image border and satisfy
+ * `shouldFill(size, waterCount)`. waterCount is the number of pixels of the region that are set in
+ * `water` (0 when no water mask is given).
+ */
+function fillZeroRegions(mask, shouldFill, water = null) {
   const { labels, sizes, touchesBorder, count } = labelRegions(mask, 0);
   const out = mask.data.slice();
+  const waterCount = new Int32Array(count + 1);
+  if (water) {
+    for (let p = 0; p < labels.length; p++) {
+      if (labels[p] !== 0 && water.data[p]) waterCount[labels[p]] += 1;
+    }
+  }
   const fill = new Uint8Array(count + 1);
   for (let label = 1; label <= count; label++) {
-    fill[label] = !touchesBorder[label] && shouldFill(sizes[label]) ? 1 : 0;
+    fill[label] = !touchesBorder[label] && shouldFill(sizes[label], waterCount[label]) ? 1 : 0;
   }
   for (let p = 0; p < labels.length; p++) {
     if (labels[p] !== 0 && fill[labels[p]]) out[p] = 1;
@@ -370,37 +393,108 @@ export function seaColorFromBorder(image) {
   return { color, tolerance: SEA_TOLERANCE };
 }
 
+/** Speck thresholds scale with the canvas: a share of its pixels, never below MIN_SPECK_PIXELS. */
+function specksPixels(width, height, share) {
+  return Math.max(MIN_SPECK_PIXELS, Math.round(width * height * share));
+}
+
+/** Within the Euclidean RGB distance `tolerance` of an RGB colour, for the pixel at byte offset i. */
+function nearColor(data, i, [r, g, b], tolerance) {
+  const dr = data[i] - r;
+  const dg = data[i + 1] - g;
+  const db = data[i + 2] - b;
+  return dr * dr + dg * dg + db * db <= tolerance * tolerance;
+}
+
+/**
+ * Rule for the holes of the land mask: a hole smaller than minLakePixels is filled (a shadow or a
+ * speck), except a hole that is mostly extra-water colour and at least a quarter of minLakePixels
+ * (a real lake, kept as water).
+ */
+function speckFillRule(minLakePixels) {
+  return (size, waterCount) => {
+    if (size >= minLakePixels) return false;
+    const lake = waterCount >= LAKE_WATER_SHARE * size && size >= minLakePixels / LAKE_KEEP_DIVISOR;
+    return !lake;
+  };
+}
+
 /**
  * Land mask of a picture by colour: a pixel is sea when its Euclidean RGB distance to seaColor
- * is at most tolerance. Then open, close, remove small land, fill small lakes.
+ * is at most tolerance. Then open, close, remove small land, fill small holes.
+ * Extra water (options.waterColors, a list of { color: [r, g, b], tolerance }, e.g. a lake of
+ * another colour) is taken out of the land after the speckle filling, so a big lake stays water
+ * and the holes left by small water bodies are filled again.
+ * Thresholds without an explicit value scale with the canvas (MIN_LAND_SHARE, MIN_LAKE_SHARE).
  * A colour heuristic: callers expose seaColor and tolerance.
  * @returns {{width: number, height: number, data: Uint8Array}} 1 = land
  */
 export function landMaskFromImage(image, options = {}) {
+  const { width, height, data } = image;
   const {
     tolerance = SEA_TOLERANCE,
-    minLandPixels = 40,
-    minLakePixels = 40,
+    minLandPixels = specksPixels(width, height, MIN_LAND_SHARE),
+    minLakePixels = specksPixels(width, height, MIN_LAKE_SHARE),
     closeRadius = 2,
     openRadius = 2,
+    waterColors = [],
   } = options;
   const seaColor = options.seaColor ?? seaColorFromBorder(image).color;
-  const { width, height, data } = image;
-  const land = newMask(width, height);
-  const [sr, sg, sb] = seaColor;
-  const limit = tolerance * tolerance;
   const n = width * height;
+  const land = newMask(width, height);
   for (let p = 0; p < n; p++) {
-    const i = p * 4;
-    const dr = data[i] - sr;
-    const dg = data[i + 1] - sg;
-    const db = data[i + 2] - sb;
-    land.data[p] = dr * dr + dg * dg + db * db <= limit ? 0 : 1;
+    land.data[p] = nearColor(data, p * 4, seaColor, tolerance) ? 0 : 1;
   }
   let result = open(land, openRadius);
   result = close(result, closeRadius);
   result = removeSmall(result, minLandPixels);
-  return fillSmallHoles(result, minLakePixels);
+  const fillRule = speckFillRule(minLakePixels);
+  if (waterColors.length === 0) return fillZeroRegions(result, fillRule);
+
+  const water = newMask(width, height);
+  for (let p = 0; p < n; p++) {
+    const i = p * 4;
+    for (const entry of waterColors) {
+      if (nearColor(data, i, entry.color, entry.tolerance ?? WATER_TOLERANCE)) {
+        water.data[p] = 1;
+        break;
+      }
+    }
+  }
+  result = fillZeroRegions(result, fillRule, water);
+  result = subtractMasks(result, water);
+  result = removeSmall(result, minLandPixels);
+  return fillZeroRegions(result, fillRule, water);
+}
+
+/**
+ * Colours of extra water (lakes, rivers of another colour) read from points of the picture: the
+ * average of the 5x5 square around each point, clamped inside the picture.
+ * @param {number[][]} points [[x, y], ...] in pixels
+ * @returns {{color: number[], tolerance: number}[]}
+ */
+export function waterColorsFromPoints(image, points, tolerance = WATER_TOLERANCE) {
+  const { width, height, data } = image;
+  return points.map(([px, py]) => {
+    const x = Math.min(width - 1, Math.max(0, Math.round(px)));
+    const y = Math.min(height - 1, Math.max(0, Math.round(py)));
+    const x0 = Math.max(0, x - WATER_SAMPLE_RADIUS);
+    const x1 = Math.min(width - 1, x + WATER_SAMPLE_RADIUS);
+    const y0 = Math.max(0, y - WATER_SAMPLE_RADIUS);
+    const y1 = Math.min(height - 1, y + WATER_SAMPLE_RADIUS);
+    const sum = [0, 0, 0];
+    let count = 0;
+    for (let sy = y0; sy <= y1; sy++) {
+      for (let sx = x0; sx <= x1; sx++) {
+        const i = (sy * width + sx) * 4;
+        sum[0] += data[i];
+        sum[1] += data[i + 1];
+        sum[2] += data[i + 2];
+        count += 1;
+      }
+    }
+    return { color: sum.map((v) => Math.round(v / count)), tolerance };
+  });
 }
 
 /** RGBA image: land white, sea black, alpha 255. */

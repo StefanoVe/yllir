@@ -164,6 +164,13 @@ export function manifestProblems(manifest) {
         if (!isPlainObject(sea) || !COLOR.test(sea.color ?? '') || !isFiniteNumber(sea.tolerance)
           || sea.tolerance < 0 || sea.tolerance > 255) {
           bad('land.sea', 'land.sea must be { color: "#rrggbb", tolerance: 0 to 255 }');
+        } else if (sea.waters !== undefined) {
+          const waters = sea.waters;
+          const waterOk = (w) => isPlainObject(w) && COLOR.test(w.color ?? '') && isFiniteNumber(w.tolerance)
+            && w.tolerance >= 0 && w.tolerance <= 255;
+          if (!Array.isArray(waters) || !waters.every(waterOk)) {
+            bad('land.sea.waters', 'land.sea.waters must be a list of { color: "#rrggbb", tolerance: 0 to 255 }');
+          }
         }
       }
     }

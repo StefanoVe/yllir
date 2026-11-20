@@ -118,6 +118,18 @@ test('manifestProblems: a partial base or land is refused, and file names must b
   assert.deepEqual(land({ file: 'land.png', sha256: 'a'.repeat(64), locked: false, sea: { color: '#1c3a4a', tolerance: 300 } }), ['land.sea']);
 });
 
+test('manifestProblems: land.sea.waters is a list of { color, tolerance }, each checked', () => {
+  const sea = (waters) => manifestProblems(baseManifest({
+    land: { file: 'land.png', sha256: 'a'.repeat(64), locked: false, sea: { color: '#1c3a4a', tolerance: 40, waters } },
+  })).map((p) => p.path);
+  assert.deepEqual(sea([{ color: '#5a7896', tolerance: 30 }]), []);
+  assert.deepEqual(sea([]), []);
+  assert.deepEqual(sea('#5a7896'), ['land.sea.waters']);
+  assert.deepEqual(sea([{ color: 'grey', tolerance: 30 }]), ['land.sea.waters']);
+  assert.deepEqual(sea([{ color: '#5a7896', tolerance: 300 }]), ['land.sea.waters']);
+  assert.deepEqual(sea([{ color: '#5a7896' }]), ['land.sea.waters']);
+});
+
 test('labelsProblems: the full sample is valid', () => {
   assert.deepEqual(labelCheck(fullLabels()), []);
 });

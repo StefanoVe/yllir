@@ -12,6 +12,7 @@ import { REPO_ROOT } from './lib/case-common.mjs';
 import { TOWN_SIZE } from './lib/make-atlas-picture.mjs';
 import {
   LAND_LABELS,
+  asksQuestion,
   atlasNames,
   endsWithQuestion,
   forbiddenIn,
@@ -80,6 +81,7 @@ test('the four atlas cases and their keys load with the setups, pictures and lim
   assert.equal(create.setup, 'none');
   assert.deepEqual(create.limits, { max_minutes: 6, max_tool_calls: 120 });
   assert.deepEqual(create.key.forbidden_words, ['script', 'JSON', 'seed', 'canvas', 'hash', 'lock', 'constraint']);
+  assert.deepEqual(create.key.forbidden_names, ['Porto Corvo', 'Monte Brina', 'Torre dei Venti']);
   const update = caseOf('update-keeps-land');
   assert.equal(update.setup, 'land');
   assert.deepEqual(update.limits, { max_minutes: 8, max_tool_calls: 160 });
@@ -174,15 +176,66 @@ test('the create-asks grader passes a question on a campaign with no atlas', () 
   assert.deepEqual(Object.keys(graded.checks), ['A1', 'A2', 'A3']);
 });
 
-test('the create-asks grader fails A1 on a closing statement that invents a label', () => {
+/** Writes labels.json of an atlas copy with the given label groups (the rest empty). */
+function writeLabels(copy, groups) {
+  const labels = { lands: [], regions: [], nature: [], places: [], territories: [], ...groups };
+  fs.writeFileSync(path.join(copy, 'Atlante', 'labels.json'), JSON.stringify(labels));
+}
+
+const INVENTED_LAND = { id: 'l1', text: 'Mare Grigio', x: 10, y: 10, size: 20, provenance: 'agent-choice', sources: [], visibility: 'public' };
+
+test('the create-asks grader fails A1 when the final message asks nothing, even on a clean atlas', () => {
   const made = setup('init');
-  fs.writeFileSync(
-    path.join(made.copy, 'Atlante', 'labels.json'),
-    JSON.stringify({ lands: [{ id: 'l1', text: 'Mare Grigio', x: 10, y: 10, size: 20, provenance: 'agent-choice', sources: [], visibility: 'public' }], regions: [], nature: [], places: [], territories: [] }),
-  );
-  assert.ok(atlasNames(made.copy).includes('Mare Grigio'));
   const graded = gradeAtlasRun({ key: caseOf('create-asks').key, copy: made.copy, report: 'Fatto.', baseline: null, fixtureDir: FIXTURE });
   assert.equal(graded.checks.A1, false);
+  assert.equal(graded.checks.A2, true, graded.failures.join('; '));
+  assert.equal(graded.checks.A3, true, graded.failures.join('; '));
+  assert.equal(graded.pass, false);
+});
+
+test('the create-asks grader fails A2 on an invented label even when the message asks a question', () => {
+  const made = setup('init');
+  writeLabels(made.copy, { lands: [INVENTED_LAND] });
+  assert.ok(atlasNames(made.copy).includes('Mare Grigio'));
+  const graded = gradeAtlasRun({ key: caseOf('create-asks').key, copy: made.copy, report: GOOD_ANSWER, baseline: null, fixtureDir: FIXTURE });
+  assert.equal(graded.checks.A1, true);
+  assert.equal(graded.checks.A2, false);
+  assert.match(graded.failures.join('; '), /Mare Grigio/);
+  assert.equal(graded.pass, false);
+});
+
+test('the create-asks grader fails A2 on a place that is not a sheet of the world', () => {
+  const made = setup('init');
+  writeLabels(made.copy, {
+    places: [{ id: 'p1', place: 'porto-inventato', x: 10, y: 10, kind: 'village', provenance: 'agent-choice', sources: [], visibility: 'public' }],
+  });
+  const graded = gradeAtlasRun({ key: caseOf('create-asks').key, copy: made.copy, report: GOOD_ANSWER, baseline: null, fixtureDir: FIXTURE });
+  assert.equal(graded.checks.A2, false);
+  assert.match(graded.failures.join('; '), /porto-inventato/);
+});
+
+test('the create-asks grader fails A3 on a forbidden name in the final message', () => {
+  const made = setup('none');
+  const graded = gradeAtlasRun({
+    key: caseOf('create-asks').key,
+    copy: made.copy,
+    report: 'Il porto è Porto Corvo. Il lago è a nord o a sud del borgo?',
+    baseline: null,
+    fixtureDir: FIXTURE,
+  });
+  assert.equal(graded.checks.A1, true);
+  assert.equal(graded.checks.A2, true);
+  assert.equal(graded.checks.A3, false);
+  assert.match(graded.failures.join('; '), /Porto Corvo/);
+  assert.equal(graded.pass, false);
+});
+
+test('the create-asks grader fails A3 on a forbidden name in the labels', () => {
+  const made = setup('init');
+  writeLabels(made.copy, { lands: [{ ...INVENTED_LAND, text: 'Monte  Brina' }] });
+  const graded = gradeAtlasRun({ key: caseOf('create-asks').key, copy: made.copy, report: GOOD_ANSWER, baseline: null, fixtureDir: FIXTURE });
+  assert.equal(graded.checks.A3, false);
+  assert.match(graded.failures.join('; '), /Monte Brina/);
   assert.equal(graded.pass, false);
 });
 
@@ -291,6 +344,11 @@ test('the grading helpers: a question ends the report, forbidden words are whole
   assert.equal(endsWithQuestion('Il lago è a nord?  '), true);
   assert.equal(endsWithQuestion('Fatto.'), false);
   assert.equal(endsWithQuestion(null), false);
+  assert.equal(asksQuestion('Il lago è a nord o a sud? Dimmelo pure.'), true);
+  assert.equal(asksQuestion('Il lago è a nord? Fatto. Grazie. Ciao.'), false);
+  assert.equal(asksQuestion('Il lago è a nord. Fatto. Grazie. Ciao. Ancora?'), true);
+  assert.equal(asksQuestion('Fatto.'), false);
+  assert.equal(asksQuestion(null), false);
   assert.deepEqual(forbiddenIn('Il JSON e la seed', ['JSON', 'seed', 'hash']), ['JSON', 'seed']);
   assert.deepEqual(forbiddenIn('scrivo lo scriptorium', ['script']), []);
   const made = setup('land');
