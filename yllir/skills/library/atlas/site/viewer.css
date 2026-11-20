@@ -1,5 +1,6 @@
 /* Viewer of the atlas site: parchment and ink, to match the painted map. Phone width collapses the panels to icon
-   buttons. The markers take their colours and size from the custom properties below, so a theme can change them. */
+   buttons. Outside the painted map a sea texture repeats when the export has one; the flat colour is the fallback.
+   The markers take their colours and size from the custom properties below, so a theme can change them. */
 
 @font-face {
   font-family: 'IM Fell English';
@@ -45,7 +46,8 @@ body {
   user-select: none;
   -webkit-user-select: none;
   cursor: grab;
-  background: var(--map-bg);
+  background-color: var(--map-bg);
+  background-repeat: repeat;
 }
 
 #map.dragging {

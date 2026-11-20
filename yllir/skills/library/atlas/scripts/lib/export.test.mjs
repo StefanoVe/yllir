@@ -199,3 +199,53 @@ test('summaryOf keeps the first paragraph, drops emphasis and cuts long text at 
   assert.ok(Array.from(long).length <= 400);
   assert.ok(long.endsWith('…'));
 });
+
+/** A campaign whose atlas has no labels: only the base (flat colour) and the land mask, given by `isLand(x, y)`. */
+function seaCampaign(isLand) {
+  const root = makeCampaign({});
+  writeAtlas(root, { manifest: baseManifest({ canvas: { width: W, height: H } }), labels: emptyLabels(), pictures: [] });
+  const dir = path.join(root, 'Atlas');
+  writePngFile(path.join(dir, 'base.png'), newImage(W, H, [200, 190, 160, 255]));
+  const land = newImage(W, H, [0, 0, 0, 255]);
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) if (isLand(x, y)) land.data[(y * W + x) * 4] = 255;
+  }
+  writePngFile(path.join(dir, 'land.png'), land);
+  return root;
+}
+
+test('a big sea area gives a sea texture in the site and in the page data', () => {
+  // Land on the left 40 columns; the sea is 80 columns wide and 90 high, so the largest sea square is 80x80.
+  const root = seaCampaign((x) => x < 40);
+  for (const audience of ['master', 'players']) {
+    const result = exportAtlas(root, { audience });
+    assert.equal(result.ok, true, JSON.stringify(result.problems));
+    const dir = path.join(root, result.dir);
+    assert.equal(fs.existsSync(path.join(dir, 'assets', 'sea.png')), true, `${audience}: sea.png is written`);
+    const data = dataOf(dir);
+    assert.equal(data.sea.file, 'assets/sea.png');
+    assert.equal(data.sea.width, 160, 'the tile is 2 x 80 canvas pixels');
+    assert.equal(data.sea.height, 160);
+  }
+});
+
+test('a picture with no big sea area gets sea: null and no sea.png', () => {
+  // All land, then a sea strip of 20 columns (smaller than the 32 needed).
+  for (const isLand of [() => true, (x) => x < 100]) {
+    const root = seaCampaign(isLand);
+    const result = exportAtlas(root, { audience: 'master' });
+    assert.equal(result.ok, true, JSON.stringify(result.problems));
+    const dir = path.join(root, result.dir);
+    assert.equal(dataOf(dir).sea, null);
+    assert.equal(fs.existsSync(path.join(dir, 'assets', 'sea.png')), false);
+  }
+});
+
+test('the sea texture is the same bytes on two exports', () => {
+  const root = seaCampaign((x) => x < 40);
+  const a = exportAtlas(root, { audience: 'master' });
+  const first = fs.readFileSync(path.join(root, a.dir, 'assets', 'sea.png'));
+  const b = exportAtlas(root, { audience: 'master' });
+  const second = fs.readFileSync(path.join(root, b.dir, 'assets', 'sea.png'));
+  assert.equal(first.equals(second), true);
+});

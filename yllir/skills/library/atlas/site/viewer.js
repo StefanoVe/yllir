@@ -32,6 +32,8 @@
 
   stage.style.width = `${W}px`;
   stage.style.height = `${H}px`;
+  // The sea texture outside the painted map: the picture is set once, its size and position follow the view in render().
+  if (data.sea) map.style.backgroundImage = `url("${data.sea.file}")`;
 
   // ---- Helpers --------------------------------------------------------------------------------
 
@@ -63,6 +65,10 @@
     frame = null;
     const s = scale();
     stage.style.transform = `translate(${view.x}px, ${view.y}px) scale(${s})`;
+    if (data.sea) {
+      map.style.backgroundSize = `${data.sea.width * s}px ${data.sea.height * s}px`;
+      map.style.backgroundPosition = `${view.x}px ${view.y}px`;
+    }
     // Markers keep their size at every zoom: only their position follows the map.
     for (const marker of markers) {
       const x = view.x + marker.x * s;

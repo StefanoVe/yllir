@@ -12,8 +12,9 @@ import { loadStyle, resolveStyleId, FONT_FILES } from './styles.mjs';
 import { runAtlasChecks, reservedLinesOf } from './checks.mjs';
 import { stringsFor } from './strings.mjs';
 import { computeTerritories, maskToPaths, territoryCentroid } from './territory.mjs';
-import { imageFromFile } from './image.mjs';
+import { imageFromFile, encodePngRgba } from './image.mjs';
 import { imageToMask } from './mask.mjs';
+import { seaTileFromBase } from './sea-tile.mjs';
 import { folderOfPlace } from './pending.mjs';
 import { buildWorldIndex } from '../../../../../scripts/lib/world-graph.mjs';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
@@ -211,6 +212,16 @@ function prepare(root, { audience, pluginRoot }) {
   } catch (err) {
     return { problems: [problem('bad-picture', path.posix.join(folder, path.basename(landPath)), '', err.message)] };
   }
+  // The sea texture comes from the base picture. A base of another size than the canvas gets no texture (flat colour).
+  let baseImage;
+  let seaTile = null;
+  try {
+    baseImage = imageFromFile(basePath);
+    if (baseImage.width === width && baseImage.height === height) seaTile = seaTileFromBase(baseImage, landMask);
+  } catch (err) {
+    return { problems: [problem('bad-picture', path.posix.join(folder, path.basename(basePath)), '', err.message)] };
+  }
+  const seaScale = width / baseImage.width;
 
   // 4. The style.
   let style;
@@ -355,6 +366,8 @@ function prepare(root, { audience, pluginRoot }) {
       strings,
       style,
       canvas: { width, height },
+      seaTile,
+      seaScale,
       title: typeof config.campaign?.name === 'string' ? config.campaign.name : strings.title,
       labels: atlas.labels,
       hiddenIds,
@@ -411,12 +424,18 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
   if (prepared.problems.length > 0) return refused(prepared.problems);
   const m = prepared.model;
 
+  const sea = m.seaTile === null ? null : {
+    file: 'assets/sea.png',
+    width: Number(fmt(m.seaTile.width * m.seaScale)),
+    height: Number(fmt(m.seaTile.height * m.seaScale)),
+  };
   const dataJson = inlineJson({
     canvas: m.canvas,
     lang: m.lang,
     strings: m.strings,
     layers: LAYERS,
     places: m.places,
+    sea,
     audience,
   });
   const html = pageHtml({
@@ -448,6 +467,7 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     }
     fs.copyFileSync(source, path.join(tmpDir, 'assets', rel));
   }
+  if (m.seaTile !== null) fs.writeFileSync(path.join(tmpDir, 'assets', 'sea.png'), encodePngRgba(m.seaTile));
 
   // The players' checks, on the text of the build (index.html and its data).
   let checks = [];

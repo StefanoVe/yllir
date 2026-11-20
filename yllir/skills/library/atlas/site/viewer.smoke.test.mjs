@@ -187,6 +187,31 @@ test('viewer creates one marker per place without errors', () => {
   }
 });
 
+test('viewer sets the sea texture on the map when the data has one, and nothing when it has none', () => {
+  const withSea = installFakeDom(JSON.stringify({ ...DATA, sea: { file: 'assets/sea.png', width: 200, height: 200 } }));
+  try {
+    vm.runInThisContext(source, { filename: 'viewer.js' });
+    withSea.flushFrames();
+    const map = globalThis.document.getElementById('map');
+    assert.match(map.style.backgroundImage, /assets\/sea\.png/);
+    assert.match(map.style.backgroundSize, /^\d+(\.\d+)?px \d+(\.\d+)?px$/);
+    assert.match(map.style.backgroundPosition, /^-?\d+(\.\d+)?px -?\d+(\.\d+)?px$/);
+  } finally {
+    removeFakeDom();
+  }
+
+  const noSea = installFakeDom(JSON.stringify({ ...DATA, sea: null }));
+  try {
+    vm.runInThisContext(source, { filename: 'viewer.js' });
+    noSea.flushFrames();
+    const map = globalThis.document.getElementById('map');
+    assert.equal(map.style.backgroundImage, undefined);
+    assert.equal(map.style.backgroundSize, undefined);
+  } finally {
+    removeFakeDom();
+  }
+});
+
 test('viewer source has no removed modes and compiles', () => {
   for (const word of ['urban', 'mixed', 'seaTexture', 'bake']) {
     assert.ok(!source.includes(word), `viewer.js must not mention "${word}"`);
