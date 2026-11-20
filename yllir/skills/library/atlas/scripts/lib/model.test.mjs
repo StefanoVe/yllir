@@ -163,6 +163,31 @@ test('manifestProblems accepts a locked layer with a snapshot and rejects a bad 
   assert.deepEqual(codes(manifestProblems(badList)), ['bad-manifest']);
 });
 
+test('manifestProblems accepts a bake inside bake/ with its layers hash and size; rejects each bad field', () => {
+  const bake = { file: 'bake/bake-0a1b2c3d.png', layersHash: 'b'.repeat(64), width: 2048, height: 1024 };
+  assert.deepEqual(manifestProblems(baseManifest({ bake })), []);
+  assert.deepEqual(manifestProblems(baseManifest()), []);
+  const cases = [
+    { ...bake, file: 'other/bake-0a1b2c3d.png' },
+    { ...bake, file: 'bake/../atlas.json' },
+    { ...bake, file: 'bake/x/../../y.png' },
+    { ...bake, file: 7 },
+    { ...bake, layersHash: 'B'.repeat(64) },
+    { ...bake, layersHash: 'abc' },
+    { ...bake, width: 0 },
+    { ...bake, width: 10.5 },
+    { ...bake, height: '1024' },
+    { file: bake.file, layersHash: bake.layersHash, width: 1 },
+    null,
+    'bake/bake-0a1b2c3d.png',
+  ];
+  for (const candidate of cases) {
+    const problems = manifestProblems(baseManifest({ bake: candidate }));
+    assert.deepEqual(codes(problems), ['bad-manifest'], JSON.stringify(candidate));
+    assert.ok(problems[0].path.startsWith('bake'), JSON.stringify(problems));
+  }
+});
+
 test('terrain constraints: unknown kind gives bad-constraint; a region on an unknown place gives unknown-place', () => {
   const root = validRoot({
     layers: {

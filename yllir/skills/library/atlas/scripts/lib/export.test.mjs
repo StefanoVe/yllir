@@ -2,7 +2,9 @@ import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { exportAtlas, summaryOf } from './export.mjs';
+import { exportAtlas, summaryOf, layersHash } from './export.mjs';
+import { readAtlas } from './model.mjs';
+import { encodePng } from '../../../../../scripts/lib/png.mjs';
 import {
   cleanupCampaigns, makeCampaign, campaignYaml, baseManifest, terrainLayer, placesLayer, writeAtlas,
   urbanManifest, groundLayer, buildingsLayer, blocksLayer, square,
@@ -480,4 +482,84 @@ test('the scale ignores the scope: a region scope with only urban features is ur
   setScope(withTerrain, 'settlement');
   assert.equal(exportAtlas(withTerrain, { audience: 'master' }).ok, true);
   assert.equal(dataOf(readHtml(withTerrain, 'master')).scale, 'mixed');
+});
+
+/**
+ * Adds a bake to the campaign's manifest: a fake PNG under Atlas/bake/. `hash` overrides the layers hash
+ * (a wrong one makes the bake stale); `withFile: false` leaves the file out.
+ */
+function addBake(root, { hash, withFile = true } = {}) {
+  const dir = path.join(root, 'Atlas');
+  const layers = readAtlas(root).layers;
+  fs.mkdirSync(path.join(dir, 'bake'), { recursive: true });
+  if (withFile) fs.writeFileSync(path.join(dir, 'bake', 'bake-1a2b3c4d.png'), encodePng(2, 2, new Uint8Array(12)));
+  const manifestPath = path.join(dir, 'atlas.json');
+  const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+  manifest.bake = { file: 'bake/bake-1a2b3c4d.png', layersHash: hash ?? layersHash(layers), width: 1000, height: 1000 };
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  return layers;
+}
+
+test('a current bake replaces the drawn map in both builds: the image is copied, the labels and targets stay', () => {
+  const root = campaign();
+  addBake(root);
+  const master = exportAtlas(root, { audience: 'master' });
+  assert.equal(master.ok, true, JSON.stringify(master.problems));
+  assert.equal(master.stats.bake, 'current');
+  const html = readHtml(root, 'master');
+  assert.equal(dataOf(html).bake, true);
+  assert.ok(html.includes('<image href="assets/bake.png"'));
+  assert.ok(html.includes('data-layer="bake"'));
+  assert.ok(!html.includes('id="layer-terrain"'), 'the drawn map is not in the page');
+  assert.ok(html.includes('data-place="north"'), 'the place has its target');
+  assert.ok(html.includes('>North<'), 'the label stays as text');
+  const copied = fs.readFileSync(path.join(root, SITE, 'master', 'assets', 'bake.png'));
+  assert.deepEqual(copied, fs.readFileSync(path.join(root, 'Atlas', 'bake', 'bake-1a2b3c4d.png')));
+
+  const players = exportAtlas(root, { audience: 'players' });
+  assert.equal(players.ok, true, JSON.stringify(players.problems));
+  assert.equal(players.stats.bake, 'current');
+  assert.equal(dataOf(readHtml(root, 'players')).bake, true);
+  assert.ok(fs.existsSync(path.join(root, SITE, 'players', 'assets', 'bake.png')));
+  assert.ok(!readHtml(root, 'players').includes(SECRET));
+});
+
+test('a stale bake falls back to the drawn map: no bake file, bake false, and the stats say stale', () => {
+  const root = campaign();
+  addBake(root, { hash: 'f'.repeat(64) });
+  const result = exportAtlas(root, { audience: 'master' });
+  assert.equal(result.ok, true, JSON.stringify(result.problems));
+  assert.equal(result.stats.bake, 'stale');
+  const html = readHtml(root, 'master');
+  assert.equal(dataOf(html).bake, false);
+  assert.ok(html.includes('id="layer-terrain"'), 'the map is drawn as usual');
+  assert.ok(!html.includes('data-layer="bake"'));
+  assert.ok(!fs.existsSync(path.join(root, SITE, 'master', 'assets', 'bake.png')));
+});
+
+test('a bake whose file is missing is not used, and no bake in the manifest gives none', () => {
+  const root = campaign();
+  addBake(root, { withFile: false });
+  const missing = exportAtlas(root, { audience: 'master' });
+  assert.equal(missing.ok, true, JSON.stringify(missing.problems));
+  assert.equal(missing.stats.bake, 'none');
+  assert.equal(dataOf(readHtml(root, 'master')).bake, false);
+  const plain = campaign();
+  const result = exportAtlas(plain, { audience: 'master' });
+  assert.equal(result.stats.bake, 'none');
+  assert.equal(dataOf(readHtml(plain, 'master')).bake, false);
+});
+
+test('the layers hash is the one of lib/bake.mjs: the labels and the places are left out, the terrain is not', () => {
+  const root = campaign();
+  const layers = readAtlas(root).layers;
+  const base = layersHash(layers);
+  assert.equal(layersHash({ ...layers, labels: { layer: 'labels', features: [{ target: 'places/north', text: 'X' }] } }), base);
+  assert.equal(layersHash(layers), base, 'the same layers give the same hash');
+  const moved = structuredClone(layers);
+  moved.places.features[0].at = [501, 500];
+  assert.equal(layersHash(moved), base, 'a place moved does not stale the bake');
+  const reshaped = structuredClone(layers);
+  reshaped.terrain.features[0].extra = 1;
+  assert.notEqual(layersHash(reshaped), base, 'a terrain change stales the bake');
 });

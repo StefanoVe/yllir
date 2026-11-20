@@ -1,18 +1,20 @@
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { stripExitLine } from '../../../../scripts/lib/cli-exit.mjs';
-import { pngSize } from '../../../../scripts/lib/png.mjs';
+import { pngSize, encodePng } from '../../../../scripts/lib/png.mjs';
 import {
-  cleanupCampaigns, standardCampaign, makeCampaign, campaignYaml, terrainLayer, placesLayer,
+  cleanupCampaigns, standardCampaign, makeCampaign, campaignYaml, terrainLayer, placesLayer, STRUCTURE,
   landFeature, square, readAtlasFile, placeSheet, writeAtlas, baseManifest, buildingsLayer,
 } from './lib/test-support.mjs';
 import { listStyles } from './lib/styles.mjs';
-import { LAYERS } from './lib/model.mjs';
+import { LAYERS, readAtlas } from './lib/model.mjs';
+import { BAKE_INPUT, layersHash } from './lib/bake.mjs';
 import { pointInPolygon } from './lib/geometry.mjs';
 
 after(cleanupCampaigns);
@@ -683,4 +685,295 @@ test('an urban atlas with only urban layers: generate biomes works on a syntheti
   assert.ok(json(result.stdout).features >= 1);
   assert.equal(fs.existsSync(path.join(root, 'Atlas', 'terrain.json')), false);
   assert.equal(run('validate', root).code, 0);
+});
+
+// ---- the bake: bake-input, bake-set, bake-clear, and the bake field of status ----
+
+const bakeDirs = [];
+after(() => {
+  for (const dir of bakeDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/** Runs the CLI with extra environment variables (the rasterizer stub). */
+function runEnv(env, ...args) {
+  try {
+    const stdout = execFileSync(process.execPath, [CLI, ...args], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: { ...process.env, ...env },
+    });
+    return { code: 0, stdout };
+  } catch (err) {
+    return { code: err.status, stdout: err.stdout, stderr: err.stderr };
+  }
+}
+
+/**
+ * A stub rasterizer module for YLLIR_ATLAS_RASTERIZER_STUB. It records the SVG, the width and the resourcesDir it
+ * was given in `log`, and returns a PNG of that width (half as high), or throws rasterizer-unavailable.
+ */
+function rasterizerStub({ unavailable = false } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-atlas-stub-'));
+  bakeDirs.push(dir);
+  const log = path.join(dir, 'call.json');
+  const pngUrl = new URL('../../../../scripts/lib/png.mjs', import.meta.url).href;
+  const file = path.join(dir, 'stub.mjs');
+  const failure = unavailable ? "const err = new Error('not installed here'); err.code = 'rasterizer-unavailable'; throw err;" : '';
+  fs.writeFileSync(file, [
+    "import fs from 'node:fs';",
+    `import { encodePng } from ${JSON.stringify(pngUrl)};`,
+    'export async function rasterizeSvg(svg, { width, resourcesDir }) {',
+    `  fs.writeFileSync(${JSON.stringify(log)}, JSON.stringify({ svg, width, resourcesDir }));`,
+    `  ${failure}`,
+    '  const height = Math.round(width / 2);',
+    '  return encodePng(width, height, new Uint8Array(width * height * 3).fill(255));',
+    '}',
+    '',
+  ].join('\n'));
+  return { env: { YLLIR_ATLAS_RASTERIZER_STUB: file }, log };
+}
+
+/** An empty data folder, so the real rasterizer is not installed there. */
+function emptyDataDir() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-atlas-data-'));
+  bakeDirs.push(dir);
+  return dir;
+}
+
+/** A campaign with a written atlas (terrain and places), on the fantasy style. */
+function bakeCampaign(layers = {}) {
+  const root = standardCampaign();
+  writeAtlas(root, {
+    manifest: baseManifest({ style: 'fantasy-color' }),
+    layers: {
+      terrain: terrainLayer(),
+      places: placesLayer([['north', [500, 500]]]),
+      ...layers,
+    },
+  });
+  return root;
+}
+
+/** A PNG file of the given size, written into a temporary folder; returns its path. */
+function pngFile(width = 16, height = 8) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-atlas-png-'));
+  bakeDirs.push(dir);
+  const file = path.join(dir, 'bake.png');
+  fs.writeFileSync(file, encodePng(width, height, new Uint8Array(width * height * 3).fill(120)));
+  return file;
+}
+
+/** A WebP file header (VP8X) with the given canvas size. */
+function webpFile(width, height) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-atlas-webp-'));
+  bakeDirs.push(dir);
+  const buf = Buffer.alloc(30);
+  buf.write('RIFF', 0, 'ascii');
+  buf.writeUInt32LE(22, 4);
+  buf.write('WEBP', 8, 'ascii');
+  buf.write('VP8X', 12, 'ascii');
+  buf.writeUInt32LE(10, 16);
+  buf.writeUIntLE(width - 1, 24, 3);
+  buf.writeUIntLE(height - 1, 27, 3);
+  const file = path.join(dir, 'bake.webp');
+  fs.writeFileSync(file, buf);
+  return file;
+}
+
+test('status prints bake none for an atlas without a bake', () => {
+  const root = bakeCampaign();
+  const status = json(run('status', root).stdout);
+  assert.equal(status.bake, 'none');
+});
+
+test('bake-input writes the players render as a PNG of the given width and prints its hash and size', () => {
+  const root = bakeCampaign();
+  const stub = rasterizerStub();
+  const result = runEnv(stub.env, 'bake-input', root, '--size', '512');
+  assert.equal(result.code, 0, result.stdout);
+  const out = json(result.stdout);
+  assert.equal(out.ok, true);
+  assert.equal(out.file, '.campaign/cache/atlas/bake/input.png');
+  assert.deepEqual([out.width, out.height], [512, 256]);
+  assert.equal(out.layersHash, layersHash(readAtlas(root).layers));
+  assert.deepEqual(pngSize(fs.readFileSync(path.join(root, out.file))), { width: 512, height: 256 });
+
+  const call = JSON.parse(fs.readFileSync(stub.log, 'utf8'));
+  assert.equal(call.width, 512);
+  assert.match(call.svg, /viewBox="0 0 1000 1000"/);
+  assert.ok(call.svg.includes('/styles/fantasy-color/'), 'the textures are read from the framework assets');
+  assert.equal(path.basename(call.resourcesDir), 'assets');
+});
+
+test('bake-input defaults to a width of 2048', () => {
+  const root = bakeCampaign();
+  const stub = rasterizerStub();
+  const out = json(runEnv(stub.env, 'bake-input', root).stdout);
+  assert.equal(out.width, 2048);
+  assert.equal(JSON.parse(fs.readFileSync(stub.log, 'utf8')).width, 2048);
+});
+
+test('bake-input keeps master-only content out: a master-only folder, a master-only feature and their names are not drawn', () => {
+  const structure = [...STRUCTURE, { id: 'segreto', folder: 'Secret', type: 'master-only' }];
+  const root = standardCampaign({
+    'Secret/Hidden Keep.md': placeSheet({ id: 'hidden-keep', title: 'Hidden Keep', body: 'Secret.' }),
+  });
+  fs.writeFileSync(path.join(root, 'campaign.yaml'), campaignYaml(structure));
+  writeAtlas(root, {
+    manifest: baseManifest({ style: 'fantasy-color' }),
+    layers: {
+      terrain: terrainLayer(),
+      places: placesLayer([['north', [500, 500]], ['hidden-keep', [700, 700]], ['south', [200, 800]]]),
+    },
+  });
+  const places = JSON.parse(readAtlasFile(root, 'places.json'));
+  places.features[2].visibility = 'master';
+  fs.writeFileSync(path.join(root, 'Atlas', 'places.json'), JSON.stringify(places));
+
+  const stub = rasterizerStub();
+  const result = runEnv(stub.env, 'bake-input', root, '--size', '512');
+  assert.equal(result.code, 0, result.stdout);
+  const svg = JSON.parse(fs.readFileSync(stub.log, 'utf8')).svg;
+  assert.equal(svg.includes('Hidden Keep'), false);
+  assert.equal(svg.includes('South'), false);
+});
+
+test('bake-input refuses an atlas without atlas.json and an atlas without any layer, and writes nothing', () => {
+  const bare = standardCampaign();
+  const stub = rasterizerStub();
+  const noAtlas = runEnv(stub.env, 'bake-input', bare, '--size', '512');
+  assert.equal(noAtlas.code, 1);
+  assert.equal(json(noAtlas.stdout).ok, false);
+  assert.deepEqual(json(noAtlas.stdout).problems.map((p) => p.code), ['no-atlas']);
+
+  const empty = standardCampaign();
+  writeAtlas(empty, { manifest: baseManifest({ style: 'fantasy-color' }), layers: {} });
+  const noLayer = runEnv(stub.env, 'bake-input', empty, '--size', '512');
+  assert.equal(noLayer.code, 1);
+  assert.deepEqual(json(noLayer.stdout).problems.map((p) => p.code), ['missing-layer']);
+  assert.equal(fs.existsSync(path.join(empty, BAKE_INPUT)), false);
+});
+
+test('bake-input without an installed rasterizer exits 1 rasterizer-unavailable and tells to run bake-setup', () => {
+  const root = bakeCampaign();
+  const result = runEnv({ YLLIR_ATLAS_RASTERIZER_STUB: '' }, 'bake-input', root, '--size', '512', '--data-dir', emptyDataDir());
+  assert.equal(result.code, 1, result.stdout);
+  const problem = json(result.stdout).problems[0];
+  assert.equal(problem.code, 'rasterizer-unavailable');
+  assert.match(problem.message, /bake-setup/);
+  assert.equal(fs.existsSync(path.join(root, BAKE_INPUT)), false);
+});
+
+test('bake-input reports the rasterizer stub unavailable the same way', () => {
+  const root = bakeCampaign();
+  const stub = rasterizerStub({ unavailable: true });
+  const result = runEnv(stub.env, 'bake-input', root, '--size', '512');
+  assert.equal(result.code, 1);
+  assert.equal(json(result.stdout).problems[0].code, 'rasterizer-unavailable');
+});
+
+test('--size outside 512..4096, not a number, or on another command, is a usage error', () => {
+  const root = bakeCampaign();
+  for (const size of ['100', '5000', 'big', '1024.5']) {
+    const result = run('bake-input', root, '--size', size);
+    assert.equal(result.code, 2, size);
+  }
+  assert.equal(run('bake-input', root, '--size').code, 2);
+  assert.equal(run('status', root, '--size', '1024').code, 2);
+  assert.equal(run('bake-input', root, '--data-dir').code, 2);
+});
+
+test('bake-set copies a PNG under its hash, records it in the manifest, and status says current', () => {
+  const root = bakeCampaign();
+  const image = pngFile(16, 8);
+  const digest = crypto.createHash('sha256').update(fs.readFileSync(image)).digest('hex').slice(0, 8);
+  const result = run('bake-set', root, image);
+  assert.equal(result.code, 0, result.stdout);
+  const out = json(result.stdout);
+  assert.equal(out.ok, true);
+  assert.equal(out.file, `Atlas/bake/bake-${digest}.png`);
+  assert.equal(out.layersHash, layersHash(readAtlas(root).layers));
+  assert.ok(fs.existsSync(path.join(root, 'Atlas', 'bake', `bake-${digest}.png`)));
+
+  const manifest = JSON.parse(readAtlasFile(root, 'atlas.json'));
+  assert.deepEqual(manifest.bake, {
+    file: `bake/bake-${digest}.png`,
+    layersHash: layersHash(readAtlas(root).layers),
+    width: 16,
+    height: 8,
+  });
+  assert.equal(json(run('status', root).stdout).bake, 'current');
+  assert.equal(run('validate', root).code, 0);
+});
+
+test('a change to a layer after the bake makes it stale', () => {
+  const root = bakeCampaign();
+  assert.equal(run('bake-set', root, pngFile()).code, 0);
+  assert.equal(json(run('status', root).stdout).bake, 'current');
+  const changed = writeJsonFile(path.join(root, 'moved.json'), movedTerrain());
+  assert.equal(run('write-layer', root, 'terrain', changed).code, 0);
+  assert.equal(json(run('status', root).stdout).bake, 'stale');
+});
+
+test('bake-set replaces the older bake: only the new file stays in bake/', () => {
+  const root = bakeCampaign();
+  assert.equal(run('bake-set', root, pngFile(16, 8)).code, 0);
+  const second = run('bake-set', root, pngFile(32, 16));
+  assert.equal(second.code, 0);
+  const files = fs.readdirSync(path.join(root, 'Atlas', 'bake'));
+  assert.deepEqual(files, [path.basename(json(second.stdout).file)]);
+  const manifest = JSON.parse(readAtlasFile(root, 'atlas.json'));
+  assert.equal(manifest.bake.file, `bake/${files[0]}`);
+  assert.deepEqual([manifest.bake.width, manifest.bake.height], [32, 16]);
+});
+
+test('bake-set accepts a WebP and reads its size from the header', () => {
+  const root = bakeCampaign();
+  const result = run('bake-set', root, webpFile(40, 20));
+  assert.equal(result.code, 0, result.stdout);
+  const manifest = JSON.parse(readAtlasFile(root, 'atlas.json'));
+  assert.ok(manifest.bake.file.endsWith('.webp'));
+  assert.deepEqual([manifest.bake.width, manifest.bake.height], [40, 20]);
+});
+
+test('bake-set refuses a file that is not an image, and one over 12 MB; nothing changes', () => {
+  const root = bakeCampaign();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-atlas-bad-'));
+  bakeDirs.push(dir);
+  const text = path.join(dir, 'notes.png');
+  fs.writeFileSync(text, 'this is a text file named like a picture');
+  const refusedText = run('bake-set', root, text);
+  assert.equal(refusedText.code, 1);
+  assert.equal(json(refusedText.stdout).problems[0].code, 'bad-image');
+
+  const big = path.join(dir, 'big.png');
+  fs.writeFileSync(big, Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(12 * 1024 * 1024)]));
+  const refusedBig = run('bake-set', root, big);
+  assert.equal(refusedBig.code, 1);
+  assert.equal(json(refusedBig.stdout).problems[0].code, 'bad-image');
+
+  assert.equal(fs.existsSync(path.join(root, 'Atlas', 'bake')), false);
+  assert.equal(JSON.parse(readAtlasFile(root, 'atlas.json')).bake, undefined);
+});
+
+test('bake-clear removes the bake field and the files of bake/; status says none; a second clear is still ok', () => {
+  const root = bakeCampaign();
+  assert.equal(run('bake-set', root, pngFile()).code, 0);
+  const cleared = run('bake-clear', root);
+  assert.equal(cleared.code, 0, cleared.stdout);
+  assert.equal(json(cleared.stdout).ok, true);
+  assert.equal(fs.existsSync(path.join(root, 'Atlas', 'bake')), false);
+  assert.equal(JSON.parse(readAtlasFile(root, 'atlas.json')).bake, undefined);
+  assert.equal(json(run('status', root).stdout).bake, 'none');
+  assert.equal(run('bake-clear', root).code, 0);
+  assert.equal(run('validate', root).code, 0);
+});
+
+test('bake-set and bake-clear without an atlas exit 1 no-atlas and write nothing', () => {
+  const bare = standardCampaign();
+  const set = run('bake-set', bare, pngFile());
+  assert.equal(set.code, 1);
+  assert.equal(json(set.stdout).problems[0].code, 'no-atlas');
+  assert.equal(fs.existsSync(path.join(bare, 'Atlas', 'atlas.json')), false);
+  assert.equal(fs.existsSync(path.join(bare, 'Atlas', 'bake')), false);
 });

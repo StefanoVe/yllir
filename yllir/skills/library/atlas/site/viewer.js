@@ -36,7 +36,10 @@
   const urban = data.scale === 'urban';
   const mixed = data.scale === 'mixed';
   const hasSea = !urban;
-  const hasMarkers = urban || mixed;
+  // A baked map (data.bake, see export.mjs) has no place icons: every place with a point gets a marker, the urban one,
+  // so the places stay findable. Without a bake nothing changes.
+  const bake = data.bake === true;
+  const hasMarkers = urban || mixed || bake;
   const maxZ = urban || mixed ? MAX_Z * URBAN_ZOOM : MAX_Z;
 
   if (hasSea) sea.style.backgroundImage = `url("${ASSET_BASE}${data.seaTexture}")`;
@@ -546,7 +549,7 @@
   function buildMarkers() {
     markerBox = el('div', 'markers', { role: 'group', 'aria-label': S.notablePlaces });
     for (const place of data.places) {
-      if (!Array.isArray(place.at) || !place.kind) continue;
+      if (!Array.isArray(place.at) || (!place.kind && !bake)) continue;
       const node = markerNode(place);
       markerBox.append(node);
       markerList.push({ id: place.id, at: place.at, node });
@@ -615,7 +618,7 @@
       nodes.set(id, node);
       // A place with a marker (a building or a district, on an urban or a mixed map) is reached through the marker,
       // so the drawn place is not in the tab order. The other places are.
-      const marked = urban || Boolean(place && place.kind);
+      const marked = urban || Boolean(place && (place.kind || bake));
       if (!marked) {
         node.setAttribute('tabindex', '0');
         node.setAttribute('role', 'button');

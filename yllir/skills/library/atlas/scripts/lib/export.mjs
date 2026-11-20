@@ -7,9 +7,12 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readAtlas, validateAtlas, isPlainObject } from './model.mjs';
+import { readAtlas, validateAtlas, isPlainObject, atlasDir } from './model.mjs';
 import { renderAtlasSvg, escapeXml } from './render.mjs';
 import { renderUrbanSvg } from './render-urban.mjs';
+import { layersHash } from './bake.mjs';
+
+export { layersHash };
 import { loadStyle, resolveStyleId } from './styles.mjs';
 import { runAtlasChecks, reservedLinesOf, masterIdsOf } from './checks.mjs';
 import { stringsFor } from './strings.mjs';
@@ -100,7 +103,26 @@ function anchorOf(feature) {
   return [Math.round((sum[0] / points.length) * 10) / 10, Math.round((sum[1] / points.length) * 10) / 10];
 }
 
-/** Relative paths under assets/ that the SVG references (`assets/<path>`). */
+/**
+ * The bake of the atlas, as the manifest declares it: `{ state: 'current', source, asset }` when its layers hash
+ * is the current one and the file exists (asset is the name under assets/, e.g. `bake.png`); `{ state: 'stale' }`
+ * when the hash differs; `{ state: 'none' }` when there is no usable entry or its file is missing.
+ */
+function resolveBake(root, manifest, layers) {
+  const entry = manifest.bake;
+  if (!isPlainObject(entry) || typeof entry.file !== 'string' || typeof entry.layersHash !== 'string') return { state: 'none' };
+  const safe = /^[A-Za-z0-9_-][A-Za-z0-9_./-]*$/.test(entry.file)
+    && !entry.file.split('/').includes('..')
+    && /\.[a-z0-9]+$/.test(entry.file);
+  const dir = atlasDir(root);
+  if (!safe || dir === null) return { state: 'none' };
+  if (entry.layersHash !== layersHash(layers)) return { state: 'stale' };
+  const source = path.join(dir, entry.file);
+  if (!fs.existsSync(source) || !fs.statSync(source).isFile()) return { state: 'none' };
+  return { state: 'current', source, asset: `bake${path.extname(entry.file)}` };
+}
+
+/** Relative paths under assets/ that the SVG references (`assets/<path>`). The bake is one of them (`assets/bake.<ext>`). */
 function referencedAssets(svg) {
   const refs = new Set([VIEWER_FONT]);
   for (const match of svg.matchAll(/assets\/([A-Za-z0-9_./-]+)/g)) refs.add(match[1]);
@@ -256,7 +278,10 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     names[named.place] ??= subject.title;
   }
 
-  // 5. Style and drawing.
+  // 5. Style and drawing. A current bake replaces the drawn map (its labels and hit targets stay); a stale or missing one
+  // is left out, and the map is drawn as usual.
+  const bakeInfo = resolveBake(root, atlas.manifest, atlas.layers);
+  const bakeRef = bakeInfo.state === 'current' ? { href: `${ASSET_BASE}${bakeInfo.asset}` } : null;
   let bundle;
   let svgResult;
   try {
@@ -265,7 +290,7 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     // A purely urban atlas uses the urban renderer; a geographic or a mixed one uses the geographic renderer,
     // which appends the urban groups when there are any.
     const draw = scale === 'urban' ? renderUrbanSvg : renderAtlasSvg;
-    svgResult = draw({ manifest: atlas.manifest, layers: renderLayers, style: bundle, names, audience, assetBase: ASSET_BASE, vignette: false });
+    svgResult = draw({ manifest: atlas.manifest, layers: renderLayers, style: bundle, names, audience, assetBase: ASSET_BASE, vignette: false, bake: bakeRef });
   } catch (err) {
     return refused([{ code: err.code ?? 'render', file: 'atlas.json', path: 'style', message: err.message }]);
   }
@@ -282,6 +307,7 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     seaTexture: `styles/${bundle.style.id}/${deepSea.file}`,
     vignette: { color: bundle.style.vignette.color, opacity: bundle.style.vignette.opacity },
     scale,
+    bake: bakeRef !== null,
     places: records,
     layers: LAYER_ORDER.filter((name) => name === 'labels' || atlas.layers[name] !== undefined),
     strings,
@@ -307,8 +333,9 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     fs.copyFileSync(source, dest);
     written.push(dest);
   };
+  // The referenced assets are the ones the SVG names; the bake is one of them and comes from the atlas folder.
   for (const rel of referencedAssets(svg)) {
-    const source = path.join(ASSETS_DIR, rel);
+    const source = bakeInfo.state === 'current' && rel === bakeInfo.asset ? bakeInfo.source : path.join(ASSETS_DIR, rel);
     if (!fs.existsSync(source)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
       return refused([{ code: 'missing-asset', file: `assets/${rel}`, path: '', message: `asset ${rel} is missing` }]);
@@ -352,6 +379,7 @@ export function exportAtlas(root, { audience = 'master', runChecks = runAtlasChe
     realms: survivors('political').length,
     stamps: drawn.stamps,
     labels: drawn.labels,
+    bake: bakeInfo.state,
     bytes: written.reduce((sum, file) => sum + fs.statSync(file).size, 0),
   };
   fs.writeFileSync(

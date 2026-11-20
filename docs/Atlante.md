@@ -94,6 +94,26 @@ Lo script fa la meccanica, l'assistente giudica: la scelta dei vincoli e la lett
 - **Esportazione del master** in `.campaign/cache/atlas/master/`, usata dal master screen.
 - **Esportazione per i giocatori:** esclude gli elementi con visibilità `master` e il blocco riservato delle schede, e passa i controlli prima della pubblicazione dell'enciclopedia.
 
+## 5b. Versione dipinta (bake)
+
+**Deciso** (decisione dell'autore, 2026-11-20): dopo l'approvazione dell'atlante completo e con il consenso del master, la mappa disegnata viene passata a un fornitore di immagini che ne fa una versione uniforme; il sito serve l'immagine con sopra puntini cliccabili e testi, che non fanno parte dell'immagine.
+
+*Implementata in 0.82.0.*
+
+- **Ingresso.** L'immagine di partenza è la versione per i giocatori dell'atlante: niente testi, niente luoghi riservati, niente segreti. Il fornitore riceve solo questa immagine e lo stile dell'atlante.
+- **Rasterizzazione.** La carta vettoriale si rasterizza con resvg e la decodifica WebP usa strumenti installati fuori dal framework alla prima richiesta (`bake-setup`), mai inclusi nel pacchetto.
+- **Fornitore.** Si usa un fornitore con immagine di riferimento; oggi è Codex. Se il servizio manca, rifiuta il consenso o fallisce tecnicamente, resta la mappa disegnata: nessun altro servizio viene provato da solo.
+- **Controllo.** L'assistente confronta l'immagine di partenza e quella dipinta: la geometria deve restare (coste, montagne, fiumi, strade, mura, edifici nello stesso posto), senza testi né cornici e con un aspetto uniforme. Al massimo due ripetizioni; se la geometria si sposta, il risultato non si tiene.
+- **Salvataggio.** La versione dipinta sta nella cartella dell'atlante, in `bake/`, con un solo file per volta: il precedente viene sostituito.
+- **Impronta dei livelli.** Il bake registra l'impronta dei livelli disegnati al momento in cui è fatto. Quando strade, terre e gli altri livelli cambiano, il bake diventa obsoleto e il sito mostra da solo la mappa disegnata. Etichette e luoghi non entrano nell'impronta: spostarli o rinominarli non rende obsoleta la versione dipinta.
+- **Ripiego.** Senza un sì del master, o se il bake fallisce, resta la mappa disegnata, che è sempre la versione di riferimento.
+
+**Questioni aperte:**
+
+- altri fornitori con immagine di riferimento (ComfyUI, Photoshop), oltre a Codex;
+- la registrazione pixel-esatta tra mappa disegnata e dipinta non è verificata dal codice: oggi il controllo è visivo, fatto dall'assistente;
+- il costo di ogni rifinitura e chi lo sostiene.
+
 ## 6. Master screen
 
 **Proposta** nei dettagli; il pulsante e il popup sono **Deciso**.

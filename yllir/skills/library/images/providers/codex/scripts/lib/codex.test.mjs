@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { probeCodex, runCodex } from './codex.mjs';
+import { buildBakeInstruction, codexArgs, probeCodex, runCodex } from './codex.mjs';
 import { PNG_SIGNATURE } from '../../../../scripts/lib/png-signature.mjs';
 
 const PNG_HEX_BODY = '0000000d49484452';
@@ -153,4 +153,58 @@ test('probeCodex reports a missing codex as not-installed', async () => {
 
   assert.equal(probe.available, false);
   assert.equal(probe.reason, 'not-installed');
+});
+
+// ---- bake jobs: the input picture is attached with -i, the prompt is sent word for word ----
+
+const BAKE_PROMPT_TEXT = 'Repaint the attached map as one uniform, finished, hand-painted fantasy map in the style: dark, muted, moody fantasy map. Output the same aspect ratio.';
+
+function makeBakeJobDir() {
+  const dir = makeJobDir({ operation: 'bake', prompt: BAKE_PROMPT_TEXT, input: 'input.png', negative: null });
+  fs.writeFileSync(path.join(dir, 'input.png'), Buffer.concat([PNG_SIGNATURE, Buffer.from('input')]));
+  return dir;
+}
+
+// Records its own argv in args.json (in the job folder), then writes the PNG like the generate fake.
+const RECORD_ARGS_THEN_WRITE_PNG = `
+require('fs').writeFileSync('args.json', JSON.stringify(process.argv.slice(2)));
+${WRITE_PNG_FROM_INSTRUCTION}
+`;
+
+test('bake attaches the input picture with -i and sends the prompt after --', async () => {
+  const jobDir = makeBakeJobDir();
+  const command = makeFake(RECORD_ARGS_THEN_WRITE_PNG);
+  const result = await runCodex({ jobDir, command, timeoutMs: 10000, stallMs: 5000 });
+
+  assert.deepEqual(result, { ok: true });
+  const argv = JSON.parse(fs.readFileSync(path.join(jobDir, 'args.json'), 'utf8'));
+  const i = argv.indexOf('-i');
+  assert.ok(i > 0, 'the input must be attached with -i');
+  assert.equal(argv[i + 1], path.join(jobDir, 'input.png'));
+  assert.equal(argv[i + 2], '--');
+  assert.ok(argv[i + 3].startsWith(BAKE_PROMPT_TEXT + ' '), argv[i + 3]);
+  assert.equal(argv.length, i + 4);
+  const run = JSON.parse(fs.readFileSync(path.join(jobDir, 'run.json'), 'utf8'));
+  assert.deepEqual(run, { provider: 'codex', parameters: { width: 512, height: 768 } });
+});
+
+test('bake without its input picture fails before codex is spawned', async () => {
+  const jobDir = makeJobDir({ operation: 'bake', prompt: BAKE_PROMPT_TEXT, input: 'input.png' });
+  const result = await runCodex({ jobDir, command: '/nonexistent/codex', timeoutMs: 10000, stallMs: 5000 });
+
+  assert.equal(result.ok, false);
+  assert.equal(result.error, 'failed');
+  assert.ok(result.message.includes('input'), result.message);
+});
+
+test('the generate arguments never carry -i, and the bake instruction is the prompt plus the save sentence only', () => {
+  const generate = makeJobDir();
+  const generateJob = JSON.parse(fs.readFileSync(path.join(generate, 'job.json'), 'utf8'));
+  assert.equal(codexArgs(generateJob, generate, path.join(generate, 'result.png')).includes('-i'), false);
+
+  const bakeJob = { operation: 'bake', prompt: BAKE_PROMPT_TEXT, input: 'input.png' };
+  const instruction = buildBakeInstruction(bakeJob, '/job/result.png');
+  assert.equal(instruction.startsWith(BAKE_PROMPT_TEXT + ' '), true);
+  assert.ok(instruction.includes('at exactly this path: /job/result.png. '));
+  assert.equal(instruction.includes('Description:'), false);
 });

@@ -431,3 +431,56 @@ test('urbanLayerGroups without terrain land: the ground fills the canvas and the
   assert.ok(groups.ground.includes('<rect x="0" y="0" width="1000" height="800"'));
   assert.ok(groups.ground.includes('M100 100'), 'the island is drawn');
 });
+
+// The bake of an urban map: the drawn layers become one image, the labels stay, and each place with a point has a target.
+const URBAN_BAKE_MANIFEST = { canvas: { width: 1000, height: 800 }, seed: 3 };
+const URBAN_BAKE_LAYERS = {
+  ground: { layer: 'ground', features: [{ id: 'ground-main', type: 'land', polygon: [[0, 0], [1000, 0], [1000, 800], [0, 800]], provenance: 'agent-choice', sources: [] }] },
+  buildings: { layer: 'buildings', features: [
+    { id: 'hall', place: 'hall', at: [300, 300], kind: 'tavern', provenance: 'master', visibility: 'public', sources: [] },
+    { id: 'cellar', place: 'cellar', at: [500, 150], kind: 'keep', provenance: 'master', visibility: 'master', sources: [] },
+  ] },
+  districts: { layer: 'districts', features: [
+    { id: 'old', type: 'district', place: 'old', seeds: [[700, 500]], polygon: [[600, 400], [900, 400], [900, 700], [600, 700]], color: '#aa3322', provenance: 'master', visibility: 'public', sources: [] },
+  ] },
+};
+const URBAN_BAKE_NAMES = { hall: 'The Hall', old: 'Old Ward' };
+
+test('urban overlays false: the drawn buildings and districts, no labels at all', () => {
+  const { svg } = renderUrbanSvg({ manifest: URBAN_BAKE_MANIFEST, layers: URBAN_BAKE_LAYERS, names: URBAN_BAKE_NAMES, style: STYLE, assetBase: ASSET_BASE, overlays: false });
+  assert.ok(svg.includes('id="layer-buildings"'));
+  assert.ok(svg.includes('id="layer-districts"'));
+  assert.ok(!svg.includes('id="layer-labels"'));
+  assert.ok(!svg.includes('<text'));
+});
+
+test('urban bake: one image replaces the layers, the labels stay, and each place with a point has a hit target', () => {
+  const { svg, stats } = renderUrbanSvg({
+    manifest: URBAN_BAKE_MANIFEST, layers: URBAN_BAKE_LAYERS, names: URBAN_BAKE_NAMES, style: STYLE, assetBase: ASSET_BASE,
+    bake: { href: 'assets/bake.webp' },
+  });
+  assert.ok(svg.includes('<g data-layer="bake"><image href="assets/bake.webp" x="0" y="0" width="1000" height="800" preserveAspectRatio="none"/></g>'));
+  for (const name of ['ground', 'buildings', 'districts']) assert.ok(!svg.includes(`id="layer-${name}"`), `${name} is baked`);
+  assert.ok(svg.includes('>The Hall<'), 'the building name stays as text');
+  assert.ok(svg.includes('>OLD WARD<') || svg.includes('>Old Ward<'), 'the district name stays as text');
+  const r = (8 * 1000 / 512).toFixed(2);
+  assert.ok(svg.includes(`<g class="place" data-place="hall"><circle cx="300" cy="300" r="${r}" fill="#000000" fill-opacity="0"/></g>`));
+  assert.ok(svg.includes('<g class="place" data-place="old"><circle cx="700" cy="500"'), 'a district is hit at its first seed');
+  assert.ok(svg.includes('data-place="cellar"'), 'the master-visibility building is in the master render');
+  assert.ok(stats.labels > 0, 'the labels are counted');
+});
+
+test('urban bake for the players: the master-visibility building has no target', () => {
+  const { svg } = renderUrbanSvg({
+    manifest: URBAN_BAKE_MANIFEST, layers: URBAN_BAKE_LAYERS, names: URBAN_BAKE_NAMES, style: STYLE, assetBase: ASSET_BASE,
+    audience: 'players', bake: { href: 'assets/bake.webp' },
+  });
+  assert.ok(svg.includes('data-place="hall"'));
+  assert.ok(!svg.includes('data-place="cellar"'));
+});
+
+test('urban default options give the same SVG as explicit overlays true and bake null', () => {
+  const base = { manifest: URBAN_BAKE_MANIFEST, layers: URBAN_BAKE_LAYERS, names: URBAN_BAKE_NAMES, style: STYLE, assetBase: ASSET_BASE };
+  assert.equal(renderUrbanSvg({ ...base, overlays: true, bake: null }).svg, renderUrbanSvg(base).svg);
+  assert.throws(() => renderUrbanSvg({ ...base, bake: { href: '' } }), /bake must be/);
+});

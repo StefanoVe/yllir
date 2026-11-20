@@ -220,6 +220,24 @@ export function manifestProblems(manifest) {
       }
     }
   }
+
+  // The bake (an image of the drawn map): optional. Its file is inside bake/, and its hash is that of the layers it was made from.
+  if (manifest.bake !== undefined) {
+    const { bake } = manifest;
+    if (!isPlainObject(bake)) {
+      bad('bake', 'bake is { file, layersHash, width, height }');
+    } else {
+      if (typeof bake.file !== 'string' || !bake.file.startsWith('bake/') || bake.file.split('/').includes('..')) {
+        bad('bake.file', 'bake.file must be a path inside bake/');
+      }
+      if (typeof bake.layersHash !== 'string' || !HEX64.test(bake.layersHash)) {
+        bad('bake.layersHash', 'bake.layersHash must be a sha256 hex digest');
+      }
+      for (const side of ['width', 'height']) {
+        if (!Number.isInteger(bake[side]) || bake[side] < 1) bad(`bake.${side}`, `bake.${side} must be a whole number above zero`);
+      }
+    }
+  }
   return out;
 }
 

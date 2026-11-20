@@ -401,6 +401,36 @@ export function urbanLayerGroups({ layers = {}, style, names = {}, audience = 'm
   };
 }
 
+/** Coordinate or radius for the hit targets: two decimals, no "-0". */
+const coord = (value) => String(Math.round(value * 100) / 100 + 0);
+
+/** The bake of the map: ONE image over the whole canvas, in its own group (see renderAtlasSvg). */
+export function bakeGroupSvg(bake, W, H) {
+  return `<g data-layer="bake"><image href="${escapeXml(bake.href)}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none"/></g>`;
+}
+
+/**
+ * The invisible hit targets of a baked map, in one group: every place feature with a point, every building with a
+ * place and a point, and every district with a place (its anchor is its first seed). Same audience filter as the
+ * renderers. The radius is 8 cells. A target is a circle with no fill opacity, so it takes the pointer and draws nothing.
+ */
+export function placeHitGroupSvg(layers, audience, cell) {
+  const r = coord(8 * cell);
+  const target = (id, at) => `<g class="place" data-place="${escapeXml(id)}">`
+    + `<circle cx="${coord(at[0])}" cy="${coord(at[1])}" r="${r}" fill="#000000" fill-opacity="0"/></g>`;
+  const out = [];
+  for (const f of visibleFeatures(layers.places, audience)) {
+    if (typeof f.id === 'string' && isFinitePoint(f.at)) out.push(target(f.id, f.at));
+  }
+  for (const f of visibleFeatures(layers.buildings, audience)) {
+    if (hasPlace(f) && isFinitePoint(f.at)) out.push(target(f.place, f.at));
+  }
+  for (const f of visibleFeatures(layers.districts, audience)) {
+    if (hasPlace(f) && isFinitePoint(f.seeds?.[0])) out.push(target(f.place, f.seeds[0]));
+  }
+  return ['<g data-layer="places">', ...out, '</g>'].join('\n');
+}
+
 /**
  * Renders the urban atlas to SVG.
  * @param {object} options
@@ -411,13 +441,22 @@ export function urbanLayerGroups({ layers = {}, style, names = {}, audience = 'm
  * @param {'master'|'players'} [options.audience]
  * @param {string} [options.assetBase] URL prefix of the styles and fonts
  * @param {boolean} [options.vignette] accepted for parity with renderAtlasSvg and ignored: the urban map has no vignette
+ * @param {boolean} [options.overlays=true] false: no labels at all (the drawn map only); the input of a bake
+ * @param {{ href: string }|null} [options.bake=null] one image replaces the drawn layers; the labels and the hit targets stay
  * @returns {{ svg: string, stats: { lots: number, buildings: number, districts: number, labels: number } }}
  */
-export function renderUrbanSvg({ manifest, layers = {}, style, names = {}, audience = 'master', assetBase = 'assets/', vignette: _vignette }) {
+export function renderUrbanSvg({
+  manifest, layers = {}, style, names = {}, audience = 'master', assetBase = 'assets/', vignette: _vignette,
+  overlays = true, bake = null,
+}) {
   if (!AUDIENCES.includes(audience)) throw new Error(`audience must be one of ${AUDIENCES.join(', ')}`);
+  if (bake !== null && (typeof bake !== 'object' || typeof bake.href !== 'string' || bake.href === '')) {
+    throw new Error('bake must be { href } or null');
+  }
   const bundle = style ?? loadStyle(DEFAULT_STYLE);
   const W = manifest.canvas.width;
   const H = manifest.canvas.height;
+  const cell = Math.max(W, H) / 512;
   const urban = urbanLayerGroups({ layers, style: bundle, names, audience, canvas: manifest.canvas, assetBase });
   const svg = [
     '<?xml version="1.0" encoding="UTF-8"?>',
@@ -425,11 +464,13 @@ export function renderUrbanSvg({ manifest, layers = {}, style, names = {}, audie
     '<defs>',
     ...urban.defs,
     '</defs>',
-    ...URBAN_LAYERS.map((name) => urban.groups[name]),
-    group('labels', urban.labels).join('\n'),
+    ...(bake ? [bakeGroupSvg(bake, W, H)] : URBAN_LAYERS.map((name) => urban.groups[name])),
+    ...(overlays ? [group('labels', urban.labels).join('\n')] : []),
+    ...(bake ? [placeHitGroupSvg(layers, audience, cell)] : []),
     '</svg>',
     '',
   ].join('\n');
-  const { lots, buildings, districts, labels } = urban.stats;
+  const { lots, buildings, districts } = urban.stats;
+  const labels = overlays ? urban.stats.labels : 0;
   return { svg, stats: { lots, buildings, districts, labels } };
 }

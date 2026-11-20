@@ -2,15 +2,21 @@
 // Atlas of a campaign: the manifest and one file per layer, checked and written by
 // deterministic rules. The drawing is not here; the agent proposes constraints and this
 // script refuses every write that breaks the rules or a locked layer.
-// Usage: node atlas.mjs <status|validate|init|places|write-layer|lock|generate <layer>|generate-terrain|preview|render|styles|set-style> <root> [args] [--unlock] [--open] [--audience master|players]
+// Usage: node atlas.mjs <status|validate|init|places|write-layer|lock|generate <layer>|generate-terrain|preview|render|styles|set-style|bake-input|bake-set <image>|bake-clear> <root> [args] [--size <px>] [--data-dir <path>] [--unlock] [--open] [--audience master|players]
 // Exit codes: 0 ok, 1 campaign problem (validation errors, refused write, no atlas folder), 2 usage.
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   LAYERS, atlasDir, atlasFolder, readAtlas, validateAtlas, manifestProblems, prefixProblems, writeJson, isPlainObject,
 } from './lib/model.mjs';
+import { BAKE_INPUT, BAKE_DIR, BAKE_MAX_BYTES, bakeStatus, bakeFileName, imageInfo, layersHash } from './lib/bake.mjs';
+import { rasterizeSvg } from './lib/rasterize.mjs';
+import { renderAtlasSvg } from './lib/render.mjs';
+import { isPublicDocument } from '../../../../scripts/lib/public-text.mjs';
+import { pngSize } from '../../../../scripts/lib/png.mjs';
 import { ensureAtlasSetup, planAtlasSetup, defaultCanvasFor, DEFAULT_STYLE } from './lib/setup.mjs';
 import { exportAtlas } from './lib/export.mjs';
 import { listStyles, loadStyle, resolveStyleId } from './lib/styles.mjs';
@@ -35,9 +41,14 @@ import { buildWorldIndex } from '../../../../scripts/lib/world-graph.mjs';
 import { parseYamlLite } from '../../../../scripts/lib/yaml-lite.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
-const USAGE = 'usage: node atlas.mjs <status|validate|init|places|write-layer|lock|generate <layer>|generate-terrain|preview|render|styles|set-style> <root> [args] [--unlock] [--open] [--audience master|players]';
-const COMMANDS = ['status', 'validate', 'init', 'places', 'write-layer', 'lock', 'generate', 'generate-terrain', 'preview', 'render', 'styles', 'set-style'];
+const USAGE = 'usage: node atlas.mjs <status|validate|init|places|write-layer|lock|generate <layer>|generate-terrain|preview|render|styles|set-style|bake-input|bake-set <image>|bake-clear> <root> [args] [--size <px>] [--data-dir <path>] [--unlock] [--open] [--audience master|players]';
+const COMMANDS = ['status', 'validate', 'init', 'places', 'write-layer', 'lock', 'generate', 'generate-terrain', 'preview', 'render', 'styles', 'set-style', 'bake-input', 'bake-set', 'bake-clear'];
 const AUDIENCES = ['master', 'players'];
+// The bake input width: the default, and the limits of --size.
+const BAKE_WIDTH = { default: 2048, min: 512, max: 4096 };
+const ASSETS_DIR = fileURLToPath(new URL('../assets/', import.meta.url));
+// Tests replace the rasterizer by a module that exports rasterizeSvg. Honoured only when this variable is set.
+const RASTERIZER_STUB_ENV = 'YLLIR_ATLAS_RASTERIZER_STUB';
 // The generator of each layer. Every generator is pure: constraints, seed and the other layers in, features and problems out.
 const GENERATORS = {
   terrain: generateTerrain,
@@ -75,6 +86,11 @@ function readJsonArg(file) {
   }
 }
 
+/** The problem of an atlas folder without atlas.json (the atlas was never initialised). */
+function missingAtlasProblem(folder) {
+  return { code: 'no-atlas', file: path.posix.join(folder, 'atlas.json'), path: '', message: 'the atlas has no atlas.json yet' };
+}
+
 function noAtlasProblem() {
   return { code: 'no-atlas', file: 'campaign.yaml', path: 'structure', message: 'campaign.yaml declares no atlas folder' };
 }
@@ -97,6 +113,7 @@ function status(root) {
     folder,
     exists: dir !== null && fs.existsSync(path.join(dir, 'atlas.json')),
     layers,
+    bake: bakeStatus(atlas.manifest, atlas.layers),
     problems: validateAtlas(root, atlas, { worldIndex }),
     pending: pendingPlaces(root, atlas, worldIndex),
   });
@@ -427,6 +444,188 @@ function setStyleCommand(root, id) {
   return 0;
 }
 
+/** The rasterizer: the test stub when RASTERIZER_STUB_ENV is set, else the installed one. */
+async function rasterizerFor() {
+  const stub = process.env[RASTERIZER_STUB_ENV];
+  if (!stub) return rasterizeSvg;
+  return (await import(pathToFileURL(path.resolve(stub)).href)).rasterizeSvg;
+}
+
+/**
+ * The layers of the players' map: a place, building or district is kept only when it is public and its sheet is
+ * public too (the rule of the players' export). Nothing master-only reaches the bake input.
+ */
+function playerLayers(layers, worldIndex, config) {
+  const subjects = new Map(worldIndex.subjects.map((s) => [s.id, s]));
+  const isPublicPlace = (id) => subjects.has(id) && isPublicDocument(subjects.get(id).file, config);
+  const visible = (feature) => isPlainObject(feature) && feature.visibility !== 'master'
+    && typeof feature.place === 'string' && isPublicPlace(feature.place);
+  const out = { ...layers };
+  for (const name of ['places', 'buildings', 'districts']) {
+    if (!Array.isArray(layers[name]?.features)) continue;
+    out[name] = { ...layers[name], features: layers[name].features.filter(visible) };
+  }
+  return out;
+}
+
+/** The names of the players' map, by place id: the titles of the public sheets the visible features name. */
+function playerNames(visibleLayers, worldIndex, config) {
+  const subjects = new Map(worldIndex.subjects.map((s) => [s.id, s]));
+  const names = {};
+  for (const name of ['places', 'buildings', 'districts', 'political']) {
+    const features = Array.isArray(visibleLayers[name]?.features) ? visibleLayers[name].features : [];
+    for (const feature of features) {
+      if (!isPlainObject(feature) || typeof feature.place !== 'string' || feature.visibility === 'master') continue;
+      const subject = subjects.get(feature.place);
+      if (subject === undefined || !isPublicDocument(subject.file, config)) continue;
+      names[feature.place] ??= subject.title;
+    }
+  }
+  return names;
+}
+
+/**
+ * Renders the players' map with no overlays (no labels, no icons: the image service paints the map only) and
+ * rasterizes it to a PNG of the given width under the campaign cache. The audience is always players, so nothing
+ * master-only leaves the campaign here. Nothing else is written.
+ */
+async function bakeInputCommand(root, { width = BAKE_WIDTH.default, dataDir } = {}) {
+  const folder = atlasFolder(root);
+  const empty = { ok: false, file: null, width: null, height: null, layersHash: null };
+  if (folder === null) return refuse(empty, [noAtlasProblem()]);
+  const dir = atlasDir(root);
+  const atlas = readAtlas(root);
+  if (!fs.existsSync(path.join(dir, 'atlas.json'))) return refuse(empty, [missingAtlasProblem(folder)]);
+  if (atlas.errors.length > 0) return refuse(empty, prefixProblems(folder, atlas.errors));
+  if (!isPlainObject(atlas.manifest) || manifestProblems(atlas.manifest).length > 0) {
+    return refuse(empty, prefixProblems(folder, manifestProblems(atlas.manifest)));
+  }
+  if (Object.keys(atlas.layers).length === 0) {
+    return refuse(empty, [{ code: 'missing-layer', file: folder, path: '', message: 'the atlas has no layer yet: generate one first' }]);
+  }
+
+  const config = readCampaignConfig(root);
+  let bundle;
+  try {
+    bundle = loadStyle(resolveStyleId({ atlasStyle: atlas.manifest.style, campaignConfig: config }).id);
+  } catch (err) {
+    return refuse(empty, [{ code: err.code ?? 'bad-adapter', file: 'campaign.yaml', path: 'system', message: err.message }]);
+  }
+
+  const worldIndex = buildWorldIndex(root);
+  const visible = playerLayers(atlas.layers, worldIndex, config);
+  let svg;
+  try {
+    svg = renderAtlasSvg({
+      manifest: atlas.manifest,
+      layers: visible,
+      style: bundle,
+      names: playerNames(visible, worldIndex, config),
+      audience: 'players',
+      assetBase: ASSETS_DIR,
+      vignette: false,
+      overlays: false,
+    }).svg;
+  } catch (err) {
+    return refuse(empty, [{ code: err.code ?? 'render', file: 'atlas.json', path: 'style', message: err.message }]);
+  }
+
+  const rasterize = await rasterizerFor();
+  let png;
+  try {
+    png = await rasterize(svg, { width, dataDir, resourcesDir: ASSETS_DIR });
+  } catch (err) {
+    if (err.code === 'rasterizer-unavailable') {
+      return refuse(empty, [{ code: 'rasterizer-unavailable', file: BAKE_INPUT, path: '', message: `the rasterizer is not installed (${err.message}); run bake-setup.mjs first` }]);
+    }
+    return refuse(empty, [{ code: 'render', file: BAKE_INPUT, path: '', message: err.message }]);
+  }
+  const size = pngSize(png);
+  if (size === null) return refuse(empty, [{ code: 'render', file: BAKE_INPUT, path: '', message: 'the rasterizer did not return a PNG' }]);
+
+  const file = path.join(root, BAKE_INPUT);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, png);
+  print({ ok: true, file: BAKE_INPUT, width: size.width, height: size.height, layersHash: layersHash(atlas.layers) });
+  return 0;
+}
+
+/**
+ * Sets the bake of the atlas from an image (PNG or WebP, at most 12 MB, checked by its magic bytes): the image is
+ * copied into bake/ under its hash, the older files of bake/ are deleted, and the manifest records the file, the
+ * size and the hash of the layers it was made from. Nothing is written when the manifest would not validate.
+ */
+function bakeSetCommand(root, imageArg) {
+  const folder = atlasFolder(root);
+  const dir = atlasDir(root);
+  const empty = { ok: false, file: null, layersHash: null };
+  if (dir === null) return refuse(empty, [noAtlasProblem()]);
+  if (!fs.existsSync(path.join(dir, 'atlas.json'))) return refuse(empty, [missingAtlasProblem(folder)]);
+  const atlas = readAtlas(root);
+  if (!isPlainObject(atlas.manifest)) {
+    return refuse(empty, [{ code: 'bad-manifest', file: path.posix.join(folder, 'atlas.json'), path: '', message: 'atlas.json is missing or invalid' }]);
+  }
+  const manifestErrors = manifestProblems(atlas.manifest);
+  if (manifestErrors.length > 0) return refuse(empty, prefixProblems(folder, manifestErrors));
+
+  const source = path.resolve(imageArg);
+  let bytes;
+  try {
+    if (fs.statSync(source).size > BAKE_MAX_BYTES) {
+      return refuse(empty, [{ code: 'bad-image', file: imageArg, path: '', message: `the image is larger than ${BAKE_MAX_BYTES} bytes` }]);
+    }
+    bytes = fs.readFileSync(source);
+  } catch {
+    return refuse(empty, [{ code: 'bad-image', file: imageArg, path: '', message: 'the image cannot be read' }]);
+  }
+  const info = imageInfo(bytes);
+  const name = bakeFileName(bytes);
+  if (info === null || name === null) {
+    return refuse(empty, [{ code: 'bad-image', file: imageArg, path: '', message: 'the image is not a PNG or WebP file' }]);
+  }
+
+  // The size comes from the file header; when it cannot be read, the size of the canvas stands in.
+  const size = info.size ?? { width: atlas.manifest.canvas.width, height: atlas.manifest.canvas.height };
+  const hash = layersHash(atlas.layers);
+  const bakeFile = `${BAKE_DIR}/${name}`;
+  const manifest = {
+    ...structuredClone(atlas.manifest),
+    bake: { file: bakeFile, layersHash: hash, width: size.width, height: size.height },
+  };
+  const problems = prefixProblems(folder, manifestProblems(manifest));
+  if (problems.length > 0) return refuse(empty, problems);
+
+  const bakeDir = path.join(dir, BAKE_DIR);
+  fs.mkdirSync(bakeDir, { recursive: true });
+  for (const entry of fs.readdirSync(bakeDir)) {
+    if (entry !== name) fs.rmSync(path.join(bakeDir, entry), { recursive: true, force: true });
+  }
+  fs.writeFileSync(path.join(bakeDir, name), bytes);
+  writeJson(path.join(dir, 'atlas.json'), manifest);
+  print({ ok: true, file: path.posix.join(folder, bakeFile), layersHash: hash });
+  return 0;
+}
+
+/** Removes the bake: its field in the manifest and the files of bake/. Nothing else changes. */
+function bakeClearCommand(root) {
+  const folder = atlasFolder(root);
+  const dir = atlasDir(root);
+  if (dir === null) return refuse({}, [noAtlasProblem()]);
+  if (!fs.existsSync(path.join(dir, 'atlas.json'))) return refuse({}, [missingAtlasProblem(folder)]);
+  const atlas = readAtlas(root);
+  if (!isPlainObject(atlas.manifest)) {
+    return refuse({}, [{ code: 'bad-manifest', file: path.posix.join(folder, 'atlas.json'), path: '', message: 'atlas.json is missing or invalid' }]);
+  }
+  if (atlas.manifest.bake !== undefined) {
+    const manifest = structuredClone(atlas.manifest);
+    delete manifest.bake;
+    writeJson(path.join(dir, 'atlas.json'), manifest);
+  }
+  fs.rmSync(path.join(dir, BAKE_DIR), { recursive: true, force: true });
+  print({ ok: true });
+  return 0;
+}
+
 function lockLayer(root, name) {
   const folder = atlasFolder(root);
   const dir = atlasDir(root);
@@ -453,17 +652,26 @@ function lockLayer(root, name) {
   return 0;
 }
 
-function main() {
+async function main() {
   const argv = process.argv.slice(2);
   const unlock = argv.includes('--unlock');
   const open = argv.includes('--open');
   let audience = null;
+  let size = null;
+  let dataDir = null;
   const args = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--unlock' || argv[i] === '--open') continue;
     if (argv[i] === '--audience') {
       audience = argv[++i] ?? null;
       if (audience === null) throw new Error(USAGE);
+      continue;
+    }
+    if (argv[i] === '--size' || argv[i] === '--data-dir') {
+      const value = argv[++i];
+      if (value === undefined || value.startsWith('--')) throw new Error(USAGE);
+      if (argv[i - 1] === '--size') size = value;
+      else dataDir = value;
       continue;
     }
     args.push(argv[i]);
@@ -473,6 +681,10 @@ function main() {
   if (unlock && command !== 'write-layer') throw new Error(USAGE);
   if (open && command !== 'preview' && command !== 'render') throw new Error(USAGE);
   if (audience !== null && (command !== 'render' || !AUDIENCES.includes(audience))) throw new Error(USAGE);
+  if ((size !== null || dataDir !== null) && command !== 'bake-input') throw new Error(USAGE);
+  if (size !== null && !(/^\d+$/.test(size) && Number(size) >= BAKE_WIDTH.min && Number(size) <= BAKE_WIDTH.max)) {
+    throw new Error(USAGE);
+  }
   const root = path.resolve(rootArg);
   if (!fs.existsSync(root) || !fs.statSync(root).isDirectory()) throw new Error(USAGE);
 
@@ -518,6 +730,18 @@ function main() {
     case 'set-style':
       if (rest.length !== 1) throw new Error(USAGE);
       code = setStyleCommand(root, rest[0]);
+      break;
+    case 'bake-input':
+      if (rest.length !== 0) throw new Error(USAGE);
+      code = await bakeInputCommand(root, { width: size === null ? BAKE_WIDTH.default : Number(size), dataDir: dataDir ?? undefined });
+      break;
+    case 'bake-set':
+      if (rest.length !== 1) throw new Error(USAGE);
+      code = bakeSetCommand(root, rest[0]);
+      break;
+    case 'bake-clear':
+      if (rest.length !== 0) throw new Error(USAGE);
+      code = bakeClearCommand(root);
       break;
     default:
       if (rest.length !== 2 || !LAYERS.includes(rest[0])) throw new Error(USAGE);

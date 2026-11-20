@@ -7,7 +7,7 @@
 import { isFinitePoint, isUsablePolygon, pointInPolygon } from './geometry.mjs';
 import { planStamps, sortStamps } from './scatter.mjs';
 import { DEFAULT_STYLE, FONT_FILES, loadStyle } from './styles.mjs';
-import { urbanLayerGroups } from './render-urban.mjs';
+import { urbanLayerGroups, bakeGroupSvg, placeHitGroupSvg } from './render-urban.mjs';
 
 const AUDIENCES = ['master', 'players'];
 // Urban layers in drawing order (the same order as render-urban.mjs). The labels come after them.
@@ -187,15 +187,25 @@ const iconKind = (icon) => (icon === 'capital' || icon === 'city' ? icon : 'othe
  * @param {'master'|'players'} [options.audience]
  * @param {string} [options.assetBase] URL prefix of the styles and fonts
  * @param {boolean} [options.vignette=true] draw the vignette inside the SVG; the viewer draws it itself when false
+ * @param {boolean} [options.overlays=true] false: no labels and no place icons, only the drawn map (the input of a bake)
+ * @param {{ href: string }|null} [options.bake=null] ONE image replaces everything drawn between the defs and the labels;
+ *   the labels stay (SVG text) and every place with a point gets an invisible hit target (`g.place`, see render-urban.mjs)
  * Urban layers, when present, are drawn in the same canvas: their groups go after the places and before
  * the labels (the ground goes right after the sea when there is no terrain land, as the base of the map).
  * Stamps keep off the urban footprint (blocks, green, squares, closed walls, ground water). A place inside
  * a block has no icon. Ambiguity resolved: the urban ground without terrain land is the land of the stamps,
  * and an island or the whole canvas, as in the urban map.
+ * Ambiguity resolved (bake): with a bake and overlays false there is no labels group, but the hit targets stay.
  * @returns {{ svg: string, stats: { stamps: number, places: number, labels: number, lots: number, buildings: number, districts: number } }}
  */
-export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audience = 'master', assetBase = 'assets/', vignette: withVignette = true }) {
+export function renderAtlasSvg({
+  manifest, layers = {}, style, names = {}, audience = 'master', assetBase = 'assets/', vignette: withVignette = true,
+  overlays = true, bake = null,
+}) {
   if (!AUDIENCES.includes(audience)) throw new Error(`audience must be one of ${AUDIENCES.join(', ')}`);
+  if (bake !== null && (typeof bake !== 'object' || typeof bake.href !== 'string' || bake.href === '')) {
+    throw new Error('bake must be { href } or null');
+  }
   const bundle = style ?? loadStyle(DEFAULT_STYLE);
   const S = bundle.style;
   const M = bundle.manifest;
@@ -590,12 +600,13 @@ export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audie
   }
 
   labelGroup.push('<g id="layer-labels" data-layer="labels">');
-  for (const label of finalLabels) {
+  // Without overlays there are no labels: nothing is drawn, and no arc path is added to the defs.
+  for (const label of overlays ? finalLabels : []) {
     labelCount++;
     labelGroup.push(labelSvg(label, defs, () => ++uid, { family: familyOf(label.font), labels: L }));
   }
   // The urban labels (building names, district names and the labels-layer overrides for urban targets) follow the geographic ones.
-  if (urban) {
+  if (urban && overlays) {
     for (const label of urban.labels) {
       labelCount++;
       labelGroup.push(label);
@@ -608,25 +619,34 @@ export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audie
     ? [`<g id="layer-vignette"><rect x="0" y="0" width="${W}" height="${H}" fill="url(#vignette)"/></g>`]
     : [];
 
+  // The drawn map: every layer from the sea to the urban groups, or ONE bake image in its place. The place icons
+  // are part of the drawn map, so they go with the overlays. The bake's hit targets come after the labels.
+  const drawnMap = bake
+    ? [bakeGroupSvg(bake, W, H)]
+    : [
+      '<g id="layer-sea"><g mask="url(#sea-fade-x)"><g mask="url(#sea-fade-y)">',
+      ...sea,
+      '</g></g></g>',
+      ...underlayGroups,
+      ...terrain,
+      ...biomes,
+      ...water,
+      ...political,
+      ...routes,
+      ...stampGroup,
+      ...(overlays ? placeGroup : []),
+      ...overGroups,
+    ];
+  const hitTargets = bake ? [placeHitGroupSvg(layers, audience, cell)] : [];
   const svg = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`,
     '<defs>',
     ...defs,
     '</defs>',
-    '<g id="layer-sea"><g mask="url(#sea-fade-x)"><g mask="url(#sea-fade-y)">',
-    ...sea,
-    '</g></g></g>',
-    ...underlayGroups,
-    ...terrain,
-    ...biomes,
-    ...water,
-    ...political,
-    ...routes,
-    ...stampGroup,
-    ...placeGroup,
-    ...overGroups,
-    ...labelGroup,
+    ...drawnMap,
+    ...(overlays ? labelGroup : []),
+    ...hitTargets,
     ...vignette,
     '</svg>',
     '',
@@ -637,7 +657,7 @@ export function renderAtlasSvg({ manifest, layers = {}, style, names = {}, audie
     stats: {
       stamps: stamps.length,
       places: places.length,
-      labels: labelCount,
+      labels: overlays ? labelCount : 0,
       lots: urbanStats.lots,
       buildings: urbanStats.buildings,
       districts: urbanStats.districts,

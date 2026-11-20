@@ -1,0 +1,6 @@
+{
+  "packages": [
+    { "package": "@resvg/resvg-js", "version": "2.6.2" },
+    { "package": "@jsquash/webp", "version": "1.5.0" }
+  ]
+}

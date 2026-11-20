@@ -73,6 +73,31 @@ export function buildInstruction(job, outputPath) {
   );
 }
 
+/**
+ * The text given to Codex for one bake job: job.prompt is the fixed repaint prompt
+ * (see bake-job.mjs), sent word for word, followed only by the save instruction.
+ */
+export function buildBakeInstruction(job, outputPath) {
+  return (
+    `${job.prompt} ` +
+    `Save the final image as a PNG file at exactly this path: ${outputPath}. ` +
+    `If the tool saves it elsewhere, copy it to that path. ` +
+    `Do nothing else: do not edit any other file, do not ask questions.`
+  );
+}
+
+/**
+ * The arguments of `codex exec` for one job. A bake job attaches its input PNG with
+ * `-i`; the variadic option is closed with `--` so the instruction is not read as a file.
+ */
+export function codexArgs(job, jobDir, resultPath) {
+  const base = ['exec', '--skip-git-repo-check', '--enable', 'image_generation', '--sandbox', 'workspace-write', '-C', jobDir];
+  if (job.operation === 'bake') {
+    return [...base, '-i', path.join(jobDir, job.input), '--', buildBakeInstruction(job, resultPath)];
+  }
+  return [...base, buildInstruction(job, resultPath)];
+}
+
 function hasPngSignature(file) {
   try {
     return fs.readFileSync(file).subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE);
@@ -89,23 +114,16 @@ function lastLogLine(text) {
 /** Runs one job through Codex. Resolves to { ok: true } or { ok: false, error, message }. */
 export function runCodex({ jobDir, command = 'codex', timeoutMs = 600000, stallMs = 180000 }) {
   const job = JSON.parse(fs.readFileSync(path.join(jobDir, 'job.json'), 'utf8'));
-  if (job.operation !== 'generate') {
+  if (job.operation !== 'generate' && job.operation !== 'bake') {
     return Promise.resolve(failure('unsupported', `operation ${job.operation} is not supported by codex`));
+  }
+  if (job.operation === 'bake' && (typeof job.input !== 'string' || !fs.existsSync(path.join(jobDir, job.input)))) {
+    return Promise.resolve(failure('failed', 'the input picture of the bake job is missing'));
   }
 
   const resultPath = path.join(jobDir, 'result.png');
   const logPath = path.join(jobDir, 'codex.log');
-  const args = [
-    'exec',
-    '--skip-git-repo-check',
-    '--enable',
-    'image_generation',
-    '--sandbox',
-    'workspace-write',
-    '-C',
-    jobDir,
-    buildInstruction(job, resultPath),
-  ];
+  const args = codexArgs(job, jobDir, resultPath);
 
   return new Promise((resolve) => {
     let settled = false;

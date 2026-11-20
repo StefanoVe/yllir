@@ -374,3 +374,53 @@ test('an urban atlas with a forest layer and no terrain renders stamps on the ur
   assert.ok(svg.indexOf('id="layer-ground"') < svg.indexOf('id="layer-biomes"'), 'the urban ground is the base under the biomes');
   assert.ok(svg.indexOf('id="layer-biomes"') < svg.indexOf('id="layer-stamps"'));
 });
+
+// The bake: overlays false draws only the map; a bake replaces the drawn map with one image and keeps the labels
+// and an invisible hit target per place with a point.
+test('overlays false: the drawn map only, no labels group, no place icons, no label text', () => {
+  const { svg } = render({}, { overlays: false });
+  assert.ok(svg.includes('id="layer-terrain"'), 'the map is drawn');
+  assert.ok(svg.includes('id="layer-stamps"'), 'the stamps are drawn');
+  assert.ok(!svg.includes('id="layer-labels"'), 'no labels group');
+  assert.ok(!svg.includes('id="layer-places"'), 'no place icons');
+  assert.ok(!svg.includes('class="place"'));
+  assert.ok(!svg.includes('<text'), 'no text at all');
+  assert.ok(!svg.includes('Northwatch'));
+});
+
+test('a bake replaces the drawn layers with one image, keeps the labels and adds a hit target per place', () => {
+  const { svg, stats } = render({}, { bake: { href: 'assets/bake.png' } });
+  assert.ok(svg.includes('<g data-layer="bake"><image href="assets/bake.png" x="0" y="0" width="1000" height="1000" preserveAspectRatio="none"/></g>'));
+  for (const id of ['layer-sea', 'layer-terrain', 'layer-biomes', 'layer-water', 'layer-political', 'layer-routes', 'layer-stamps', 'layer-places']) {
+    assert.ok(!svg.includes(`id="${id}"`), `${id} is replaced by the bake`);
+  }
+  assert.ok(svg.indexOf('data-layer="bake"') < svg.indexOf('id="layer-labels"'), 'the labels are drawn over the bake');
+  assert.ok(svg.includes('>Northwatch<'), 'the labels stay as text');
+  assert.ok(svg.includes('>Secret Hold<'), 'the master label is in the master render');
+  const r = (8 * 1000 / 512).toFixed(2);
+  assert.ok(svg.includes(`<g class="place" data-place="north"><circle cx="300" cy="700" r="${r}" fill="#000000" fill-opacity="0"/></g>`));
+  assert.ok(svg.includes('<g class="place" data-place="hold">'), 'the master-visibility place has its target in the master render');
+  assert.ok(svg.indexOf('id="layer-labels"') < svg.indexOf('data-layer="places"'), 'the hit targets come after the labels');
+  assert.ok(stats.stamps > 0, 'the stats still count the stamps of the drawn map');
+});
+
+test('a bake for the players: no target and no label of a master-visibility place', () => {
+  const { svg } = render({}, { audience: 'players', bake: { href: 'assets/bake.png' } });
+  assert.ok(svg.includes('data-layer="bake"'));
+  assert.ok(svg.includes('data-place="north"'));
+  assert.ok(!svg.includes('data-place="hold"'));
+  assert.ok(!svg.includes('Secret Hold'));
+});
+
+test('a bake with overlays false: the image and the hit targets, and no labels', () => {
+  const { svg } = render({}, { overlays: false, bake: { href: 'assets/bake.png' } });
+  assert.ok(svg.includes('data-layer="bake"'));
+  assert.ok(!svg.includes('id="layer-labels"'));
+  assert.ok(!svg.includes('<text'));
+  assert.ok(svg.includes('data-place="north"'));
+});
+
+test('a bake needs an href, and the default options give the same SVG as no options', () => {
+  assert.throws(() => render({}, { bake: { file: 'x.png' } }), /bake must be/);
+  assert.equal(render({}, { overlays: true, bake: null }).svg, render().svg);
+});

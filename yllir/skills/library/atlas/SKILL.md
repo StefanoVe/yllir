@@ -2,7 +2,7 @@
 name: atlas
 description: Library skill. Creates the atlas of the campaign (a map of the world or of a part of it, drawn in layers from the documents in the look of a hand-painted fantasy map, and also a map of a settlement or a district: a city, a village, a quarter, when the world is that small or the master asks) only when the master asks, and keeps it up to date: places new places, adds new land outside the existing one, and never changes land already approved unless the master asks for it explicitly. The extent can mix scales: a region or world map can hold a detailed city, and a city plan can have forests, hills or mountains around it. Invoked by the entry skill when the master asks for the atlas or a map of the world or of a region, by the master screen's atlas button, and by build-world or write-document with the argument "update" after a batch that added places.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" *), Bash(node */skills/library/atlas/scripts/atlas.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node */scripts/versions.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Glob, Grep, WebSearch, WebFetch
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" *), Bash(node */skills/library/atlas/scripts/atlas.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/bake-setup.mjs" *), Bash(node */skills/library/atlas/scripts/bake-setup.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/bake-job.mjs" *), Bash(node */skills/library/images/scripts/bake-job.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-select.mjs" *), Bash(node */skills/library/images/scripts/image-select.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node */scripts/versions.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Glob, Grep, WebSearch, WebFetch
 ---
 
 # Atlas
@@ -12,13 +12,13 @@ You draw and keep the atlas. Its data lives in the atlas folder of the campaign:
 **Commands.** Run the command exactly as written, as one single command: nothing before it, nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Run it from the campaign root, with `.` as the campaign folder. The script ends its output with `exit: <code>`. You write candidate JSON files only under `.campaign/state/atlas/`, with the Write tool. You never write in the atlas folder directly: only the script writes there.
 
 **Rules.**
-1. **Only on request.** Never start an atlas on your own, and never suggest one at the end of other work.
+1. **Only on request.** Never start an atlas on your own, and never suggest one at the end of other work. The one exception is the offer of Step 10, made once.
 2. **Never take anything for granted.** What the documents say is used. What they do not say, you ask, one question at a time. This covers the extent of the atlas, where a region lies relative to another when no document says it, and a name the map would show that no document gives. Never invent a place name or a geographic name. A sea, a mountain range or a continent with no name in the documents gets no label, unless the master gives one.
 3. **Positions you choose** within what the documents allow are fine, with `provenance: "agent-choice"`. Positions stated by documents use `provenance: "document"` with `sources` (file and section). Positions or names given by the master in this conversation use `provenance: "master"`.
 4. **The land never changes.** After the master approved the land, it is locked. You may add new land only outside it, by appending constraints. You use `--unlock` only when the master, in this conversation, explicitly asked to change the shape of land already drawn; before writing, tell the master what changes and get a clear yes. When a script refuses a write because a layer is locked, do not look for a way around it.
 5. **Outside sources.** When the world seed or the sheets say the campaign is set in a published setting (a known published world), search its geography with WebSearch and WebFetch, and use it as a source. The model accepts only campaign files as sources, so record outside facts in the constraint `note`, with the URL. Never put in a search any text from the reserved block (`<!-- master -->` onward), from the world seed, or from a master-only category. Search only public names.
 6. **Secrets.** A place or feature that the players must not know gets `visibility: "master"`. Its name and position then never reach the players' version.
-7. **Words.** Never say to the master: script, JSON, layer ids, constraint, seed, canvas, hash, lock, exit codes, file paths. Say «terre e mari», «montagne», «fiumi», «confini», «carta», «approvare la forma delle terre». For a city map, also «mura», «strade», «isolati», «quartieri», «edifici».
+7. **Words.** Never say to the master: script, JSON, layer ids, constraint, seed, canvas, hash, lock, exit codes, file paths. Say «terre e mari», «montagne», «fiumi», «confini», «carta», «approvare la forma delle terre». For a city map, also «mura», «strade», «isolati», «quartieri», «edifici». For the painted version, say «mappa dipinta in un'unica immagine» and «rifinitura»; never «bake», «rasterizzare», «PNG» or «provider».
 8. **Previews.** You look at every preview yourself with the Read tool before showing it. The master sees it through the preview and render commands with `--open` (rule 10 says where). Ask the master's approval twice in a creation: once for the land and sea, once for the whole atlas. When the conversation runs inside the master screen, a message that waits for the master's approval of the land and sea or of the whole atlas MUST end with the question itself (for example "Ti va bene, o vuoi cambiare qualcosa?") and never with a pointer to a section or a closing remark, because the screen only offers an answer box after a question.
 9. **Style.** The look of the atlas has a style. The game system picks it (`auto`), or the master picks one.
    - When the master asks for a different look («fai l'atlante in stile pergamena», «più cupo»), list the installed styles, pick the one whose name matches, set it, render, and save a version:
@@ -372,3 +372,57 @@ A change to approved ground, walls or streets follows Step 8 and rule 4.
 - **A city inside a geographic map.** Write and approve the geographic layers first (Steps 5 and 6). Then write the urban layers of the city inside its area of the canvas, with sub-steps (b) to (h), but in (b) use only the water kinds `river`, `canal` and `pond`, and no `coast` or `island`: the land is the terrain, and the water is drawn on top of it. Draw the city larger than its true scale: in a region map a city needs a footprint of at least about 300 units across to read, with streets 5 to 14 units wide and lots 6 to 16. This is a drawing choice: never say it to the master.
 - **A city plan with scenery.** Write the urban layers first, then add `relief` and `biomes` constraints outside the walls, in the same format as Step 6, and generate them. The stamps avoid blocks, parks, squares and the inside of closed walls; without a `terrain` layer they take as land the island of `ground`, or the whole canvas. In (h), lock relief and biomes too, with green and districts.
 - **Never** use the geographic `places` icon for a city that has a detailed plan inside: its buildings and districts are the places. A `places` feature inside a block is not drawn, because the buildings replace it.
+
+**Step 10: painted version (the bake).** It runs only after the master approved the whole atlas: the final approval of a creation (Step 6, or sub-step (h) of the urban scale), or any time later when the master asks to «rifinire» or «dipingere la mappa». It is a look of the approved drawing: it never changes the layers.
+
+**Offer.** After the master's final yes of a creation, offer it ONCE, in one sentence, and only then: «Vuoi che la faccia rifinire come un'unica immagine dipinta? Resta tutto uguale, cambia solo l'aspetto, e uso un servizio esterno che riceve solo la carta disegnata, senza testi né segreti.» This is the only exception to Rule 1. If the master declines, never repeat it.
+
+(a) **Consent and service.** Run:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-select.mjs" . --operation bake
+```
+Read the lines `provider`, `reason` and `needs-consent`.
+- `provider: none` or `reason: requested-unavailable`: say in one sentence that no service for this is available, and stop. The drawn map stays.
+- `needs-consent: yes`: say the consent sentence [consent] of the lexicon, with the plain service name that the images skill gives for that service (for codex: «Codex di OpenAI» in Italian, «OpenAI's Codex» in English) and «Atlante» as the title. Wait for the master's answer in the conversation. Without a yes, stop. On a yes, run `image-select.mjs . --operation bake --consent <id>` with the id of that service, then go on.
+- Never name the service in any other message.
+
+(b) **Setup**, once per conversation:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/bake-setup.mjs" --data-dir "${CLAUDE_PLUGIN_DATA}"
+```
+If it prints `unavailable`, say in one sentence that the tool cannot be prepared now, and stop.
+
+(c) **Input.** Run:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" bake-input . --data-dir "${CLAUDE_PLUGIN_DATA}"
+```
+Read `.campaign/cache/atlas/bake/input.png` with the Read tool and check that it shows the map and is not blank; if it is blank, say so in one sentence and stop. The input is made for the PLAYERS audience on purpose: master-only places never reach the service. Say nothing about it unless the master asks.
+
+(d) **Repaint.** Take the id of the current style from the styles command of Rule 9, then run:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/bake-job.mjs" --atlas-input .campaign/cache/atlas/bake/input.png --style <current style id> --out .campaign/cache/atlas/bake/baked.png
+```
+Read the `result:` line. `result: ok`: go to (e). `error: unavailable`, `error: timeout` or `error: failed`: try nothing else, say it in one sentence, and stop.
+
+(e) **Check.** Read `input.png` and `baked.png` with the Read tool and compare them. The result must keep the same layout (coasts, mountains, rivers, roads, walls, streets and buildings at the same places), contain no text or frames, and look uniform. If it fails the check, repeat (d) as a corrective retry, at most 2 retries in total. If it still fails, say it in one sentence and stop. Never keep a result that moved things.
+
+(f) **Save and ask.** Run:
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" bake-set . .campaign/cache/atlas/bake/baked.png
+```
+Then render the atlas (`--open` outside the master screen only, rule 10):
+```
+node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render .
+```
+Ask: «Ecco la mappa dipinta. Ti piace, o torno a quella disegnata?»
+- On a no: run `bake-clear`, render again, and say in one sentence that the drawn map is back:
+  ```
+  node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" bake-clear .
+  ```
+- On a yes: save a version:
+  ```
+  node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" save . --message "Atlante: mappa dipinta."
+  ```
+- Labels, texts and the markers stay on top of the picture and are never part of it. Say it in one sentence only if the master asks why.
+
+(g) **Later changes.** Run the status command of Step 1. `bake: stale` means the layers changed after the bake; the site then shows the drawn map by itself. After any change to the layers, in the same message to the master, offer the repaint again in one sentence, without insisting. `bake: current` means the painted version is up to date; `bake: none` means there is none.
