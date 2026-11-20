@@ -1,9 +1,11 @@
 // Encounter census: `query encounters [sessionId]`. For every plot event that
 // declares a fight (the `enemies` field, see plot/enemies-check.mjs), it reads
-// the challenge rating of each enemy from its sheet (the adapter's statSummary)
-// and, when the adapter has difficulty rules, rates the fight against the
-// levels of the player characters. Asynchronous only because the adapter's
-// modules are loaded with import(). Read-only; never writes.
+// each enemy's challenge rating, level and rank from its sheet (the adapter's
+// statSummary) and, when the adapter has difficulty rules, rates the fight
+// against the levels of the player characters. Games rated by challenge rating
+// (D&D) report `cr`, xp and budgets; games rated by level (`level-offset`)
+// report `level` and `rank`, and a band with working `detail`. Asynchronous only
+// because the adapter's modules are loaded with import(). Read-only; never writes.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,10 +45,18 @@ export async function runEncounters(root, args = []) {
     const enemies = event.enemies.map((enemy) => {
       const subject = subjects.get(enemy.id) ?? null;
       const text = subject === null ? null : readOptional(path.join(root, subject.file));
-      const cr = text !== null && statSummary !== null ? crOf(statSummary(adapter, text)) : null;
-      return { id: enemy.id, title: subject?.title ?? null, count: enemy.count, cr, known: subject !== null };
+      const summary = text !== null && statSummary !== null ? statSummary(adapter, text) : null;
+      return {
+        id: enemy.id,
+        title: subject?.title ?? null,
+        count: enemy.count,
+        cr: summary === null ? null : lineOf(summary, 'cr'),
+        level: summary === null ? null : lineOf(summary, 'level'),
+        rank: summary === null ? null : lineOf(summary, 'rank'),
+        known: subject !== null,
+      };
     });
-    results.push(rate(event, enemies, party, rateEncounter, adapter));
+    results.push(rateEvent(event, enemies, party, rateEncounter, adapter));
   }
 
   results.sort((a, b) => compareStrings(a.session ?? '', b.session ?? '') || compareStrings(a.event, b.event));
@@ -54,36 +64,49 @@ export async function runEncounters(root, args = []) {
     query: 'encounters',
     args: argList,
     party,
-    rated: results.some((entry) => entry.xp !== null),
+    rated: results.some((entry) => entry.band !== null),
     results,
   };
 }
 
 /**
  * Rates one event. The first problem that applies is the one reported: no rules,
- * no party, an unknown enemy, an enemy without CR, or the rating's own error code.
- * `enemies` entries carry `known` (the id is a subject), which is not part of the output.
+ * no party, an unknown enemy, an enemy without CR (or without level, for a game
+ * rated by level), or the rating's own error code. `enemies` entries carry `known`
+ * (the id is a subject), which is not part of the output. Exported for tests.
  */
-function rate(event, enemies, party, rateEncounter, adapter) {
+export function rateEvent(event, enemies, party, rateEncounter, adapter) {
+  const byLevel = adapter?.difficulty?.method === 'level-offset';
   const base = {
     event: event.event,
     file: event.file,
     session: event.session,
-    enemies: enemies.map(({ id, title, count, cr }) => ({ id, title, count, cr })),
+    enemies: byLevel
+      ? enemies.map(({ id, title, count, level, rank }) => ({ id, title, count, level, rank }))
+      : enemies.map(({ id, title, count, cr }) => ({ id, title, count, cr })),
   };
-  const none = { xp: null, band: null, budgets: null };
+  const none = byLevel
+    ? { xp: null, band: null, budgets: null, detail: null }
+    : { xp: null, band: null, budgets: null };
   const fail = (problem) => ({ ...base, ...none, problem });
 
   if (rateEncounter === null) return fail('no-difficulty-rules');
   if (party.length === 0) return fail('no-party');
   if (enemies.some((enemy) => !enemy.known)) return fail('unknown-enemy');
-  if (enemies.some((enemy) => enemy.cr === null)) return fail('no-cr');
+  if (byLevel) {
+    if (enemies.some((enemy) => enemy.level === null)) return fail('no-level');
+  } else if (enemies.some((enemy) => enemy.cr === null)) {
+    return fail('no-cr');
+  }
 
   const outcome = rateEncounter(adapter, {
     party,
-    enemies: enemies.map((enemy) => ({ cr: enemy.cr, count: enemy.count })),
+    enemies: enemies.map((enemy) => ({ cr: enemy.cr, count: enemy.count, level: enemy.level, rank: enemy.rank })),
   });
-  if (!outcome.ok) return { ...base, ...none, problem: outcome.error.code };
+  if (!outcome.ok) return fail(outcome.error.code);
+  if (byLevel) {
+    return { ...base, xp: outcome.xp, band: outcome.band, budgets: outcome.budgets, detail: outcome.detail, problem: null };
+  }
   return { ...base, xp: outcome.xp, band: outcome.band, budgets: outcome.budgets, problem: null };
 }
 
@@ -97,9 +120,9 @@ function adapterOf(root) {
   return loaded.ok && loaded.adapter ? loaded.adapter : null;
 }
 
-/** The cr line of a statSummary result, or null. */
-function crOf(summary) {
-  const line = summary.lines.find((entry) => entry.id === 'cr');
+/** The value of the statSummary line with this id, or null when the line is missing. */
+function lineOf(summary, id) {
+  const line = summary.lines.find((entry) => entry.id === id);
   return line === undefined ? null : line.value;
 }
 

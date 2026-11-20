@@ -190,6 +190,18 @@ Stato nella versione 0.30.0 (**Implementato in 0.30.0**, salvo dove è indicato 
 
 Non implementato (**Proposta**): le operazioni del tracker degli scontri (`init_encounter`, `record_event`, `advance_turn`) e `rate_encounter`. Il tracker non esiste, e la tabella che associa le fasce ai GS deve essere verificata sul testo ufficiale 2024 prima di essere scritta nell'adattatore. Il metodo è dichiarato, ma la tabella manca.
 
+### Estensioni del contratto (0.93.0)
+
+Introdotte con l'adattatore [Fabula Ultima](Adattatore%20Fabula%20Ultima.md), il primo sistema senza punteggi numerici. Tutte facoltative; un adattatore che non le dichiara resta com'era.
+
+- `attributes`: `ids`, `dice` (taglie crescenti), `floor` (taglia minima, una di `dice`).
+- `condition_effects`: per ogni condizione, gli attributi che abbassa di un passo. Richiede `attributes`.
+- `pools`: punti guadagnati e spesi per evento, senza massimo né recupero; `owner` è la lista dei lati del tracker (`pc`, `ally`, `enemy`) che li possono avere.
+- `difficulty.method: level-offset` con `level_offsets` (scarto di livello minimo per fascia), accanto a `band-and-cr`.
+- Il tracker accetta `next --id`, `add --turns` e l'op `turns` solo per i sistemi a lati alterni; D&D li rifiuta.
+
+Orologi e Legami (`clocks`, `bonds`) restano **Proposta**: non hanno ancora un consumatore.
+
 ## Esempio: sistema narrativo senza combattimento a turni
 
 Immaginiamo un gioco narrativo di tensioni fra pescatori e mercanti, con scene e conflitti, senza iniziativa né round. Il suo adattatore, `sale-e-catene` (nome fittizio), dichiara:

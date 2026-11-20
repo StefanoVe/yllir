@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { runEncounters } from './encounters.mjs';
+import { runEncounters, rateEvent } from './encounters.mjs';
 
 const campaignYaml = (adapter) => `schema: 1
 
@@ -162,4 +162,49 @@ test('more than one argument is an error', async (t) => {
   const result = await runEncounters(makeCampaign(t), ['a', 'b']);
   assert.equal(typeof result.error, 'string');
   assert.equal(result.results, undefined);
+});
+
+// rateEvent with a fake rating function: the adapter is not loaded, so the level-offset path is tested alone.
+const LEVEL_EVENT = { event: 'e1', file: 'f.md', session: 's1' };
+const levelEnemies = (level) => [{ id: 'wolf', title: 'Wolf', count: 2, cr: null, level, rank: 'Soldier', known: true }];
+const LEVEL_ADAPTER = { difficulty: { method: 'level-offset' } };
+const fakeRating = (calls) => (adapter, input) => {
+  calls.push(input);
+  return { ok: true, band: 'normal', xp: null, budgets: null, detail: { offset: 5 } };
+};
+
+test('a level-offset adapter rates by level and rank, with detail and no XP', () => {
+  const calls = [];
+  const entry = rateEvent(LEVEL_EVENT, levelEnemies('15'), [10, 10], fakeRating(calls), LEVEL_ADAPTER);
+  assert.deepEqual(entry, {
+    event: 'e1',
+    file: 'f.md',
+    session: 's1',
+    enemies: [{ id: 'wolf', title: 'Wolf', count: 2, level: '15', rank: 'Soldier' }],
+    xp: null,
+    band: 'normal',
+    budgets: null,
+    detail: { offset: 5 },
+    problem: null,
+  });
+  assert.deepEqual(calls, [{ party: [10, 10], enemies: [{ cr: null, count: 2, level: '15', rank: 'Soldier' }] }]);
+});
+
+test('a level-offset enemy without level gives problem no-level and no rating', () => {
+  const calls = [];
+  const entry = rateEvent(LEVEL_EVENT, levelEnemies(null), [10, 10], fakeRating(calls), LEVEL_ADAPTER);
+  assert.equal(entry.problem, 'no-level');
+  assert.equal(entry.band, null);
+  assert.equal(entry.detail, null);
+  assert.equal(entry.xp, null);
+  assert.equal(calls.length, 0, 'the rating is not called');
+});
+
+test('a challenge-rating adapter without cr gives problem no-cr and no detail key', () => {
+  const calls = [];
+  const entry = rateEvent(LEVEL_EVENT, levelEnemies(null), [10, 10], fakeRating(calls), { difficulty: { method: 'band-and-cr' } });
+  assert.equal(entry.problem, 'no-cr');
+  assert.equal(Object.hasOwn(entry, 'detail'), false);
+  assert.deepEqual(entry.enemies, [{ id: 'wolf', title: 'Wolf', count: 2, cr: null }]);
+  assert.equal(calls.length, 0);
 });

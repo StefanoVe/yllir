@@ -160,3 +160,40 @@ describe('notices in the CLI output', () => {
     assert.deepEqual(json.notices, [{ kind: 'defeated', id: 'c-1', name: 'Goblin 1' }]);
   });
 });
+
+describe('fixed-order and turns options on a D&D game', () => {
+  let root;
+  before(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'combat-turns-'));
+    const run = spawnSync(process.execPath, [INIT, root, '--name', 'T', '--language', 'en', '--register', 'plain', '--world', 'W', '--seed', 'World seed.md', '--adapter', 'dnd-2024'], { encoding: 'utf8' });
+    assert.equal(run.status, 0, run.stdout);
+    const dir = path.join(root, '.campaign', 'state', 'live', SESSION);
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(root, '.campaign', 'state', 'live', 'active.json'), JSON.stringify({ sessionId: SESSION }));
+    assert.equal(cli(['start', root]).code, 0);
+    assert.equal(cli(['add', root, '--name', 'Goblin 1', '--side', 'enemy', '--hp', '7']).code, 0);
+  });
+  after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('next with --id is refused with fixed-order', () => {
+    const { code, json } = cli(['next', root, '--id', 'c-1']);
+    assert.equal(code, 1);
+    assert.equal(json.error.code, 'fixed-order');
+  });
+
+  test('turns with --id and --value is refused with unknown-op on D&D', () => {
+    const { code, json } = cli(['turns', root, '--id', 'c-1', '--value', '2']);
+    assert.equal(code, 1);
+    assert.equal(json.error.code, 'unknown-op');
+  });
+
+  test('turns without --value is a usage error', () => {
+    assert.equal(cli(['turns', root, '--id', 'c-1']).code, 2);
+  });
+
+  test('add with --turns is refused with bad-value on D&D', () => {
+    const { code, json } = cli(['add', root, '--name', 'X', '--side', 'enemy', '--hp', '1', '--turns', '2']);
+    assert.equal(code, 1);
+    assert.equal(json.error.code, 'bad-value');
+  });
+});

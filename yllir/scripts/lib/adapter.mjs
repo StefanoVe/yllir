@@ -123,7 +123,7 @@ const BUDGET_KEYS = ['low', 'moderate', 'high'];
 function validateDifficulty(difficulty, folder, error) {
   if (!isMapping(difficulty)) { error('bad-type', 'difficulty', 'difficulty must be a mapping'); return; }
   for (const key of Object.keys(difficulty)) {
-    if (!['method', 'bands', 'ops', 'budget_per_character', 'cr_xp'].includes(key)) error('unknown-key', `difficulty.${key}`, `"${key}" is not a setting of difficulty`);
+    if (!['method', 'bands', 'ops', 'budget_per_character', 'cr_xp', 'level_offsets'].includes(key)) error('unknown-key', `difficulty.${key}`, `"${key}" is not a setting of difficulty`);
   }
   const opsProblem = moduleFileProblem(difficulty.ops, folder);
   if (opsProblem) error(opsProblem.code, 'difficulty.ops', opsProblem.message);
@@ -163,6 +163,23 @@ function validateDifficulty(difficulty, folder, error) {
       });
     }
   }
+  // difficulty.level_offsets (method level-offset): band -> whole number of levels added to the party level, rising with the band.
+  const offsetsAt = 'difficulty.level_offsets';
+  if (difficulty.method === 'level-offset' && difficulty.level_offsets === undefined) error('bad-value', offsetsAt, 'level-offset needs level_offsets');
+  if (difficulty.level_offsets !== undefined) {
+    if (!isMapping(difficulty.level_offsets)) {
+      error('bad-type', offsetsAt, `${offsetsAt} must be a mapping of band to a whole number`);
+    } else {
+      const bands = Array.isArray(difficulty.bands) ? difficulty.bands : null;
+      let previous = null;
+      for (const [band, offset] of Object.entries(difficulty.level_offsets)) {
+        if (!Number.isInteger(offset) || offset < 0) error('bad-value', offsetsAt, `${offsetsAt}.${band} must be a whole number of zero or more`);
+        if (bands !== null && !bands.includes(band)) error('bad-value', `${offsetsAt}.${band}`, `${band} is not a band of difficulty`);
+        if (Number.isInteger(offset) && previous !== null && offset <= previous) error('bad-value', offsetsAt, `${offsetsAt} must rise with the band: ${band} is not above the band before it`);
+        if (Number.isInteger(offset)) previous = offset;
+      }
+    }
+  }
 }
 
 // economy.reference_item: a mapping of language to nonempty text, with it and en required.
@@ -191,7 +208,7 @@ function validate(adapter, folderId, folder) {
   const errors = [];
   const error = (code, field, message) => errors.push({ code, path: field, message });
   if (!isMapping(adapter)) return [{ code: 'bad-type', path: '', message: 'adapter manifest must be a mapping' }];
-  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'economy', 'resources', 'conditions', 'condition_durations', 'condition_labels', 'duration_labels', 'action_table', 'action_groups', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not', 'atlas_style'];
+  const allowed = ['id', 'name', 'version', 'headings', 'encounters', 'battle_grid', 'progression', 'difficulty', 'economy', 'resources', 'conditions', 'condition_durations', 'condition_labels', 'duration_labels', 'action_table', 'action_groups', 'creature_sheet', 'checks', 'encounter_ops', 'item_sheet', 'tracking', 'do_not', 'atlas_style', 'attributes', 'condition_effects', 'pools'];
   for (const key of Object.keys(adapter)) if (!allowed.includes(key)) error('unknown-key', key, `"${key}" is not a setting of an adapter manifest`);
   if (typeof adapter.id !== 'string' || !SLUG_RE.test(adapter.id)) error('bad-value', 'id', 'id must be a lowercase slug');
   if (adapter.id !== folderId) error('id-mismatch', 'id', `id must match the adapter folder ${folderId}`);
@@ -319,6 +336,64 @@ function validate(adapter, folderId, folder) {
         if (group.markers !== undefined && !isTextList(group.markers)) {
           error('bad-value', `${at}.markers`, `${at}.markers must be a list of nonempty text`);
         }
+      });
+    }
+  }
+  // Optional attributes (the stats of the rules, with their dice and floor), the attributes each condition lowers, and the resource pools of the sides.
+  if (adapter.attributes !== undefined) {
+    if (!isMapping(adapter.attributes)) {
+      error('bad-type', 'attributes', 'attributes must be a mapping');
+    } else {
+      for (const key of Object.keys(adapter.attributes)) {
+        if (!['ids', 'dice', 'floor'].includes(key)) error('unknown-key', `attributes.${key}`, `"${key}" is not a setting of attributes`);
+      }
+      const { ids, dice, floor } = adapter.attributes;
+      if (!Array.isArray(ids) || ids.length === 0 || !ids.every((id) => typeof id === 'string' && SLUG_RE.test(id)) || new Set(ids).size !== ids.length) {
+        error('bad-value', 'attributes.ids', 'attributes.ids must be a nonempty list of distinct lowercase slugs');
+      }
+      const diceValid = Array.isArray(dice) && dice.length > 0 && dice.every((die) => Number.isInteger(die) && die >= 2) && dice.every((die, index) => index === 0 || die > dice[index - 1]);
+      if (!diceValid) error('bad-value', 'attributes.dice', 'attributes.dice must be a nonempty list of whole numbers of 2 or more, strictly increasing');
+      if (!Number.isInteger(floor) || !Array.isArray(dice) || !dice.includes(floor)) error('bad-value', 'attributes.floor', 'attributes.floor must be one of attributes.dice');
+    }
+  }
+  if (adapter.condition_effects !== undefined) {
+    const at = 'condition_effects';
+    if (!isMapping(adapter.condition_effects)) {
+      error('bad-type', at, 'condition_effects must be a mapping');
+    } else {
+      const attributeIds = isMapping(adapter.attributes) && Array.isArray(adapter.attributes.ids) ? adapter.attributes.ids : null;
+      const conditions = Array.isArray(adapter.conditions) ? adapter.conditions : [];
+      if (attributeIds === null) error('bad-value', at, 'condition_effects needs attributes');
+      for (const [condition, list] of Object.entries(adapter.condition_effects)) {
+        const where = `condition_effects.${condition}`;
+        if (!conditions.includes(condition)) error('bad-value', where, `${condition} is not a condition of this adapter`);
+        if (attributeIds === null) continue;
+        const listValid = Array.isArray(list) && list.length > 0 && list.every((id) => attributeIds.includes(id)) && new Set(list).size === list.length;
+        if (!listValid) error('bad-value', where, `${where} must be a nonempty list of distinct attribute ids`);
+      }
+    }
+  }
+  if (adapter.pools !== undefined) {
+    if (!Array.isArray(adapter.pools)) {
+      error('bad-type', 'pools', 'pools must be a list');
+    } else {
+      const resourceIds = Array.isArray(adapter.resources) ? adapter.resources.filter(isMapping).map((resource) => resource.id) : [];
+      const sides = ['pc', 'ally', 'enemy'];
+      const poolIds = new Set();
+      adapter.pools.forEach((pool, index) => {
+        const at = `pools[${index}]`;
+        if (!isMapping(pool)) { error('bad-type', at, `${at} must be a mapping`); return; }
+        for (const key of Object.keys(pool)) {
+          if (!['id', 'owner', 'label'].includes(key)) error('unknown-key', `${at}.${key}`, `"${key}" is not a setting of a pool`);
+        }
+        const idValid = typeof pool.id === 'string' && SLUG_RE.test(pool.id) && !poolIds.has(pool.id) && !resourceIds.includes(pool.id);
+        if (!idValid) error('bad-value', `${at}.id`, `${at}.id must be a lowercase slug, unique among pools and not a resource id`);
+        if (typeof pool.id === 'string') poolIds.add(pool.id);
+        const owner = pool.owner;
+        if (!Array.isArray(owner) || owner.length === 0 || !owner.every((side) => sides.includes(side)) || new Set(owner).size !== owner.length) {
+          error('bad-value', `${at}.owner`, `${at}.owner must be a nonempty list of distinct sides: pc, ally, enemy`);
+        }
+        validLabel(`${at}.label`, pool.label);
       });
     }
   }

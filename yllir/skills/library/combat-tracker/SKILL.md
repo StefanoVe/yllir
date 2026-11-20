@@ -39,7 +39,8 @@ If it exits `1` with `already-active`, ask the master ONE question: "A fight is 
 - a note the master asks to keep: `note <root> --id <id> --text "<text>"`
 - a combatant revealed to the players: `reveal <root> --id <id>`
 - the initiative of someone: `initiative <root> --id <id> --initiative <n>`
-- the end of a turn, the next one: `next <root>`
+- the end of a turn, the next one: `next <root>`; in a game whose sides alternate, when the master names who acts: `next <root> --id <id>` (D&D never takes `--id`)
+- a champion acts more than once per round: `turns <root> --id <id> --value <n>`, or `--turns <n>` on `add`
 - a combatant leaves the fight: `remove <root> --id <id>`
 If one message holds more than one change, run one command per change, in the order the master said them, and read each result before the next. Ids are given by the tracker when a combatant is added: read them from the `combat` output (`combatants[].id`) or from the status table. Never invent an id.
 
@@ -52,6 +53,15 @@ If one message holds more than one change, run one command per change, in the or
 **7. Show the state as a short table** when the master asks for it, or at the end of each round. Columns: order (initiative), name, hit points (current / maximum, or a dash when unknown), conditions, and a mark for who is up. Use the campaign language. Do not show ids or internal words.
 
 **8. End the fight.** When the master says the fight is over, run `end <root>`. Then tell the master in plain words that the master screen shows the same panel live, and that the fight stays in the record of the session.
+## Games whose sides alternate
+
+Some games (Fabula Ultima) do not keep one initiative order: the sides alternate, heroes then enemies, and there is no initiative roll to record.
+- When the master names who acts, run `next <root> --id <id>`.
+- Without a name, `next <root>` picks the first who can act on the side whose turn it is.
+- A champion's turns per round go with `--turns <n>` on `add`, or with the `turns` operation.
+- Ultima Points of a villain: `resource <root> --id <id> --resource ultima --value <n>`. Fabula Points of a player character: `resource <root> --id <id> --resource fabula --value <n>`.
+- The error codes `wrong-side` and `no-turns-left` mean: tell the master in one plain sentence whose turn it is.
+
 ## Rules
 
 - The master-only block of a sheet is never copied into the tracker `notes`, and never quoted to the master. Only the Statistics values you need (AC, HP) go into the command.

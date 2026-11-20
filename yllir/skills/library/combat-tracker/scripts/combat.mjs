@@ -3,19 +3,21 @@
 // Prints one JSON document on stdout and ends with `exit: <code>`.
 // Usage: node combat.mjs <op> <root> [options]
 //   ops: start add remove initiative damage heal condition-add condition-remove
-//        resource note reveal next end status
+//        resource note reveal next turns end status
 //   options: --id --name --side --initiative --hp --hp-max --ac --sheet --amount
-//            --condition --duration --rounds --resource --delta --value --text --hidden
+//            --condition --duration --rounds --resource --delta --value --turns --text --hidden
+//   next --id <id> names who acts next (games whose sides alternate); turns sets the
+//   turns per round of a combatant (--value); add --turns <n> sets it when adding.
 // Exit codes: 0 ok, 1 domain error (the rules refused, or no game in progress), 2 usage.
 
 import path from 'node:path';
 import { applyOp, getCombat } from './lib/combat-store.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
-const USAGE = 'usage: node combat.mjs <start|add|remove|initiative|damage|heal|condition-add|condition-remove|resource|note|reveal|next|end|status> <root> [--id --name --side --initiative --hp --hp-max --ac --sheet --amount --condition --duration --rounds --resource --delta --value --text --hidden]';
-const OPS = ['start', 'add', 'remove', 'initiative', 'damage', 'heal', 'condition-add', 'condition-remove', 'resource', 'note', 'reveal', 'next', 'end', 'status'];
+const USAGE = 'usage: node combat.mjs <start|add|remove|initiative|damage|heal|condition-add|condition-remove|resource|note|reveal|next|turns|end|status> <root> [--id --name --side --initiative --hp --hp-max --ac --sheet --amount --condition --duration --rounds --resource --delta --value --turns --text --hidden]';
+const OPS = ['start', 'add', 'remove', 'initiative', 'damage', 'heal', 'condition-add', 'condition-remove', 'resource', 'note', 'reveal', 'next', 'turns', 'end', 'status'];
 const TEXT_OPTIONS = ['id', 'name', 'side', 'sheet', 'condition', 'duration', 'resource', 'text'];
-const NUMBER_OPTIONS = ['initiative', 'hp', 'hp-max', 'ac', 'amount', 'rounds', 'delta', 'value'];
+const NUMBER_OPTIONS = ['initiative', 'hp', 'hp-max', 'ac', 'amount', 'rounds', 'delta', 'value', 'turns'];
 const FLAG_OPTIONS = ['hidden'];
 const INTEGER_RE = /^-?\d+$/;
 
@@ -59,9 +61,14 @@ function buildOp(name, o) {
   };
   switch (name) {
     case 'start':
-    case 'next':
     case 'end':
       return { op: { op: name } };
+    case 'next':
+      return o.id === undefined ? { op: { op: name } } : withId({});
+    case 'turns': {
+      const problem = need('id', '--id') ?? need('value', '--value');
+      return problem ? { problem } : { op: { op: name, id: o.id, value: o.value } };
+    }
     case 'add': {
       const problem = need('name', '--name') ?? need('side', '--side');
       if (problem) return { problem };
@@ -72,6 +79,7 @@ function buildOp(name, o) {
       if (o.ac !== undefined) op.ac = o.ac;
       if (o.sheet !== undefined) op.sheet = o.sheet;
       if (o.hidden === true) op.hidden = true;
+      if (o.turns !== undefined) op.turns = o.turns;
       return { op };
     }
     case 'remove':

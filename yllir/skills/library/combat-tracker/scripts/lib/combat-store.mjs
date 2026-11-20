@@ -157,8 +157,9 @@ export async function applyOp(root, op, { now = new Date().toISOString() } = {})
     if (current?.active) return fail('already-active', 'a combat is already running: end it first');
     result = encounter.startEncounter(adapter, current, context);
   } else if (op.op === 'next') {
+    // Through recordEvent, so the rules can refuse a next that names an id (fixed order).
     if (current === null) return fail('no-combat', 'no combat has started yet');
-    result = encounter.advanceTurn(adapter, current, context);
+    result = encounter.recordEvent(adapter, current, op, context);
   } else if (op.op === 'end') {
     if (current === null) return fail('no-combat', 'no combat has started yet');
     result = encounter.endEncounter(adapter, current, context);

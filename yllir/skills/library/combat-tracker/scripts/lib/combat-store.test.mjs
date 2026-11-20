@@ -187,3 +187,19 @@ describe('combat store notices', () => {
     assert.deepEqual(result.notices, []);
   });
 });
+
+describe('combat store next with an id', () => {
+  let root;
+  before(() => { root = makeCampaign(); openLive(root); });
+  after(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  test('on D&D, next with an id is refused with fixed-order and saves nothing new', async () => {
+    await applyOp(root, { op: 'start' }, { now: NOW });
+    await applyOp(root, { op: 'add', name: 'Goblin 1', side: 'enemy', hp: 7 }, { now: NOW });
+    const before = fs.readFileSync(combatPath(root), 'utf8');
+    const result = await applyOp(root, { op: 'next', id: 'c-1' }, { now: NOW });
+    assert.equal(result.ok, false);
+    assert.equal(result.error.code, 'fixed-order');
+    assert.equal(fs.readFileSync(combatPath(root), 'utf8'), before);
+  });
+});

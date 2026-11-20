@@ -1,6 +1,6 @@
 # Adattatore Fabula Ultima
 
-**Stato:** livello 1 implementato (2026-11-20, framework 0.92.0): `yllir/modules/systems/fabula-ultima/` con `adapter.yaml` e `checks.mjs`. Il livello 2 resta da fare. Tutto ciò che è marcato **Proposta** non è approvato.
+**Stato:** livelli 1 e 2 implementati (2026-11-20, framework 0.92.0 e 0.93.0): `yllir/modules/systems/fabula-ultima/` con `adapter.yaml`, `checks.mjs`, `difficulty.mjs` ed `encounter.mjs`. Il caso di testbench (punto 3 del piano) resta da fare. Tutto ciò che è marcato **Proposta** non è approvato.
 **Parte di:** [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md), che definisce il contratto dell'adattatore.
 
 ## Scopo
@@ -112,7 +112,38 @@ Valgono quelle di [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md
    - Le formule dei PG (PV, PM, PI, crisi, Difesa Magica, compagno, costo forgiato, sezioni d'Orologio) sono funzioni pure con i loro test. Nessun controllo le applica ancora alle schede dei PG, che restano trascrizioni.
    - Le prove di scena non hanno ancora un formato: senza `checkSceneCheck` il motore le accetta come sono.
    - Etichette italiane scelte dall'autore il 2026-11-20, da confermare sul testo di Need Games: DES, INT, VIG, VOL; PV, PM, Difesa, Difesa Magica, Livello, Grado; status Lento, Confuso, Debole, Scosso, Furente, Avvelenato.
-2. **Livello 2:** estensioni del contratto (taglie di dado, effetti degli status, pool, Orologi, Legami) e tracker di scontro. Da 3 a 5 giorni. Dipende dalle decisioni sotto.
+2. **Livello 2 (fatto, 0.93.0).** Decisioni dell'autore del 2026-11-20:
+   - nel contratto entra solo ciò che il tracker usa: taglie di dado, effetti degli status e pool. Orologi e Legami restano fuori finché non si decide dove vivono;
+   - i Punti Ultima stanno nella scheda del cattivo e, durante lo scontro, nel tracker;
+   - i lati si alternano e il master sceglie chi agisce;
+   - rientrano la difficoltà `level-offset`, il formato delle prove di scena con la sigla DL anche in italiano, e i supplementi.
+
+   Cosa contiene:
+   - **Contratto** (`yllir/scripts/lib/adapter.mjs`). Ci sono tre chiavi nuove, tutte facoltative:
+     - `attributes`: id, taglie e minimo;
+     - `condition_effects`: per ogni status, gli attributi che abbassa, validati contro `attributes` e `conditions`;
+     - `pools`: id, `owner` (i lati del tracker `pc`, `ally`, `enemy`) ed etichetta; un id non può coincidere con quello di una risorsa.
+     Il metodo di difficoltà `level-offset` usa `level_offsets`, scarti crescenti per fascia.
+   - **Manifest.** Pool `fabula` (proprietario `pc`) e `ultima` (proprietario `enemy`). Effetti degli status: Lento DES, Confuso INT, Debole VIG, Scosso VOL, Furente DES e INT, Avvelenato VIG e VOL. Fasce facile 0, normale +5, difficile +10. Fonti: quick reference e scheda PNG di FFCS 2.2.1, parti non marcate come playtest.
+   - **Tracker** (`encounter.mjs`). Lo stato ha la stessa forma di quello di D&D, così il master screen non cambia; si aggiungono `turns` e `acted` per combattente e `first`, il lato che apre ogni round. Funzionamento:
+     - eroi (`pc`, `ally`) e nemici si alternano; quando un lato ha finito, l'altro continua; il round finisce quando nessuno può più agire;
+     - chi parte per primo e quanti turni ha un campione li dichiara il master (`next --id`, `--turns`, op `turns`): le regole playtest (il cattivo agisce per primo, turni per grado) non sono codificate;
+     - a 0 PV chiunque è sconfitto;
+     - la crisi compare solo nel testo dello storico: il master screen conosce solo le notifiche esistenti;
+     - l'aggiunta di uno status nomina gli attributi abbassati;
+     - i Punti Ultima si danno solo ai nemici e i Punti Fabula solo ai PG.
+     D&D rifiuta `next --id` e `--turns`.
+   - **Difficoltà** (`difficulty.mjs`):
+     - fascia di livello, dallo scarto fra il livello medio pesato dei nemici e il livello medio del gruppo;
+     - fascia di numero, dai nemici in soldati equivalenti (élite 2, campione N) contro il numero di PG;
+     - la fascia finale è la più dura delle due. Questa combinazione è una scelta di Yllir, non una regola del gioco.
+     Il censimento del motore (`query encounters`) legge livello e grado dalle schede e riporta `no-level` al posto di `no-cr`. Per D&D l'uscita è invariata.
+   - **Prove di scena** (`checkSceneCheck`). La forma è `DES + INT DL 10` oppure `VIG + VOL contrapposta`; in inglese `DEX + INS DL 10` e `MIG + WLP opposed`. Il DL è solo 7, 10, 13 o 16.
+   - **Supplementi.** Nessun nome di classe o di pool di classe entra nel manifest, finché la licenza non è letta. Le meccaniche di classe, compresi i pool dei supplementi, restano trascritte nella scheda del PG.
+   - **Limiti noti:**
+     - se il master rimuove il combattente che sta agendo, il `next` successivo apre un round nuovo;
+     - una scena FU scritta sotto la 0.92.0 con una prova in forma libera va riscritta alla prossima modifica;
+     - il prompt del cockpit del master screen parla ancora di iniziativa.
 3. **Testbench:** caso con scheda sintetica (non quella di Cross), trappole: omonimi fra incantesimi di classi diverse (Barriera e Aura hanno la stessa forma), status cumulativi sullo stesso attributo, versione 1.1 contro Press Start.
 
 Stima dei costi: nostra, non misurata.

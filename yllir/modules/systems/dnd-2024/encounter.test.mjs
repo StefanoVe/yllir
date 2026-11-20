@@ -55,6 +55,23 @@ describe('adapter setting', () => {
   });
 });
 
+describe('the game has a fixed initiative order', () => {
+  test('next with an id is refused with fixed-order and the state is unchanged', () => {
+    const state = fighting([{ op: 'add', name: 'Goblin 1', side: 'enemy', hp: 7 }, { op: 'add', name: 'Ilde', side: 'pc', hp: 20 }]);
+    const before = JSON.stringify(state);
+    assert.equal(refusal(state, { op: 'next', id: 'c-1' }), 'fixed-order');
+    assert.equal(JSON.stringify(state), before);
+  });
+
+  test('add with turns is refused with bad-value', () => {
+    assert.equal(refusal(fighting(), { op: 'add', name: 'Champion', side: 'enemy', hp: 9, turns: 2 }), 'bad-value');
+  });
+
+  test('turns is an unknown operation in this game', () => {
+    assert.equal(refusal(fighting([{ op: 'add', name: 'Goblin 1', side: 'enemy', hp: 7 }]), { op: 'turns', id: 'c-1', value: 2 }), 'unknown-op');
+  });
+});
+
 describe('add', () => {
   test('assigns c-<n> ids and defaults hpMax to hp', () => {
     const state = fighting([{ op: 'add', name: 'Goblin 1', side: 'enemy', hp: 7 }, { op: 'add', name: 'Ilde', side: 'pc', hp: 20, hpMax: 24 }]);

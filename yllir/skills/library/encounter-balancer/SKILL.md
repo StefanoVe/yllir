@@ -40,14 +40,14 @@ You make the fights of the campaign fit the party the master has, without changi
 2. Read the JSON result. Keep these fields:
    - `party`: the list of character levels of the current party.
    - `rated`: true or false.
-   - `results`: one entry per fight. Each entry has `event` (the title of the scene), `file` (the path of the scene), `session`, `enemies` (a list of `id`, `title`, `count`, `cr`), `xp`, `band`, `budgets` and `problem`.
-3. An entry with `problem` is not changed. Report it to the master in plain words, in one line per entry: «Lo scontro <event> non si può misurare: <reason>.» Reasons in plain words: `no-cr` → «una scheda nemica non dichiara il suo grado di sfida»; `no-party` → «non ci sono personaggi con un livello»; `unknown-enemy` → «una scheda nemica manca»; `no-difficulty-rules` → «questo gioco non ha regole per misurare gli scontri». Never say the code.
+   - `results`: one entry per fight. Each entry has `event` (the title of the scene), `file` (the path of the scene), `session`, `enemies`, `xp`, `band`, `budgets` and `problem`. The `enemies` items have `id`, `title`, `count` and `cr` for games rated by challenge rating, or `id`, `title`, `count`, `level` and `rank` for games rated by level. For games rated by level, `xp` and `budgets` are null, and the entry has `detail` (working numbers only, never shown).
+3. An entry with `problem` is not changed. Report it to the master in plain words, in one line per entry: «Lo scontro <event> non si può misurare: <reason>.» Reasons in plain words: `no-cr` → «una scheda nemica non dichiara il suo grado di sfida»; `no-level` → «una scheda nemica non dichiara il suo livello»; `no-party` → «non ci sono personaggi con un livello»; `unknown-enemy` → «una scheda nemica manca»; `no-difficulty-rules` → «questo gioco non ha regole per misurare gli scontri». Never say the code.
 4. Keep only the entries without `problem`, within the scope of Step 2.
 
 **Step 4 — Plan each fight.**
 1. For each fight in scope, compute the target band:
-   - the target is the band the master named: `trivial` and `low` are «facile», `moderate` is «impegnativo», `high` and `beyond` are «molto duro»;
-   - when the master said «più duro» or «più facile», the target is one band up or down from the `band` of the entry.
+   - the target is the band the master named: `trivial` and `low` are «facile», `moderate` is «impegnativo», `high` and `beyond` are «molto duro»; for games rated by level, `easy` is «facile», `normal` is «impegnativo», `hard` is «molto duro»;
+   - when the master said «più duro» or «più facile», the target is one band up or down from the `band` of the entry, in the order of the game: `trivial, low, moderate, high, beyond` for D&D, `easy, normal, hard` for games rated by level.
 2. Choose the change that reaches the target without changing what the fight is about. The options, in order of preference:
    - change the `count` of an enemy in the `enemies` list of the scene (keep it a positive whole number);
    - add a minion that is already in the campaign: an `enemies` entry with the `id` of an existing creature sheet whose template is `enemy`;

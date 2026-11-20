@@ -385,6 +385,97 @@ test('loads the Fabula Ultima manifest without errors', () => {
   assert.equal(loaded.adapter.name, 'Fabula Ultima');
   assert.deepEqual(loaded.adapter.creature_sheet.required.map((f) => f.id), ['level', 'rank', 'hp', 'mp', 'dex', 'ins', 'mig', 'wlp', 'def', 'mdef']);
   assert.ok(loaded.adapter.checksPath.endsWith('checks.mjs'));
-  assert.equal(loaded.adapter.difficulty, undefined);
-  assert.equal(loaded.adapter.encounter_ops, undefined);
+  assert.equal(loaded.adapter.difficulty.method, 'level-offset');
+  assert.ok(loaded.adapter.difficultyOpsPath.endsWith('difficulty.mjs'));
+  assert.equal(loaded.adapter.encounter_ops, 'encounter.mjs');
+  assert.deepEqual(loaded.adapter.pools.map((p) => p.id), ['fabula', 'ultima']);
+  assert.deepEqual(loaded.adapter.condition_effects.enraged, ['dex', 'ins']);
+});
+
+const OPTIONAL_BLOCKS = `attributes:
+  ids: [str, dex]
+  dice: [6, 8, 10, 12]
+  floor: 6
+condition_effects:
+  poisoned: [str]
+  prone: [dex, str]
+pools:
+  - id: luck
+    owner: [pc]
+    label:
+      it: Fortuna
+      en: Luck
+`;
+const LEVEL_OFFSETS = '  level_offsets:\n    easy: 0\n    normal: 5\n    hard: 10\n';
+const LEVEL_OFFSET_DIFFICULTY = `difficulty:\n  method: level-offset\n  bands: [easy, normal, hard]\n${LEVEL_OFFSETS}`;
+
+// Writes the D&D manifest text into a temp folder next to the checks and difficulty files it names.
+function writeDnd(temp, text) {
+  fs.mkdirSync(path.join(temp, 'modules/systems/dnd-2024'), { recursive: true });
+  fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/checks.mjs'), 'export {};\n');
+  fs.writeFileSync(path.join(temp, 'modules/systems/dnd-2024/difficulty.mjs'), 'export {};\n');
+  write(temp, 'dnd-2024', text);
+}
+
+test('optional attributes, condition_effects and pools load when valid', () => {
+  withRoot((temp) => {
+    writeDnd(temp, `${source}${OPTIONAL_BLOCKS}`);
+    assert.deepEqual(loadAdapter(temp, 'dnd-2024').errors, []);
+  });
+});
+
+test('attributes must have distinct slugs, strictly increasing dice and a floor among the dice', () => {
+  withRoot((temp) => {
+    writeDnd(temp, replace(`${source}${OPTIONAL_BLOCKS}`, 'dice: [6, 8, 10, 12]', 'dice: [8, 6]'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'attributes.dice'));
+
+    writeDnd(temp, replace(replace(`${source}${OPTIONAL_BLOCKS}`, 'dice: [6, 8, 10, 12]', 'dice: [6, 8]'), 'floor: 6', 'floor: 4'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'attributes.floor'));
+
+    writeDnd(temp, replace(`${source}${OPTIONAL_BLOCKS}`, 'floor: 6\n', 'floor: 6\n  max: 3\n'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'unknown-key' && e.path === 'attributes.max'));
+  });
+});
+
+test('condition_effects needs attributes, known conditions and known attribute ids', () => {
+  withRoot((temp) => {
+    writeDnd(temp, `${source}condition_effects:\n  poisoned: [str]\n`);
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'condition_effects'));
+
+    writeDnd(temp, replace(`${source}${OPTIONAL_BLOCKS}`, 'poisoned: [str]', 'flying: [str]'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'condition_effects.flying'));
+
+    writeDnd(temp, replace(`${source}${OPTIONAL_BLOCKS}`, 'poisoned: [str]', 'poisoned: [wis]'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'condition_effects.poisoned'));
+  });
+});
+
+test('pools need a unique slug id that is not a resource, owners from the sides, and a label', () => {
+  withRoot((temp) => {
+    writeDnd(temp, replace(`${source}${OPTIONAL_BLOCKS}`, 'owner: [pc]', 'owner: [gm]'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'pools[0].owner'));
+
+    writeDnd(temp, replace(`${source}${OPTIONAL_BLOCKS}`, '- id: luck', '- id: hp'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'bad-value' && e.path === 'pools[0].id'));
+
+    writeDnd(temp, replace(`${source}${OPTIONAL_BLOCKS}`, '      en: Luck\n', ''));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.path.startsWith('pools[0].label')));
+  });
+});
+
+test('difficulty method level-offset needs level_offsets rising with the bands', () => {
+  withRoot((temp) => {
+    const text = `${source.slice(0, source.indexOf('\ndifficulty:\n') + 1)}${LEVEL_OFFSET_DIFFICULTY}${source.slice(source.indexOf('\neconomy:\n') + 1)}`;
+    writeDnd(temp, text);
+    assert.deepEqual(loadAdapter(temp, 'dnd-2024').errors, []);
+
+    writeDnd(temp, replace(text, LEVEL_OFFSETS, ''));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.path === 'difficulty.level_offsets'));
+
+    writeDnd(temp, replace(text, 'normal: 5', 'normal: 12'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.path === 'difficulty.level_offsets'));
+
+    writeDnd(temp, replace(text, '    hard: 10\n', '    hard: 10\n    brutal: 20\n'));
+    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.path === 'difficulty.level_offsets.brutal'));
+  });
 });

@@ -168,6 +168,7 @@ export function endEncounter(adapter, state, ctx = {}) {
 }
 
 function opAdd(state, op, ctx) {
+  if (op.turns !== undefined) return fail('bad-value', 'this game has one turn per round: turns is not used');
   const name = typeof op.name === 'string' ? op.name.trim() : '';
   if (name === '') return fail('bad-value', 'a combatant needs a name');
   if (!SIDES.includes(op.side)) return fail('bad-value', 'side must be pc, ally or enemy');
@@ -368,7 +369,9 @@ export function recordEvent(adapter, state, op, ctx = {}) {
   if (!isPlainObject(op)) return fail('bad-op', 'the operation must be an object');
   switch (op.op) {
     case 'start': return startEncounter(adapter, state, ctx);
-    case 'next': return advanceTurn(adapter, state, ctx);
+    case 'next':
+      if (op.id !== undefined) return fail('fixed-order', 'in this game the turn follows the initiative order: next takes no id');
+      return advanceTurn(adapter, state, ctx);
     case 'end': return endEncounter(adapter, state, ctx);
     case 'add': return opAdd(state, op, ctx);
     case 'remove': return opRemove(state, op, ctx);

@@ -17,6 +17,7 @@ import {
   npcAccuracyBonus,
   npcDamageBonus,
   checkCreature,
+  checkSceneCheck,
 } from './checks.mjs';
 
 function codes(fields) {
@@ -191,4 +192,48 @@ test('numeric values work as well as strings', () => {
 
 test('codes helper reports the codes of a bad sheet', () => {
   assert.deepEqual(codes({ dex: 'd20', mdef: '0' }), ['bad-value', 'bad-value']);
+});
+
+test('checkSceneCheck accepts valid Italian checks', () => {
+  for (const text of ['DES + INT DL 10', 'int+int dl 13', 'VIG + VOL contrapposta', 'DES + DES DL 7']) {
+    assert.deepEqual(checkSceneCheck(text, 'it'), [], text);
+  }
+});
+
+test('checkSceneCheck accepts valid English checks', () => {
+  for (const text of ['DEX + INS DL 16', 'MIG + WLP opposed']) {
+    assert.deepEqual(checkSceneCheck(text, 'en'), [], text);
+  }
+});
+
+test('checkSceneCheck rejects English attribute names in an Italian campaign', () => {
+  const result = checkSceneCheck('DEX + INS DL 10', 'it');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].code, 'bad-check');
+  assert.ok(result[0].message.includes('DEX'));
+});
+
+test('checkSceneCheck reports a DL that is not 7, 10, 13 or 16', () => {
+  const result = checkSceneCheck('DES + INT DL 11', 'it');
+  assert.equal(result.length, 1);
+  assert.equal(result[0].code, 'bad-check');
+  assert.ok(result[0].message.includes('DL'));
+});
+
+test('checkSceneCheck rejects a check with one attribute, Italian names, or the wrong keyword', () => {
+  for (const [text, lang] of [
+    ['DES DL 10', 'it'],
+    ['Destrezza + Intuito DL 10', 'it'],
+    ['DEX + INS CD 10', 'en'],
+    ['', 'en'],
+  ]) {
+    const result = checkSceneCheck(text, lang);
+    assert.equal(result.length, 1, text);
+    assert.equal(result[0].code, 'bad-check', text);
+  }
+});
+
+test('checkSceneCheck treats any language other than it as en', () => {
+  assert.deepEqual(checkSceneCheck('DEX + INS DL 10', 'fr'), []);
+  assert.equal(checkSceneCheck('DES + INT DL 10', 'fr')[0].code, 'bad-check');
 });

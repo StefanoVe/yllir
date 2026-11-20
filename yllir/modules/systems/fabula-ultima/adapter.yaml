@@ -15,9 +15,23 @@ headings:
     it: Effetti
     en: Effects
 encounters: turn-based
+encounter_ops: encounter.mjs
 progression:
   method: experience
   experience_points: true
+# Attributes are die sizes; a status lowers each attribute it names by one size, never below the floor.
+attributes:
+  ids: [dex, ins, mig, wlp]
+  dice: [6, 8, 10, 12]
+  floor: 6
+difficulty:
+  method: level-offset
+  bands: [easy, normal, hard]
+  ops: difficulty.mjs
+  level_offsets:
+    easy: 0
+    normal: 5
+    hard: 10
 resources:
   - id: hp
     recovery: rest
@@ -25,6 +39,18 @@ resources:
     recovery: rest
   - id: ip
     recovery: rest
+# Points gained and spent by event, without a maximum or a rest; owner is the tracker side that holds them.
+pools:
+  - id: fabula
+    owner: [pc]
+    label:
+      it: Punti Fabula
+      en: Fabula Points
+  - id: ultima
+    owner: [enemy]
+    label:
+      it: Punti Ultima
+      en: Ultima Points
 conditions:
   - slow
   - dazed
@@ -56,6 +82,13 @@ duration_labels:
   until_removed:
     it: finché non viene rimosso
     en: until removed
+condition_effects:
+  slow: [dex]
+  dazed: [ins]
+  weak: [mig]
+  shaken: [wlp]
+  enraged: [dex, ins]
+  poisoned: [mig, wlp]
 creature_sheet:
   section: statistics
   required:
@@ -90,6 +123,7 @@ creature_sheet:
       label_it: Difesa Magica
       label_en: Magic Defense
   optional: [species, traits, affinities, basic_attacks, skills, spells, ultima_points, villain]
+action_table: [attacchi e capacità, attacks and abilities]
 checks: checks.mjs
 item_sheet:
   mechanical_fields: [cost, category, quality, accuracy, damage, defense, magic_defense]

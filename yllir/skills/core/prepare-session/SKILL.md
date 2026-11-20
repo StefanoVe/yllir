@@ -108,7 +108,7 @@ Output: the list of new and expanded subjects, and the list of invented facts.
     Il gruppo riceve soltanto un invito a tornare il giorno dopo.
     ```
 
-    - Read the adapter file `${CLAUDE_PLUGIN_ROOT}/modules/systems/<SYSTEM ADAPTER>/adapter.yaml` (SYSTEM ADAPTER from Step 1). Write the check value in its format. For D&D 2024 the value is `Carisma (Persuasione) CD 13`, `Carisma CD 13` or `Tiro salvezza su Saggezza CD 15`. If SYSTEM ADAPTER is `none`, write the value in words, with the difficulty in words, for example `### Prova: convincere Sibilla (difficile)`.
+    - Read the adapter file `${CLAUDE_PLUGIN_ROOT}/modules/systems/<SYSTEM ADAPTER>/adapter.yaml` (SYSTEM ADAPTER from Step 1). Write the check value in its format. For D&D 2024 the value is `Carisma (Persuasione) CD 13`, `Carisma CD 13` or `Tiro salvezza su Saggezza CD 15`. For Fabula Ultima the value is two attributes and a DL of 7, 10, 13 or 16, or an opposed check: `DES + INT DL 10` or `VIG + VOL contrapposta` (English: `DEX + INS DL 10`, `MIG + WLP opposed`). If SYSTEM ADAPTER is `none`, write the value in words, with the difficulty in words, for example `### Prova: convincere Sibilla (difficile)`.
     - Write both outcomes as paragraphs that say what happens and what the players learn or get. Never write "succeeds" or "fails", and never a single word.
     - Never write "ask the players for a check" in prose. The check is its heading, not a sentence.
 - the new and expanded subject files, with `provenance: generated`.

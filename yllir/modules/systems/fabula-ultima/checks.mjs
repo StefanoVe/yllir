@@ -1,6 +1,7 @@
 // Deterministic arithmetic checks for Fabula Ultima character and NPC sheets.
 // Receives the cell text of the sheet tables, keyed by adapter field id, and returns [{ code, field, message }].
 // No rule tables and no dice: attributes are die sizes (d6, d8, d10, d12) and the formulas below are the only numbers.
+// checkSceneCheck validates the heading of a scene check ("DES + INT DL 10" or "VIG + VOL contrapposta") in Italian or English.
 // Pure functions: no randomness and no file access.
 
 const DIE_SIZES = [6, 8, 10, 12];
@@ -212,4 +213,45 @@ export function checkCreature(fields, statistics = '') {
   }
 
   return errors;
+}
+
+const SCENE_ATTRIBUTES = {
+  it: ['DES', 'INT', 'VIG', 'VOL'],
+  en: ['DEX', 'INS', 'MIG', 'WLP'],
+};
+const SCENE_DL = [7, 10, 13, 16];
+const SCENE_EXAMPLE = {
+  it: '"DES + INT DL 10" or "VIG + VOL contrapposta"',
+  en: '"DEX + INS DL 10" or "MIG + WLP opposed"',
+};
+const SCENE_DL_RE = /^([^+]+?)\s*\+\s*([^+]+?)\s+DL\s+(\d+)$/i;
+const SCENE_OPPOSED_RE = {
+  it: /^([^+]+?)\s*\+\s*([^+]+?)\s+contrapposta$/i,
+  en: /^([^+]+?)\s*\+\s*([^+]+?)\s+opposed$/i,
+};
+
+/**
+ * Checks the heading of one scene check: "<A> + <B> DL <n>" with n 7, 10, 13 or 16, or "<A> + <B> contrapposta" (it)
+ * or "<A> + <B> opposed" (en). Attribute names are case-insensitive and must be the campaign language's names.
+ * @param {string} value the heading text
+ * @param {string} lang 'it' or 'en'; anything else is treated as 'en'
+ * @returns {Array<{ code: string, message: string }>} empty when the check is valid, otherwise one bad-check entry
+ */
+export function checkSceneCheck(value, lang) {
+  const language = lang === 'it' ? 'it' : 'en';
+  const text = String(value ?? '').trim().replace(/\s+/g, ' ');
+  const fail = (reason) => [{
+    code: 'bad-check',
+    message: `"${text}" is not a Fabula Ultima check${reason ? `: ${reason}` : ''}; write ${SCENE_EXAMPLE[language]}`,
+  }];
+
+  const dl = SCENE_DL_RE.exec(text);
+  const match = dl ?? SCENE_OPPOSED_RE[language].exec(text);
+  if (!match) return fail('');
+
+  for (const name of [match[1].trim(), match[2].trim()]) {
+    if (!SCENE_ATTRIBUTES[language].includes(name.toUpperCase())) return fail(`"${name}" is not an attribute`);
+  }
+  if (dl && !SCENE_DL.includes(Number(dl[3]))) return fail('the DL must be 7, 10, 13 or 16');
+  return [];
 }
