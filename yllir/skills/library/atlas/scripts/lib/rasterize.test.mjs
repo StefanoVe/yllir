@@ -209,6 +209,24 @@ test('rasterizeSvg renders at the given width with fit-to-width, no system fonts
   assert.deepEqual(Object.keys(calls[0].options).sort(), ['fitTo', 'font']);
 });
 
+test('rasterizeSvg passes fontFiles to the renderer only when they are given', async () => {
+  const dataDir = tempData();
+  fakeInstall(dataDir);
+  const fontFile = path.join(dataDir, 'Cinzel.ttf');
+  const withFonts = [];
+  await rasterizeSvg(SVG, {
+    width: 200,
+    dataDir,
+    loader: async () => fakeModule(withFonts),
+    fontFiles: [fontFile],
+  });
+  assert.deepEqual(withFonts[0].options.font, { loadSystemFonts: false, fontFiles: [fontFile] });
+  const without = [];
+  await rasterizeSvg(SVG, { width: 200, dataDir, loader: async () => fakeModule(without) });
+  assert.deepEqual(without[0].options.font, { loadSystemFonts: false });
+  assert.equal('fontFiles' in without[0].options.font, false);
+});
+
 test('rasterizeSvg resolves the hrefs the renderer lists against resourcesDir, and skips the ones that do not exist', async () => {
   const dataDir = tempData();
   fakeInstall(dataDir);

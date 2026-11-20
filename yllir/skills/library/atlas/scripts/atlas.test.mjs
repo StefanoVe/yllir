@@ -722,8 +722,8 @@ function rasterizerStub({ unavailable = false } = {}) {
   fs.writeFileSync(file, [
     "import fs from 'node:fs';",
     `import { encodePng } from ${JSON.stringify(pngUrl)};`,
-    'export async function rasterizeSvg(svg, { width, resourcesDir }) {',
-    `  fs.writeFileSync(${JSON.stringify(log)}, JSON.stringify({ svg, width, resourcesDir }));`,
+    'export async function rasterizeSvg(svg, { width, resourcesDir, fontFiles }) {',
+    `  fs.writeFileSync(${JSON.stringify(log)}, JSON.stringify({ svg, width, resourcesDir, fontFiles }));`,
     `  ${failure}`,
     '  const height = Math.round(width / 2);',
     '  return encodePng(width, height, new Uint8Array(width * height * 3).fill(255));',
@@ -976,4 +976,224 @@ test('bake-set and bake-clear without an atlas exit 1 no-atlas and write nothing
   assert.equal(json(set.stdout).problems[0].code, 'no-atlas');
   assert.equal(fs.existsSync(path.join(bare, 'Atlas', 'atlas.json')), false);
   assert.equal(fs.existsSync(path.join(bare, 'Atlas', 'bake')), false);
+});
+
+// ---- the reference picture: init --reference, reference-set, reference-grid, reference-overlay, status, privacy ----
+
+/** A scope file without a canvas, so that the reference picture sets the canvas. */
+function freeScopeFile(root) {
+  return writeJsonFile(path.join(root, 'free-scope.json'), { scope: { kind: 'region', places: ['north'] }, seed: 7, style: 'default' });
+}
+
+/** The relative paths of every file under a folder, sorted. */
+function filesUnder(dir) {
+  const out = [];
+  const walk = (current) => {
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) walk(full);
+      else out.push(path.relative(dir, full).split(path.sep).join('/'));
+    }
+  };
+  walk(dir);
+  return out.sort();
+}
+
+/** The relative path and SHA-256 of every file under a folder: equal snapshots mean an unchanged folder. */
+function folderSnapshot(dir) {
+  return filesUnder(dir).map((rel) => [rel, crypto.createHash('sha256').update(fs.readFileSync(path.join(dir, rel))).digest('hex')]);
+}
+
+/** The first 8 hex digits of the SHA-256 of a file: the name of a stored reference picture. */
+const digestOf = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 8);
+
+test('init with --reference gives a 4000x2000 canvas for a 1000x500 PNG and records and stores the picture', () => {
+  const root = standardCampaign();
+  const image = pngFile(1000, 500);
+  const result = run('init', root, freeScopeFile(root), '--reference', image);
+  assert.equal(result.code, 0, result.stdout);
+  const name = `ref-${digestOf(image)}.png`;
+  const out = json(result.stdout);
+  assert.equal(out.reference, `Atlas/reference/${name}`);
+  const manifest = JSON.parse(readAtlasFile(root, 'atlas.json'));
+  assert.deepEqual(manifest.canvas, { width: 4000, height: 2000 });
+  assert.deepEqual(manifest.reference, { file: `reference/${name}`, width: 1000, height: 500 });
+  assert.deepEqual(fs.readdirSync(path.join(root, 'Atlas', 'reference')), [name]);
+  assert.deepEqual(fs.readFileSync(path.join(root, 'Atlas', 'reference', name)), fs.readFileSync(image));
+});
+
+test('init with a text file as --reference is refused with bad-reference; no atlas.json, no reference folder, campaign.yaml unchanged', () => {
+  const root = standardCampaign();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-atlas-ref-'));
+  bakeDirs.push(dir);
+  const text = path.join(dir, 'map.png');
+  fs.writeFileSync(text, 'this is a text file named like a picture');
+  const yamlBefore = fs.readFileSync(path.join(root, 'campaign.yaml'), 'utf8');
+  const result = run('init', root, freeScopeFile(root), '--reference', text);
+  assert.equal(result.code, 1);
+  assert.equal(json(result.stdout).problems[0].code, 'bad-reference');
+  assert.equal(fs.existsSync(path.join(root, 'Atlas', 'atlas.json')), false);
+  assert.equal(fs.existsSync(path.join(root, 'Atlas', 'reference')), false);
+  assert.equal(fs.readFileSync(path.join(root, 'campaign.yaml'), 'utf8'), yamlBefore);
+});
+
+test('reference-set reports the aspect as differs or match, keeps the other fields and the canvas, and keeps one picture', () => {
+  const root = bakeCampaign();
+  assert.equal(run('bake-set', root, pngFile()).code, 0);
+  const before = JSON.parse(readAtlasFile(root, 'atlas.json'));
+
+  const wide = pngFile(1000, 500);
+  const differs = run('reference-set', root, wide);
+  assert.equal(differs.code, 0, differs.stdout);
+  assert.deepEqual(json(differs.stdout), {
+    ok: true,
+    file: `Atlas/reference/ref-${digestOf(wide)}.png`,
+    width: 1000,
+    height: 500,
+    aspect: 'differs',
+  });
+
+  const square = pngFile(1000, 1000);
+  const matched = run('reference-set', root, square);
+  assert.equal(matched.code, 0, matched.stdout);
+  assert.equal(json(matched.stdout).aspect, 'match');
+  assert.deepEqual(fs.readdirSync(path.join(root, 'Atlas', 'reference')), [`ref-${digestOf(square)}.png`]);
+
+  const manifest = JSON.parse(readAtlasFile(root, 'atlas.json'));
+  assert.deepEqual(manifest.reference, { file: `reference/ref-${digestOf(square)}.png`, width: 1000, height: 1000 });
+  assert.deepEqual(manifest.canvas, before.canvas);
+  assert.deepEqual(manifest.bake, before.bake);
+  assert.equal(run('validate', root).code, 0);
+});
+
+test('status shows the reference file, or null without one', () => {
+  const root = bakeCampaign();
+  assert.equal(json(run('status', root).stdout).reference, null);
+  assert.equal(run('reference-set', root, pngFile(1000, 500)).code, 0);
+  const manifest = JSON.parse(readAtlasFile(root, 'atlas.json'));
+  const status = json(run('status', root).stdout);
+  assert.equal(status.reference, manifest.reference.file);
+  assert.equal(status.bake, 'none');
+});
+
+test('reference-set without an atlas exits 1 no-atlas and writes nothing', () => {
+  const bare = standardCampaign();
+  const result = run('reference-set', bare, pngFile());
+  assert.equal(result.code, 1);
+  assert.equal(json(result.stdout).problems[0].code, 'no-atlas');
+  assert.equal(fs.existsSync(path.join(bare, 'Atlas', 'atlas.json')), false);
+  assert.equal(fs.existsSync(path.join(bare, 'Atlas', 'reference')), false);
+});
+
+test('reference-grid writes the grid at the given width with Cinzel, and changes nothing in the atlas folder', () => {
+  const root = bakeCampaign();
+  assert.equal(run('reference-set', root, pngFile(1000, 500)).code, 0);
+  const before = folderSnapshot(path.join(root, 'Atlas'));
+  const stub = rasterizerStub();
+  const result = runEnv(stub.env, 'reference-grid', root, '--size', '512');
+  assert.equal(result.code, 0, result.stdout);
+  const out = json(result.stdout);
+  assert.equal(out.file, '.campaign/cache/atlas/reference/grid.png');
+  assert.deepEqual([out.width, out.height], [512, 256]);
+  assert.deepEqual(pngSize(fs.readFileSync(path.join(root, out.file))), { width: 512, height: 256 });
+
+  const call = JSON.parse(fs.readFileSync(stub.log, 'utf8'));
+  assert.equal(call.width, 512);
+  assert.ok(call.svg.includes('data:image/png;base64,'), 'the picture is drawn as a data URI');
+  assert.ok(call.svg.includes('font-family="Cinzel"'));
+  assert.deepEqual(call.fontFiles.map((f) => path.basename(f)), ['Cinzel.ttf']);
+  assert.deepEqual(folderSnapshot(path.join(root, 'Atlas')), before);
+});
+
+test('reference-grid defaults to a width of 1600', () => {
+  const root = bakeCampaign();
+  assert.equal(run('reference-set', root, pngFile(1000, 500)).code, 0);
+  const stub = rasterizerStub();
+  const out = json(runEnv(stub.env, 'reference-grid', root).stdout);
+  assert.equal(out.width, 1600);
+  assert.equal(JSON.parse(fs.readFileSync(stub.log, 'utf8')).width, 1600);
+});
+
+test('reference-overlay writes the picture with the drawn map on top, and changes nothing in the atlas folder', () => {
+  const root = bakeCampaign();
+  assert.equal(run('reference-set', root, pngFile(1000, 500)).code, 0);
+  const before = folderSnapshot(path.join(root, 'Atlas'));
+  const stub = rasterizerStub();
+  const result = runEnv(stub.env, 'reference-overlay', root, '--size', '512');
+  assert.equal(result.code, 0, result.stdout);
+  const out = json(result.stdout);
+  assert.equal(out.file, '.campaign/cache/atlas/reference/overlay.png');
+  assert.deepEqual([out.width, out.height], [512, 256]);
+  assert.ok(fs.existsSync(path.join(root, out.file)));
+  const call = JSON.parse(fs.readFileSync(stub.log, 'utf8'));
+  assert.equal((call.svg.match(/<image /g) ?? []).length, 2, 'the picture and the drawn map');
+  assert.deepEqual(folderSnapshot(path.join(root, 'Atlas')), before);
+});
+
+test('reference-grid and reference-overlay refuse without a reference picture (missing-reference) and write nothing', () => {
+  const root = bakeCampaign();
+  const stub = rasterizerStub();
+  for (const command of ['reference-grid', 'reference-overlay']) {
+    const result = runEnv(stub.env, command, root, '--size', '512');
+    assert.equal(result.code, 1, command);
+    assert.equal(json(result.stdout).problems[0].code, 'missing-reference', command);
+  }
+  assert.equal(fs.existsSync(path.join(root, '.campaign', 'cache', 'atlas', 'reference')), false);
+});
+
+test('reference-overlay refuses an atlas with no layer (missing-layer); reference-grid still works', () => {
+  const root = standardCampaign();
+  writeAtlas(root, { manifest: baseManifest({ style: 'fantasy-color' }), layers: {} });
+  assert.equal(run('reference-set', root, pngFile(1000, 500)).code, 0);
+  const stub = rasterizerStub();
+  const overlay = runEnv(stub.env, 'reference-overlay', root, '--size', '512');
+  assert.equal(overlay.code, 1);
+  assert.equal(json(overlay.stdout).problems[0].code, 'missing-layer');
+  assert.equal(runEnv(stub.env, 'reference-grid', root, '--size', '512').code, 0);
+});
+
+test('reference-grid without an installed rasterizer exits 1 rasterizer-unavailable and writes nothing', () => {
+  const root = bakeCampaign();
+  assert.equal(run('reference-set', root, pngFile(1000, 500)).code, 0);
+  const stub = rasterizerStub({ unavailable: true });
+  const result = runEnv(stub.env, 'reference-grid', root, '--size', '512');
+  assert.equal(result.code, 1);
+  assert.equal(json(result.stdout).problems[0].code, 'rasterizer-unavailable');
+  assert.equal(fs.existsSync(path.join(root, '.campaign', 'cache', 'atlas', 'reference', 'grid.png')), false);
+});
+
+test('--reference is only for init; --size and --data-dir are not for reference-set', () => {
+  const root = bakeCampaign();
+  const image = pngFile();
+  assert.equal(run('reference-set', root, image, '--reference', image).code, 2);
+  assert.equal(run('bake-set', root, image, '--reference', image).code, 2);
+  assert.equal(run('init', root, freeScopeFile(root), '--reference').code, 2);
+  assert.equal(run('reference-set', root, image, '--size', '512').code, 2);
+  assert.equal(run('reference-grid', root, '--size', '100').code, 2);
+  assert.equal(run('reference-grid', root, '--data-dir').code, 2);
+});
+
+test('the reference picture never reaches the master or players export, nor the bake input', () => {
+  const root = renderableCampaign();
+  const image = pngFile(1000, 500);
+  assert.equal(run('reference-set', root, image).code, 0);
+  const bytes = fs.readFileSync(image);
+  const base64 = bytes.toString('base64');
+
+  for (const audience of ['master', 'players']) {
+    const result = run('render', root, '--audience', audience);
+    assert.equal(result.code, 0, `${audience}: ${result.stdout}`);
+    const dir = path.join(root, json(result.stdout).dir);
+    for (const rel of filesUnder(dir)) {
+      assert.equal(rel.includes('reference'), false, `${audience}: ${rel}`);
+      assert.equal(fs.readFileSync(path.join(dir, rel)).equals(bytes), false, `${audience}: ${rel}`);
+    }
+    assert.equal(fs.readFileSync(path.join(dir, 'index.html'), 'utf8').includes(base64), false, audience);
+  }
+
+  const stub = rasterizerStub();
+  assert.equal(runEnv(stub.env, 'bake-input', root, '--size', '512').code, 0);
+  const svg = JSON.parse(fs.readFileSync(stub.log, 'utf8')).svg;
+  assert.equal(svg.includes(base64), false);
+  assert.equal(svg.includes('reference/'), false);
 });

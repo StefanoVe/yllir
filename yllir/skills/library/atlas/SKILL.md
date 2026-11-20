@@ -1,6 +1,6 @@
 ---
 name: atlas
-description: Library skill. Creates the atlas of the campaign (a map of the world or of a part of it, drawn in layers from the documents in the look of a hand-painted fantasy map, and also a map of a settlement or a district: a city, a village, a quarter, when the world is that small or the master asks) only when the master asks, and keeps it up to date: places new places, adds new land outside the existing one, and never changes land already approved unless the master asks for it explicitly. The extent can mix scales: a region or world map can hold a detailed city, and a city plan can have forests, hills or mountains around it. Invoked by the entry skill when the master asks for the atlas or a map of the world or of a region, by the master screen's atlas button, and by build-world or write-document with the argument "update" after a batch that added places.
+description: Library skill. Creates the atlas of the campaign (a map of the world or of a part of it, drawn in layers from the documents in the look of a hand-painted fantasy map, and also a map of a settlement or a district: a city, a village, a quarter, when the world is that small or the master asks) only when the master asks, and keeps it up to date: places new places, adds new land outside the existing one, and never changes land already approved unless the master asks for it explicitly. The extent can mix scales: a region or world map can hold a detailed city, and a city plan can have forests, hills or mountains around it. Invoked by the entry skill when the master asks for the atlas or a map of the world or of a region, by the master screen's atlas button, and by build-world or write-document with the argument "update" after a batch that added places. It can start from a picture of the map, found in the sources or given by the master, and trace it into the layers.
 user-invocable: false
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" *), Bash(node */skills/library/atlas/scripts/atlas.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/bake-setup.mjs" *), Bash(node */skills/library/atlas/scripts/bake-setup.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/bake-job.mjs" *), Bash(node */skills/library/images/scripts/bake-job.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/images/scripts/image-select.mjs" *), Bash(node */skills/library/images/scripts/image-select.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node */scripts/versions.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Read, Write, Glob, Grep, WebSearch, WebFetch
 ---
@@ -38,6 +38,7 @@ You draw and keep the atlas. Its data lives in the atlas folder of the campaign:
    - `auto` goes back to the style chosen by the game system.
    - Changing the style never changes the land.
 10. **Inside the master screen.** When the conversation started from the master screen, the master already sees the previews and the atlas in the master screen. Never use `--open` there. The first message says so («This conversation runs inside the master screen»). Outside the master screen, `--open` is the way to show the master the drawing.
+11. **Base picture.** The master may give a picture of the land or of the town (a map, a plan, a drawing), or the sources may hold one, to be used as the base of the atlas. The picture is traced into data and never painted into the map: the scripts still draw, the layers are still approved and locked as always. Words for the master: «la carta che mi hai dato», «l'immagine»; never «reference», «overlay», «grid», «outline» or the commands. The picture is master-only material: it never goes to a search, to an image service or to the players' version. The painted version (Step 10) still receives only the drawing made from the layers, never the base picture.
 
 **Step 0: mode.** The argument decides the mode: `update` means the update mode (Step 9); anything else, or nothing, means the create-or-change mode.
 
@@ -52,6 +53,7 @@ and read `exists`, `layers` and `pending`. Then follow the first case that match
   ```
   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render . --open
   ```
+- If the atlas does not exist and the master gave a picture, or the sources hold a map, Step 2b applies right after Step 2.
 - If it does not exist, go to Step 2.
 
 **Step 2: read the world.**
@@ -62,6 +64,37 @@ and read `exists`, `layers` and `pending`. Then follow the first case that match
 - Read the world seed and every place sheet with the Read tool. With more than 40 places, read the top-level ones and their direct children first, and the rest only when you place them.
 - Note every geographic statement you find, with its file and section: directions («a nord di», «oltre il mare»), distances («tre giorni di cammino»), coasts, rivers, mountains, islands, climates, borders and realms.
 - If a published setting is named, do the outside search (Rule 5).
+
+**Step 2b: base picture.** Do this only when the master gave a picture for the atlas (in the conversation, or by naming a file), or when you find one in the sources.
+1. **Find it.**
+   - A file the master named, or a path you can see: use it.
+   - A picture pasted or dragged into the conversation has no path: invoke the import skill (the master's material, kept as an original in the sources), then use the path of the original it keeps. If that is not possible, ask in one sentence for the file to be put in the campaign folder.
+   - Without a picture from the master, use Glob on the sources folder of the campaign (the folder of type `sources` in `campaign.yaml`) for `*.png`, `*.jpg`, `*.jpeg` and `*.webp`. Read the ones whose name suggests a map. If one is a map of the world or town to draw, ask ONE question: «Ho trovato <name>: la uso come base per la carta?». Never use a picture you found yourself without a yes.
+2. **Read it** with the Read tool. Note, for yourself: whether it is a land (coasts, islands, rivers, mountains, forests, borders) or a town (shore, walls, streets, districts, parks, buildings); what it shows and what it hides. A name that is printed on the picture and that you can read counts as a name given by a document when the picture is in the sources, and as a name given by the master when the master gave the picture (Rule 3 for the provenance); a name you cannot read with certainty is not used (Rule 2).
+3. **Extent.** The picture usually answers the extent of Step 3: propose it in one sentence, and ask only what the picture and the documents do not say. If the picture is a whole island covered by one city, the extent is `settlement` with an island (see Step 3).
+4. **Create with the picture.** In Step 4, run the init command with the picture. The canvas then takes the proportions of the picture:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" init . .campaign/state/atlas/scope.json --reference <path of the picture>
+   ```
+   Then prepare the drawing tools, once per conversation, and make the coordinate view of the picture (for you only):
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/bake-setup.mjs" --data-dir "${CLAUDE_PLUGIN_DATA}"
+   ```
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" reference-grid . --data-dir "${CLAUDE_PLUGIN_DATA}"
+   ```
+   If the first prints `unavailable`, say in one sentence that the picture cannot be used now, and offer to make the atlas from the documents alone. Read `.campaign/cache/atlas/reference/grid.png` with the Read tool: it is the picture on the canvas with a pink grid; the numbers at the top and at the left are the x and y of the canvas, and a thicker line every four. Take every coordinate from it. The grid and the overlay below are for you only: never use `--open` on them and never show them to the master.
+5. **Trace.** In Steps 5 and 6 and in the Urban scale, the constraints come from what the picture shows, with `provenance: "document"` and `sources: [{ "file": "<the path in the field reference of the status command>" }]` (the copy kept in the atlas folder); use `provenance: "master"` for what the master told you in words. Never `agent-choice` for a shape that the picture shows. Where the picture is silent, the usual rules apply. Where the picture and a document disagree: the document wins for names and facts, the picture for shapes; if it is a real contradiction, ask the master one question.
+   - **Land and sea:** one `landmass` per island or continent with `outline`: the points of its coast taken from the grid, in order, 12 to 60 points, following every bay and peninsula that the picture shows. With an `outline` the `center` and `radius` are not needed. Lakes, seas and open edges as usual. Leave `roughness` out or at most 0.2, so the script keeps the traced coast.
+   - **Rivers, mountains, forests, borders, places, routes:** the constraints of Step 6 with the points read from the grid.
+   - **Island city:** the ground `island` with `at` (a point well inside the island) and `outline` (20 to 60 points along the shore, harbours and bays included; the coast must not cross itself). `radius` is not needed. Then the walls ring along the walls of the picture, the main streets along its main streets (a `grid` only where the picture shows a regular quarter), one `district` per quarter that the picture shows (seeds read from the grid), the parks, and one building feature per named building at its place in the picture.
+   - **Not a copy.** The script draws its own streets between the ones you give, and its own blocks and houses. Give the structure (shore, walls, main streets, districts, named buildings), not every lane.
+6. **Check against the picture.** After you write and generate a layer, make the overlay (the drawing at half opacity over the picture) and Read it:
+   ```
+   node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" reference-overlay . --data-dir "${CLAUDE_PLUGIN_DATA}"
+   ```
+   Open `.campaign/cache/atlas/reference/overlay.png` with the Read tool. A coast, wall, street, district or building that is off by more than about one grid square, or a bay that is filled in, or a missing island, is wrong: fix the constraints, write and generate again. At most 3 rounds per layer; then go on with the best result and tell the master in one sentence what still differs. The approvals of the master (land and sea, then the whole map) stay as in Steps 5 and 6 and the Urban scale, on the normal preview.
+7. **A picture given later** for an atlas that already exists: run `atlas.mjs reference-set . <path>`, then use it only for new land or for places not drawn yet; approved layers change only by Rule 4.
 
 **Step 3: extent and questions.**
 - Propose the extent in one sentence: the whole world, one continent or one region, and which top places it contains. Base it on what exists. If the documents describe only one region, propose that region, and say the atlas can grow later.
@@ -250,7 +283,7 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render . --a
 - `coast`: `id`, `side` north|south|east|west, `depth` > 0 (how far the water enters from that canvas edge), optional `roughness` 0..1.
 - `pond`: `id`, `at` [x,y], `radius` > 0, optional `roughness`.
 - `canal`: `id`, `path` [[x,y]...] with at least 2 points, `width` > 0.
-- `island`: the city is on an island. The whole canvas is sea and the land is ONE island (a noisy ellipse around its centre): `{ "kind": "island", "id": "<kebab>", "at": [x, y], "radius": [rx, ry], "roughness": 0.4, "provenance", "sources" }`. Use it only for an island city, at most one per map. `radius` at most [0.42 * width, 0.42 * height] of the canvas, so the island fits inside it with a margin. The script then writes the sea as four water polygons and one `land` feature (the island outline). Rivers, canals and ponds may be added on the island, as above.
+- `island`: the city is on an island. The whole canvas is sea and the land is ONE island (a noisy ellipse around its centre): `{ "kind": "island", "id": "<kebab>", "at": [x, y], "radius": [rx, ry], "roughness": 0.4, "provenance", "sources" }`. Use it only for an island city, at most one per map. `radius` at most [0.42 * width, 0.42 * height] of the canvas, so the island fits inside it with a margin. The script then writes the sea as four water polygons and one `land` feature (the island outline). Rivers, canals and ponds may be added on the island, as above. With a picture, give `outline` (a polygon of 20 to 60 points along the shore, taken from the picture, with `at` inside it) instead of relying on `radius` and `roughness`: see Step 2b.
 
 Every constraint has `id` (kebab-case, unique in the layer), `provenance`, `sources`, and optional `note` and `visibility`. Add only the water that the documents mention or the master asks for; a position you choose is `agent-choice`. Then:
 ```
@@ -374,6 +407,8 @@ A change to approved ground, walls or streets follows Step 8 and rule 4.
 - **Never** use the geographic `places` icon for a city that has a detailed plan inside: its buildings and districts are the places. A `places` feature inside a block is not drawn, because the buildings replace it.
 
 **Step 10: painted version (the bake).** It runs only after the master approved the whole atlas: the final approval of a creation (Step 6, or sub-step (h) of the urban scale), or any time later when the master asks to «rifinire» or «dipingere la mappa». It is a look of the approved drawing: it never changes the layers.
+
+The service receives only the drawing made from the layers; the base picture of Step 2b is never sent.
 
 **Offer.** After the master's final yes of a creation, offer it ONCE, in one sentence, and only then: «Vuoi che la faccia rifinire come un'unica immagine dipinta? Resta tutto uguale, cambia solo l'aspetto, e uso un servizio esterno che riceve solo la carta disegnata, senza testi né segreti.» This is the only exception to Rule 1. If the master declines, never repeat it.
 

@@ -9,13 +9,15 @@
 // The meander noise runs along the arc length (one noise unit per 150 canvas units).
 // A constraint without a usable kebab-case id is a bad-constraint problem too.
 // Island (the only land): without an island the land is the rest of the canvas. An island gives one
-// land feature (its outline, a closed noisy ellipse of ISLAND_POINTS points, the axis points included)
-// and four sea features, one per canvas quadrant around the centre, each a simple polygon with no hole.
-// The four sea pieces and the island cover the canvas. Only one island per layer: a later one is a
+// land feature. Without an outline it is a closed noisy ellipse of ISLAND_POINTS points (the axis points
+// included) and four sea features, one per canvas quadrant around the centre, each a simple polygon with
+// no hole. With a traced outline the land is the traced polygon itself (bays and harbours kept) and the
+// sea is one keyhole polygon, id `<id>-sea`, with a zero-width slit from the canvas top edge.
+// The sea pieces and the island cover the canvas. Only one island per layer: a later one is a
 // problem and gives no feature. An island that leaves the canvas by more than 1 unit gives a problem
 // and no feature; within 1 unit its points are clamped.
 
-import { isFinitePoint } from '../geometry.mjs';
+import { isFinitePoint, isUsablePolygon, pointInPolygon } from '../geometry.mjs';
 import { fbm } from '../noise.mjs';
 import { subSeed } from '../scatter.mjs';
 import { blob, bufferPath, densify, polygonArea, r1, smoothPath } from './shapes.mjs';
@@ -131,9 +133,16 @@ function canalPolygon(c) {
   return bufferPath(c.path, c.width);
 }
 
-/** Closed noisy outline of an island: the ellipse radius at each angle, varied by fbm as blob does. */
+/**
+ * Outline of an island: the traced polygon as given (bays and inlets kept), or else a closed noisy
+ * ellipse of ISLAND_POINTS points, the radius at each angle varied by fbm as blob does.
+ */
 function islandOutline(c, seed) {
   need(isFinitePoint(c.at), 'an island needs an at point');
+  if (isUsablePolygon(c.outline)) {
+    need(pointInPolygon(c.at, c.outline), 'the island centre must be inside its outline');
+    return c.outline;
+  }
   need(isRadiusPair(c.radius), 'island radius is [rx, ry], both above 0');
   const [rx, ry] = c.radius;
   const roughness = Number.isFinite(c.roughness) ? clamp01(c.roughness) : ISLAND_ROUGHNESS;
@@ -151,10 +160,45 @@ function islandOutline(c, seed) {
   return outline;
 }
 
+/** Signed shoelace area: positive when the ring runs clockwise on screen (y grows downwards), as the canvas boundary does. */
+function signedArea(ring) {
+  let sum = 0;
+  for (let i = 0; i < ring.length; i++) {
+    const [x0, y0] = ring[i];
+    const [x1, y1] = ring[(i + 1) % ring.length];
+    sum += x0 * y1 - x1 * y0;
+  }
+  return sum / 2;
+}
+
 /**
- * The land and the four sea pieces of an island, or null when the outline leaves the canvas by more
- * than the tolerance. Quadrant pieces: the outline arc of the quadrant, then the canvas edge points
- * that close it (north-east: (at.x, 0), (width, 0), (width, at.y); the others by symmetry).
+ * The sea of a traced island as ONE keyhole polygon: the canvas boundary from the slit's top point,
+ * the slit down to the outline's topmost vertex (smallest y, then smallest x), the outline walked
+ * against the canvas boundary, then the slit back. The slit is traversed twice, so it has no width,
+ * and the sea needs no hole: point-in-polygon, scanline fill and the SVG nonzero fill all see land out.
+ */
+function seaKeyhole(land, width, height) {
+  let top = 0;
+  for (let i = 1; i < land.length; i++) {
+    const [x, y] = land[i];
+    const [tx, ty] = land[top];
+    if (y < ty || (y === ty && x < tx)) top = i;
+  }
+  const [px, py] = land[top];
+  const ring = signedArea(land) > 0 ? [...land].reverse() : land;
+  const start = ring.findIndex(([x, y]) => x === px && y === py);
+  const walk = [...ring.slice(start), ...ring.slice(0, start)];
+  return [
+    [px, 0], [width, 0], [width, height], [0, height], [0, 0], [px, 0],
+    [px, py], ...walk.slice(1), [px, py],
+  ];
+}
+
+/**
+ * The land and the sea of an island, or null when the outline leaves the canvas by more than the
+ * tolerance. A traced outline gives one keyhole sea piece (see seaKeyhole). A noisy ellipse gives four
+ * quadrant pieces: the outline arc of the quadrant, then the canvas edge points that close it
+ * (north-east: (at.x, 0), (width, 0), (width, at.y); the others by symmetry).
  */
 function islandFeatures(c, seed, width, height) {
   const outline = islandOutline(c, seed);
@@ -163,6 +207,12 @@ function islandFeatures(c, seed, width, height) {
   if (!fits) return null;
   const land = clipToCanvas(outline, width, height);
   need(land.length >= 3 && polygonArea(land) >= MIN_AREA, 'the polygon has fewer than 3 points or is under 100 square units');
+  if (isUsablePolygon(c.outline)) {
+    return [
+      { id: c.id, type: 'land', kind: 'island', polygon: land, ...metaOf(c) },
+      { id: `${c.id}-sea`, type: 'water', kind: 'sea', polygon: seaKeyhole(land, width, height), ...metaOf(c) },
+    ];
+  }
   const arc = (start, direction) => Array.from(
     { length: ISLAND_POINTS / 4 + 1 },
     (_, j) => land[(start + direction * j + ISLAND_POINTS) % ISLAND_POINTS],

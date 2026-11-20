@@ -242,7 +242,7 @@ export async function prepareSvgImages(svg, { workDir, loader = defaultLoader, d
  * @param {{ width: number, dataDir?: string, resourcesDir?: string, loader?: (entry: string) => Promise<object> }} options
  * @returns {Promise<Buffer>} the PNG bytes
  */
-export async function rasterizeSvg(svg, { width, dataDir, resourcesDir, loader = defaultLoader } = {}) {
+export async function rasterizeSvg(svg, { width, dataDir, resourcesDir, loader = defaultLoader, fontFiles } = {}) {
   if (!Number.isInteger(width) || width < 1) throw new RangeError('width must be a whole number above zero');
   const pins = loadPins();
   const tools = toolsDirOf(dataDir);
@@ -257,7 +257,9 @@ export async function rasterizeSvg(svg, { width, dataDir, resourcesDir, loader =
     const prepared = await prepareSvgImages(svg, { workDir, loader, dataDir });
     const options = {
       fitTo: { mode: 'width', value: width },
-      font: { loadSystemFonts: false },
+      font: Array.isArray(fontFiles) && fontFiles.length > 0
+        ? { loadSystemFonts: false, fontFiles }
+        : { loadSystemFonts: false },
     };
     const renderer = new Resvg(prepared, options);
     // The hrefs the renderer asks for are read from resourcesDir (a relative href is taken from it). Absolute

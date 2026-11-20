@@ -238,6 +238,21 @@ export function manifestProblems(manifest) {
       }
     }
   }
+
+  // The reference picture (the map the assistant traces from): optional. Its file is inside reference/, and its size is the picture's.
+  if (manifest.reference !== undefined) {
+    const { reference } = manifest;
+    if (!isPlainObject(reference)) {
+      bad('reference', 'reference is { file, width, height }');
+    } else {
+      if (typeof reference.file !== 'string' || !reference.file.startsWith('reference/') || reference.file.split('/').includes('..')) {
+        bad('reference.file', 'reference.file must be a path inside reference/');
+      }
+      for (const side of ['width', 'height']) {
+        if (!Number.isInteger(reference[side]) || reference[side] < 1) bad(`reference.${side}`, `reference.${side} must be a whole number above zero`);
+      }
+    }
+  }
   return out;
 }
 
@@ -292,6 +307,20 @@ function constraintPoint(constraint, field, base, file, out) {
   }
 }
 
+/** An optional outline of a constraint: a list of at least three points, each one a finite point. */
+function constraintOutline(constraint, base, file, out) {
+  const outline = constraint.outline;
+  if (!Array.isArray(outline) || outline.length < 3) {
+    out.push(problem('bad-constraint', file, `${base}.outline`, 'outline must be a list of at least 3 points'));
+    return;
+  }
+  outline.forEach((point, k) => {
+    if (!isFinitePoint(point)) {
+      out.push(problem('bad-constraint', file, `${base}.outline[${k}]`, 'each outline point must be two finite numbers'));
+    }
+  });
+}
+
 function constraintPositive(value) {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
 }
@@ -319,9 +348,11 @@ function checkConstraintFields(constraint, base, file, ctx, out) {
   switch (constraint.kind) {
     case 'landmass': {
       constraintId(constraint, base, file, out);
-      constraintPoint(constraint, 'center', base, file, out);
+      const outlined = constraint.outline !== undefined;
+      if (outlined) constraintOutline(constraint, base, file, out);
+      if (!outlined || constraint.center !== undefined) constraintPoint(constraint, 'center', base, file, out);
       const r = constraint.radius;
-      if (!Array.isArray(r) || r.length !== 2 || !r.every(constraintPositive)) {
+      if ((!outlined || r !== undefined) && (!Array.isArray(r) || r.length !== 2 || !r.every(constraintPositive))) {
         out.push(problem('bad-constraint', file, `${base}.radius`, 'radius is [rx, ry], both above 0'));
       }
       constraintRoughness(constraint, base, file, out);
@@ -448,7 +479,10 @@ function checkUrbanConstraintFields(c, base, file, ctx, out) {
       break;
     case 'island':
       constraintPoint(c, 'at', base, file, out);
-      if (!isSizePair(c.radius)) bad('radius', 'radius is [rx, ry], both above 0');
+      if (c.outline !== undefined) constraintOutline(c, base, file, out);
+      if (c.outline === undefined || c.radius !== undefined) {
+        if (!isSizePair(c.radius)) bad('radius', 'radius is [rx, ry], both above 0');
+      }
       constraintRoughness(c, base, file, out);
       break;
     case 'park':

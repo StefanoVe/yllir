@@ -152,3 +152,21 @@ test('a lake with roughness 0.6 is not a circle: max and min distance from the c
   const distances = lake.polygon.map((p) => Math.hypot(p[0] - cx, p[1] - cy));
   assert.ok(Math.max(...distances) / Math.min(...distances) > 1.2);
 });
+
+test('a landmass with an outline follows the outline: its bounding box is within 120 of the square, and the centre is land', () => {
+  const square = [[1000, 800], [3000, 800], [3000, 2200], [1000, 2200]];
+  const constraints = [{ kind: 'landmass', id: 'traced', outline: square, provenance: 'master', sources: [] }];
+  const canvas = { width: 4000, height: 3000 };
+  const { features, problems } = generateTerrain({ canvas, seed: 5, constraints });
+  assert.deepEqual(problems, []);
+  const land = features.filter((f) => f.type === 'land');
+  assert.equal(land.length, 1);
+  const xs = land[0].polygon.map((p) => p[0]);
+  const ys = land[0].polygon.map((p) => p[1]);
+  assert.ok(Math.abs(Math.min(...xs) - 1000) <= 120, `minX ${Math.min(...xs)}`);
+  assert.ok(Math.abs(Math.max(...xs) - 3000) <= 120, `maxX ${Math.max(...xs)}`);
+  assert.ok(Math.abs(Math.min(...ys) - 800) <= 120, `minY ${Math.min(...ys)}`);
+  assert.ok(Math.abs(Math.max(...ys) - 2200) <= 120, `maxY ${Math.max(...ys)}`);
+  assert.ok(pointInPolygon([2000, 1500], land[0].polygon));
+  assert.deepEqual(generateTerrain({ canvas, seed: 5, constraints }), { features, problems });
+});

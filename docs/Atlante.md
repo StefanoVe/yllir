@@ -1,6 +1,6 @@
 # Atlante
 
-**Stato:** processo, forma e principi **Deciso** dall'autore (2026-11-19); prima implementazione in 0.78.0 (skill `atlas`, sezione Atlante del master screen 0.19.0), con formati e strumenti come descritti qui. La scala `settlement`/`district` (decisione 12, sezione 2b) è implementata nella versione 0.79.0 del framework, con le differenze indicate in sezione 2b. Le scale mescolate (sezione 2b) sono implementate nella versione 0.81.0.
+**Stato:** processo, forma e principi **Deciso** dall'autore (2026-11-19); prima implementazione in 0.78.0 (skill `atlas`, sezione Atlante del master screen 0.19.0), con formati e strumenti come descritti qui. La scala `settlement`/`district` (decisione 12, sezione 2b) è implementata nella versione 0.79.0 del framework, con le differenze indicate in sezione 2b. Le scale mescolate (sezione 2b) sono implementate nella versione 0.81.0. L'immagine di partenza (sezione 5c) è implementata nella versione 0.83.0.
 **Parte di:** [Skill di libreria](Skill%20di%20libreria.md) (scheda [L25](Skill%20di%20libreria.md#l25-atlante)) e [Master screen](Master%20screen.md)
 
 ## Scopo del documento
@@ -113,6 +113,25 @@ Lo script fa la meccanica, l'assistente giudica: la scelta dei vincoli e la lett
 - altri fornitori con immagine di riferimento (ComfyUI, Photoshop), oltre a Codex;
 - la registrazione pixel-esatta tra mappa disegnata e dipinta non è verificata dal codice: oggi il controllo è visivo, fatto dall'assistente;
 - il costo di ogni rifinitura e chi lo sostiene.
+
+## 5c. Immagine di partenza
+
+**Deciso** (decisione dell'autore, 2026-11-20): prima del bake, nella generazione iniziale, l'assistente può partire da un'immagine trovata nelle fonti o data dal master (per esempio un'isola con una città da costa a costa). L'assistente la legge, ne ricava coste, quartieri, edifici e il resto, e rifà la carta in modalità atlante, che poi può passare al bake.
+
+*Implementata in 0.83.0.*
+
+- **Coerente con la decisione 8.** L'immagine non viene mai dipinta nella carta: viene tracciata in dati (livelli e vincoli), e il disegno resta degli script. Quindi valgono livelli, approvazioni, blocco dei livelli e ripetibilità come sempre.
+- **Contorno tracciato.** Un vincolo `landmass` (terre) o `island` (isola della città) può avere un `outline`: il poligono della costa letto dall'assistente. Nelle terre il contorno entra nel campo di terra con un rumore leggero. Nell'isola della città il contorno è la terra, e il mare è la tela meno la terra (baie e porti restano).
+- **Comandi.** `init --reference <immagine>` imposta la tela con le proporzioni dell'immagine e ne tiene una copia nella cartella dell'atlante, in `reference/` (una sola immagine alla volta); `reference-set` la aggiunge a un atlante esistente; `reference-grid` mostra l'immagine sulla tela con una griglia numerata, per leggere le coordinate; `reference-overlay` sovrappone il disegno all'immagine per il controllo (al massimo tre giri per livello). Griglia e sovrapposizione sono solo per l'assistente.
+- **Provenienza.** Ciò che si ricava dall'immagine ha provenienza `document` con l'immagine come fonte (o `master` per ciò che il master dice a voce). I nomi leggibili sull'immagine contano come nomi dati da un documento se l'immagine è una fonte, come nomi dati dal master se l'ha data lui.
+- **Riservatezza.** L'immagine è materiale solo per il master: non va a ricerche, fornitori di immagini né al sito dei giocatori. Il bake riceve solo il disegno fatto dai livelli, mai l'immagine di partenza.
+- **Immagine incollata nella conversazione.** Non ha un percorso: passa da `import`, che la tiene come originale nelle fonti, e si usa il percorso dell'originale.
+
+**Questioni aperte:**
+
+- l'immagine è conservata due volte: come originale nelle fonti e come copia in `reference/` dell'atlante. Si può evitare la copia e puntare all'originale? Non deciso.
+- se la proporzione dell'immagine non coincide con la tela (atlante già esistente) l'immagine viene stirata sulla tela: va bene, o serve un adattamento?
+- tracciare da un'immagine che è un'illustrazione (non una carta piana) può dare contorni imprecisi: serve un controllo più forte del giro di sovrapposizione?
 
 ## 6. Master screen
 

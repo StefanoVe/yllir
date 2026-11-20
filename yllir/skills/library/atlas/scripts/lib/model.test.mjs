@@ -188,6 +188,28 @@ test('manifestProblems accepts a bake inside bake/ with its layers hash and size
   }
 });
 
+test('manifestProblems accepts a reference inside reference/ with its size; rejects each bad field', () => {
+  const reference = { file: 'reference/ref-0a1b2c3d.png', width: 1000, height: 500 };
+  assert.deepEqual(manifestProblems(baseManifest({ reference })), []);
+  assert.deepEqual(manifestProblems(baseManifest()), []);
+  const cases = [
+    { ...reference, file: 'bake/ref-0a1b2c3d.png' },
+    { ...reference, file: 'reference/../atlas.json' },
+    { ...reference, file: 7 },
+    { ...reference, width: 0 },
+    { ...reference, height: 2.5 },
+    { ...reference, width: '1000' },
+    { file: reference.file, width: 1000 },
+    null,
+    'reference/ref-0a1b2c3d.png',
+  ];
+  for (const candidate of cases) {
+    const problems = manifestProblems(baseManifest({ reference: candidate }));
+    assert.deepEqual(codes(problems), ['bad-manifest'], JSON.stringify(candidate));
+    assert.ok(problems[0].path.startsWith('reference'), JSON.stringify(problems));
+  }
+});
+
 test('terrain constraints: unknown kind gives bad-constraint; a region on an unknown place gives unknown-place', () => {
   const root = validRoot({
     layers: {
@@ -669,4 +691,25 @@ test('districts: the realm rules, a character, and the district type', () => {
     ['bad-feature features[0].character']);
   assert.deepEqual(problemsOf({ districts: layer('districts', { features: [{ ...feature, name: 3 }] }) }),
     ['bad-feature features[0].name']);
+});
+
+test('a landmass with an outline needs no centre or radius; an outline of 2 points or a non-finite point is bad-constraint', () => {
+  const outline = [[1000, 800], [3000, 800], [3000, 2200], [1000, 2200]];
+  const landmassWith = (extra) => ({ kind: 'landmass', id: 'traced', outline, provenance: 'master', sources: [], ...extra });
+  const terrainCodes = (constraint) => codes(check(validRoot({ layers: { terrain: { ...terrainLayer(), constraints: [constraint] } } })));
+  assert.deepEqual(terrainCodes(landmassWith({})), []);
+  assert.deepEqual(terrainCodes(landmassWith({ outline: [[1000, 800], [3000, 800]] })), ['bad-constraint']);
+  assert.deepEqual(terrainCodes(landmassWith({ outline: [[1000, 800], [3000, 800], [NaN, 2200]] })), ['bad-constraint']);
+  assert.deepEqual(terrainCodes(landmassWith({ center: [500] })), ['bad-constraint']);
+  assert.deepEqual(terrainCodes({ kind: 'landmass', id: 'plain', center: [500, 500], radius: [300, 200], provenance: 'master', sources: [] }), []);
+});
+
+test('an island with an outline needs no radius, still needs at; a bad outline point is bad-constraint', () => {
+  const outline = [[600, 400], [1000, 250], [1500, 300], [1900, 500], [1800, 1000], [1900, 1400], [1300, 1550], [700, 1300]];
+  const island = { kind: 'island', id: 'traced-isle', at: [1200, 900], outline, ...master };
+  assert.deepEqual(problemsOf({ ground: layer('ground', { constraints: [island] }) }), []);
+  const ground = (extra) => problemsOf({ ground: layer('ground', { constraints: [{ ...island, ...extra }] }) });
+  assert.deepEqual(ground({ outline: [[600, 400], [1000, 250]] }), ['bad-constraint constraints[0].outline']);
+  assert.deepEqual(ground({ outline: [[600, 400], [1000, 250], [NaN, 300]] }), ['bad-constraint constraints[0].outline[2]']);
+  assert.deepEqual(ground({ at: undefined }), ['bad-constraint constraints[0].at']);
 });

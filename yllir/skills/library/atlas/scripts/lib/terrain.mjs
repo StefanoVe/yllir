@@ -99,7 +99,27 @@ export function generateTerrain({ canvas, seed, constraints = [], locked = null 
   const get = (i, j) => field[j * gw + i];
 
   for (const [c, k] of list) {
-    if (c.kind === 'landmass' && isNew(k) && isFinitePoint(c.center)
+    if (c.kind === 'landmass' && isNew(k) && isUsablePolygon(c.outline)) {
+      // An outline is traced: inside is land, the distance to its edge sets the coast, and the fine noise roughens it.
+      const roughness = typeof c.roughness === 'number' ? c.roughness : 0.2;
+      const xs = c.outline.map((p) => p[0]);
+      const ys = c.outline.map((p) => p[1]);
+      const margin = cell * 6;
+      const i0 = Math.max(0, Math.floor((Math.min(...xs) - margin) / cell));
+      const i1 = Math.min(gw - 1, Math.ceil((Math.max(...xs) + margin) / cell));
+      const j0 = Math.max(0, Math.floor((Math.min(...ys) - margin) / cell));
+      const j1 = Math.min(gh - 1, Math.ceil((Math.max(...ys) + margin) / cell));
+      for (let j = j0; j <= j1; j++) {
+        for (let i = i0; i <= i1; i++) {
+          const p = at(i, j);
+          const inside = pointInPolygon(p, c.outline);
+          const d = distanceToEdges(p, c.outline);
+          const fine = (fbm(seed + k + 23, p[0] / (cell * 12), p[1] / (cell * 12), { octaves: 6, gain: 0.55 }) - 0.5) * 2;
+          const v = (inside ? 1 : -1) * Math.min(1, d / (cell * 6)) + roughness * 0.5 * fine;
+          set(i, j, Math.max(get(i, j), v));
+        }
+      }
+    } else if (c.kind === 'landmass' && isNew(k) && isFinitePoint(c.center)
       && Array.isArray(c.radius) && c.radius.length === 2 && c.radius.every((r) => r > 0)) {
       const [cx, cy] = c.center;
       const [rx, ry] = c.radius;

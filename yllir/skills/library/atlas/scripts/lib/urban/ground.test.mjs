@@ -4,6 +4,7 @@ import { generateGround } from './ground.mjs';
 import { pointInPolygon } from '../geometry.mjs';
 import { centroid, inAnyPolygon, polygonArea } from './shapes.mjs';
 import { generateBlocks } from './blocks.mjs';
+import { crossLayerProblems } from '../model.mjs';
 
 const CANVAS = { width: 2400, height: 1800 };
 const generate = (constraints, extra = {}) => generateGround({ canvas: CANVAS, seed: 7, constraints, ...extra });
@@ -264,4 +265,74 @@ test('end to end: blocks fill the island, and no block centroid is in the sea', 
     assert.equal(inAnyPolygon(c, sea), false, `${block.id} centroid is in the sea`);
     assert.equal(pointInPolygon(c, land), true, `${block.id} centroid is off the island`);
   }
+});
+
+function distanceToSegment([px, py], [ax, ay], [bx, by]) {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)));
+  return Math.hypot(px - (ax + t * dx), py - (ay + t * dy));
+}
+
+const TRACED = {
+  kind: 'island', id: 'traced-isle', at: [1200, 900],
+  outline: [[600, 400], [1000, 250], [1500, 300], [1900, 500], [1800, 1000], [1900, 1400], [1300, 1550], [700, 1300]],
+  provenance: 'master', sources: [],
+};
+
+test('an island with an outline gives one land feature on the outline and one keyhole sea piece', () => {
+  const { features, problems } = generate([TRACED]);
+  assert.deepEqual(problems, []);
+  assert.deepEqual(features.map((f) => f.type), ['land', 'water']);
+  const outline = TRACED.outline;
+  const land = islandOf(features);
+  for (const [x, y] of land.polygon) {
+    const nearest = Math.min(...outline.map((_, e) => distanceToSegment([x, y], outline[e], outline[(e + 1) % outline.length])));
+    assert.ok(nearest <= 25, `point ${x},${y} is ${nearest} from the outline`);
+  }
+});
+
+test('an island whose centre is outside its outline gives a problem and no feature', () => {
+  const { features, problems } = generate([{ ...TRACED, at: [200, 200] }]);
+  assert.deepEqual(features, []);
+  assert.equal(problems.length, 1);
+  assert.equal(problems[0].code, 'bad-constraint');
+  assert.match(problems[0].message, /the island centre must be inside its outline$/);
+});
+
+// A rectangle 1600 x 1000 around the centre, with a bay 400 wide and 500 deep cut into its south side.
+const HARBOUR = {
+  kind: 'island', id: 'harbour-isle', at: [1200, 900],
+  outline: [[400, 400], [2000, 400], [2000, 1400], [1400, 1400], [1400, 900], [1000, 900], [1000, 1400], [400, 1400]],
+  provenance: 'master', sources: [],
+};
+
+test('a traced island keeps its bay: the land is the outline and the sea is one keyhole piece', () => {
+  const { features, problems } = generate([HARBOUR]);
+  assert.deepEqual(problems, []);
+  assert.deepEqual(features.map((f) => [f.id, f.type, f.kind]), [
+    ['harbour-isle', 'land', 'island'],
+    ['harbour-isle-sea', 'water', 'sea'],
+  ]);
+  const land = features[0].polygon;
+  const sea = features[1].polygon;
+  assert.deepEqual(land, HARBOUR.outline);
+  assert.equal(pointInPolygon([1200, 1200], land), false, 'the bay is not land');
+  assert.equal(pointInPolygon([1200, 1200], sea), true, 'the bay is sea');
+  assert.equal(pointInPolygon([1200, 600], land), true, 'the middle of the island is land');
+  assert.equal(pointInPolygon([1200, 600], sea), false, 'the middle of the island is not sea');
+  assert.equal(pointInPolygon([500, 200], sea), true, 'the sea beside the slit is sea');
+  assert.equal(pointInPolygon([0, 0], sea), true, 'a canvas corner is sea');
+  assert.equal(pointInPolygon([0, 0], land), false);
+  assert.ok(insideCanvas(sea));
+  const distinct = new Set(sea.map((p) => p.join(','))).size;
+  assert.ok(distinct <= 4 + HARBOUR.outline.length + 2, `${distinct} distinct points`);
+  assert.ok(Math.abs(polygonArea(sea) + polygonArea(land) - CANVAS_AREA) / CANVAS_AREA < 0.001);
+});
+
+test('a building in the bay of a traced island is in water; one on the island is not', () => {
+  const { features } = generate([HARBOUR]);
+  const withBuilding = (at) => crossLayerProblems({ ground: { features }, buildings: { features: [{ id: 'tavern', at }] } }, {});
+  assert.ok(withBuilding([1200, 1200]).some((p) => p.code === 'building-in-water'));
+  assert.ok(!withBuilding([1200, 600]).some((p) => p.code === 'building-in-water'));
 });

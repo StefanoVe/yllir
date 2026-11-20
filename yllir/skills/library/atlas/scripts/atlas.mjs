@@ -2,11 +2,14 @@
 // Atlas of a campaign: the manifest and one file per layer, checked and written by
 // deterministic rules. The drawing is not here; the agent proposes constraints and this
 // script refuses every write that breaks the rules or a locked layer.
-// Usage: node atlas.mjs <status|validate|init|places|write-layer|lock|generate <layer>|generate-terrain|preview|render|styles|set-style|bake-input|bake-set <image>|bake-clear> <root> [args] [--size <px>] [--data-dir <path>] [--unlock] [--open] [--audience master|players]
+// The reference picture (a map the assistant traces from) is master-only: it is kept in reference/ and only read by
+// reference-grid and reference-overlay, which write their PNGs under the campaign cache.
+// Usage: node atlas.mjs <status|validate|init [--reference <image>]|places|write-layer|lock|generate <layer>|generate-terrain|preview|render|styles|set-style|bake-input|bake-set <image>|bake-clear|reference-set <image>|reference-grid|reference-overlay> <root> [args] [--size <px>] [--data-dir <path>] [--reference <image>] [--unlock] [--open] [--audience master|players]
 // Exit codes: 0 ok, 1 campaign problem (validation errors, refused write, no atlas folder), 2 usage.
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
@@ -37,16 +40,29 @@ import { generateBlocks } from './lib/urban/blocks.mjs';
 import { generateDistricts } from './lib/urban/districts.mjs';
 import { withTerrain } from './lib/urban/synthetic-terrain.mjs';
 import { renderPreview } from './lib/preview.mjs';
+import {
+  referenceImageInfo, canvasForReference, referenceGridSvg, referenceOverlaySvg, dataUriOf,
+} from './lib/reference.mjs';
 import { buildWorldIndex } from '../../../../scripts/lib/world-graph.mjs';
 import { parseYamlLite } from '../../../../scripts/lib/yaml-lite.mjs';
 import { exitWith, runCli } from '../../../../scripts/lib/cli-exit.mjs';
 
-const USAGE = 'usage: node atlas.mjs <status|validate|init|places|write-layer|lock|generate <layer>|generate-terrain|preview|render|styles|set-style|bake-input|bake-set <image>|bake-clear> <root> [args] [--size <px>] [--data-dir <path>] [--unlock] [--open] [--audience master|players]';
-const COMMANDS = ['status', 'validate', 'init', 'places', 'write-layer', 'lock', 'generate', 'generate-terrain', 'preview', 'render', 'styles', 'set-style', 'bake-input', 'bake-set', 'bake-clear'];
+const USAGE = 'usage: node atlas.mjs <status|validate|init [--reference <image>]|places|write-layer|lock|generate <layer>|generate-terrain|preview|render|styles|set-style|bake-input|bake-set <image>|bake-clear|reference-set <image>|reference-grid|reference-overlay> <root> [args] [--size <px>] [--data-dir <path>] [--reference <image>] [--unlock] [--open] [--audience master|players]';
+const COMMANDS = ['status', 'validate', 'init', 'places', 'write-layer', 'lock', 'generate', 'generate-terrain', 'preview', 'render', 'styles', 'set-style', 'bake-input', 'bake-set', 'bake-clear', 'reference-set', 'reference-grid', 'reference-overlay'];
 const AUDIENCES = ['master', 'players'];
-// The bake input width: the default, and the limits of --size.
+// The commands that take --size and --data-dir (the rasterized width and the rasterizer's data folder).
+const SIZED_COMMANDS = ['bake-input', 'reference-grid', 'reference-overlay'];
+// The width of a rasterized image: the default of each command, and the limits of --size.
 const BAKE_WIDTH = { default: 2048, min: 512, max: 4096 };
+const REFERENCE_WIDTH = { default: 1600, min: BAKE_WIDTH.min, max: BAKE_WIDTH.max };
 const ASSETS_DIR = fileURLToPath(new URL('../assets/', import.meta.url));
+const FONT_FILES = [path.join(ASSETS_DIR, 'fonts', 'Cinzel.ttf')];
+// The folder of the reference picture, inside the atlas folder (one picture at a time).
+const REFERENCE_DIR = 'reference';
+// Where the grid and the overlay of the reference go before the assistant looks at them (campaign-relative).
+const REFERENCE_CACHE = '.campaign/cache/atlas/reference';
+// The aspect ratio of a reference picture may differ from the canvas by this much (relative) before it is reported.
+const REFERENCE_ASPECT_TOLERANCE = 0.02;
 // Tests replace the rasterizer by a module that exports rasterizeSvg. Honoured only when this variable is set.
 const RASTERIZER_STUB_ENV = 'YLLIR_ATLAS_RASTERIZER_STUB';
 // The generator of each layer. Every generator is pure: constraints, seed and the other layers in, features and problems out.
@@ -95,6 +111,13 @@ function noAtlasProblem() {
   return { code: 'no-atlas', file: 'campaign.yaml', path: 'structure', message: 'campaign.yaml declares no atlas folder' };
 }
 
+/** The reference picture's file, relative to the atlas folder, or null when the manifest has none. */
+function referenceFileOf(manifest) {
+  return isPlainObject(manifest) && isPlainObject(manifest.reference) && typeof manifest.reference.file === 'string'
+    ? manifest.reference.file
+    : null;
+}
+
 function status(root) {
   const folder = atlasFolder(root);
   const atlas = readAtlas(root);
@@ -114,6 +137,7 @@ function status(root) {
     exists: dir !== null && fs.existsSync(path.join(dir, 'atlas.json')),
     layers,
     bake: bakeStatus(atlas.manifest, atlas.layers),
+    reference: referenceFileOf(atlas.manifest),
     problems: validateAtlas(root, atlas, { worldIndex }),
     pending: pendingPlaces(root, atlas, worldIndex),
   });
@@ -127,12 +151,51 @@ function validate(root) {
 }
 
 /**
+ * Reads a reference picture (PNG, JPEG or WebP, at most BAKE_MAX_BYTES, checked by its magic bytes and a readable size).
+ * The path is relative to the campaign root or absolute. Nothing is written here.
+ * @returns {{ ok: true, bytes: Buffer, width: number, height: number, file: string } | { ok: false, problem: object }}
+ *   file is the atlas-relative name the picture is stored under: reference/ref-<first 8 hex of sha256>.<ext>
+ */
+function readReferenceImage(root, imageArg) {
+  const badReference = (message) => ({ code: 'bad-reference', file: imageArg, path: '', message });
+  const source = path.resolve(root, imageArg);
+  let bytes;
+  try {
+    if (fs.statSync(source).size > BAKE_MAX_BYTES) {
+      return { ok: false, problem: badReference(`the picture is larger than ${BAKE_MAX_BYTES} bytes`) };
+    }
+    bytes = fs.readFileSync(source);
+  } catch {
+    return { ok: false, problem: badReference('the picture cannot be read') };
+  }
+  const info = referenceImageInfo(bytes);
+  if (info === null || info.size === null) {
+    return { ok: false, problem: badReference('the picture is not a PNG, JPEG or WebP file with a readable size') };
+  }
+  const digest = createHash('sha256').update(bytes).digest('hex').slice(0, 8);
+  return { ok: true, bytes, width: info.size.width, height: info.size.height, file: `${REFERENCE_DIR}/ref-${digest}.${info.ext}` };
+}
+
+/** Stores the picture in the atlas folder and deletes every other file of reference/. Call only after the manifest validated. */
+function storeReference(dir, picture) {
+  const refDir = path.join(dir, REFERENCE_DIR);
+  const name = path.posix.basename(picture.file);
+  fs.mkdirSync(refDir, { recursive: true });
+  for (const entry of fs.readdirSync(refDir)) {
+    if (entry !== name) fs.rmSync(path.join(refDir, entry), { recursive: true, force: true });
+  }
+  fs.writeFileSync(path.join(refDir, name), picture.bytes);
+}
+
+/**
  * Creates atlas.json. Missing seed, canvas and style get their defaults. The campaign is set up for the
  * atlas (category and module, see lib/setup.mjs) only after the scope passed every check, so a refused
  * init changes nothing. An existing atlas.json is refused first, with campaign.yaml untouched.
+ * With a reference picture, the canvas is the picture's aspect ratio on the default long side (unless the
+ * scope gives a canvas), and the picture is stored in reference/.
  */
-function init(root, scopeFile) {
-  const none = { written: false, categoryAdded: false, moduleEnabled: false };
+function init(root, scopeFile, referenceArg = null) {
+  const none = { written: false, categoryAdded: false, moduleEnabled: false, reference: null };
   const read = readJsonArg(scopeFile);
   if (read.error) {
     return refuse(none, [{ code: 'bad-json', file: scopeFile, path: '', message: read.error }]);
@@ -148,14 +211,24 @@ function init(root, scopeFile) {
   }
 
   const input = isPlainObject(read.value) ? read.value : {};
+  const defaults = defaultCanvasFor(input.scope?.kind);
+  let picture = null;
+  if (referenceArg !== null) {
+    const picked = readReferenceImage(root, referenceArg);
+    if (!picked.ok) return refuse(none, [picked.problem]);
+    picture = picked;
+  }
+  const canvas = input.canvas
+    ?? (picture === null ? defaults : canvasForReference({ width: picture.width, height: picture.height }, defaults.width));
   const manifest = {
     schema: 1,
     scope: input.scope,
-    canvas: input.canvas ?? defaultCanvasFor(input.scope?.kind),
+    canvas,
     seed: input.seed ?? plan.seed,
     style: input.style ?? DEFAULT_STYLE,
     layers: {},
   };
+  if (picture !== null) manifest.reference = { file: picture.file, width: picture.width, height: picture.height };
   const problems = prefixProblems(folder, manifestProblems(manifest));
   if (problems.length > 0) return refuse(none, problems);
 
@@ -163,14 +236,125 @@ function init(root, scopeFile) {
   if (!setup.ok) return refuse({ ...none, categoryAdded: setup.categoryAdded }, setup.errors);
 
   fs.mkdirSync(dir, { recursive: true });
+  if (picture !== null) storeReference(dir, picture);
   writeJson(file, manifest);
   print({
     ok: true,
     written: path.posix.join(folder, 'atlas.json'),
     categoryAdded: setup.categoryAdded,
     moduleEnabled: setup.moduleEnabled,
+    reference: picture === null ? null : path.posix.join(folder, picture.file),
     problems: [],
   });
+  return 0;
+}
+
+/**
+ * Sets the reference picture of an existing atlas: stores it, deletes the older picture, and records its file and size in
+ * the manifest (every other field kept, the canvas unchanged). Prints whether the picture's aspect ratio matches the canvas.
+ */
+function referenceSetCommand(root, imageArg) {
+  const folder = atlasFolder(root);
+  const dir = atlasDir(root);
+  const empty = { ok: false, file: null, width: null, height: null, aspect: null };
+  if (dir === null) return refuse(empty, [noAtlasProblem()]);
+  if (!fs.existsSync(path.join(dir, 'atlas.json'))) return refuse(empty, [missingAtlasProblem(folder)]);
+  const atlas = readAtlas(root);
+  if (!isPlainObject(atlas.manifest)) {
+    return refuse(empty, [{ code: 'bad-manifest', file: path.posix.join(folder, 'atlas.json'), path: '', message: 'atlas.json is missing or invalid' }]);
+  }
+  const manifestErrors = manifestProblems(atlas.manifest);
+  if (manifestErrors.length > 0) return refuse(empty, prefixProblems(folder, manifestErrors));
+
+  const read = readReferenceImage(root, imageArg);
+  if (!read.ok) return refuse(empty, [read.problem]);
+  const manifest = { ...structuredClone(atlas.manifest), reference: { file: read.file, width: read.width, height: read.height } };
+  const problems = prefixProblems(folder, manifestProblems(manifest));
+  if (problems.length > 0) return refuse(empty, problems);
+
+  storeReference(dir, read);
+  writeJson(path.join(dir, 'atlas.json'), manifest);
+  const { canvas } = atlas.manifest;
+  const drift = Math.abs((read.width / read.height) / (canvas.width / canvas.height) - 1);
+  print({
+    ok: true,
+    file: path.posix.join(folder, read.file),
+    width: read.width,
+    height: read.height,
+    aspect: drift > REFERENCE_ASPECT_TOLERANCE ? 'differs' : 'match',
+  });
+  return 0;
+}
+
+/** The PNG preview of the atlas as drawn (the bytes preview writes, and the drawing the reference overlay shows). */
+function previewPng(atlas) {
+  return renderPreview({ canvas: atlas.manifest.canvas, layers: atlas.layers });
+}
+
+/**
+ * Writes the grid (kind 'grid') or the overlay (kind 'overlay') of the reference picture, rasterized at the given width,
+ * under the campaign cache. The overlay draws the atlas on the picture. Nothing in the atlas folder changes.
+ */
+async function referenceRasterCommand(root, kind, { width, dataDir } = {}) {
+  const folder = atlasFolder(root);
+  const dir = atlasDir(root);
+  const empty = { ok: false, file: null, width: null, height: null };
+  if (dir === null) return refuse(empty, [noAtlasProblem()]);
+  if (!fs.existsSync(path.join(dir, 'atlas.json'))) return refuse(empty, [missingAtlasProblem(folder)]);
+  const atlas = readAtlas(root);
+  if (!isPlainObject(atlas.manifest)) {
+    return refuse(empty, [{ code: 'bad-manifest', file: path.posix.join(folder, 'atlas.json'), path: '', message: 'atlas.json is missing or invalid' }]);
+  }
+  const manifestErrors = manifestProblems(atlas.manifest);
+  if (manifestErrors.length > 0) return refuse(empty, prefixProblems(folder, manifestErrors));
+  if (atlas.errors.length > 0) return refuse(empty, prefixProblems(folder, atlas.errors));
+
+  const referenceFile = referenceFileOf(atlas.manifest);
+  if (referenceFile === null || !fs.existsSync(path.join(dir, referenceFile))) {
+    return refuse(empty, [{
+      code: 'missing-reference',
+      file: path.posix.join(folder, referenceFile ?? 'atlas.json'),
+      path: 'reference',
+      message: 'the atlas has no reference picture: set one with init --reference or reference-set',
+    }]);
+  }
+  if (kind === 'overlay' && Object.keys(atlas.layers).length === 0) {
+    return refuse(empty, [{ code: 'missing-layer', file: folder, path: '', message: 'the atlas has no layer yet: generate one first' }]);
+  }
+
+  const bytes = fs.readFileSync(path.join(dir, referenceFile));
+  const info = referenceImageInfo(bytes);
+  if (info === null) {
+    return refuse(empty, [{ code: 'bad-reference', file: path.posix.join(folder, referenceFile), path: '', message: 'the reference picture is not a PNG, JPEG or WebP file' }]);
+  }
+  const options = { canvas: atlas.manifest.canvas, imageHref: dataUriOf(bytes, info.mime) };
+  let svg;
+  try {
+    svg = kind === 'grid'
+      ? referenceGridSvg(options)
+      : referenceOverlaySvg({ ...options, drawingHref: dataUriOf(previewPng(atlas), 'image/png') });
+  } catch (err) {
+    return refuse(empty, [{ code: 'render', file: path.posix.join(folder, referenceFile), path: '', message: err.message }]);
+  }
+
+  const file = `${REFERENCE_CACHE}/${kind}.png`;
+  const rasterize = await rasterizerFor();
+  let png;
+  try {
+    png = await rasterize(svg, { width, dataDir, resourcesDir: ASSETS_DIR, fontFiles: FONT_FILES });
+  } catch (err) {
+    if (err.code === 'rasterizer-unavailable') {
+      return refuse(empty, [{ code: 'rasterizer-unavailable', file, path: '', message: `the rasterizer is not installed (${err.message}); run bake-setup.mjs first` }]);
+    }
+    return refuse(empty, [{ code: 'render', file, path: '', message: err.message }]);
+  }
+  const size = pngSize(png);
+  if (size === null) return refuse(empty, [{ code: 'render', file, path: '', message: 'the rasterizer did not return a PNG' }]);
+
+  const target = path.join(root, file);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, png);
+  print({ ok: true, file, width: size.width, height: size.height });
   return 0;
 }
 
@@ -367,7 +551,7 @@ function previewCommand(root, { open = false } = {}) {
   }
   const file = path.join(root, PREVIEW_FILE);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(file, renderPreview({ canvas: atlas.manifest.canvas, layers: atlas.layers }));
+  fs.writeFileSync(file, previewPng(atlas));
   if (open) {
     print({ ok: true, file: PREVIEW_FILE, opened: openFile(file) });
   } else {
@@ -659,12 +843,19 @@ async function main() {
   let audience = null;
   let size = null;
   let dataDir = null;
+  let reference = null;
   const args = [];
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--unlock' || argv[i] === '--open') continue;
     if (argv[i] === '--audience') {
       audience = argv[++i] ?? null;
       if (audience === null) throw new Error(USAGE);
+      continue;
+    }
+    if (argv[i] === '--reference') {
+      const value = argv[++i];
+      if (value === undefined || value.startsWith('--')) throw new Error(USAGE);
+      reference = value;
       continue;
     }
     if (argv[i] === '--size' || argv[i] === '--data-dir') {
@@ -681,7 +872,8 @@ async function main() {
   if (unlock && command !== 'write-layer') throw new Error(USAGE);
   if (open && command !== 'preview' && command !== 'render') throw new Error(USAGE);
   if (audience !== null && (command !== 'render' || !AUDIENCES.includes(audience))) throw new Error(USAGE);
-  if ((size !== null || dataDir !== null) && command !== 'bake-input') throw new Error(USAGE);
+  if (reference !== null && command !== 'init') throw new Error(USAGE);
+  if ((size !== null || dataDir !== null) && !SIZED_COMMANDS.includes(command)) throw new Error(USAGE);
   if (size !== null && !(/^\d+$/.test(size) && Number(size) >= BAKE_WIDTH.min && Number(size) <= BAKE_WIDTH.max)) {
     throw new Error(USAGE);
   }
@@ -697,7 +889,19 @@ async function main() {
       break;
     case 'init':
       if (rest.length !== 1) throw new Error(USAGE);
-      code = init(root, rest[0]);
+      code = init(root, rest[0], reference);
+      break;
+    case 'reference-set':
+      if (rest.length !== 1) throw new Error(USAGE);
+      code = referenceSetCommand(root, rest[0]);
+      break;
+    case 'reference-grid':
+    case 'reference-overlay':
+      if (rest.length !== 0) throw new Error(USAGE);
+      code = await referenceRasterCommand(root, command === 'reference-grid' ? 'grid' : 'overlay', {
+        width: size === null ? REFERENCE_WIDTH.default : Number(size),
+        dataDir: dataDir ?? undefined,
+      });
       break;
     case 'places':
       if (rest.length !== 0) throw new Error(USAGE);
