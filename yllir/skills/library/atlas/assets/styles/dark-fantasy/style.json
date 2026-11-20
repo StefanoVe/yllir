@@ -1,39 +1,10 @@
 {
-  "schema": 1,
+  "schema": 2,
   "id": "dark-fantasy",
   "names": { "it": "Dark fantasy", "en": "Dark fantasy" },
+  "repaint": "dark, muted, moody fantasy map",
   "fonts": { "place": "IM Fell English", "realm": "Cinzel", "feature": "IM Fell English" },
-  "textures": { "land": "land", "sand": "sand", "snow": "snow", "sea": "sea", "deepSea": "deep-sea" },
-  "sea": { "glow": { "width": 36, "blur": 6, "opacity": 0.6 }, "ripples": { "count": 3, "color": "#9fb3b8", "opacity": 0.15, "step": 0.05, "base": 4, "spacing": 7 } },
-  "coast": { "color": "#121212", "width": 1.0, "shade": { "color": "#000000", "opacity": 0.25, "width": 3 } },
-  "rivers": { "under": "#3b4a50", "underWidth": 2.4, "color": "#5f7f8c", "width": 1.3 },
-  "lakes": { "highlight": { "color": "#ffffff", "opacity": 0.25, "width": 2 } },
-  "borders": { "fillOpacity": 0.08, "width": 1.1, "dash": [3, 2], "opacity": 0.8, "coastGap": 3.5 },
-  "routes": { "road": { "color": "#5a4636", "width": 0.9, "dash": [3, 1.5] }, "trail": { "color": "#5a4636", "width": 0.6, "dash": [1.2, 1.8] }, "sea": { "color": "#5a4636", "width": 0.6, "dash": [0.6, 2], "opacity": 0.8 } },
-  "labels": {
-    "fill": "#e8e0d0", "halo": "#141414", "haloOpacity": 0.8, "haloWidth": 0.28,
-    "featureFill": "#d9cfbd", "featureSize": 7, "featureSpacing": 0.2,
-    "placeSize": { "capital": 6.5, "city": 6.5, "other": 5 },
-    "realmDarken": -0.2, "realmOpacity": 0.75,
-    "realmSize": { "max": 22, "min": 8, "fitMin": 6, "areaDivisor": 14 },
-    "realmSpacing": 0.35, "realmSpacingMin": 0.12
-  },
-  "stamps": { "mirrorTrees": true, "scale": 1 },
-  "masks": { "blur": 3 },
-  "icons": { "capital": 26, "city": 21, "other": 17 },
-  "vignette": { "color": "#000000", "opacity": 0.55 },
-  "forestTint": { "color": "#0f1f12", "opacity": 0.2 },
-  "urban": {
-    "ground": "#2a2e2f", "water": "#1f3a4a", "waterEdge": "#0d1a22", "outline": "#0c0c0c", "square": "#3a3f40", "block": "#34393a",
-    "green": { "park": "#2f4a35", "garden": "#3a5a40", "field": "#4a5a3a", "wood": "#1d3324", "orchard": "#3f5239" },
-    "street": { "casing": "#0b0b0b", "main": "#6a6d6e", "secondary": "#55595a", "lane": "#474b4c" },
-    "wall": { "stone": "#5c6163", "outline": "#0c0c0c" },
-    "roof": {
-      "house": "#4e4a48", "rowhouse": "#463f3d", "shop": "#5a4a3e", "barn": "#4a3c30", "tavern": "#5e3a35", "inn": "#5b4236",
-      "temple": "#8c8c90", "shrine": "#6e6a72", "palace": "#7a7a80", "castle": "#55595e", "keep": "#4a4e53", "tower": "#5a5f63",
-      "mill": "#5d5448", "warehouse": "#403b38", "market": "#564c47", "guildhall": "#4a3a48", "smithy": "#3d3a3a",
-      "gatehouse": "#4b4f52", "landmark": "#6b6470"
-    },
-    "district": { "fillOpacity": 0.10, "labelOpacity": 0.7 }
-  }
+  "labels": { "fill": "#e8e0d0", "halo": "#14110e", "haloOpacity": 0.8, "haloWidth": 0.28, "featureFill": "#d9cfbd", "landSpacing": 0.35, "regionOpacity": 0.75 },
+  "borders": { "fillOpacity": 0.08, "width": 1.4, "dash": [4, 3], "opacity": 0.8 },
+  "markers": { "fill": "#2a2620", "stroke": "#e8e0d0", "size": 14 }
 }

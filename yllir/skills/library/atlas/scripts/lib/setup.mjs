@@ -5,21 +5,13 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import crypto from 'node:crypto';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { addCategory, stringifyConfig } from '../../../../../scripts/lib/config-write.mjs';
 import { validateConfig } from '../../../../../scripts/lib/config.mjs';
-import { atlasFolder, isUrbanScope } from './model.mjs';
+import { atlasFolder } from './model.mjs';
 
 const FILE = 'campaign.yaml';
-export const DEFAULT_CANVAS = { width: 4000, height: 3000 };
-export const DEFAULT_URBAN_CANVAS = { width: 2400, height: 1800 };
 export const DEFAULT_STYLE = 'fantasy-color';
-
-/** A new copy of the default canvas for a scope kind: the urban one for a settlement or district. */
-export function defaultCanvasFor(kind) {
-  return { ...(isUrbanScope(kind) ? DEFAULT_URBAN_CANVAS : DEFAULT_CANVAS) };
-}
 
 const isMapping = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -56,25 +48,16 @@ export function atlasFolderFor(config) {
   return italian ? 'Atlante della campagna' : 'Campaign atlas';
 }
 
-/** The seed of a campaign that gives none: the first 28 bits of sha256 of its slug (the folder name when it has none). */
-export function defaultSeed(config, root) {
-  const slug = isMapping(config.campaign) && typeof config.campaign.slug === 'string' && config.campaign.slug !== ''
-    ? config.campaign.slug
-    : path.basename(path.resolve(root));
-  return parseInt(crypto.createHash('sha256').update(slug).digest('hex').slice(0, 7), 16);
-}
-
 /**
  * What init needs before it writes anything: the atlas folder (the existing one, or the one a new
- * category would get) and the default seed. Reads campaign.yaml only.
- * @returns {{ folder: string|null, seed: number|null, errors: object[] }}
+ * category would get). Reads campaign.yaml only.
+ * @returns {{ folder: string|null, errors: object[] }}
  */
 export function planAtlasSetup(root) {
   const read = readConfig(root);
-  if (read.error) return { folder: null, seed: null, errors: [read.error] };
+  if (read.error) return { folder: null, errors: [read.error] };
   return {
     folder: atlasFolder(root) ?? atlasFolderFor(read.config),
-    seed: defaultSeed(read.config, root),
     errors: [],
   };
 }

@@ -1,0 +1,7 @@
+kind: city
+# C1: the scope kind of atlas.json is settlement or district.
+# C2: the canvas of atlas.json is the size of the picture the campaign holds (360 by 300).
+# C3: land.png exists in the atlas folder.
+# C4: `atlas.mjs validate` exits 0.
+# The picture is placed by the runner as Fonti/citta.png; the base is not sent anywhere (no network in the case).
+scope_kinds: [settlement, district]

@@ -1,135 +1,73 @@
-// Locks of the atlas layers. A locked layer keeps a snapshot (the hash of each constraint,
-// in order, and of every feature). Changing or removing a locked feature or a locked
-// constraint is refused unless the master unlocks the layer. Adding a feature is allowed,
-// except a new land that overlaps locked land; constraints may be appended after the lock.
+// Locks of the atlas. Two things can be locked: the painted base (`base`) and the land mask
+// (`land`). A locked item carries its hash in atlas.json; the caller checks the file on disk
+// against it. Changing the land of a locked atlas is refused unless the master unlocks it, or
+// the change only adds land (extend) and loses none.
 
-import { canonicalJson, sha256, featureHash, vertexOverlap, isUsablePolygon } from './geometry.mjs';
+export const LOCKABLE = ['base', 'land'];
 
-export const CONSTRAINTS_ID = '(constraints)';
+/** Changes of the land below this many pixels, on each side, are noise and are not counted. */
+const NOISE_PIXELS = 25;
+const HEX64 = /^[0-9a-f]{64}$/;
 
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
-function featuresOf(layer) {
-  return Array.isArray(layer?.features)
-    ? layer.features.filter((f) => isPlainObject(f) && typeof f.id === 'string')
-    : [];
-}
-
-function constraintsOf(layer) {
-  return Array.isArray(layer?.constraints) ? layer.constraints : [];
-}
-
-/** One hash per constraint, in order. */
-function constraintHashes(layer) {
-  return constraintsOf(layer).map((c) => sha256(canonicalJson(c)));
-}
-
 /**
- * True when the constraints of a layer no longer start with the locked ones. The locked hashes
- * must be the first N constraints, in the same order; constraints appended after the lock are fine.
+ * Problems of the locks in a manifest that do not need the files: a locked item without a sha256.
+ * @returns {Array<{ code: string, file: string, path: string, message: string }>}
  */
-function constraintsChanged(lockedHashes, layer) {
-  if (!Array.isArray(lockedHashes)) return true;
-  const current = constraintHashes(layer);
-  if (current.length < lockedHashes.length) return true;
-  return lockedHashes.some((hash, i) => current[i] !== hash);
-}
-
-/**
- * Snapshot of a layer object: the hash of each constraint, in order, and the hash of each feature by id.
- * @returns {{ constraints: string[], features: Record<string, string> }}
- */
-export function snapshotOf(layer) {
-  const features = {};
-  for (const feature of featuresOf(layer)) features[feature.id] = featureHash(feature);
-  return { constraints: constraintHashes(layer), features };
-}
-
-/** Compares a snapshot with the current features of a layer (ids are sorted). */
-function diffFeatures(snapshotFeatures, layer) {
-  const current = new Map(featuresOf(layer).map((f) => [f.id, f]));
-  const changed = [];
-  const removed = [];
-  const added = [];
-  for (const [id, hash] of Object.entries(snapshotFeatures)) {
-    const feature = current.get(id);
-    if (feature === undefined) removed.push(id);
-    else if (featureHash(feature) !== hash) changed.push(id);
-  }
-  for (const id of current.keys()) {
-    if (!Object.hasOwn(snapshotFeatures, id)) added.push(id);
-  }
-  return { changed: changed.sort(), removed: removed.sort(), added: added.sort() };
-}
-
-/**
- * Problems of the locked layers of a manifest, given the layer objects on disk.
- * A layer file that is missing counts as an empty layer, so its locked features are removed.
- * @returns {Array<{ code: string, file: string, path: string, message: string, ids: string[] }>}
- *   file is relative to the atlas folder (for example `terrain.json`).
- */
-export function lockProblems(manifest, layers) {
+export function lockProblems(manifest) {
   const problems = [];
-  const entries = isPlainObject(manifest?.layers) ? manifest.layers : {};
-  for (const name of Object.keys(entries).sort()) {
-    const entry = entries[name];
-    if (!isPlainObject(entry) || entry.locked !== true || !isPlainObject(entry.snapshot)) continue;
-    const layer = layers?.[name] ?? {};
-    const { changed, removed } = diffFeatures(entry.snapshot.features ?? {}, layer);
-    if (constraintsChanged(entry.snapshot.constraints, layer)) changed.unshift(CONSTRAINTS_ID);
-    const ids = [...changed, ...removed];
-    if (ids.length === 0) continue;
-    problems.push({
-      code: 'locked-layer-changed',
-      file: `${name}.json`,
-      path: 'features',
-      message: `locked layer ${name} changed: ${ids.join(', ')}`,
-      ids,
-    });
+  if (!isPlainObject(manifest)) return problems;
+  for (const name of LOCKABLE) {
+    const entry = manifest[name];
+    if (!isPlainObject(entry) || entry.locked !== true) continue;
+    if (!HEX64.test(entry.sha256 ?? '')) {
+      problems.push({
+        code: 'locked-without-hash',
+        file: 'atlas.json',
+        path: `${name}.sha256`,
+        message: `${name} is locked but has no sha256`,
+      });
+    }
   }
   return problems;
 }
 
 /**
- * Checks a write of one layer against the manifest.
+ * A new manifest with the lock flag of each named item set. Pure: the given manifest is never changed.
+ * Locking an item that does not exist throws; unlocking one that does not exist changes nothing.
  * @param {object} manifest the manifest on disk
- * @param {string} layerName the layer being written
- * @param {object} candidateLayer the layer object as it would be written
- * @param {{ unlock?: boolean, current?: object|null }} [options]
- *   current is the layer on disk now; it supplies the locked land for the overlap check.
- *   For a layer that is not locked, changes are compared with current when it is given.
- * @returns {{ ok: boolean, changed: string[], removed: string[], added: string[], overlaps: string[] }}
+ * @param {string[]} names items to change, each one of LOCKABLE
+ * @param {boolean} locked the new state
+ * @returns {object} the new manifest
  */
-export function checkWrite(manifest, layerName, candidateLayer, { unlock = false, current = null } = {}) {
-  const entry = manifest?.layers?.[layerName];
-  const locked = isPlainObject(entry) && entry.locked === true && isPlainObject(entry.snapshot);
-  const base = locked ? entry.snapshot : (current ? snapshotOf(current) : null);
-
-  let changed = [];
-  let removed = [];
-  let added;
-  if (base) {
-    ({ changed, removed, added } = diffFeatures(base.features ?? {}, candidateLayer));
-    if (constraintsChanged(base.constraints, candidateLayer)) changed.unshift(CONSTRAINTS_ID);
-  } else {
-    added = featuresOf(candidateLayer).map((f) => f.id).sort();
-  }
-
-  const overlaps = [];
-  if (layerName === 'terrain' && locked && current) {
-    const lockedIds = entry.snapshot.features;
-    const lockedLand = featuresOf(current)
-      .filter((f) => f.type === 'land' && isUsablePolygon(f.polygon) && Object.hasOwn(lockedIds, f.id))
-      .map((f) => f.polygon);
-    for (const feature of featuresOf(candidateLayer)) {
-      if (feature.type !== 'land' || !isUsablePolygon(feature.polygon)) continue;
-      if (Object.hasOwn(lockedIds, feature.id)) continue;
-      if (lockedLand.some((polygon) => vertexOverlap(feature.polygon, polygon))) overlaps.push(feature.id);
+export function setLock(manifest, names, locked) {
+  if (!isPlainObject(manifest)) throw new TypeError('setLock expects the manifest object');
+  const next = structuredClone(manifest);
+  for (const name of names) {
+    if (!LOCKABLE.includes(name)) throw new RangeError(`cannot lock ${name}: not one of ${LOCKABLE.join(', ')}`);
+    if (!isPlainObject(next[name])) {
+      if (locked) throw new Error(`cannot lock ${name}: it does not exist yet`);
+      continue;
     }
-    overlaps.sort();
+    next[name].locked = locked;
   }
+  return next;
+}
 
-  const blocked = locked && !unlock && (changed.length > 0 || removed.length > 0);
-  const overlapBlocked = overlaps.length > 0 && !unlock;
-  return { ok: !blocked && !overlapBlocked, changed, removed, added, overlaps };
+/**
+ * Whether a change of the land is allowed by the lock.
+ * @param {{ manifest: object, diff?: { gained: number, lost: number }, extend?: boolean, unlock?: boolean }} change
+ *   diff counts the land pixels gained (sea to land) and lost (land to sea) by the change.
+ *   extend allows a change that only gains land. unlock is the master's explicit request.
+ * @returns {{ ok: true } | { ok: false, reason: 'land-locked' }}
+ */
+export function checkLandChange({ manifest, diff = { gained: 0, lost: 0 }, extend = false, unlock = false }) {
+  if (manifest?.land?.locked !== true) return { ok: true };
+  if (unlock) return { ok: true };
+  const gained = diff.gained >= NOISE_PIXELS ? diff.gained : 0;
+  const lost = diff.lost >= NOISE_PIXELS ? diff.lost : 0;
+  if (extend && lost === 0) return { ok: true };
+  if (gained + lost > 0) return { ok: false, reason: 'land-locked' };
+  return { ok: true };
 }

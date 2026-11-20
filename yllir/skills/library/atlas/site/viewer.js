@@ -1,23 +1,23 @@
-// Viewer of the atlas site: pan and zoom of the inline map, the infinite sea, the layer switches,
-// the search and the place card. Vanilla browser JavaScript, no libraries. The page data is read from
-// #atlas-data; every piece of text on screen comes from its `strings`, so the viewer chooses no language.
+// Viewer of the atlas site: pan and zoom of the painted map, the layer switches, the place markers, the search and
+// the place card. Vanilla browser JavaScript, no libraries. The page data is read from #atlas-data; every piece of
+// text on screen comes from its `strings`, so the viewer chooses no language.
 (function () {
   'use strict';
 
   const MIN_Z = 1 / 1.5; // zoom relative to fit-to-window
   const MAX_Z = 12;
-  const URBAN_ZOOM = 8; // an urban map zooms in about 8 times further than a geographic one
-  const FOCUS_Z = 3;
+  const FOCUS_Z = 3; // a search result or a marker brings the map to at least this zoom
+  const GLIDE_MS = 600;
   const DRAG_PX = 6;
   const TAP_MS = 300;
   const TAP_PX = 25;
-  const ASSET_BASE = 'assets/';
+  const PAN_STEP = 60;
+  const SEARCH_MAX = 8;
   const LAYERS_KEY = 'yllir-atlas-layers-open';
 
-  const dataEl = document.getElementById('atlas-data');
   let data;
   try {
-    data = JSON.parse(dataEl.textContent);
+    data = JSON.parse(document.getElementById('atlas-data').textContent);
   } catch (err) {
     return;
   }
@@ -26,23 +26,10 @@
   const H = data.canvas.height;
   const map = document.getElementById('map');
   const stage = document.getElementById('stage');
-  const sea = document.getElementById('sea');
   const svg = stage.querySelector('svg');
-  const places = new Map(data.places.map((p) => [p.id, p]));
-  const nodes = new Map();
-  // The scale of the atlas (set by export.mjs): 'urban' is a purely urban map, with no infinite sea, and it zooms in
-  // further; 'mixed' is a geographic map with urban layers, so it has the sea, the notable-place markers and the
-  // high zoom; 'geo' is a geographic map. Markers are for the places that have a kind (buildings and districts).
-  const urban = data.scale === 'urban';
-  const mixed = data.scale === 'mixed';
-  const hasSea = !urban;
-  // A baked map (data.bake, see export.mjs) has no place icons: every place with a point gets a marker, the urban one,
-  // so the places stay findable. Without a bake nothing changes.
-  const bake = data.bake === true;
-  const hasMarkers = urban || mixed || bake;
-  const maxZ = urban || mixed ? MAX_Z * URBAN_ZOOM : MAX_Z;
+  const placesById = new Map(data.places.map((p) => [p.id, p]));
+  const markers = []; // { id, x, y, node }, one per place, filled at start
 
-  if (hasSea) sea.style.backgroundImage = `url("${ASSET_BASE}${data.seaTexture}")`;
   stage.style.width = `${W}px`;
   stage.style.height = `${H}px`;
 
@@ -58,7 +45,8 @@
 
   // Lowercase, without accents: the search ignores case and accents.
   const norm = (text) => String(text).normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
-  const layerName = (name) => (S.layerNames && S.layerNames[name]) || name;
+  const layerTitle = (name) => ({ borders: S.layerBorders, labels: S.layerLabels, places: S.layerPlaces }[name] || name);
+  const markerOf = (id) => markers.find((m) => m.id === id) || null;
 
   // ---- Pan and zoom ---------------------------------------------------------------------------
 
@@ -68,19 +56,19 @@
   let anim = null;
   let lastSize = null;
   const scale = () => view.fit * view.z;
-  const clampZ = (z) => Math.min(maxZ, Math.max(MIN_Z, z));
+  const clampZ = (z) => Math.min(MAX_Z, Math.max(MIN_Z, z));
   const mapSize = () => ({ w: map.clientWidth, h: map.clientHeight });
 
   function render() {
     frame = null;
     const s = scale();
     stage.style.transform = `translate(${view.x}px, ${view.y}px) scale(${s})`;
-    if (hasSea) {
-      const tile = data.seaTile * s;
-      sea.style.backgroundSize = `${tile}px ${tile}px`;
-      sea.style.backgroundPosition = `${view.x}px ${view.y}px`;
+    // Markers keep their size at every zoom: only their position follows the map.
+    for (const marker of markers) {
+      const x = view.x + marker.x * s;
+      const y = view.y + marker.y * s;
+      marker.node.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
     }
-    if (hasMarkers) placeMarkers(s);
   }
 
   function schedule() {
@@ -115,6 +103,7 @@
     view.fit = Math.min(s.w / W, s.h / H) || 1;
   }
 
+  // The picture is centred in the window; the area outside it is the plain map background.
   function fitToWindow() {
     stopAnimation();
     computeFit();
@@ -126,13 +115,12 @@
     schedule();
   }
 
-  // Animates to zoom z with the canvas point (cx, cy) in the middle of the map.
+  // Glides to zoom z with the canvas point (cx, cy) in the middle of the map. Zero duration jumps at once.
   function animateCentre(z, cx, cy, ms) {
     stopAnimation();
     const target = clampZ(z);
     const s = mapSize();
     const to = { z: target, x: s.w / 2 - cx * view.fit * target, y: s.h / 2 - cy * view.fit * target };
-    // A duration of zero (reduced motion) jumps to the place at once.
     if (ms <= 0) {
       view.z = to.z;
       view.x = to.x;
@@ -231,9 +219,9 @@
     if (wasSingle && !moved && e.type === 'pointerup') tap(e);
   }
 
+  // Only a double tap does something here: it zooms in. A marker's own click opens its card.
   function tap(e) {
     const hit = document.elementFromPoint(e.clientX, e.clientY);
-    // A marker opens its own card on click, so a tap on it is not a map tap (and not a double tap either).
     if (hit && hit.closest && hit.closest('.marker')) return;
     const now = performance.now();
     if (lastTap && now - lastTap.t < TAP_MS && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < TAP_PX) {
@@ -243,8 +231,6 @@
       return;
     }
     lastTap = { t: now, x: e.clientX, y: e.clientY };
-    const place = hit && hit.closest ? hit.closest('g.place') : null;
-    if (place) openPlace(place.getAttribute('data-place'), place);
   }
 
   map.addEventListener('pointerdown', onDown);
@@ -327,10 +313,10 @@
     }
   }
 
-  // Layers: one switch per layer present. Terrain is always shown. Stamps carry their layer, so they follow.
+  // Layers: one switch per layer in data.layers. A switch hides or shows every node tagged with its layer, in the
+  // overlay and among the markers (markers carry the `places` layer).
   function setLayer(name, on) {
-    const scopes = markerBox ? [svg, markerBox] : [svg];
-    for (const scope of scopes) {
+    for (const scope of [svg, markerBox]) {
       scope.querySelectorAll(`[data-layer="${name}"]`).forEach((node) => node.classList.toggle('is-off', !on));
     }
   }
@@ -344,17 +330,15 @@
   layersPanel.setOpen(rememberedOpen());
   layersPanel.body.append(el('p', 'panel-title', null, S.layers));
   for (const name of data.layers) {
-    const input = el('input', '', { type: 'checkbox', id: `layer-${name}`, 'aria-label': layerName(name) });
+    const input = el('input', '', { type: 'checkbox', id: `layer-${name}`, 'aria-label': layerTitle(name) });
     input.checked = true;
-    if (name === 'terrain') input.disabled = true;
     input.addEventListener('change', () => setLayer(name, input.checked));
     const row = el('label', 'row');
-    row.append(input, document.createTextNode(` ${layerName(name)}`));
-    if (name === 'terrain') row.append(el('span', 'note', null, ` (${S.alwaysOn})`));
+    row.append(input, document.createTextNode(` ${layerTitle(name)}`));
     layersPanel.body.append(row);
   }
 
-  // Search: up to eight places whose title contains the text, ignoring case and accents.
+  // Search: up to SEARCH_MAX places whose name contains the text, ignoring case and accents.
   const searchPanel = panel('panel-search', '⌕', S.searchToggle, (open) => {
     if (open) searchInput.focus({ preventScroll: true });
   });
@@ -373,13 +357,13 @@
     results.replaceChildren();
     const query = norm(searchInput.value.trim());
     if (query === '') return;
-    const hits = data.places.filter((p) => norm(p.title).includes(query)).slice(0, 8);
+    const hits = data.places.filter((p) => norm(p.name).includes(query)).slice(0, SEARCH_MAX);
     if (hits.length === 0) {
-      results.append(el('li', 'none', null, S.searchNone));
+      results.append(el('li', 'none', null, S.searchEmpty));
       return;
     }
     for (const place of hits) {
-      const button = el('button', 'result', { type: 'button', 'aria-label': place.title }, place.title);
+      const button = el('button', 'result', { type: 'button', 'aria-label': place.name }, place.name);
       button.addEventListener('click', () => choosePlace(place));
       const item = el('li');
       item.append(button);
@@ -391,8 +375,9 @@
     results.replaceChildren();
     searchInput.value = '';
     searchPanel.setOpen(false);
-    animateCentre(Math.max(view.z, FOCUS_Z), place.at[0], place.at[1], 600);
-    openPlace(place.id, nodes.get(place.id) || null);
+    const marker = markerOf(place.id);
+    animateCentre(Math.max(view.z, FOCUS_Z), place.x, place.y, GLIDE_MS);
+    openPlace(place.id, marker ? marker.node : null);
   }
 
   searchInput.addEventListener('input', showResults);
@@ -416,62 +401,34 @@
     zoomButton(S.zoomFit, '⤢', fitToWindow),
   );
 
-  // The vignette is drawn here, over the map and under the panels, so it follows the viewport, not the map.
-  function vignetteNode() {
-    const v = data.vignette;
-    const node = el('div', 'vignette', { 'aria-hidden': 'true' });
-    if (v && typeof v.color === 'string') {
-      node.style.background = `radial-gradient(farthest-corner, ${rgba(v.color, 0)} 60%, ${rgba(v.color, v.opacity)} 100%)`;
-    }
-    return node;
-  }
-
-  // A hex colour with an alpha, for the gradient. A colour that is not hex becomes black.
-  function rgba(hex, alpha) {
-    const match = /^#([0-9a-f]{6})$/i.exec(String(hex));
-    const n = match ? Number.parseInt(match[1], 16) : 0;
-    return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-  }
-
   // ---- Place card -----------------------------------------------------------------------------
 
   const card = el('section', 'card', { role: 'dialog', 'aria-labelledby': 'card-title' });
   let origin = null;
 
-  function linkNode(place) {
-    const link = place.link;
-    if (!link) return null;
-    const line = el('p', 'card-link');
-    if (link.kind === 'url') {
-      line.append(el('a', '', { href: link.href, rel: 'noopener' }, S.openEncyclopedia));
-      return line;
-    }
-    if (window.parent !== window) {
-      const button = el('button', 'card-action', { type: 'button', 'aria-label': S.openDocument }, S.openDocument);
-      button.addEventListener('click', () => {
-        window.parent.postMessage({ type: 'yllir-atlas-open', path: link.path }, '*');
-      });
-      line.append(button);
-      return line;
-    }
-    line.append(el('span', 'note', null, `${S.documentPath}: `), el('code', '', null, link.path));
-    return line;
-  }
-
   function openPlace(id, node) {
-    const place = places.get(id);
+    const place = placesById.get(id);
     if (!place) return;
     origin = node || null;
     card.replaceChildren();
-    const head = el('div', 'card-head');
-    const title = el('h2', 'card-title', { id: 'card-title', tabindex: '-1' }, place.title);
+    const title = el('h2', 'card-title', { id: 'card-title', tabindex: '-1' }, place.name);
     const close = el('button', 'card-close', { type: 'button', 'aria-label': S.close, title: S.close }, '×');
     close.addEventListener('click', () => closeCard(true));
+    const head = el('div', 'card-head');
     head.append(title, close);
     card.append(head);
-    if (place.summary) card.append(el('p', 'card-summary', null, place.summary));
-    const link = linkNode(place);
-    if (link) card.append(link);
+
+    const kindWord = (S.kind && S.kind[place.kind]) || place.kind;
+    const meta = [kindWord, place.parent].filter(Boolean).join(' · ');
+    if (meta) card.append(el('p', 'card-meta', null, meta));
+    card.append(el('p', 'card-summary', null, place.summary || S.noSynopsis));
+    const files = (place.sources || []).map((s) => s.file).filter(Boolean);
+    if (files.length > 0) card.append(el('p', 'card-sources', null, `${S.source}: ${files.join(', ')}`));
+    if (place.url) {
+      const line = el('p', 'card-link');
+      line.append(el('a', '', { href: place.url, rel: 'noopener' }, S.openEncyclopedia));
+      card.append(line);
+    }
     card.classList.add('is-open');
     markPressed(id);
     title.focus({ preventScroll: true });
@@ -486,99 +443,41 @@
     }
   }
 
-  // ---- Urban markers --------------------------------------------------------------------------
-
-  // One button per notable place (a place record with an anchor and a kind: a building or a district), drawn over
-  // the map. Its size and symbol are the same at every zoom: only its position follows the map. A symbol is a few
-  // stroked paths on a 24-unit grid; a kind without one is a plain dot.
-  const SVG_NS = 'http://www.w3.org/2000/svg';
-  const TOWER = 'M8 20V8h8v12 M6 8h12 M8 8V5h2v3 M14 8V5h2v3 M11 20v-4h2v4';
-  const MUG = 'M5 7h10v10a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2z M15 9h2a2 2 0 0 1 0 4h-2';
-  const CROSS = 'M12 5v14 M7 10h10';
-  const SYMBOLS = new Map([
-    ['tavern', MUG],
-    ['inn', MUG],
-    ['temple', CROSS],
-    ['shrine', CROSS],
-    ['palace', 'M4 17L3.5 8 8 11l4-6 4 6 4.5-3L20 17z'],
-    ['castle', TOWER],
-    ['keep', TOWER],
-    ['tower', TOWER],
-    ['mill', 'M12 6a6 6 0 1 0 0 12 6 6 0 1 0 0-12z M12 6v12 M6 12h12'],
-    ['market', 'M4 9h16 M5 9v10h14V9 M4 9l2-4h12l2 4 M9 19v-5h6v5'],
-    ['warehouse', 'M4 8l8-4 8 4v10H4z M4 8l8 4 8-4 M12 12v8'],
-    ['guildhall', 'M6 5h12v7c0 3.5-3 6-6 7-3-1-6-3.5-6-7z'],
-    ['smithy', 'M3 8h13 M16 8h4 M6 8v3h7V8 M9 11v4 M6 15h7'],
-    ['gatehouse', 'M6 20V11a6 6 0 0 1 12 0v9 M10 20v-5a2 2 0 0 1 4 0v5'],
-    ['district', 'M6 20V4 M6 5h11l-2.5 3.5L17 12H6'],
-  ]);
-  const DOT = 'M12 12h.01';
-
-  let markerBox = null;
-  let markerList = []; // { id, at, node } for each marker
-
-  function symbolNode(kind) {
-    const icon = document.createElementNS(SVG_NS, 'svg');
-    icon.setAttribute('class', 'marker-icon');
-    icon.setAttribute('viewBox', '0 0 24 24');
-    icon.setAttribute('aria-hidden', 'true');
-    icon.setAttribute('focusable', 'false');
-    const path = document.createElementNS(SVG_NS, 'path');
-    path.setAttribute('d', SYMBOLS.get(kind) || DOT);
-    icon.append(path);
-    return icon;
+  // The marker of the open card reports aria-pressed; every other marker reports it released.
+  function markPressed(id) {
+    for (const marker of markers) marker.node.setAttribute('aria-pressed', String(marker.id === id));
   }
 
-  function markerNode(place) {
-    const district = place.kind === 'district';
-    const button = el('button', district ? 'marker is-district' : 'marker', {
-      type: 'button',
-      'aria-label': place.title,
-      'aria-pressed': 'false',
-      'data-place': place.id,
-      'data-layer': district ? 'districts' : 'buildings',
-    });
-    const disc = el('span', 'marker-disc');
-    disc.append(symbolNode(place.kind));
-    // The name is shown on hover and focus only; the button's aria-label already names it for a screen reader.
-    button.append(disc, el('span', 'marker-name', { 'aria-hidden': 'true' }, place.title));
-    button.addEventListener('click', () => openFromMarker(place, button));
-    return button;
-  }
+  // ---- Markers --------------------------------------------------------------------------------
+
+  // One round button per place, drawn over the map. Its colours and size are CSS custom properties (see viewer.css).
+  const markerBox = el('div', 'markers', { role: 'group', 'aria-label': S.notablePlaces });
 
   function buildMarkers() {
-    markerBox = el('div', 'markers', { role: 'group', 'aria-label': S.notablePlaces });
     for (const place of data.places) {
-      if (!Array.isArray(place.at) || (!place.kind && !bake)) continue;
-      const node = markerNode(place);
-      markerBox.append(node);
-      markerList.push({ id: place.id, at: place.at, node });
-    }
-    map.append(markerBox);
-  }
-
-  // Positions every marker at its canvas point under the current pan and zoom (the stage's own transform).
-  function placeMarkers(s) {
-    for (const marker of markerList) {
-      const x = view.x + marker.at[0] * s;
-      const y = view.y + marker.at[1] * s;
-      marker.node.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+      const button = el('button', 'marker', {
+        type: 'button',
+        'aria-label': place.name,
+        'aria-pressed': 'false',
+        'data-place': place.id,
+        'data-layer': 'places',
+      });
+      // The name shows on hover and focus only; the button's aria-label already names it for a screen reader.
+      button.append(el('span', 'marker-name', { 'aria-hidden': 'true' }, place.name));
+      button.addEventListener('click', () => openFromMarker(place, button));
+      markerBox.append(button);
+      markers.push({ id: place.id, x: place.x, y: place.y, node: button });
     }
   }
 
   // The card of the marker's place opens and the map centres softly on it; reduced motion means no glide.
   function openFromMarker(place, button) {
     const reduce = Boolean(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    animateCentre(Math.max(view.z, FOCUS_Z), place.at[0], place.at[1], reduce ? 0 : 600);
+    animateCentre(Math.max(view.z, FOCUS_Z), place.x, place.y, reduce ? 0 : GLIDE_MS);
     openPlace(place.id, button);
   }
 
-  // The marker of the open card reports aria-pressed; every other marker reports it released.
-  function markPressed(id) {
-    for (const marker of markerList) marker.node.setAttribute('aria-pressed', String(marker.id === id));
-  }
-
-  // ---- Keyboard-------------------------------------------------------------------------------
+  // ---- Keyboard and outside clicks ------------------------------------------------------------
 
   // A click or tap outside an open panel closes it. The layers panel remembers that choice.
   document.addEventListener('pointerdown', (e) => {
@@ -595,53 +494,26 @@
     }
     const typing = e.target && e.target.matches && e.target.matches('input, textarea');
     if (typing) return;
-    const step = 60;
     if (e.key === '+' || e.key === '=') zoomCentre(1.25);
     else if (e.key === '-' || e.key === '_') zoomCentre(1 / 1.25);
     else if (e.key === '0') fitToWindow();
-    else if (e.key === 'ArrowLeft') panBy(step, 0);
-    else if (e.key === 'ArrowRight') panBy(-step, 0);
-    else if (e.key === 'ArrowUp') panBy(0, step);
-    else if (e.key === 'ArrowDown') panBy(0, -step);
+    else if (e.key === 'ArrowLeft') panBy(PAN_STEP, 0);
+    else if (e.key === 'ArrowRight') panBy(-PAN_STEP, 0);
+    else if (e.key === 'ArrowUp') panBy(0, PAN_STEP);
+    else if (e.key === 'ArrowDown') panBy(0, -PAN_STEP);
     else return;
     e.preventDefault();
   });
 
   // ---- Start ----------------------------------------------------------------------------------
 
-  function setUpPlaces() {
+  function start() {
     svg.setAttribute('role', 'img');
     svg.setAttribute('aria-label', S.mapLabel);
-    svg.querySelectorAll('g.place').forEach((node) => {
-      const id = node.getAttribute('data-place');
-      const place = places.get(id);
-      nodes.set(id, node);
-      // A place with a marker (a building or a district, on an urban or a mixed map) is reached through the marker,
-      // so the drawn place is not in the tab order. The other places are.
-      const marked = urban || Boolean(place && (place.kind || bake));
-      if (!marked) {
-        node.setAttribute('tabindex', '0');
-        node.setAttribute('role', 'button');
-      }
-      node.setAttribute('aria-label', place ? place.title : id);
-      node.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          openPlace(id, node);
-        }
-      });
-    });
-  }
-
-  function start() {
-    setUpPlaces();
-    if (urban) {
-      document.documentElement.classList.add('is-urban');
-      document.body.classList.add('is-urban');
-    }
-    if (hasMarkers) buildMarkers();
+    map.append(markerBox);
+    buildMarkers();
     // Panels, zoom buttons and the card sit outside the map, so the map's pointer capture never takes their clicks.
-    document.body.append(vignetteNode(), zoom, layersPanel.box, searchPanel.box, card);
+    document.body.append(zoom, layersPanel.box, searchPanel.box, card);
     fitToWindow();
   }
 

@@ -1,4 +1,7 @@
 kind: update
+# U1: a place sheet titled Riva Storta exists.
+# U2: land.png is byte-identical to the setup and land.locked is still true.
+# U3: the place is in labels.places, on a land pixel of land.png.
+# U4: the place is not pending in the status.
+# U5: a version was saved after the setup.
 new_title: Riva Storta
-lake_id: lago-grigio
-region_place: morvalle

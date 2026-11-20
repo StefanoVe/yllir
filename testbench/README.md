@@ -7,6 +7,7 @@ The testbench holds synthetic campaigns, each with an answer key, and the runner
 - `fixtures/morvalle-seeded/campaign/`: the same campaign with three constraints seeded in the world seed (a faction, a family naming rule and something to avoid). Only the `world/region` case uses it. Its answer key is `cases/world/region/key.yaml`.
 - `fixtures/continuity/campaign/`: a small synthetic campaign for the library skill `continuity-keeper` (rename with a homonym, delete with a dependent document, merge with a conflicting fact, retcon of a played chronicle). Its traps are listed in `fixtures/continuity/README.md`. Each answer key is `cases/continuity/<name>/key.yaml`.
 - `fixtures/atlas-morvalle/campaign/`: the Morvalle campaign plus a second region (Valdaspra), two wells with the same title, a hidden refuge and no stated direction for one well. Only the atlas cases use it. Its traps are listed in `fixtures/atlas-morvalle/README.md`; each answer key is `cases/atlas/<name>/key.yaml`.
+- `fixtures/atlas-ostrava-town/campaign/`: a synthetic walled river town (Bornago) with two districts and a homonym. Only the atlas city case uses it; its traps are listed in `fixtures/atlas-ostrava-town/README.md`.
 - `fixtures/morvalle-legacy/campaign/`: a frozen copy of the same campaign before the world-graph migration (no `kind`, `provenance` or relations, and no seed). Only the update cases use it, because they need the old format.
 - `cases/<kind>/<name>/case.yaml`: one case: the master's message, the expected behaviour and its limits.
 - `runners/`: the scripts that run a case or grade a component against its key.
@@ -50,8 +51,9 @@ A run that exceeds a limit fails. The current values:
 | `world/region` | 10 | 200 | target: a region of about 30 subjects in 5 to 10 minutes (section 11, «Misura», of `docs/Riprogettazione.md`) |
 | `world/creature` | 3 | 60 | target: one enemy sheet, the same budget as the entry cases |
 | `atlas/create-asks` | 6 | 120 | target: the atlas question on a campaign with no atlas |
-| `atlas/update-keeps-land` | 8 | 160 | target: an added place on a locked atlas (agent update) |
+| `atlas/update-keeps-land` | 8 | 160 | target: an added place on a locked land (agent update) |
 | `atlas/players-no-secrets` | 4 | 60 | target: the players' version of the atlas |
+| `atlas/city-from-picture` | 6 | 120 | target: a city atlas from a picture in the sources |
 
 The minute targets come from the redesign document («Tempi misurati»). Note that the medians recorded there for prepare-session (6.5 min) and after-session (3.4 min) are above the 3-minute targets, so those cases will fail on time until the framework is faster. The tool-call limits come from `results/*.jsonl` (haiku runs).
 
@@ -65,7 +67,7 @@ The minute targets come from the redesign document («Tempi misurati»). Note th
 | `run-audit-case.mjs` | `audit/full` | A1 to A8: recall of the contradictions, no problem for perspectives, hypotheses or recorded exclusions, no change to the documents |
 | `run-continuity-case.mjs` | `continuity/rename-with-homonym`, `continuity/delete-still-referenced` (two turns), `continuity/merge-conflicting-fact`, `continuity/retcon-contradicts-chronicle` | R1 to R6 (rename), D1 to D4 after the question and D5 to D9 after the answer (delete), M1 to M4 (merge), T1 to T3 (retcon). Each run starts from a copy of the fixture with one baseline version; a question turn must save nothing and change nothing. Three runs per agent (`runs: 3` in each `case.yaml`) |
 | `run-world-case.mjs` | `world/region`, `world/creature` | W1 to W10 (region: new subjects with provenance, kinds, sketches and full documents, no new world-graph error, the lake subtree, a faction with members, the family-name rule, the seed changed, one saved version, a final message that names a created subject and says it is invented). C1 to C5 (creature: one enemy sheet that the adapter validates, ability modifiers, location, one saved version). Optional `Q-grid` with `--judge` |
-| `run-atlas-case.mjs` | `atlas/create-asks`, `atlas/update-keeps-land`, `atlas/players-no-secrets` | A1 to A4 (create: ends on a question in Italian, no locked layer, every name and label is a sheet title, no forbidden word), U1 to U4 (update: Riva Storta has a sheet, the locked terrain is byte-identical, the place is on land and south of the lake or the question is asked, a version is saved), P1 to P4 (players: the players' version exists, no text of the hidden refuge, both Pozzo Vecchio places each near their own place, the master site kept). The setups are built through the atlas CLI only. Three runs per agent. Quick mode runs them: they are paid agent runs |
+| `run-atlas-case.mjs` | `atlas/create-asks`, `atlas/update-keeps-land`, `atlas/players-no-secrets`, `atlas/city-from-picture` | A1 to A3 (create: a question in Italian or no invented label, no locked layer, no forbidden word), U1 to U5 (update: the Riva Storta sheet exists, land.png is byte-identical and still locked, the place is on a land pixel, it is not pending, a version is saved), P1 to P3 (players: the players' version exists, no text of the hidden place or its reserved block, the master site is byte-identical), C1 to C4 (city: the scope kind is settlement or district, the canvas is the picture's size, land.png exists, validate exits 0). The setups are built through the atlas CLI only, from a procedural picture (`runners/lib/make-atlas-picture.mjs`). Three runs per agent. The agent's provider is a fake Codex script (first on the PATH and set as `YLLIR_CODEX_BIN`) that returns that picture, so no real image service is called. They are paid agent runs and run only with `--with-atlas` |
 | `run-convert-case.mjs` | `convert/basic` (two turns; run by hand, `run-suite.mjs` does not map the kind yet) | O1 to O4 (the outline turn), W1 and D1 (saved, nothing deleted), E1 to E6 (subjects), H1 to H3 (homonyms stay two), A1 and A2 (alias), C1 and C2 (contradiction reported, not decided), Y1 (no accusation), S1 to S3 (master-only secret), U1 to U3 (dated and undated evening), I1 (input unchanged). Deterministic, no model grades |
 
 Every case also has `L-time` and `L-calls` when it declares limits.
@@ -101,6 +103,10 @@ With `--keep` the folder is kept and the agent's final message, cost, duration a
 ## Atlas cases
 
 The atlas cases do not run by default, in quick mode or in release mode: the suite runs them only with `--with-atlas`. Each run is a paid agent run that builds its setup through the atlas CLI first, so run them when the atlas path changes (`atlas` skill, its scripts, the entry or update process that calls it).
+
+Setups: `none` (the fixture only), `init` (the atlas with the procedural picture as base), `land` (init, then the land locked, one placed village, one master-only place, the master site rendered and a version saved; the baseline holds the land hash, the lock, the version count and the master site hash). The picture is `morvalle` (400 by 300, a green island with a lake and a second small island) or `town` (360 by 300, one island), chosen by the case's `picture`; `source_picture` copies it into the campaign before the baseline. The fake provider answers every job with that picture, so a provider call costs nothing and never leaves the machine.
+
+The atlas tests run offline: `node --test runners/run-atlas-case.test.mjs runners/lib/make-atlas-picture.test.mjs`.
 
 ## World cases
 

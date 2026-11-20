@@ -1,8 +1,6 @@
 kind: players
+# P1: the players version exists (.campaign/cache/atlas/players/index.html).
+# P2: neither the master-only place name nor a line of the reserved block of its sheet appears in it.
+# P3: the master site is byte-identical to the setup.
 refuge_file: Mondo/Morvalle/Rifugio dei Contrabbandieri.md
 refuge_title: Rifugio dei Contrabbandieri
-well_title: Pozzo Vecchio
-borgo_well: pozzo-vecchio-borgo
-borgo_place: borgo-cenere
-valdaspra_well: pozzo-vecchio-valdaspra
-valdaspra_place: valdaspra

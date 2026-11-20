@@ -35,13 +35,17 @@ export function reservedLinesOf(body) {
     .filter((line) => line.length >= MIN_RESERVED_LENGTH);
 }
 
-/** Ids of every feature with master visibility, across the layers. */
-export function masterIdsOf(layers = {}) {
+/**
+ * Ids of every item with master visibility, across the labels (lands, regions, nature, places, territories).
+ * @param {Record<string, unknown>} [labels] the labels object of labels.json
+ * @returns {Set<string>}
+ */
+export function masterIdsOf(labels = {}) {
   const ids = new Set();
-  for (const layer of Object.values(layers)) {
-    const features = Array.isArray(layer?.features) ? layer.features : [];
-    for (const feature of features) {
-      if (feature?.visibility === 'master' && typeof feature.id === 'string') ids.add(feature.id);
+  for (const list of Object.values(labels ?? {})) {
+    if (!Array.isArray(list)) continue;
+    for (const item of list) {
+      if (item?.visibility === 'master' && typeof item.id === 'string') ids.add(item.id);
     }
   }
   return ids;
@@ -53,13 +57,13 @@ const DATA_RE = /<script type="application\/json" id="atlas-data">([\s\S]*?)<\/s
  * Runs the three players' checks.
  * @param {object} input
  * @param {{ rel: string, text: string }[]} input.outputs the text files of the build (html, json, css, js, svg)
- * @param {Record<string, object>} [input.layers] the atlas layers, used for the master ids when masterIds is omitted
+ * @param {object} [input.labels] the labels object of labels.json, used for the master ids when masterIds is omitted
  * @param {string[]} [input.reservedLines] reserved lines (see reservedLinesOf)
  * @param {Iterable<string>} [input.masterIds] ids of the master-visibility features
  * @returns {{ id: string, status: 'pass' | 'fail', message: string }[]}
  */
-export function runAtlasChecks({ outputs = [], layers = {}, reservedLines = [], masterIds } = {}) {
-  const ids = [...(masterIds ?? masterIdsOf(layers))];
+export function runAtlasChecks({ outputs = [], labels = {}, reservedLines = [], masterIds } = {}) {
+  const ids = [...(masterIds ?? masterIdsOf(labels))];
   const results = [];
   const result = (id, leaks, failMessage, passMessage) => results.push({
     id,

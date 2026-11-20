@@ -1,4 +1,4 @@
-// Tests of the image-select command line for the bake operation. The probe table is
+// Tests of the image-select command line for the repaint operation. The probe table is
 // written by hand, so no Codex is run.
 
 import { test } from 'node:test';
@@ -14,18 +14,18 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SELECT_CLI = path.join(HERE, 'image-select.mjs');
 
 function tempCampaign() {
-  return fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-select-bake-'));
+  return fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-select-repaint-'));
 }
 
 function select(root, ...extra) {
   return spawnSync(process.execPath, [SELECT_CLI, root, ...extra], { encoding: 'utf8' });
 }
 
-test('bake: codex is chosen and needs consent until the master gives it', () => {
+test('repaint: codex is chosen and needs consent until the master gives it', () => {
   const root = tempCampaign();
   writeTable(root, { providers: { codex: { available: true } } });
 
-  const asked = select(root, '--operation', 'bake');
+  const asked = select(root, '--operation', 'repaint');
   assert.equal(asked.status, 0);
   assert.equal(asked.stdout, 'provider: codex\nreason: automatic\nneeds-consent: yes\nexit: 0\n');
 
@@ -33,33 +33,33 @@ test('bake: codex is chosen and needs consent until the master gives it', () => 
   assert.equal(recorded.status, 0);
   assert.equal(recorded.stdout, 'consent: codex\nexit: 0\n');
 
-  const chosen = select(root, '--operation', 'bake');
+  const chosen = select(root, '--operation', 'repaint');
   assert.equal(chosen.stdout, 'provider: codex\nreason: automatic\nneeds-consent: no\nexit: 0\n');
 });
 
-test('bake: no codex in the probe table means no provider', () => {
+test('repaint: no codex in the probe table means no provider', () => {
   const root = tempCampaign();
   writeTable(root, { providers: { codex: { available: false, reason: 'not-installed' } } });
 
-  const result = select(root, '--operation', 'bake');
+  const result = select(root, '--operation', 'repaint');
   assert.equal(result.status, 1);
   assert.equal(result.stdout, 'provider: none\nreason: none-available\nneeds-consent: no\nexit: 1\n');
 });
 
-test('bake: a requested provider that does not list bake is unsupported', () => {
+test('repaint: a requested provider that does not list repaint is unsupported', () => {
   const root = tempCampaign();
   writeTable(root, { providers: { comfyui: { available: true }, codex: { available: true, consent: true } } });
 
-  const result = select(root, '--operation', 'bake', '--provider', 'comfyui');
+  const result = select(root, '--operation', 'repaint', '--provider', 'comfyui');
   assert.equal(result.status, 1);
   assert.equal(result.stdout, 'provider: none\nreason: requested-unsupported\nneeds-consent: no\nexit: 1\n');
 });
 
-test('bake: the requested codex is chosen with its consent', () => {
+test('repaint: the requested codex is chosen with its consent', () => {
   const root = tempCampaign();
   writeTable(root, { providers: { codex: { available: true, consent: true } } });
 
-  const result = select(root, '--operation', 'bake', '--provider', 'codex');
+  const result = select(root, '--operation', 'repaint', '--provider', 'codex');
   assert.equal(result.status, 0);
   assert.equal(result.stdout, 'provider: codex\nreason: requested\nneeds-consent: no\nexit: 0\n');
 });

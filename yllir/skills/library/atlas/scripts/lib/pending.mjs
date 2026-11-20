@@ -1,8 +1,10 @@
-// Places of the campaign that are in the scope of the atlas but have no feature in the
-// places layer yet. The places themselves come from the world index (the sheets).
+// Places of the campaign that are in the scope of the atlas but are not on the map yet. The places
+// themselves come from the world index (the sheets); a place is on the map when labels.json has a
+// places item that names it.
 
 import path from 'node:path';
 import { buildWorldIndex } from '../../../../../scripts/lib/world-graph.mjs';
+
 /**
  * The folder of a place whose file is `A/B/B.md` (the file name equals the parent folder),
  * with a trailing slash. Otherwise null: the place has no sub-folder.
@@ -28,21 +30,17 @@ export function inScope(subject, scope, worldIndex) {
   });
 }
 
-/**
- * The place ids already in the atlas: a place with a feature in the places, buildings or districts layer
- * (each feature names its place in `place`). Every scope kind counts the same layers.
- */
+/** The place ids on the map: the `place` of each item of labels.places. */
 function placedIds(atlas) {
-  const featuresOf = (name) => (Array.isArray(atlas.layers?.[name]?.features) ? atlas.layers[name].features : []);
-  const layerNames = ['places', 'buildings', 'districts'];
-  return new Set(layerNames.flatMap(featuresOf).map((f) => f?.place).filter((id) => typeof id === 'string'));
+  const items = Array.isArray(atlas.labels?.places) ? atlas.labels.places : [];
+  return new Set(items.map((item) => item?.place).filter((id) => typeof id === 'string'));
 }
 
 /**
- * In-scope places (`{ id, title, file }`, sorted by id) that are not placed yet. A place is placed when it has
- * a feature in places, buildings or districts, or when it is listed in scope.places.
+ * In-scope places (`{ id, title, file }`, sorted by id) that are not on the map yet. A place is on the map
+ * when labels.places names it, or when it is listed in scope.places.
  * @param {string} root campaign folder
- * @param {{ manifest: object|null, layers: object }} atlas as read by readAtlas
+ * @param {{ manifest: object|undefined, labels: object|undefined }} atlas as read by readAtlas
  * @param {{ subjects: object[] }} [worldIndex] built when omitted
  */
 export function pendingPlaces(root, atlas, worldIndex) {

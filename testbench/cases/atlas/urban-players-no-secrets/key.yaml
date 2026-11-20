@@ -1,7 +1,0 @@
-kind: urban-players
-# P1: the players version exists (.campaign/cache/atlas/players/index.html).
-# P2: its text does not contain the master-only sentence (folded like the other players checks).
-# P3: its text does not contain the id of any master-visibility building (rocca-del-sigillo).
-secret_sentence: "Sotto l'altare di San Ottavio dorme il sigillo di Bornago, nella cripta chiamata Sala Nera."
-master_building_ids: [rocca-del-sigillo]
-players_html: .campaign/cache/atlas/players/index.html

@@ -1,9 +1,0 @@
-kind: urban-building
-# B1: the buildings layer has a feature whose id is il-gatto-borgo-vecchio (not il-gatto-porto, the homonym)
-#     and whose kind is tavern.
-# B2: `node yllir/skills/library/atlas/scripts/atlas.mjs validate <copy>` exits 0, and its problems hold
-#     no building-not-on-block entry for that id.
-place_id: il-gatto-borgo-vecchio
-homonym_id: il-gatto-porto
-building_kind: tavern
-validate_problem: building-not-on-block

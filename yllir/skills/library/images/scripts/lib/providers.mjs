@@ -9,7 +9,7 @@ import path from 'node:path';
 import { parseYamlLite } from '../../../../../scripts/lib/yaml-lite.mjs';
 import { loadCampaignProviders } from './campaign-providers.mjs';
 
-export const OPERATIONS = ['generate', 'remove_background', 'bake'];
+export const OPERATIONS = ['generate', 'remove_background', 'repaint'];
 export const ORDER = ['comfyui', 'codex', 'generate2dmedia', 'photoshop', 'upload'];
 
 const KINDS = ['script', 'mcp', 'manual'];

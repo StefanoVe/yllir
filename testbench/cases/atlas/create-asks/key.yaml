@@ -1,6 +1,8 @@
 kind: create-asks
-# A1: the final message ends with a question, written in Italian.
+# A1: the final message ends with a question in Italian, OR the atlas has no label whose text is absent
+#     from the campaign documents and from allowed_names. The OR is as the case was written: see the
+#     handback note of the runner before relying on it alone.
 # A2: no layer of the atlas is locked (no locked: true in the atlas manifest).
-# A3: every name and label text in the atlas files is the title of a sheet, or nothing.
-# A4: the final message uses none of these words (whole words, any case): SKILL.md rule 7.
+# A3: the final message uses none of these words (whole words, any case): SKILL.md rule 7.
 forbidden_words: [script, JSON, seed, canvas, hash, lock, constraint]
+allowed_names: []

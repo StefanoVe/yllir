@@ -4,11 +4,13 @@
 
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { PNG_SIGNATURE } from '../../../../scripts/lib/png-signature.mjs';
 
 const KILL_GRACE_MS = 2000;
 const MESSAGE_LIMIT = 200;
+const FALLBACK_SLACK_MS = 2000;
 
 function oneLine(text) {
   return String(text ?? '').replace(/\s+/g, ' ').trim();
@@ -74,10 +76,10 @@ export function buildInstruction(job, outputPath) {
 }
 
 /**
- * The text given to Codex for one bake job: job.prompt is the fixed repaint prompt
- * (see bake-job.mjs), sent word for word, followed only by the save instruction.
+ * The text given to Codex for one repaint job: job.prompt is the full repaint prompt
+ * (see atlas-repaint-job.mjs), sent word for word, followed only by the save instruction.
  */
-export function buildBakeInstruction(job, outputPath) {
+export function buildRepaintInstruction(job, outputPath) {
   return (
     `${job.prompt} ` +
     `Save the final image as a PNG file at exactly this path: ${outputPath}. ` +
@@ -87,13 +89,16 @@ export function buildBakeInstruction(job, outputPath) {
 }
 
 /**
- * The arguments of `codex exec` for one job. A bake job attaches its input PNG with
- * `-i`; the variadic option is closed with `--` so the instruction is not read as a file.
+ * The arguments of `codex exec` for one job. A repaint job with an input picture attaches
+ * it with `-i`; the variadic option is closed with `--` so the instruction is not read as a file.
  */
 export function codexArgs(job, jobDir, resultPath) {
   const base = ['exec', '--skip-git-repo-check', '--enable', 'image_generation', '--sandbox', 'workspace-write', '-C', jobDir];
-  if (job.operation === 'bake') {
-    return [...base, '-i', path.join(jobDir, job.input), '--', buildBakeInstruction(job, resultPath)];
+  if (job.operation === 'repaint' && typeof job.input === 'string') {
+    return [...base, '-i', path.join(jobDir, job.input), '--', buildRepaintInstruction(job, resultPath)];
+  }
+  if (job.operation === 'repaint') {
+    return [...base, buildRepaintInstruction(job, resultPath)];
   }
   return [...base, buildInstruction(job, resultPath)];
 }
@@ -106,19 +111,72 @@ function hasPngSignature(file) {
   }
 }
 
+/**
+ * Looks for a PNG that codex generated but could not copy to the job folder: the CLI saves
+ * it under <codexHome>/generated_images/<session>/. Only files modified at or after startedAt
+ * (with clock slack) and with the PNG signature qualify; the newest qualifying file wins.
+ * The original is never moved or deleted. Returns its path, or null.
+ */
+function findFallbackPng(codexHome, startedAt) {
+  const root = path.join(codexHome, 'generated_images');
+  let sessions;
+  try {
+    sessions = fs.readdirSync(root, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  const candidates = [];
+  for (const session of sessions) {
+    if (!session.isDirectory()) continue;
+    const sessionDir = path.join(root, session.name);
+    let names;
+    try {
+      names = fs.readdirSync(sessionDir);
+    } catch {
+      continue;
+    }
+    for (const name of names) {
+      if (!name.endsWith('.png')) continue;
+      const file = path.join(sessionDir, name);
+      try {
+        const stat = fs.statSync(file);
+        if (stat.isFile() && stat.mtimeMs >= startedAt - FALLBACK_SLACK_MS) {
+          candidates.push({ file, mtimeMs: stat.mtimeMs });
+        }
+      } catch {
+        // the file vanished between the listing and the stat: not a candidate
+      }
+    }
+  }
+  candidates.sort((a, b) => b.mtimeMs - a.mtimeMs);
+  const found = candidates.find((candidate) => hasPngSignature(candidate.file));
+  return found ? found.file : null;
+}
+
 function lastLogLine(text) {
   const lines = text.split('\n').map((line) => line.trim()).filter((line) => line !== '');
   return lines.length > 0 ? lines[lines.length - 1] : '';
 }
 
-/** Runs one job through Codex. Resolves to { ok: true } or { ok: false, error, message }. */
-export function runCodex({ jobDir, command = 'codex', timeoutMs = 600000, stallMs = 180000 }) {
+/**
+ * Runs one job through Codex. Resolves to { ok: true } or { ok: false, error, message }.
+ * The codex binary is `command`, else the YLLIR_CODEX_BIN variable, else `codex` on the PATH.
+ * When codex generated an image but did not copy it to result.png, the newest fresh PNG under
+ * `codexHome`/generated_images is copied there (see findFallbackPng).
+ */
+export function runCodex({
+  jobDir,
+  command = process.env.YLLIR_CODEX_BIN || 'codex',
+  timeoutMs = 600000,
+  stallMs = 180000,
+  codexHome = process.env.CODEX_HOME || path.join(os.homedir(), '.codex'),
+}) {
   const job = JSON.parse(fs.readFileSync(path.join(jobDir, 'job.json'), 'utf8'));
-  if (job.operation !== 'generate' && job.operation !== 'bake') {
+  if (job.operation !== 'generate' && job.operation !== 'repaint') {
     return Promise.resolve(failure('unsupported', `operation ${job.operation} is not supported by codex`));
   }
-  if (job.operation === 'bake' && (typeof job.input !== 'string' || !fs.existsSync(path.join(jobDir, job.input)))) {
-    return Promise.resolve(failure('failed', 'the input picture of the bake job is missing'));
+  if (job.operation === 'repaint' && typeof job.input === 'string' && !fs.existsSync(path.join(jobDir, job.input))) {
+    return Promise.resolve(failure('failed', 'the input picture of the repaint job is missing'));
   }
 
   const resultPath = path.join(jobDir, 'result.png');
@@ -171,6 +229,7 @@ export function runCodex({ jobDir, command = 'codex', timeoutMs = 600000, stallM
     fs.rmSync(resultPath, { force: true });
     fs.rmSync(path.join(jobDir, 'run.json'), { force: true });
     fs.appendFileSync(logPath, '');
+    const startedAt = Date.now();
     try {
       child = spawn(command, args, { cwd: jobDir, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (err) {
@@ -191,6 +250,17 @@ export function runCodex({ jobDir, command = 'codex', timeoutMs = 600000, stallM
       if (expired) {
         settle(failure('timeout', 'codex did not finish in time and was stopped'));
         return;
+      }
+      if (!hasPngSignature(resultPath)) {
+        const fallback = findFallbackPng(codexHome, startedAt);
+        if (fallback) {
+          try {
+            fs.copyFileSync(fallback, resultPath);
+            fs.appendFileSync(logPath, `fallback: copied ${fallback}\n`);
+          } catch {
+            // the copy failed: the check below reports the missing image as before
+          }
+        }
       }
       if (hasPngSignature(resultPath)) {
         fs.writeFileSync(

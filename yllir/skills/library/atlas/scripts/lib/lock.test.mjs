@@ -1,122 +1,90 @@
-import { test, after } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { snapshotOf, lockProblems, checkWrite } from './lock.mjs';
-import { readAtlas, validateAtlas } from './model.mjs';
-import {
-  cleanupCampaigns, standardCampaign, baseManifest, terrainLayer, landFeature, square, writeAtlas,
-} from './test-support.mjs';
+import { LOCKABLE, lockProblems, setLock, checkLandChange } from './lock.mjs';
+import { baseManifest } from './test-support.mjs';
 
-after(cleanupCampaigns);
+const HASH = 'b'.repeat(64);
 
-function lockedManifest(layer) {
-  return baseManifest({ layers: { terrain: { locked: true, snapshot: snapshotOf(layer) } } });
-}
-
-function withConstraints(layer) {
-  return { ...layer, constraints: [{ kind: 'landmass', id: 'main', center: [500, 500], radius: [400, 400], provenance: 'master', sources: [] }] };
-}
-
-function movedVertex(layer) {
-  const moved = structuredClone(layer);
-  moved.features[0].polygon[2] = [880, 880];
-  return moved;
-}
-
-test('checkWrite: changing a locked feature is refused, unlock allows it', () => {
-  const locked = terrainLayer();
-  const manifest = lockedManifest(locked);
-  const refused = checkWrite(manifest, 'terrain', movedVertex(locked), { current: locked });
-  assert.equal(refused.ok, false);
-  assert.ok(refused.changed.includes('land-main'));
-
-  const allowed = checkWrite(manifest, 'terrain', movedVertex(locked), { current: locked, unlock: true });
-  assert.equal(allowed.ok, true);
+test('LOCKABLE is the base and the land', () => {
+  assert.deepEqual(LOCKABLE, ['base', 'land']);
 });
 
-test('checkWrite: a new non-overlapping land is allowed after the lock', () => {
-  const locked = terrainLayer();
-  const manifest = lockedManifest(locked);
-  const candidate = structuredClone(locked);
-  candidate.features.push(landFeature('land-island', square(10, 10, 60, 60)));
-  const result = checkWrite(manifest, 'terrain', candidate, { current: locked });
-  assert.equal(result.ok, true);
-  assert.deepEqual(result.added, ['land-island']);
-  assert.deepEqual(result.overlaps, []);
-});
+test('lockProblems: a locked item without a sha256 is reported, one with a hash is not', () => {
+  const manifest = baseManifest();
+  assert.deepEqual(lockProblems(manifest), []);
 
-test('checkWrite: a new land overlapping locked land is refused even without changes', () => {
-  const locked = terrainLayer();
-  const manifest = lockedManifest(locked);
-  const candidate = structuredClone(locked);
-  candidate.features.push(landFeature('land-clash', square(300, 300, 400, 400)));
-  const result = checkWrite(manifest, 'terrain', candidate, { current: locked });
-  assert.equal(result.ok, false);
-  assert.deepEqual(result.overlaps, ['land-clash']);
-  assert.equal(checkWrite(manifest, 'terrain', candidate, { current: locked, unlock: true }).ok, true);
-});
-
-test('lockProblems: a feature edited on disk after the lock is reported', () => {
-  const root = standardCampaign();
-  const layer = terrainLayer();
-  writeAtlas(root, { manifest: lockedManifest(layer), layers: { terrain: movedVertex(layer) } });
-  const atlas = readAtlas(root);
-  const problems = lockProblems(atlas.manifest, atlas.layers);
+  const noHash = baseManifest({ land: { file: 'land.png', sha256: 'nope', locked: true } });
+  const problems = lockProblems(noHash);
   assert.equal(problems.length, 1);
-  assert.equal(problems[0].code, 'locked-layer-changed');
-  assert.deepEqual(problems[0].ids, ['land-main']);
+  assert.equal(problems[0].code, 'locked-without-hash');
+  assert.equal(problems[0].file, 'atlas.json');
+  assert.equal(problems[0].path, 'land.sha256');
+
+  const hashed = baseManifest({ base: { file: 'base.png', sha256: HASH, locked: true } });
+  assert.deepEqual(lockProblems(hashed), []);
 });
 
-test('lockProblems: a locked layer that is unchanged reports nothing, and new ids are allowed', () => {
-  const layer = terrainLayer();
-  const manifest = lockedManifest(layer);
-  const grown = structuredClone(layer);
-  grown.features.push(landFeature('land-new', square(10, 10, 20, 20)));
-  assert.deepEqual(lockProblems(manifest, { terrain: layer }), []);
-  assert.deepEqual(lockProblems(manifest, { terrain: grown }), []);
+test('lockProblems: nothing to report for a missing or non-object manifest', () => {
+  assert.deepEqual(lockProblems(undefined), []);
+  assert.deepEqual(lockProblems(null), []);
 });
 
-test('lockProblems: a removed feature and a changed constraint are reported', () => {
-  const layer = withConstraints(terrainLayer());
-  const manifest = lockedManifest(layer);
-  const removed = { ...layer, features: [], constraints: [{ kind: 'sea', note: 'x' }] };
-  const [problem] = lockProblems(manifest, { terrain: removed });
-  assert.deepEqual(problem.ids, ['(constraints)', 'land-main']);
+test('setLock locks and unlocks named items and returns a new manifest', () => {
+  const manifest = baseManifest();
+  const locked = setLock(manifest, ['base', 'land'], true);
+  assert.equal(locked.base.locked, true);
+  assert.equal(locked.land.locked, true);
+  assert.equal(manifest.base.locked, false, 'the given manifest is not changed');
+  assert.notEqual(locked, manifest);
+
+  const unlocked = setLock(locked, ['land'], false);
+  assert.equal(unlocked.land.locked, false);
+  assert.equal(unlocked.base.locked, true);
 });
 
-test('a constraint appended after the lock is allowed; editing or removing the first one is not', () => {
-  const layer = withConstraints(terrainLayer());
-  const manifest = lockedManifest(layer);
-
-  const appended = structuredClone(layer);
-  appended.constraints.push({ kind: 'sea', at: [900, 900], radius: 10, provenance: 'master', sources: [] });
-  assert.deepEqual(lockProblems(manifest, { terrain: appended }), []);
-  assert.equal(checkWrite(manifest, 'terrain', appended, { current: layer }).ok, true);
-
-  const edited = structuredClone(layer);
-  edited.constraints[0].radius = [300, 200];
-  const editedProblems = lockProblems(manifest, { terrain: edited });
-  assert.equal(editedProblems.length, 1);
-  assert.deepEqual(editedProblems[0].ids, ['(constraints)']);
-  const refused = checkWrite(manifest, 'terrain', edited, { current: layer });
-  assert.equal(refused.ok, false);
-  assert.deepEqual(refused.changed, ['(constraints)']);
-
-  const dropped = structuredClone(layer);
-  dropped.constraints = [];
-  assert.equal(checkWrite(manifest, 'terrain', dropped, { current: layer }).ok, false);
+test('setLock refuses to lock an item that does not exist, and an unknown name', () => {
+  const manifest = baseManifest({ base: undefined });
+  assert.throws(() => setLock(manifest, ['base'], true), /does not exist/);
+  assert.throws(() => setLock(manifest, ['terrain'], true), RangeError);
+  assert.throws(() => setLock(manifest, ['terrain'], false), RangeError);
 });
 
-test('a snapshot stores one hash per constraint, in order', () => {
-  const layer = withConstraints(terrainLayer());
-  layer.constraints.push({ kind: 'sea', at: [1, 1], radius: 5, provenance: 'master', sources: [] });
-  assert.equal(snapshotOf(layer).constraints.length, 2);
-  assert.deepEqual(snapshotOf(layer).constraints, snapshotOf(structuredClone(layer)).constraints);
+test('setLock unlocking an item that does not exist changes nothing', () => {
+  const manifest = baseManifest({ base: undefined });
+  assert.deepEqual(setLock(manifest, ['base'], false), manifest);
 });
 
-test('validateAtlas reports locked-layer-changed for an edit on disk', () => {
-  const root = standardCampaign();
-  const layer = terrainLayer();
-  writeAtlas(root, { manifest: lockedManifest(layer), layers: { terrain: movedVertex(layer) } });
-  const problems = validateAtlas(root, readAtlas(root), {});
-  assert.ok(problems.some((p) => p.code === 'locked-layer-changed' && p.file === 'Atlas/terrain.json'));
+test('checkLandChange: an unlocked land accepts any change', () => {
+  const manifest = baseManifest();
+  assert.deepEqual(checkLandChange({ manifest, diff: { gained: 5000, lost: 5000 } }), { ok: true });
+});
+
+test('checkLandChange: a locked land refuses a change, unless unlock is given', () => {
+  const manifest = setLock(baseManifest(), ['land'], true);
+  assert.deepEqual(checkLandChange({ manifest, diff: { gained: 400, lost: 0 } }), { ok: false, reason: 'land-locked' });
+  assert.deepEqual(checkLandChange({ manifest, diff: { gained: 0, lost: 400 } }), { ok: false, reason: 'land-locked' });
+  assert.deepEqual(checkLandChange({ manifest, diff: { gained: 400, lost: 0 }, unlock: true }), { ok: true });
+});
+
+test('checkLandChange: extend accepts a change that gains land and loses none', () => {
+  const manifest = setLock(baseManifest(), ['land'], true);
+  assert.deepEqual(checkLandChange({ manifest, diff: { gained: 400, lost: 0 }, extend: true }), { ok: true });
+  assert.deepEqual(checkLandChange({ manifest, diff: { gained: 400, lost: 300 }, extend: true }), { ok: false, reason: 'land-locked' });
+});
+
+test('checkLandChange: changes below 25 pixels on each side are noise', () => {
+  const manifest = setLock(baseManifest(), ['land'], true);
+  assert.deepEqual(checkLandChange({ manifest, diff: { gained: 24, lost: 3 } }), { ok: true });
+  assert.deepEqual(checkLandChange({ manifest, diff: { gained: 0, lost: 0 } }), { ok: true });
+  assert.deepEqual(checkLandChange({ manifest, diff: { gained: 25, lost: 0 } }), { ok: false, reason: 'land-locked' });
+});
+
+test('checkLandChange: no diff given counts as no change', () => {
+  const manifest = setLock(baseManifest(), ['land'], true);
+  assert.deepEqual(checkLandChange({ manifest }), { ok: true });
+});
+
+test('checkLandChange: a lock on the base alone does not restrict the land', () => {
+  const manifest = setLock(baseManifest(), ['base'], true);
+  assert.deepEqual(checkLandChange({ manifest, diff: { gained: 900, lost: 900 } }), { ok: true });
 });

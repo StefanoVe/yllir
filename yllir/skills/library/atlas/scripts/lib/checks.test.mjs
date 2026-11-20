@@ -17,12 +17,17 @@ test('reservedLinesOf takes the non-empty lines of length 12 or more after the m
   assert.deepEqual(reservedLinesOf('No marker, so nothing is reserved at all.'), []);
 });
 
-test('masterIdsOf lists the ids of master-visibility features of every layer', () => {
+test('masterIdsOf lists the ids of master-visibility items of every kind of label', () => {
   const ids = masterIdsOf({
-    places: { features: [{ id: 'north', visibility: 'public' }, { id: 'hold', visibility: 'master' }] },
-    water: { features: [{ id: 'silver', visibility: 'master' }] },
+    lands: [{ id: 'l1', visibility: 'public' }, { id: 'l2', visibility: 'master' }],
+    regions: [{ id: 'r1', visibility: 'master' }],
+    nature: [],
+    places: [{ id: 'p1', visibility: 'public' }, { id: 'p2' }],
+    territories: [{ id: 't1', visibility: 'master' }],
+    legend: { show: true },
   });
-  assert.deepEqual([...ids].sort(), ['hold', 'silver']);
+  assert.deepEqual([...ids].sort(), ['l2', 'r1', 't1']);
+  assert.deepEqual([...masterIdsOf({})], []);
 });
 
 test('no-master-marker fails on the master marker and on a closing master comment, and passes on a clean build', () => {

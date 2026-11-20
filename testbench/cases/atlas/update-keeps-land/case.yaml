@@ -1,7 +1,7 @@
 case: atlas/update-keeps-land
 fixture: atlas-morvalle
 setup: land
-prompt: "Aggiungi un villaggio di pescatori, Riva Storta, sulla riva sud del Lago Grigio."
+prompt: "Aggiungi un villaggio di pescatori, Riva Storta, sulla riva sud del Lago Grigio. Hai il mio ok: procedi senza chiedermi conferma."
 runs: 3
 limits:
   max_minutes: 8

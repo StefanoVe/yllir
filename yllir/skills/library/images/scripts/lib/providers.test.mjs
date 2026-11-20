@@ -45,7 +45,7 @@ test('loadProviders reads the five real manifests in ORDER', () => {
   );
   assert.deepEqual(providers.map((p) => p.id), ORDER);
   const codex = providers.find((p) => p.id === 'codex');
-  assert.deepEqual(codex, { id: 'codex', kind: 'script', operations: ['generate', 'bake'], external: true });
+  assert.deepEqual(codex, { id: 'codex', kind: 'script', operations: ['generate', 'repaint'], external: true });
   const g2d = providers.find((p) => p.id === 'generate2dmedia');
   assert.deepEqual(g2d, { id: 'generate2dmedia', kind: 'script', operations: ['generate'], external: true });
 });
@@ -287,52 +287,52 @@ test('image-select CLI accepts a campaign provider name for --provider', () => {
   assert.equal(result.stdout, 'provider: gemini\nreason: requested\nneeds-consent: no\nexit: 0\n');
 });
 
-// ---- the bake operation ----
+// ---- the repaint operation ----
 
-test('bake is listed by the codex provider only, among the built-in ones', () => {
-  assert.deepEqual(providers.filter((p) => p.operations.includes('bake')).map((p) => p.id), ['codex']);
-  assert.ok(OPERATIONS.includes('bake'));
+test('repaint is listed by the codex provider only, among the built-in ones', () => {
+  assert.deepEqual(providers.filter((p) => p.operations.includes('repaint')).map((p) => p.id), ['codex']);
+  assert.ok(OPERATIONS.includes('repaint'));
 });
 
-test('bake: codex is chosen automatically and needs consent until given', () => {
-  const r = selectProvider({ providers, table: allAvailable({ codex: { available: true } }), operation: 'bake' });
+test('repaint: codex is chosen automatically and needs consent until given', () => {
+  const r = selectProvider({ providers, table: allAvailable({ codex: { available: true } }), operation: 'repaint' });
   assert.deepEqual(r, { provider: 'codex', reason: 'automatic', needsConsent: true });
 
-  const consented = selectProvider({ providers, table: allAvailable(), operation: 'bake' });
+  const consented = selectProvider({ providers, table: allAvailable(), operation: 'repaint' });
   assert.deepEqual(consented, { provider: 'codex', reason: 'automatic', needsConsent: false });
 });
 
-test('bake: a provider that does not list bake is unsupported when requested', () => {
+test('repaint: a provider that does not list repaint is unsupported when requested', () => {
   for (const requested of ['comfyui', 'photoshop', 'upload']) {
-    const r = selectProvider({ providers, table: allAvailable(), operation: 'bake', requested });
+    const r = selectProvider({ providers, table: allAvailable(), operation: 'repaint', requested });
     assert.equal(r.provider, null, requested);
     assert.equal(r.reason, 'requested-unsupported', requested);
   }
 });
 
-test('bake: codex unavailable means none available, and a requested codex is unavailable', () => {
+test('repaint: codex unavailable means none available, and a requested codex is unavailable', () => {
   const table = allAvailable({ codex: { available: false, consent: true } });
-  assert.deepEqual(selectProvider({ providers, table, operation: 'bake' }), { provider: null, reason: 'none-available', needsConsent: false });
-  assert.deepEqual(selectProvider({ providers, table, operation: 'bake', requested: 'codex' }), { provider: null, reason: 'requested-unavailable', needsConsent: false });
+  assert.deepEqual(selectProvider({ providers, table, operation: 'repaint' }), { provider: null, reason: 'none-available', needsConsent: false });
+  assert.deepEqual(selectProvider({ providers, table, operation: 'repaint', requested: 'codex' }), { provider: null, reason: 'requested-unavailable', needsConsent: false });
 });
 
-test('bake: an excluded codex leaves nothing to choose', () => {
-  const r = selectProvider({ providers, table: allAvailable(), operation: 'bake', exclude: ['codex'] });
+test('repaint: an excluded codex leaves nothing to choose', () => {
+  const r = selectProvider({ providers, table: allAvailable(), operation: 'repaint', exclude: ['codex'] });
   assert.deepEqual(r, { provider: null, reason: 'none-available', needsConsent: false });
 });
 
-test('a campaign provider may list bake, and an unknown operation in its manifest is invalid', () => {
-  const root = tempDir('yllir-bake-manifest-');
+test('a campaign provider may list repaint, and an unknown operation in its manifest is invalid', () => {
+  const root = tempDir('yllir-repaint-manifest-');
   const head = 'id: painter\nname: Painter\nkind: http\nexternal: true\nadded: 2026-11-11T10:00:00Z\n';
   writeCampaignProvider(root, 'painter', {
-    'provider.yaml': `${head}operations:\n  - bake\n`,
+    'provider.yaml': `${head}operations:\n  - repaint\n`,
     'request.json': JSON.stringify({ method: 'POST', url: 'https://example.invalid/v1', body: { prompt: '{PROMPT}' }, response: { base64: 'data' } }),
   });
   const ok = loadAllProviders(pluginRoot, root);
   assert.deepEqual(ok.errors, []);
-  assert.deepEqual(ok.providers[0].operations, ['bake']);
+  assert.deepEqual(ok.providers[0].operations, ['repaint']);
 
-  const bad = tempDir('yllir-bake-bad-');
+  const bad = tempDir('yllir-repaint-bad-');
   writeCampaignProvider(bad, 'painter', { 'provider.yaml': `${head}operations:\n  - paint\n` });
   const invalid = loadAllProviders(pluginRoot, bad);
   assert.equal(invalid.errors.length, 1);

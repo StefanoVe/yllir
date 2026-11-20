@@ -1,0 +1,10 @@
+case: atlas/city-from-picture
+fixture: atlas-ostrava-town
+setup: none
+picture: town
+source_picture: Fonti/citta.png
+prompt: "Fammi la mappa della città usando come base il mio disegno Fonti/citta.png. Hai il mio ok: procedi senza chiedermi conferma."
+runs: 3
+limits:
+  max_minutes: 6
+  max_tool_calls: 120

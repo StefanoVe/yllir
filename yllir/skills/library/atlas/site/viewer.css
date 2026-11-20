@@ -1,18 +1,29 @@
-/* Viewer of the atlas site: parchment and ink, to match the map. Phone width collapses the panels to icon buttons. */
+/* Viewer of the atlas site: parchment and ink, to match the painted map. Phone width collapses the panels to icon
+   buttons. The markers take their colours and size from the custom properties below, so a theme can change them. */
 
 @font-face {
   font-family: 'IM Fell English';
-  src: url('fonts/IMFellEnglish-Regular.ttf') format('truetype');
+  src: url('assets/fonts/IMFellEnglish-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Cinzel';
+  src: url('assets/fonts/Cinzel.ttf') format('truetype');
   font-display: swap;
 }
 
 :root {
   --paper: #f3ead2;
+  --paper-strong: #fbf6e6;
   --ink: #2b2118;
   --line: #3b2f22;
   --accent: #8a5a1c;
+  --map-bg: #d8cba9;
   --shadow: 0 2px 10px rgba(43, 33, 24, 0.35);
-  --sea: #1f3a4d;
+  --marker-fill: #f3ead2;
+  --marker-stroke: #3b2f22;
+  --marker-size: 24px;
   color-scheme: light;
 }
 
@@ -21,17 +32,9 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: var(--sea);
+  background: var(--map-bg);
   color: var(--ink);
   font-family: 'IM Fell English', Georgia, serif;
-}
-
-/* The sea goes on past the map edges; its tile moves and scales with the map (set in viewer.js). */
-#sea {
-  position: fixed;
-  inset: 0;
-  background-color: var(--sea);
-  background-repeat: repeat;
 }
 
 #map {
@@ -42,6 +45,7 @@ body {
   user-select: none;
   -webkit-user-select: none;
   cursor: grab;
+  background: var(--map-bg);
 }
 
 #map.dragging {
@@ -59,45 +63,15 @@ body {
   will-change: transform;
 }
 
-/* An urban map has no sea (viewer.js adds the classes): outside the map is the page's neutral paper colour. */
-html.is-urban,
-html.is-urban body {
-  background: var(--paper);
-}
-
-body.is-urban #sea {
-  display: none;
-}
-
-/* The last 3% of the map fades into the sea. */
+/* The overlay fills the stage, which is the picture's size in canvas pixels. */
 #stage svg {
   display: block;
-  mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent),
-    linear-gradient(to bottom, transparent, #000 3%, #000 97%, transparent);
-  mask-size: 100% 100%;
-  mask-repeat: no-repeat;
-  mask-composite: intersect;
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent),
-    linear-gradient(to bottom, transparent, #000 3%, #000 97%, transparent);
-  -webkit-mask-size: 100% 100%;
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-composite: source-in;
+  width: 100%;
+  height: 100%;
 }
 
 .is-off {
   display: none;
-}
-
-g.place {
-  cursor: pointer;
-}
-
-g.place:focus {
-  outline: none;
-}
-
-g.place:focus-visible image {
-  filter: drop-shadow(0 0 2px #fff3c4) drop-shadow(0 0 4px var(--accent));
 }
 
 button,
@@ -155,14 +129,6 @@ button:hover {
   display: block;
 }
 
-/* The vignette: over the map and under the panels, the viewport's own darkening at the edges. */
-.vignette {
-  position: fixed;
-  inset: 0;
-  z-index: 2;
-  pointer-events: none;
-}
-
 .panel-title {
   margin: 0 0 4px;
   font-size: 1.05rem;
@@ -207,16 +173,11 @@ button:hover {
   white-space: nowrap;
 }
 
-.note {
-  font-style: italic;
-  opacity: 0.75;
-}
-
 .search-input {
   width: 100%;
   box-sizing: border-box;
   padding: 6px 8px;
-  background: #fbf6e6;
+  background: var(--paper-strong);
   border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 1rem;
@@ -293,7 +254,8 @@ button:hover {
 
 .card-title {
   margin: 0;
-  font-size: 1.35rem;
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 1.3rem;
   font-weight: normal;
 }
 
@@ -308,28 +270,34 @@ button:hover {
   padding: 2px 8px;
 }
 
+.card-meta {
+  margin: 4px 0 0;
+  font-style: italic;
+  opacity: 0.8;
+}
+
 .card-summary {
   margin: 8px 0;
   line-height: 1.4;
+}
+
+.card-sources {
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
 }
 
 .card-link {
   margin: 8px 0 0;
 }
 
-.card a,
-.card-action {
+.card a {
   color: var(--accent);
   text-decoration: underline;
 }
 
-.card code {
-  font-size: 0.9rem;
-  word-break: break-all;
-}
-
-/* Urban markers: one button per notable place, over the map. The size is the same at every zoom (viewer.js sets
-   the position). The disc is 28 px; on a phone the button, the touch target, is 44 px around it. */
+/* Markers: one round button per place, over the map. Its size is the same at every zoom (viewer.js sets the
+   position). On a phone the touch target grows through --marker-size. */
 .markers {
   position: absolute;
   left: 0;
@@ -339,64 +307,31 @@ button:hover {
   z-index: 1;
 }
 
-.marker,
-.marker:hover {
+.marker {
   position: absolute;
   left: 0;
   top: 0;
   box-sizing: border-box;
-  width: 28px;
-  height: 28px;
-  margin: -14px 0 0 -14px;
+  width: var(--marker-size);
+  height: var(--marker-size);
+  margin: calc(var(--marker-size) / -2) 0 0 calc(var(--marker-size) / -2);
   padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: 0;
+  background: var(--marker-fill);
+  border: 2px solid var(--marker-stroke);
   border-radius: 50%;
+  box-shadow: var(--shadow);
   cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.marker:hover,
+.marker[aria-pressed="true"] {
+  background: var(--paper-strong);
+  border-color: var(--accent);
 }
 
 .marker.is-off {
   display: none;
-}
-
-.marker-disc {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--paper);
-  border: 2px solid var(--line);
-  box-shadow: var(--shadow);
-  color: var(--ink);
-  transition: border-color 0.15s ease, background-color 0.15s ease;
-}
-
-/* A district is an outlined disc: the paper shows through, and the outline is the accent colour. */
-.marker.is-district .marker-disc {
-  background: rgba(243, 234, 210, 0.6);
-  border: 2px solid var(--accent);
-}
-
-.marker:hover .marker-disc,
-.marker[aria-pressed="true"] .marker-disc {
-  border-color: var(--accent);
-  background: #fbf6e6;
-}
-
-.marker-icon {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 
 .marker:focus-visible {
@@ -427,17 +362,8 @@ button:hover {
   display: block;
 }
 
-@media (max-width: 480px) {
-  .marker,
-  .marker:hover {
-    width: 44px;
-    height: 44px;
-    margin: -22px 0 0 -22px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .marker-disc {
+  .marker {
     transition: none;
   }
 }
@@ -453,9 +379,13 @@ button:hover {
   }
 }
 
-/* Phone width: the search is an icon that expands into a full-width input, the zoom buttons go to the
-   bottom right, and the place card is a bottom sheet. */
+/* Phone width: the search is an icon that expands into a full-width input, the zoom buttons go to the bottom right,
+   the place card is a bottom sheet, and the markers are larger to touch. */
 @media (max-width: 480px) {
+  :root {
+    --marker-size: 34px;
+  }
+
   .panel-search {
     width: auto;
   }

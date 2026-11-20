@@ -437,26 +437,3 @@ test('prepareSvgImages throws rasterizer-unavailable when the WebP decoder is no
     (err) => err.code === 'rasterizer-unavailable',
   );
 });
-
-test('the real rasterizer draws a WebP texture as pixels: a rect filled with the pattern is not blank (skipped when the packages are not installed)', async (t) => {
-  const dataDir = resolveDataDir(undefined);
-  const tools = toolsDirOf(dataDir);
-  const entries = PINS.packages.map((pin) => packageEntry(tools, pin.package));
-  if (entries.some((entry) => entry === null)) {
-    t.skip(`the rasterizer packages are not installed in ${tools}; run bake-setup.mjs`);
-    return;
-  }
-  try {
-    for (const entry of entries) await defaultLoader(entry);
-  } catch (err) {
-    t.skip(`the rasterizer packages cannot be loaded here: ${err.message}`);
-    return;
-  }
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">'
-    + `<defs><pattern id="p" width="64" height="64" patternUnits="userSpaceOnUse"><image href="${TEXTURE}" width="64" height="64"/></pattern></defs>`
-    + '<rect width="128" height="128" fill="url(#p)"/></svg>';
-  const png = await rasterizeSvg(svg, { width: 128, dataDir });
-  const back = decodePngRgba(png);
-  assert.deepEqual([back.width, back.height], [128, 128]);
-  assert.ok(distinctColours(back.rgba) > 10, `only ${distinctColours(back.rgba)} colours: the texture is blank`);
-});

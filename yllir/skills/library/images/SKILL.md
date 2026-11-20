@@ -22,6 +22,11 @@ You are the AUTHOR. Images make a picture for a campaign document: a portrait, a
 
 **Maps.** When the master asks for a map, battle map, floor plan or «mappa di battaglia» of a place, follow `maps.md` in this folder instead of the Steps below (read it with the Read tool). A map of the whole world or of a region is the atlas: stop here and say [atlas elsewhere].
 
+**Atlas repaint.** The atlas skill repaints its picture with `scripts/atlas-repaint-job.mjs` (`--mode base|crop`), and only after `image-select.mjs . --operation repaint` has asked the master for consent (the consent sentence of Step 4) and the master has said yes.
+Only public text goes in the prompt file: never a master-only note, a secret, or text copied from a campaign file.
+The script adds its own fixed English wrapper and the style, so the atlas skill never adds them itself.
+Atlas repaint never goes through the Steps below or `image-place.mjs`: the atlas skill places the result.
+
 ## Steps
 
 **Step 1 — Settings.** Read `campaign.yaml` with the Read tool. Keep the CAMPAIGN LANGUAGE (`language.main`), `campaign.seed` and the `structure` entries.
