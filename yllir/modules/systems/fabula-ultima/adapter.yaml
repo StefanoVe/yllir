@@ -1,0 +1,104 @@
+id: fabula-ultima
+name: "Fabula Ultima"
+version: 1
+headings:
+  statistics:
+    it: Statistiche
+    en: Statistics
+  description:
+    it: Descrizione
+    en: Description
+  brief:
+    it: In breve
+    en: In brief
+  effects:
+    it: Effetti
+    en: Effects
+encounters: turn-based
+progression:
+  method: experience
+  experience_points: true
+resources:
+  - id: hp
+    recovery: rest
+  - id: mp
+    recovery: rest
+  - id: ip
+    recovery: rest
+conditions:
+  - slow
+  - dazed
+  - weak
+  - shaken
+  - enraged
+  - poisoned
+condition_durations: [until_removed]
+condition_labels:
+  slow:
+    it: Lento
+    en: Slow
+  dazed:
+    it: Confuso
+    en: Dazed
+  weak:
+    it: Debole
+    en: Weak
+  shaken:
+    it: Scosso
+    en: Shaken
+  enraged:
+    it: Furente
+    en: Enraged
+  poisoned:
+    it: Avvelenato
+    en: Poisoned
+duration_labels:
+  until_removed:
+    it: finché non viene rimosso
+    en: until removed
+creature_sheet:
+  section: statistics
+  required:
+    - id: level
+      label_it: Livello
+      label_en: Level
+    - id: rank
+      label_it: Grado
+      label_en: Rank
+    - id: hp
+      label_it: PV
+      label_en: HP
+    - id: mp
+      label_it: PM
+      label_en: MP
+    - id: dex
+      label_it: DES
+      label_en: DEX
+    - id: ins
+      label_it: INT
+      label_en: INS
+    - id: mig
+      label_it: VIG
+      label_en: MIG
+    - id: wlp
+      label_it: VOL
+      label_en: WLP
+    - id: def
+      label_it: Difesa
+      label_en: Defense
+    - id: mdef
+      label_it: Difesa Magica
+      label_en: Magic Defense
+  optional: [species, traits, affinities, basic_attacks, skills, spells, ultima_points, villain]
+checks: checks.mjs
+item_sheet:
+  mechanical_fields: [cost, category, quality, accuracy, damage, defense, magic_defense]
+  printable_fields: [title, description]
+do_not:
+  - roll dice for the master
+  - choose targets
+  - decide the outcome of checks, opposed checks or attacks
+  - "run random tables (such as Gamble or ingredients): name them, the master rolls"
+  - spend Fabula Points or Ultima Points for the master or the players
+  - add affinities (resistance, immunity, absorption, vulnerability) the sheet does not declare
+  - rewrite a player character sheet

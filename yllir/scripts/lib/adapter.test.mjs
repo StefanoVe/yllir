@@ -25,7 +25,7 @@ function replace(text, before, after) {
 }
 
 test('discovers installed adapters in sorted order and loads the D&D manifest', () => {
-  assert.deepEqual(listAdapters(root), ['dnd-2024']);
+  assert.deepEqual(listAdapters(root), ['dnd-2024', 'fabula-ultima']);
   const loaded = loadAdapter(root, 'dnd-2024');
   assert.equal(loaded.ok, true);
   assert.deepEqual(loaded.errors, []);
@@ -375,4 +375,16 @@ test('atlas_style is optional, a style id when present, and the D&D manifest dec
     write(temp, 'dnd-2024', replace(source, 'atlas_style: fantasy-color\n', ''));
     assert.deepEqual(loadAdapter(temp, 'dnd-2024').errors, []);
   });
+});
+
+test('loads the Fabula Ultima manifest without errors', () => {
+  const loaded = loadAdapter(root, 'fabula-ultima');
+  assert.equal(loaded.ok, true);
+  assert.deepEqual(loaded.errors, []);
+  assert.equal(loaded.adapter.id, 'fabula-ultima');
+  assert.equal(loaded.adapter.name, 'Fabula Ultima');
+  assert.deepEqual(loaded.adapter.creature_sheet.required.map((f) => f.id), ['level', 'rank', 'hp', 'mp', 'dex', 'ins', 'mig', 'wlp', 'def', 'mdef']);
+  assert.ok(loaded.adapter.checksPath.endsWith('checks.mjs'));
+  assert.equal(loaded.adapter.difficulty, undefined);
+  assert.equal(loaded.adapter.encounter_ops, undefined);
 });

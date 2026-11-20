@@ -1,6 +1,6 @@
 # Adattatore Fabula Ultima
 
-**Stato:** Bozza di progetto, solo scaffold (2026-11-20). Tutto ciò che è marcato **Proposta** non è approvato.
+**Stato:** livello 1 implementato (2026-11-20, framework 0.92.0): `yllir/modules/systems/fabula-ultima/` con `adapter.yaml` e `checks.mjs`. Il livello 2 resta da fare. Tutto ciò che è marcato **Proposta** non è approvato.
 **Parte di:** [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md), che definisce il contratto dell'adattatore.
 
 ## Scopo
@@ -105,7 +105,13 @@ Valgono quelle di [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md
 
 ## Piano (Proposta)
 
-1. **Livello 1:** manifest minimo, `checks.mjs` con le formule sopra e i test, schede PG e PNG, intestazioni, `do_not`. Circa una giornata.
+1. **Livello 1 (fatto, 0.92.0):** manifest minimo, `checks.mjs` con le formule sopra e i test, schede PG e PNG, intestazioni, `do_not`. Cosa contiene:
+   - Il manifest usa solo le chiavi del contratto attuale. Restano fuori `attributes`, `condition_effects`, `pools`, `clocks`, `bonds`, `ranks` e `difficulty`, che sono il livello 2. Mancano anche `battle_grid` ed `encounter_ops`, perciò il tracker di scontro risponde che il sistema non ha regole di combattimento.
+   - Scheda PNG: tabella `### Caratteristiche` con Livello, Grado, PV, PM, DES, INT, VIG, VOL, Difesa, Difesa Magica (in inglese Level, Rank, HP, MP, DEX, INS, MIG, WLP, Defense, Magic Defense).
+   - `checkCreature` controlla le taglie di dado, il livello da 1 a 60 e il grado (soldato, élite, campione da 2 a 6). Controlla anche i minimi dei PNG: PV almeno (2 × livello + 5 × VIG) × moltiplicatore di grado, PM almeno livello + 5 × VOL, Difesa Magica almeno la taglia di INT. Se è scritta, la crisi deve essere la metà dei PV. Sono minimi perché abilità ed equipaggiamento possono alzare i valori. La Difesa non si confronta, perché l'armatura può fissarla.
+   - Le formule dei PG (PV, PM, PI, crisi, Difesa Magica, compagno, costo forgiato, sezioni d'Orologio) sono funzioni pure con i loro test. Nessun controllo le applica ancora alle schede dei PG, che restano trascrizioni.
+   - Le prove di scena non hanno ancora un formato: senza `checkSceneCheck` il motore le accetta come sono.
+   - Etichette italiane scelte dall'autore il 2026-11-20, da confermare sul testo di Need Games: DES, INT, VIG, VOL; PV, PM, Difesa, Difesa Magica, Livello, Grado; status Lento, Confuso, Debole, Scosso, Furente, Avvelenato.
 2. **Livello 2:** estensioni del contratto (taglie di dado, effetti degli status, pool, Orologi, Legami) e tracker di scontro. Da 3 a 5 giorni. Dipende dalle decisioni sotto.
 3. **Testbench:** caso con scheda sintetica (non quella di Cross), trappole: omonimi fra incantesimi di classi diverse (Barriera e Aura hanno la stessa forma), status cumulativi sullo stesso attributo, versione 1.1 contro Press Start.
 
