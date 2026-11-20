@@ -64,6 +64,32 @@ describe('ProjectorService', () => {
     await expect(service.project('/secret.png')).resolves.toBe(false);
   });
 
+  it('projectCombat opens the window before posting the combat kind', async () => {
+    const order: string[] = [];
+    openSpy.mockImplementation(() => {
+      order.push('open');
+      return fakeWindow as unknown as Window;
+    });
+    fetchMock.mockImplementation(async () => {
+      order.push('post');
+      return jsonResponse(200, { kind: 'combat', combat: null });
+    });
+
+    await expect(service.projectCombat()).resolves.toBe(true);
+
+    expect(order).toEqual(['open', 'post']);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/projector');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({ kind: 'combat' });
+    expect(service.current()).toEqual({ kind: 'combat', combat: null });
+  });
+
+  it('projectCombat returns false on an error without throwing', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse(500, { error: 'boom' }));
+    await expect(service.projectCombat()).resolves.toBe(false);
+  });
+
   it('posts the blank projection', async () => {
     fetchMock.mockImplementation(async () => jsonResponse(200, { kind: 'blank' }));
     await expect(service.blank()).resolves.toBe(true);

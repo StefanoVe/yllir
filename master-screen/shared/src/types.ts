@@ -443,9 +443,34 @@ export interface PrintSheetResult { ok: boolean; file: string | null; fileUrl: s
 // Projector (the second window the players see: GET/POST /api/projector).
 // ---------------------------------------------------------------------------
 
+/** Health a player can read of an enemy, from its hit points: never the numbers. */
+export type ProjectedHealth = 'unhurt' | 'wounded' | 'bloodied' | 'down';
+export interface ProjectedCombatant {
+  id: string; name: string; side: 'pc' | 'ally' | 'enemy';
+  initiative: number | null;
+  current: boolean;
+  /** Enemies only, when their hit points are known. */
+  health?: ProjectedHealth;
+  /** PCs and allies only, when known. */
+  hp?: number; hpMax?: number; tempHp?: number;
+  defeated?: boolean;
+}
+export interface ProjectedCombat {
+  round: number;
+  /** Initiative order, hidden combatants left out. */
+  order: ProjectedCombatant[];
+  /** The battle map, only when it is a public image; null otherwise. */
+  map: { src: string; cols?: number; rows?: number } | null;
+  /** Tokens of the visible combatants: cell (with grid) or fraction 0..1 (without). */
+  positions: Record<string, { x: number; y: number }>;
+}
 /** What the projector window shows. Declarative: the projector can only draw these kinds. */
-export type Projection = { kind: 'blank' } | { kind: 'image'; src: string };
+export type Projection =
+  | { kind: 'blank' }
+  | { kind: 'image'; src: string }
+  /** combat is null when no fight is running: the projector shows its rest screen. */
+  | { kind: 'combat'; combat: ProjectedCombat | null };
 /** POST /api/projector body. */
-export type ProjectRequest = { kind: 'blank' } | { kind: 'image'; src: string };
+export type ProjectRequest = { kind: 'blank' } | { kind: 'image'; src: string } | { kind: 'combat' };
 /** GET /api/projector/check answer. */
 export interface ProjectableResponse { projectable: boolean }

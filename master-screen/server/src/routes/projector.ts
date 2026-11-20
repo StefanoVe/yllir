@@ -1,19 +1,22 @@
 // GET /projector: the current projection. GET /projector/events: SSE stream of the projection.
 // GET /projector/check: whether a source may be projected. POST /projector: set the projection.
-// Owner: projector.
+// A combat projection is rebuilt from the server state (battle host and live session), never
+// from the client. Owner: projector.
 import type { Router } from 'express';
 import type { ProjectableResponse, ProjectRequest, Projection } from '../../../shared/src/types.js';
+import type { BattleHost } from '../cockpit-host/battle.js';
 import type { Ctx } from '../context.js';
 import { wrap } from '../http.js';
 import { projectorFor, resolveSrc } from '../projector/projector.js';
 
 const MAX_SRC_LENGTH = 2048;
 
-/** The body of POST /projector, or null when it is not exactly one of the two kinds. */
+/** The body of POST /projector, or null when it is not exactly one of the three kinds. */
 function parseProjectRequest(body: unknown): ProjectRequest | null {
   if (typeof body !== 'object' || body === null || Array.isArray(body)) return null;
   const record = body as Record<string, unknown>;
   if (record.kind === 'blank') return Object.keys(record).length === 1 ? { kind: 'blank' } : null;
+  if (record.kind === 'combat') return Object.keys(record).length === 1 ? { kind: 'combat' } : null;
   if (record.kind === 'image') {
     if (Object.keys(record).length !== 2 || typeof record.src !== 'string') return null;
     if (record.src.length > MAX_SRC_LENGTH) return null;
@@ -22,13 +25,16 @@ function parseProjectRequest(body: unknown): ProjectRequest | null {
   return null;
 }
 
-export function registerProjectorRoutes(app: Router, ctx: Ctx): void {
-  app.get('/projector', (_req, res) => {
-    res.json(projectorFor(ctx).current());
-  });
+export function registerProjectorRoutes(app: Router, ctx: Ctx, battle: BattleHost): void {
+  app.get(
+    '/projector',
+    wrap(async (_req, res) => {
+      res.json(await projectorFor(ctx, battle).current());
+    }),
+  );
 
   app.get('/projector/events', (_req, res) => {
-    projectorFor(ctx).subscribe(res);
+    void projectorFor(ctx, battle).subscribe(res);
   });
 
   app.get(
@@ -48,10 +54,14 @@ export function registerProjectorRoutes(app: Router, ctx: Ctx): void {
         res.status(400).json({ error: 'The request could not be read.' });
         return;
       }
-      const projector = projectorFor(ctx);
+      const projector = projectorFor(ctx, battle);
       if (request.kind === 'blank') {
         projector.set({ kind: 'blank' });
-        res.json(projector.current());
+        res.json(await projector.current());
+        return;
+      }
+      if (request.kind === 'combat') {
+        res.json(await projector.showCombat());
         return;
       }
       const src = await resolveSrc(ctx, request.src);

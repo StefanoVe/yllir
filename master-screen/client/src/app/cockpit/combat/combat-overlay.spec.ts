@@ -344,11 +344,13 @@ describe('Combat overlay', () => {
     const bar = (fixture.nativeElement as HTMLElement).querySelector('.bar')!;
     const order = [...bar.children].map((el) => el.className);
     const at = (name: string) => order.findIndex((className) => className.split(' ').includes(name));
+    // The projector button is an icon button too, placed before Next turn; the trailing ones are the hide and close buttons.
+    const lastIcon = Math.max(...order.flatMap((className, i) => (className.split(' ').includes('icon-button') ? [i] : [])));
 
     expect(at('round')).toBeLessThan(at('notice-strip'));
     expect(at('notice-strip')).toBeLessThan(at('spacer'));
     expect(at('spacer')).toBeLessThan(at('next-turn'));
-    expect(at('next-turn')).toBeLessThan(at('icon-button'));
+    expect(at('next-turn')).toBeLessThan(lastIcon);
   });
 
   it('gives each strip tile the full name as its title', async () => {

@@ -81,7 +81,7 @@ export function createApp(ctx: Ctx): express.Express {
   registerEncyclopediaRoutes(api, ctx);
   registerAtlasRoutes(api, ctx);
   registerPrintRoutes(api, ctx);
-  registerProjectorRoutes(api, ctx);
+  registerProjectorRoutes(api, ctx, battle);
   registerSettingsRoutes(api, ctx);
   registerUpdateRoutes(api, ctx);
   app.use('/api', api);

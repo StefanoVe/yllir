@@ -104,7 +104,8 @@
 }
 
 /* A toggle that is on: the chosen-option look. */
-.icon-button[aria-pressed="true"] {
+.icon-button[aria-pressed="true"],
+.icon-button.active {
   background: var(--color-selected-bg);
   border-color: var(--color-selected-border);
   color: var(--color-accent);

@@ -53,7 +53,7 @@ export class Shell {
 
   readonly icons = { Dices, GitBranch, Library, Music, BookOpen, MapIcon, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff, Projector, MonitorOff, Monitor };
   /** Something is on the projector: the rail offers to clear it. */
-  readonly projecting = computed(() => this.projector.current().kind === 'image');
+  readonly projecting = computed(() => this.projector.current().kind !== 'blank');
   /** The connection notice shows only after the stream has been down for a while, so load and blips do not flash it. */
   readonly showOffline = signal(false);
   private offlineTimer: ReturnType<typeof setTimeout> | undefined;

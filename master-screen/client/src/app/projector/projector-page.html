@@ -1,6 +1,58 @@
 <main class="projector">
   @if (imageSrc(); as src) {
     <img class="projection" [src]="src" alt="" />
+  } @else if (combat(); as c) {
+    <div class="fight" [class.with-map]="!!c.map">
+      @if (c.map; as map) {
+        <div class="map-area">
+          <div class="map-frame" [style.--ratio]="ratio()">
+            <img class="map-image" [src]="map.src" alt="" (load)="onMapLoad($event)" />
+            @for (t of tokens(); track t.id) {
+              <span
+                class="token"
+                role="img"
+                [attr.aria-label]="t.name"
+                [attr.data-side]="t.side"
+                [class.current]="t.current"
+                [class.defeated]="t.defeated"
+                [style.left.%]="t.left"
+                [style.top.%]="t.top"
+              >{{ t.label }}</span>
+            }
+          </div>
+        </div>
+      }
+      <section class="order" [attr.aria-label]="i18n.t('projector.order')">
+        <h1 class="round">{{ i18n.t('projector.round', { n: c.round }) }}</h1>
+        <ol>
+          @for (row of c.order; track row.id) {
+            <li
+              [class.current]="row.current"
+              [class.defeated]="row.defeated"
+              [attr.aria-current]="row.current ? 'true' : null"
+              [attr.data-side]="row.side"
+            >
+              <span class="init">{{ row.initiative ?? '—' }}</span>
+              <span class="name">{{ row.name }}</span>
+              @if (row.side === 'enemy') {
+                @if (row.health; as health) {
+                  <span class="status" [attr.data-health]="health">
+                    <span class="dot" aria-hidden="true"></span>{{ healthLabel(health) }}
+                  </span>
+                }
+              } @else {
+                <span class="status">
+                  {{ hitPoints(row) }}
+                  @if (row.tempHp) {
+                    <span class="temp">{{ i18n.t('projector.temp', { n: row.tempHp }) }}</span>
+                  }
+                </span>
+              }
+            </li>
+          }
+        </ol>
+      </section>
+    </div>
   } @else {
     <p class="rest">{{ campaignName() }}</p>
   }

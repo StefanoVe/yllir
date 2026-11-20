@@ -36,6 +36,7 @@ import { BattleBoard } from "./battle-board";
 import { TurnPanel } from "./turn-panel";
 import { CombatHud } from "./combat-hud.service";
 import { TooltipDirective } from "../../core/tooltip.directive";
+import { ProjectorService } from "../../projector/projector.service";
 
 /** True when the focus is in a field that takes typed text, where the H key must not hide the panels. */
 function isTyping(target: EventTarget | null): boolean {
@@ -74,6 +75,9 @@ export class CombatOverlay implements OnDestroy {
   readonly ticks = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
   private readonly battleApi = inject(BattleApi);
   private readonly overlay = inject(OverlayService);
+  readonly projector = inject(ProjectorService);
+  /** True while the projector shows the fight, so the header button is pressed. */
+  readonly projecting = computed(() => this.projector.current().kind === "combat");
   /** The combat thread being created, so that a second caller waits for it instead of creating another. */
   private ensuring: Promise<void> | null = null;
   /** The table and whether it had a combat the last time the session was seen. */
@@ -324,6 +328,12 @@ export class CombatOverlay implements OnDestroy {
     } catch {
       this.error.set(this.i18n.t("combat.error.turn"));
     }
+  }
+
+  /** Projects the fight on the projector, or blanks the projector when the fight is already on it. */
+  async toggleProjection(): Promise<void> {
+    const ok = this.projecting() ? await this.projector.blank() : await this.projector.projectCombat();
+    if (!ok) this.error.set(this.i18n.t("projector.combat.failed"));
   }
 
   async endCombat(): Promise<void> {

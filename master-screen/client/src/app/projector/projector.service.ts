@@ -1,7 +1,38 @@
 import { Injectable, signal } from '@angular/core';
 
+/** How a combatant is hurt, as a word for the table. Enemies only; PCs and allies show their hit points. */
+export type ProjectedHealth = 'unhurt' | 'wounded' | 'bloodied' | 'down';
+
+/** One line of the initiative order as the projector shows it. Mirrors the server contract. */
+export interface ProjectedCombatant {
+  id: string;
+  name: string;
+  side: 'pc' | 'ally' | 'enemy';
+  initiative: number | null;
+  current: boolean;
+  health?: ProjectedHealth;
+  hp?: number;
+  hpMax?: number;
+  tempHp?: number;
+  defeated?: boolean;
+}
+
+/** The fight as the projector shows it: the order, the battle map and the tokens' cells (or fractions without a grid). */
+export interface ProjectedCombat {
+  round: number;
+  order: ProjectedCombatant[];
+  map: { src: string; cols?: number; rows?: number } | null;
+  positions: Record<string, { x: number; y: number }>;
+}
+
 /** What the projector window shows. Mirrors the server contract; declared locally on purpose. */
-export type Projection = { kind: 'blank' } | { kind: 'image'; src: string };
+export type Projection =
+  | { kind: 'blank' }
+  | { kind: 'image'; src: string }
+  | { kind: 'combat'; combat: ProjectedCombat | null };
+
+/** What the master sends: the server answers with the new current projection. */
+type ProjectionRequest = { kind: 'blank' } | { kind: 'image'; src: string } | { kind: 'combat' };
 
 export const PROJECTOR_WINDOW_NAME = 'yllir-projector';
 const PROJECTOR_FEATURES = 'popup=yes,width=1280,height=720';
@@ -55,11 +86,17 @@ export class ProjectorService {
     return this.post({ kind: 'image', src });
   }
 
+  /** Projects the live fight. Like project(), the window opens first; the server then pushes each new frame by itself. */
+  async projectCombat(): Promise<boolean> {
+    if (!this.isOpen()) this.open();
+    return this.post({ kind: 'combat' });
+  }
+
   async blank(): Promise<boolean> {
     return this.post({ kind: 'blank' });
   }
 
-  private async post(body: Projection): Promise<boolean> {
+  private async post(body: ProjectionRequest): Promise<boolean> {
     try {
       const response = await fetch('/api/projector', {
         method: 'POST',

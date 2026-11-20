@@ -33,3 +33,226 @@
   letter-spacing: 0.04em;
   text-align: center;
 }
+
+/* The fight: the map on the left, the initiative order on the right (or alone, centred, without a map). */
+.fight {
+  --ink: #efe9dc;
+  --ink-soft: #8d877a;
+  --rule: #2b2a27;
+  /* Name size of the initiative rows: scales with the width, larger when the column stands alone. */
+  --name-size: clamp(18px, 1.9vw, 40px);
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  color: var(--ink);
+  font-size: clamp(16px, 2.4vh, 40px);
+}
+
+.map-area {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* The box keeps the map's proportions and fits the area: never wider than the area, never taller than the screen. */
+.map-frame {
+  position: relative;
+  width: min(100%, calc(100vh * var(--ratio, 1.7778)));
+  aspect-ratio: var(--ratio, 1.7778);
+}
+
+.map-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* A token is a circle the size of most of a cell, so it scales with the map box. */
+.token {
+  --token: clamp(26px, 6.2vh, 110px);
+  position: absolute;
+  z-index: 1;
+  width: var(--token);
+  height: var(--token);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 3px solid #000;
+  background: var(--ink);
+  color: #000;
+  font-size: calc(var(--token) * 0.36);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.token[data-side='ally'] {
+  background: #7fa8e0;
+  color: #000;
+}
+
+.token[data-side='enemy'] {
+  background: #c8583f;
+  color: #fff;
+}
+
+/* The current turn: a white ring outside the token. */
+.token.current {
+  outline: 4px solid #fff;
+  outline-offset: 4px;
+}
+
+.token.defeated {
+  opacity: 0.35;
+  filter: grayscale(1);
+}
+
+/* The initiative column: about 30% of the screen with a map (never under 260px); alone, centred and wider without one. */
+.order {
+  flex: 0 0 clamp(260px, 30vw, 560px);
+  box-sizing: border-box;
+  height: 100%;
+  min-width: 0;
+  padding: 4vh 2.2vw;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4vh;
+  border-left: 1px solid var(--rule);
+  overflow: hidden;
+}
+
+.fight:not(.with-map) {
+  --name-size: clamp(22px, 2.6vw, 56px);
+}
+
+.fight:not(.with-map) .order {
+  flex: 0 0 min(60vw, 1100px);
+  margin: 0 auto;
+  border-left: 0;
+  justify-content: center;
+}
+
+.round {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(22px, 2.4vw, 52px);
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.order ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1vh;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* One row per combatant: the initiative number on the left spans two rows; the name is on the first,
+   the status (health word or hit points) on the second, aligned with the name. Names wrap, never truncate. */
+.order li {
+  display: grid;
+  grid-template-columns: minmax(2.2em, auto) minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  align-items: start;
+  column-gap: 0.6em;
+  row-gap: 0.2em;
+  padding: 1.1vh 0.9vw;
+  border: 1px solid var(--rule);
+  font-size: var(--name-size);
+  line-height: 1.2;
+}
+
+.init {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  font-size: 1.1em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.name {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+.status {
+  grid-column: 2;
+  grid-row: 2;
+  display: inline-flex;
+  align-items: baseline;
+  justify-self: start;
+  gap: 0.4em;
+  font-size: 0.7em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.temp {
+  color: var(--ink-soft);
+  font-size: 0.85em;
+}
+
+/* Health dot: the word says the state, the dot repeats it for a quick look. */
+.dot {
+  display: inline-block;
+  width: 0.62em;
+  height: 0.62em;
+  margin-right: 0.45em;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  vertical-align: middle;
+}
+
+.status[data-health='unhurt'] .dot {
+  background: transparent;
+}
+
+.status[data-health='wounded'] .dot {
+  background: #e0b35a;
+  border-color: #e0b35a;
+}
+
+.status[data-health='bloodied'] .dot {
+  background: #d9663f;
+  border-color: #d9663f;
+}
+
+.status[data-health='down'] .dot {
+  background: #5a5a5a;
+  border-color: #5a5a5a;
+}
+
+/* The current turn: the one inverted row, readable across a room. */
+.order li.current {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #000;
+  font-weight: 700;
+}
+
+.order li.current .temp {
+  color: #000;
+}
+
+.order li.defeated {
+  opacity: 0.45;
+}
+
+.order li.defeated .name {
+  text-decoration: line-through;
+}

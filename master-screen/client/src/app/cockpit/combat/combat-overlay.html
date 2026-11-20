@@ -42,6 +42,18 @@
     @if (combat()) {
     <button
       type="button"
+      class="icon-button"
+      [class.active]="projecting()"
+      [attr.aria-pressed]="projecting()"
+      [attr.aria-label]="i18n.t('projector.combat.project')"
+      [msTooltip]="i18n.t('projector.combat.project')"
+      msTooltipPosition="bottom"
+      (click)="toggleProjection()"
+    >
+      <ui-icon name="projector" [size]="18" />
+    </button>
+    <button
+      type="button"
       class="next-turn"
       [disabled]="!nextId()"
       [attr.aria-label]="i18n.t('combat.next')"

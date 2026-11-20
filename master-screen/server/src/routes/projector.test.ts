@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict';
+import fsSync from 'node:fs';
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { after, before, describe, it } from 'node:test';
-import type { ProjectableResponse, Projection } from '../../../shared/src/types.js';
-import { get, send, sendRaw, startApp, type Harness } from '../live/test-support.js';
+import type {
+  BattleView,
+  CombatState,
+  Combatant,
+  ProjectableResponse,
+  ProjectedCombat,
+  Projection,
+} from '../../../shared/src/types.js';
+import { get, makeCampaign, makeFramework, send, sendRaw, startApp, type Harness } from '../live/test-support.js';
+import { projectCombat } from '../projector/projector.js';
 
 // The real framework in this repository (four levels up from src/routes/).
 const REAL_FRAMEWORK = fileURLToPath(new URL('../../../../yllir', import.meta.url));
@@ -222,6 +231,199 @@ describe('projector routes', () => {
     assert.equal(contentType, 'text/event-stream; charset=utf-8');
     assert.match(text, /^retry: 3000\n\n/);
     assert.match(text, /event: projection\ndata: \{"kind":"image","src":"\/api\/file\?path=img%2Fmap\.png"\}\n\n/);
+    await send(h, 'POST', '/projector', { kind: 'blank' });
+  });
+
+  it('a combat request with no live session answers the rest screen, and a combat body takes no other key', async () => {
+    const res = await send(h, 'POST', '/projector', { kind: 'combat' });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json, { kind: 'combat', combat: null });
+    assert.deepEqual(await projection(), { kind: 'combat', combat: null });
+
+    const extra = await send(h, 'POST', '/projector', { kind: 'combat', src: MAP });
+    assert.equal(extra.status, 400);
+    assert.deepEqual(extra.json, { error: 'The request could not be read.' });
+
+    await send(h, 'POST', '/projector', { kind: 'blank' });
+  });
+});
+
+describe('projectCombat', () => {
+  const FIGHTERS: Combatant[] = [
+    {
+      id: 'c-1', name: 'Mira', side: 'pc', initiative: 18, hp: 20, hpMax: 30, tempHp: 4, ac: 15,
+      conditions: [{ id: 'prone', duration: 'until-removed' }], resources: { 'spell slots': 2 },
+      notes: 'master only', sheet: 'Players/Mira.md',
+    },
+    {
+      id: 'c-2', name: 'Goblin', side: 'enemy', initiative: 14, hp: 3, hpMax: 10, ac: 13,
+      conditions: [], resources: {}, notes: 'master only', sheet: 'Enemies/goblin.md',
+    },
+    { id: 'c-3', name: 'Ghost', side: 'enemy', initiative: 12, hp: 0, hpMax: 10, conditions: [], resources: {}, hidden: true },
+    {
+      id: 'c-4', name: 'Guard', side: 'ally', initiative: 10, hp: 5, hpMax: 12, tempHp: 0, ac: 16,
+      conditions: [], resources: {}, defeated: true,
+    },
+  ];
+
+  const stateOf = (overrides: Partial<CombatState> = {}, combatants: Combatant[] = FIGHTERS): CombatState => ({
+    active: true,
+    round: 2,
+    turn: 1,
+    order: ['c-1', 'c-2', 'c-3', 'c-4', 'c-9'],
+    combatants,
+    events: [],
+    revision: 3,
+    ...overrides,
+  });
+
+  const BATTLE: BattleView = {
+    map: { ref: 'Maps/harbor.png', cols: 10, rows: 8 },
+    positions: { 'c-1': { x: 2, y: 3 }, 'c-2': { x: 4, y: 4 }, 'c-3': { x: 9, y: 9 }, 'c-9': { x: 1, y: 1 } },
+    revision: 5,
+  };
+
+  /** The projected row of one enemy with the given hit points, in a fight where it is up. */
+  function enemyRow(hp: number | undefined, extra: Partial<Combatant> = {}): ProjectedCombat['order'][number] {
+    const enemy: Combatant = { id: 'e', name: 'E', side: 'enemy', initiative: 5, conditions: [], resources: {}, ...extra };
+    if (hp !== undefined) enemy.hp = hp;
+    enemy.hpMax = 10;
+    const projected = projectCombat(stateOf({ order: ['e'], turn: 0 }, [enemy]), null, null);
+    assert.ok(projected);
+    return projected.order[0];
+  }
+
+  it('is null when there is no state or the combat is not active', () => {
+    assert.equal(projectCombat(null, BATTLE, null), null);
+    assert.equal(projectCombat(stateOf({ active: false }), BATTLE, null), null);
+  });
+
+  it('leaves hidden combatants and unknown ids out of the order', () => {
+    const projected = projectCombat(stateOf(), null, null);
+    assert.ok(projected);
+    assert.deepEqual(projected.order.map((row) => row.id), ['c-1', 'c-2', 'c-4']);
+    assert.equal(projected.round, 2);
+  });
+
+  it('marks the combatant at the turn index as current', () => {
+    const projected = projectCombat(stateOf(), null, null);
+    assert.ok(projected);
+    assert.deepEqual(projected.order.map((row) => row.current), [false, true, false]);
+  });
+
+  it('marks nobody current when the turn holder is hidden or the turn is out of range', () => {
+    const hiddenTurn = projectCombat(stateOf({ turn: 2 }), null, null);
+    assert.ok(hiddenTurn);
+    assert.equal(hiddenTurn.order.some((row) => row.current), false);
+    const outOfRange = projectCombat(stateOf({ turn: 40 }), null, null);
+    assert.ok(outOfRange);
+    assert.equal(outOfRange.order.some((row) => row.current), false);
+  });
+
+  it('gives an enemy only a health word, from its hit points: 100%, 60%, 40% and 0%', () => {
+    assert.equal(enemyRow(10).health, 'unhurt');
+    assert.equal(enemyRow(6).health, 'wounded');
+    assert.equal(enemyRow(4).health, 'bloodied');
+    assert.equal(enemyRow(0).health, 'down');
+    assert.equal(enemyRow(7, { defeated: true }).health, 'down');
+  });
+
+  it('gives an enemy no health word when its hit points are not known', () => {
+    const row = enemyRow(undefined);
+    assert.equal(row.health, undefined);
+    assert.equal('health' in row, false);
+  });
+
+  it('gives an enemy no numbers, armour, conditions, notes or sheet at all', () => {
+    const projected = projectCombat(stateOf(), null, null);
+    assert.ok(projected);
+    const enemy = projected.order[1];
+    assert.deepEqual(Object.keys(enemy).sort(), ['current', 'health', 'id', 'initiative', 'name', 'side']);
+    assert.equal(JSON.stringify(projected).includes('master only'), false);
+    assert.equal(JSON.stringify(projected).includes('goblin.md'), false);
+  });
+
+  it('keeps hit points of a player character and an ally, and never their armour, conditions or resources', () => {
+    const projected = projectCombat(stateOf(), null, null);
+    assert.ok(projected);
+    const pc = projected.order[0];
+    assert.deepEqual(Object.keys(pc).sort(), ['current', 'hp', 'hpMax', 'id', 'initiative', 'name', 'side', 'tempHp']);
+    assert.equal(pc.hp, 20);
+    assert.equal(pc.hpMax, 30);
+    assert.equal(pc.tempHp, 4);
+    const ally = projected.order[2];
+    assert.deepEqual(Object.keys(ally).sort(), ['current', 'defeated', 'hp', 'hpMax', 'id', 'initiative', 'name', 'side']);
+    assert.equal(ally.defeated, true);
+  });
+
+  it('copies no temporary hit points of zero and no defeated flag that is not true', () => {
+    const projected = projectCombat(stateOf(), null, null);
+    assert.ok(projected);
+    assert.equal('tempHp' in projected.order[2], false);
+    assert.equal('defeated' in projected.order[0], false);
+  });
+
+  it('keeps only the tokens of the projected order, and the map with its grid', () => {
+    const projected = projectCombat(stateOf(), BATTLE, '/api/file?path=Maps%2Fharbor.png');
+    assert.ok(projected);
+    assert.deepEqual(projected.map, { src: '/api/file?path=Maps%2Fharbor.png', cols: 10, rows: 8 });
+    assert.deepEqual(projected.positions, { 'c-1': { x: 2, y: 3 }, 'c-2': { x: 4, y: 4 } });
+  });
+
+  it('projects no map and no tokens when the map may not be shown', () => {
+    const projected = projectCombat(stateOf(), BATTLE, null);
+    assert.ok(projected);
+    assert.equal(projected.map, null);
+    assert.deepEqual(projected.positions, {});
+  });
+});
+
+describe('projector combat, end to end', () => {
+  let tmp: string;
+  let h: Harness;
+
+  before(async () => {
+    tmp = makeCampaign({});
+    h = await startApp(tmp, makeFramework({ libs: true }));
+  });
+
+  after(async () => {
+    await h.server.close();
+    await h.ctx.closeAll();
+  });
+
+  it('projects the order without the hidden combatant, and keeps the enemy numberless', async () => {
+    const opened = await send(h, 'POST', '/live/open', {});
+    assert.equal(opened.status, 200, opened.text);
+    const sessionId = (opened.json as { session: { id: string } }).session.id;
+    await send(h, 'POST', '/live/combat', { op: 'start' });
+    await send(h, 'POST', '/live/combat', { op: 'add', name: 'Mira', side: 'pc', initiative: 18 });
+    await send(h, 'POST', '/live/combat', { op: 'add', name: 'Goblin', side: 'enemy', initiative: 14 });
+    await send(h, 'POST', '/live/combat', { op: 'add', name: 'Ghost', side: 'enemy', initiative: 12 });
+    await send(h, 'POST', '/live/combat', { op: 'next' });
+
+    // The stand-in library has no `hidden` or hit points: the test sets them in the combat file.
+    const file = path.join(tmp, '.campaign', 'state', 'live', sessionId, 'combat.json');
+    const stored = JSON.parse(fsSync.readFileSync(file, 'utf8')) as CombatState;
+    stored.combatants[1] = { ...stored.combatants[1], hp: 3, hpMax: 10, ac: 13, notes: 'master only' };
+    stored.combatants[2] = { ...stored.combatants[2], hidden: true };
+    fsSync.writeFileSync(file, JSON.stringify(stored, null, 2));
+
+    const res = await send(h, 'POST', '/projector', { kind: 'combat' });
+    assert.equal(res.status, 200);
+    const projected = (res.json as { kind: 'combat'; combat: ProjectedCombat }).combat;
+    assert.deepEqual(projected.order.map((row) => row.id), ['c-1', 'c-2']);
+    assert.deepEqual(projected.order.map((row) => row.current), [false, true]);
+    assert.equal(projected.order[1].health, 'bloodied');
+    assert.deepEqual(Object.keys(projected.order[1]).sort(), ['current', 'health', 'id', 'initiative', 'name', 'side']);
+    assert.equal(projected.map, null);
+    assert.deepEqual(projected.positions, {});
+
+    const text = JSON.stringify(res.json);
+    assert.equal(text.includes('Ghost'), false);
+    assert.equal(text.includes('master only'), false);
+
+    assert.deepEqual((await get(h, '/projector')).json, res.json);
     await send(h, 'POST', '/projector', { kind: 'blank' });
   });
 });

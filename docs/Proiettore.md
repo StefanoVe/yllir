@@ -1,6 +1,6 @@
 # Proiettore
 
-**Stato:** prima versione implementata (master screen 0.21.0, 2026-11-20): finestra proiettore, «Apri proiettore», «Proietta» nella lightbox; il combat tracker proiettato è rimandato; le questioni aperte restano aperte
+**Stato:** implementato (master screen 0.21.0 del 2026-11-20 e 0.22.0 del 2026-11-21): finestra proiettore, «Apri proiettore», «Proietta» nella lightbox e combattimento proiettato; le altre questioni aperte restano aperte
 **Parte di:** [Master screen](Master%20screen.md)
 
 ## Scopo del documento
@@ -17,10 +17,16 @@ Questa idea supera, per il proiettore, la decisione «Vista per i giocatori: per
 
 ## Prima versione (2026-11-20)
 
-- **Combat tracker escluso (Deciso, 2026-11-20).** L'autore ha chiesto di saltarlo per ora: la prima versione proietta soltanto immagini e lo schermo di riposo.
+- **Combat tracker escluso nella prima versione (2026-11-20).** L'autore ha chiesto di saltarlo nella 0.21.0, che proietta soltanto immagini e lo schermo di riposo; è arrivato con la 0.22.0 (sotto).
 - **Cosa c'è.** La pagina `/projector` senza barra né tasti (un doppio clic la porta a schermo intero), il tasto «Apri proiettore» nella barra laterale e, quando qualcosa è proiettato, «Svuota il proiettore»; nella lightbox «Proietta» accanto al pop-up. Il proiettore si apre solo su richiesta del master: è la scelta prudente finché la prima questione aperta non è decisa.
 - **Controllo sul server.** Si proietta un'immagine solo se la cita la parte pubblica di un documento non riservato, oppure se il master l'ha caricata sulla scrivania della partita live; altrimenti il tasto «Proietta» non compare e il server rifiuta la richiesta. L'indirizzo proiettato lo ricostruisce il server.
 - **Un solo proiettore, immagine intera.** Il server resta su 127.0.0.1 e la mappa si proietta intera, senza zoom né nebbia.
+
+## Combattimento proiettato (Deciso, 2026-11-21)
+
+- **Cosa vedono i giocatori.** Round, ordine di iniziativa e turno corrente, con i nomi. Dei nemici solo lo stato a parole ricavato dai punti ferita (illeso, ferito, sanguinante, a terra), mai i numeri; di personaggi e alleati i punti ferita esatti. Classe armatura, condizioni, risorse e note restano al master; i combattenti nascosti non compaiono finché il master non li rivela.
+- **Ordine e mappa.** Se il combattimento ha una battle map, il proiettore la mostra con le pedine dei combattenti visibili e l'ordine di iniziativa a lato; senza mappa mostra solo l'ordine. La mappa compare solo se è un'immagine pubblica, con lo stesso controllo delle immagini.
+- **Aggiornamento.** Il tasto «Proietta il combattimento» nella barra del combattimento avvia la proiezione e, premuto di nuovo, la toglie; il server ricostruisce la vista a ogni cambio di turno, danno o spostamento di pedina.
 
 ## 2. Come potrebbe funzionare (Proposta)
 
@@ -42,6 +48,5 @@ Questa idea supera, per il proiettore, la decisione «Vista per i giocatori: per
 
 - Il proiettore si apre sempre all'avvio, o solo quando il master lo chiede? (L'apertura automatica è limitata dai browser, sezione 3.)
 - Quali viste hanno «Proietta» oltre a lightbox e combat tracker: schede pubbliche, atlante, mappa di battaglia con le pedine?
-- Combat tracker proiettato: quali campi vedono i giocatori, e lo stato dei nemici (per esempio «ferito») si mostra?
 - Proiezione di una mappa: intera, o la porzione e lo zoom che il master sta guardando, con eventuale nebbia di guerra?
 - Un solo proiettore, o più finestre (per esempio un tablet al tavolo in rete locale)? Oggi il server ascolta solo su 127.0.0.1.
