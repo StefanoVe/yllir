@@ -438,3 +438,14 @@ export type PrintState = 'to-print' | 'printed' | 'reprint';
 export interface PrintCard { id: string; title: string; path: string; category: string; print: PrintState | null; hasImage: boolean; personal: boolean }
 export interface PrintStatus { enabled: boolean; cards: PrintCard[]; renderer: 'photoshop' | 'node'; format: '5x7' | 'a4'; cmyk: boolean; baseUrl: string; encyclopediaEnabled: boolean }
 export interface PrintSheetResult { ok: boolean; file: string | null; fileUrl: string | null; pages: number; excluded: { id: string; reason: string }[]; warnings: { code: string; message: string }[] }
+
+// ---------------------------------------------------------------------------
+// Projector (the second window the players see: GET/POST /api/projector).
+// ---------------------------------------------------------------------------
+
+/** What the projector window shows. Declarative: the projector can only draw these kinds. */
+export type Projection = { kind: 'blank' } | { kind: 'image'; src: string };
+/** POST /api/projector body. */
+export type ProjectRequest = { kind: 'blank' } | { kind: 'image'; src: string };
+/** GET /api/projector/check answer. */
+export interface ProjectableResponse { projectable: boolean }

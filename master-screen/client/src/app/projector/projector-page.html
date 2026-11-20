@@ -1,0 +1,7 @@
+<main class="projector">
+  @if (imageSrc(); as src) {
+    <img class="projection" [src]="src" alt="" />
+  } @else {
+    <p class="rest">{{ campaignName() }}</p>
+  }
+</main>

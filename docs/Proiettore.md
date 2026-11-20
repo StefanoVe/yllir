@@ -1,6 +1,6 @@
 # Proiettore
 
-**Stato:** idea dell'autore (2026-11-20), da sviluppare; tutto il resto è **Proposta**; nessuna implementazione
+**Stato:** prima versione implementata (master screen 0.21.0, 2026-11-20): finestra proiettore, «Apri proiettore», «Proietta» nella lightbox; il combat tracker proiettato è rimandato; le questioni aperte restano aperte
 **Parte di:** [Master screen](Master%20screen.md)
 
 ## Scopo del documento
@@ -14,6 +14,13 @@ Questo file raccoglie l'idea del proiettore del master screen, per svilupparla i
 - **Effetto.** Cliccando «Proietta», nella finestra proiettore compare la stessa cosa che il master sta guardando.
 
 Questa idea supera, per il proiettore, la decisione «Vista per i giocatori: per ora non c'è» del 2026-11-12 in [Master screen](Master%20screen.md#decisioni-dellautore).
+
+## Prima versione (2026-11-20)
+
+- **Combat tracker escluso (Deciso, 2026-11-20).** L'autore ha chiesto di saltarlo per ora: la prima versione proietta soltanto immagini e lo schermo di riposo.
+- **Cosa c'è.** La pagina `/projector` senza barra né tasti (un doppio clic la porta a schermo intero), il tasto «Apri proiettore» nella barra laterale e, quando qualcosa è proiettato, «Svuota il proiettore»; nella lightbox «Proietta» accanto al pop-up. Il proiettore si apre solo su richiesta del master: è la scelta prudente finché la prima questione aperta non è decisa.
+- **Controllo sul server.** Si proietta un'immagine solo se la cita la parte pubblica di un documento non riservato, oppure se il master l'ha caricata sulla scrivania della partita live; altrimenti il tasto «Proietta» non compare e il server rifiuta la richiesta. L'indirizzo proiettato lo ricostruisce il server.
+- **Un solo proiettore, immagine intera.** Il server resta su 127.0.0.1 e la mappa si proietta intera, senza zoom né nebbia.
 
 ## 2. Come potrebbe funzionare (Proposta)
 

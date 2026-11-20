@@ -31,6 +31,16 @@
     >
       <ui-icon name="external" />
     </button>
+    @if (projectable()) {
+    <button
+      class="icon-button"
+      (click)="projectImage()"
+      [attr.aria-label]="i18n.t('liveAgent.viewer.project')"
+      [msTooltip]="i18n.t('liveAgent.viewer.project')"
+    >
+      <ui-icon name="projector" />
+    </button>
+    }
     <button
       class="icon-button"
       (click)="viewer.toggleFullscreen()"

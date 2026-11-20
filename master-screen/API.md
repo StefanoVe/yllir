@@ -430,3 +430,16 @@ Framework CLI (JSON then `exit: <code>`): `node <fw>/skills/library/atlas/script
 Generation (`server/src/atlas/generation.ts`): `start(mode)` creates one conversation and submits the fixed English prompt of the mode (`server/src/atlas/texts.ts`) with the chat's default model (no override). The first line of the prompt is the conversation title. The state follows that conversation's turns, as the alignment does: a turn that is queued or running gives `running`; a turn that ends normally gives `done` when the atlas exists and the assistant's last message is not a question (places may stay pending), otherwise `waiting-answer`; an error or a cancel gives `failed` (start is allowed again). `mode` is kept in the state, and `conversationId` stays set after the run. The state is kept in memory: after a restart it is `idle`. Every turn end and every start publishes the `conversations` SSE event.
 
 The viewer in the iframe posts `{ type: 'yllir-atlas-open', path: '<campaign-relative .md path>' }` to its parent window; the screen opens that document.
+
+## Projector (the players' window)
+
+The second window `/projector` only receives. The server keeps the last projection in memory (`Projection` in `shared/src/types.ts`, starts `{ kind: 'blank' }`) and streams it, so a reconnecting projector gets it at once. `ProjectRequest` and `ProjectableResponse` are in the same file.
+
+| Method and path | Request | Response |
+|---|---|---|
+| GET `/api/projector` | | `Projection` |
+| GET `/api/projector/events` | | SSE: `retry: 3000`, then at once `event: projection` with the current `Projection`, then every change; `: ping` every 15 s |
+| GET `/api/projector/check?src=` | `src` | `ProjectableResponse` `{ projectable }`: whether the server would project `src` |
+| POST `/api/projector` | `ProjectRequest` | `{ kind: 'blank' }` sets the blank projection and answers it. `{ kind: 'image', src }` answers the normalized `Projection`; 403 `{ error }` when the source may not be shown; 400 `{ error }` for any other body (src longer than 2048 characters included) |
+
+Security rule: the server decides what may be projected, never the client. An image is allowed only when it is `/api/file?path=…` and the public part of a document that is not master-only embeds or links it, or when it is `/api/cockpit/sessions/<id>/files/<name>` with plain names and a raster extension (the images the master uploaded to his live board). Images that only a master block or a master-only document shows are refused. The server rebuilds the URL it stores; absolute URLs, `data:`, protocol-relative sources and `..` are refused. Gate: `resolveSrc` in `server/src/projector/projector.ts`.

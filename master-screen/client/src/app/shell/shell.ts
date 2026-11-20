@@ -2,7 +2,7 @@ import { Component, DOCUMENT, DestroyRef, ElementRef, HostListener, computed, ef
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Map as MapIcon, Music, Printer, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
+import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Map as MapIcon, Monitor, MonitorOff, Music, Printer, Projector, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
 import { filter, map } from 'rxjs';
 import { LiveService } from '../core/live.service';
 import { SettingsService } from '../core/settings.service';
@@ -16,6 +16,7 @@ import { ThemeService } from '../core/theme.service';
 import { UpdateAlign } from '../update-align/update-align';
 import { UpdateNotice } from '../update-notice/update-notice';
 import { ViewModeService } from '../core/view-mode.service';
+import { ProjectorService } from '../projector/projector.service';
 import { TooltipDirective } from '../core/tooltip.directive';
 import { type TooltipPosition } from '../core/tooltip.service';
 import { I18n, type TranslationKey } from '../i18n';
@@ -34,6 +35,7 @@ export class Shell {
   readonly theme = inject(ThemeService);
   readonly viewMode = inject(ViewModeService);
   readonly palette = inject(PaletteController);
+  readonly projector = inject(ProjectorService);
   private readonly router = inject(Router);
   private readonly prefs = inject(PrefsService);
   private readonly status = inject(StatusService);
@@ -49,7 +51,9 @@ export class Shell {
   readonly showUpdateNotice = this.updates.showNotice;
   readonly settingsLabel = computed(() => this.i18n.t(this.showUpdateNotice() ? 'shell.updateNotice' : 'nav.settings'));
 
-  readonly icons = { Dices, GitBranch, Library, Music, BookOpen, MapIcon, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff };
+  readonly icons = { Dices, GitBranch, Library, Music, BookOpen, MapIcon, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff, Projector, MonitorOff, Monitor };
+  /** Something is on the projector: the rail offers to clear it. */
+  readonly projecting = computed(() => this.projector.current().kind === 'image');
   /** The connection notice shows only after the stream has been down for a while, so load and blips do not flash it. */
   readonly showOffline = signal(false);
   private offlineTimer: ReturnType<typeof setTimeout> | undefined;
@@ -132,6 +136,10 @@ export class Shell {
     const pref = this.theme.pref();
     const name: TranslationKey = pref === 'system' ? 'theme.system' : pref === 'light' ? 'theme.light' : 'theme.dark';
     return this.i18n.t('nav.theme') + ': ' + this.i18n.t(name);
+  }
+
+  clearProjector(): void {
+    void this.projector.blank();
   }
 
   previewLabel(): string {

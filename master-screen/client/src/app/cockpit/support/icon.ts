@@ -91,6 +91,7 @@ import {
   ScanEye,
   Scan,
   Palette,
+  Projector,
 } from "lucide-angular";
 const icons = {
   music: Music2,
@@ -185,6 +186,7 @@ const icons = {
   scanEye: ScanEye,
   scan: Scan,
   palette: Palette,
+  projector: Projector,
   back: Undo2,
 };
 @Component({

@@ -17,6 +17,7 @@ import { registerPlotRoutes } from './routes/plot.js';
 import { registerStatusRoutes } from './routes/status.js';
 import { createSiteRouter, registerEncyclopediaRoutes } from './routes/encyclopedia.js';
 import { registerPrintRoutes } from './routes/print.js';
+import { registerProjectorRoutes } from './routes/projector.js';
 import { registerSettingsRoutes } from './routes/settings.js';
 import { registerUpdateRoutes } from './routes/update.js';
 import { encyclopediaEnabledAtStartup } from './encyclopedia/config.js';
@@ -80,6 +81,7 @@ export function createApp(ctx: Ctx): express.Express {
   registerEncyclopediaRoutes(api, ctx);
   registerAtlasRoutes(api, ctx);
   registerPrintRoutes(api, ctx);
+  registerProjectorRoutes(api, ctx);
   registerSettingsRoutes(api, ctx);
   registerUpdateRoutes(api, ctx);
   app.use('/api', api);

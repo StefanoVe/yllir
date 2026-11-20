@@ -146,6 +146,7 @@ export const liveAgentIt = {
   'liveAgent.viewer.zoomOut': 'Riduci',
   'liveAgent.viewer.fullscreen': 'Schermo intero',
   'liveAgent.viewer.popup': 'Apri immagine in una finestra pop-up',
+  'liveAgent.viewer.project': 'Proietta',
   'liveAgent.viewer.closeImage': 'Chiudi immagine',
   'liveAgent.viewer.closeImageTitle': 'Chiudi · Esc',
   'liveAgent.viewer.pdf': 'Documento PDF',

@@ -138,6 +138,7 @@ export const liveAgentEn = {
   'liveAgent.viewer.zoomOut': 'Zoom out',
   'liveAgent.viewer.fullscreen': 'Full screen',
   'liveAgent.viewer.popup': 'Open image in a pop-up window',
+  'liveAgent.viewer.project': 'Project',
   'liveAgent.viewer.closeImage': 'Close image',
   'liveAgent.viewer.closeImageTitle': 'Close · Esc',
   'liveAgent.viewer.pdf': 'PDF document',

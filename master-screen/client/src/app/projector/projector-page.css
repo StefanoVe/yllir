@@ -1,0 +1,35 @@
+:host {
+  position: fixed;
+  inset: 0;
+  display: block;
+  background: #000;
+  cursor: none;
+  overflow: hidden;
+}
+
+.projector {
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  background: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: none;
+}
+
+.projection {
+  width: 100vw;
+  height: 100vh;
+  object-fit: contain;
+  display: block;
+}
+
+.rest {
+  margin: 0;
+  padding: 0 16px;
+  color: #5c5c5c;
+  font-size: 0.9rem;
+  letter-spacing: 0.04em;
+  text-align: center;
+}

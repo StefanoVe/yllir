@@ -43,6 +43,18 @@
             [attr.aria-label]="i18n.t('nav.search')" [msTooltip]="i18n.t('nav.search')" [msTooltipPosition]="tooltipSide()" (click)="palette.show()">
       <lucide-angular [img]="icons.Search" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
     </button>
+    <button type="button" class="rail-item"
+            [attr.aria-label]="i18n.t('nav.projector')" [msTooltip]="i18n.t('nav.projector')" [msTooltipPosition]="tooltipSide()"
+            (click)="projector.open()">
+      <lucide-angular [img]="icons.Projector" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
+    </button>
+    @if (projecting()) {
+      <button type="button" class="rail-item"
+              [attr.aria-label]="i18n.t('nav.projectorClear')" [msTooltip]="i18n.t('nav.projectorClear')" [msTooltipPosition]="tooltipSide()"
+              (click)="clearProjector()">
+        <lucide-angular [img]="icons.MonitorOff" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
+      </button>
+    }
     <button type="button" class="rail-item rail-sep rail-bottom" [class.active]="viewMode.viewMode() === 'public'"
             [attr.aria-pressed]="viewMode.viewMode() === 'public'"
             [attr.aria-label]="previewLabel()" [msTooltip]="previewLabel()" [msTooltipPosition]="tooltipSide()"
