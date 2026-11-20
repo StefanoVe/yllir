@@ -37,6 +37,11 @@ function write(dir, file, text) {
   fs.writeFileSync(full, text);
 }
 
+// A set YLLIR_PUBLISHED_SOURCE makes the marketplace refresh skip, so no test
+// starts the real claude CLI. This source has the installed version: no notice.
+process.env.YLLIR_PUBLISHED_SOURCE = tempDir();
+write(process.env.YLLIR_PUBLISHED_SOURCE, '.claude-plugin/plugin.json', JSON.stringify({ name: 'yllir', version: FRAMEWORK_VERSION }));
+
 const VALID_CONFIG = [
   'schema: 1',
   '',
@@ -482,8 +487,9 @@ describe('update notice', () => {
     }
   }
 
-  test('without YLLIR_PUBLISHED_SOURCE the update field is null and the output ends at the next step', () => {
-    withPublishedSource(undefined, () => {
+  test('a published version equal to the installed one gives no update field and the output ends at the next step', () => {
+    const source = publishedSource(FRAMEWORK_VERSION, {});
+    withPublishedSource(source, () => {
       const root = campaign();
       const result = sessionCheck(root);
       assert.equal(result.update, null);

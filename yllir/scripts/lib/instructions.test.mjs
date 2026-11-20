@@ -72,6 +72,7 @@ describe('project allow rules', () => {
       'Edit(.campaign/image-providers/**)',
       'Edit(.campaign/styles/**)',
       'Bash(claude plugin update *)',
+      'Bash(claude plugin marketplace update *)',
     ]) {
       assert.ok(allow.includes(rule), rule);
     }
@@ -93,6 +94,18 @@ describe('project allow rules', () => {
     }
   });
 
+  test('a skill that allows only the marketplace update command gets exactly that rule', () => {
+    const dir = tempDir();
+    fs.mkdirSync(path.join(dir, 'm'), { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, 'm/SKILL.md'),
+      '---\nname: m\nallowed-tools: Bash(claude plugin marketplace update *), Read\n---\n',
+    );
+    assert.deepEqual(projectAllowRules(dir).filter((rule) => rule.includes('claude plugin')), [
+      'Bash(claude plugin marketplace update *)',
+    ]);
+  });
+
   test('reads the allowed-tools line of a skill and returns null without one', () => {
     assert.equal(
       allowedToolsOf('---\nname: x\nallowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/a.mjs" *), Read\n---\nBody\n'),
@@ -108,13 +121,14 @@ describe('project allow rules', () => {
     fs.mkdirSync(path.join(dir, 'b'), { recursive: true });
     fs.writeFileSync(
       path.join(dir, 'a/SKILL.md'),
-      '---\nname: a\nallowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/x.mjs" *), Bash(node */scripts/x.mjs *), Bash(claude plugin update *), Read\n---\n',
+      '---\nname: a\nallowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/x.mjs" *), Bash(node */scripts/x.mjs *), Bash(claude plugin update *), Bash(claude plugin marketplace update *), Read\n---\n',
     );
     fs.writeFileSync(
       path.join(dir, 'b/SKILL.md'),
       '---\nname: b\nallowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/x.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/b/y.mjs" *)\n---\n',
     );
     assert.deepEqual(projectAllowRules(dir), [
+      'Bash(claude plugin marketplace update *)',
       'Bash(claude plugin update *)',
       'Bash(node "*/b/y.mjs" *)',
       'Bash(node "*/scripts/x.mjs" *)',

@@ -21,11 +21,21 @@ function tempDir(t, prefix) {
   return dir;
 }
 
-/** Runs the hook with a fake home (YLLIR_HOME_DIR) and a fake HOME, so the real home is never used. */
+/**
+ * Runs the hook with a fake home (YLLIR_HOME_DIR) and a fake HOME, so the real home is never used.
+ * YLLIR_PUBLISHED_SOURCE is set to a folder that does not exist: the marketplace refresh is skipped
+ * (no real claude CLI is started) and the update notice stays silent.
+ */
 function runHook(args, { home, fakeHome }) {
   return spawnSync(process.execPath, [CLI, ...args], {
     encoding: 'utf8',
-    env: { ...process.env, HOME: fakeHome, USERPROFILE: fakeHome, YLLIR_HOME_DIR: home },
+    env: {
+      ...process.env,
+      HOME: fakeHome,
+      USERPROFILE: fakeHome,
+      YLLIR_HOME_DIR: home,
+      YLLIR_PUBLISHED_SOURCE: path.join(fakeHome, 'no-published-source'),
+    },
   });
 }
 

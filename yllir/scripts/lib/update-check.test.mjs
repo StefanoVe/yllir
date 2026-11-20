@@ -3,7 +3,14 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { checkUpdate, collectNews, compareVersions, formatUpdateNotice, recordNotice } from './update-check.mjs';
+import {
+  checkUpdate,
+  collectNews,
+  compareVersions,
+  formatUpdateNotice,
+  recordNotice,
+  refreshMarketplace,
+} from './update-check.mjs';
 import { parseYamlLite } from './yaml-lite.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
@@ -71,6 +78,32 @@ function withPublishedSource(value, fn) {
   }
 }
 
+/** Runs fn with HOME set to home (os.homedir() reads it on macOS and Linux), then restores it. */
+function withHome(home, fn) {
+  const saved = process.env.HOME;
+  process.env.HOME = home;
+  try {
+    return fn();
+  } finally {
+    if (saved === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = saved;
+    }
+  }
+}
+
+/** A fake home folder with the marketplace clone's plugin folder at the default place. */
+function fakeHomeWithMarketplace(version, news = {}) {
+  const home = tempDir();
+  const plugin = path.join(home, '.claude', 'plugins', 'marketplaces', 'yllir', 'yllir');
+  write(plugin, '.claude-plugin/plugin.json', JSON.stringify({ name: 'yllir', version }));
+  for (const [file, text] of Object.entries(news)) {
+    write(plugin, `news/${file}`, text);
+  }
+  return home;
+}
+
 function listFiles(dir) {
   const out = [];
   const walk = (current, rel) => {
@@ -117,10 +150,44 @@ describe('compareVersions', () => {
 describe('checkUpdate', () => {
   test('without a source folder there is nothing to show', () => {
     const root = campaignWithMemory();
-    withPublishedSource(undefined, () => {
-      assert.equal(checkUpdate(root, { installed: '1.0.0', today: TODAY }), null);
+    withHome(tempDir(), () => {
+      withPublishedSource(undefined, () => {
+        assert.equal(checkUpdate(root, { installed: '1.0.0', today: TODAY }), null);
+      });
     });
     assert.equal(checkUpdate(root, { sourceDir: '', installed: '1.0.0', today: TODAY }), null);
+  });
+
+  test('without the variable the default source is the plugin folder of the marketplace clone', () => {
+    const root = campaignWithMemory();
+    const home = fakeHomeWithMarketplace('1.1.0', { '1.1.0.md': 'Dal mercato' });
+    withHome(home, () => {
+      withPublishedSource(undefined, () => {
+        assert.deepEqual(checkUpdate(root, { installed: '1.0.0', today: TODAY, language: 'it' }), {
+          installed: '1.0.0',
+          published: '1.1.0',
+          news: 'Dal mercato',
+        });
+      });
+      withPublishedSource('', () => {
+        assert.equal(checkUpdate(root, { installed: '1.0.0', today: TODAY, language: 'it' }).published, '1.1.0');
+      });
+    });
+  });
+
+  test('the variable, when set, wins over the marketplace clone', () => {
+    const root = campaignWithMemory();
+    const home = fakeHomeWithMarketplace('1.1.0');
+    const source = publishedSource('1.2.0', { '1.2.0.md': 'Dalla variabile' });
+    withHome(home, () => {
+      withPublishedSource(source, () => {
+        assert.deepEqual(checkUpdate(root, { installed: '1.0.0', today: TODAY, language: 'it' }), {
+          installed: '1.0.0',
+          published: '1.2.0',
+          news: 'Dalla variabile',
+        });
+      });
+    });
   });
 
   test('a source folder that does not exist gives no notice and does not throw', () => {
@@ -284,6 +351,51 @@ describe('checkUpdate', () => {
     const before = listFiles(root);
     checkUpdate(root, { sourceDir: source, installed: '1.0.0', today: TODAY });
     assert.deepEqual(listFiles(root), before);
+  });
+});
+
+describe('refreshMarketplace', () => {
+  test('runs the command once, writes the stamp, and does not run it again the same day', () => {
+    const root = campaignWithMemory();
+    let calls = 0;
+    withPublishedSource(undefined, () => {
+      assert.equal(refreshMarketplace(root, { today: TODAY, run: () => { calls += 1; } }), true);
+      assert.equal(refreshMarketplace(root, { today: TODAY, run: () => { calls += 1; } }), false);
+    });
+    assert.equal(calls, 1);
+    const parsed = parseYamlLite(fs.readFileSync(path.join(root, '.campaign/state/update-refresh.yaml'), 'utf8'));
+    assert.deepEqual(parsed.data, { last_refreshed_on: TODAY });
+  });
+
+  test('a new day runs the command again', () => {
+    const root = campaignWithMemory();
+    let calls = 0;
+    const run = () => { calls += 1; };
+    withPublishedSource(undefined, () => {
+      refreshMarketplace(root, { today: TODAY, run });
+      assert.equal(refreshMarketplace(root, { today: '2026-11-10', run }), true);
+    });
+    assert.equal(calls, 2);
+  });
+
+  test('a command that throws does not throw, and the stamp is still written', () => {
+    const root = campaignWithMemory();
+    withPublishedSource(undefined, () => {
+      assert.doesNotThrow(() => refreshMarketplace(root, { today: TODAY, run: () => { throw new Error('boom'); } }));
+    });
+    assert.equal(refreshMarketplace(root, { today: TODAY, run: () => {} }), false);
+    assert.ok(fs.existsSync(path.join(root, '.campaign/state/update-refresh.yaml')));
+  });
+
+  test('with YLLIR_PUBLISHED_SOURCE set it returns false, runs nothing and writes nothing', () => {
+    const root = campaignWithMemory();
+    const source = publishedSource('1.1.0');
+    let calls = 0;
+    withPublishedSource(source, () => {
+      assert.equal(refreshMarketplace(root, { today: TODAY, run: () => { calls += 1; } }), false);
+    });
+    assert.equal(calls, 0);
+    assert.deepEqual(listFiles(root), []);
   });
 });
 

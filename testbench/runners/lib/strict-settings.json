@@ -2,6 +2,7 @@
   "permissions": {
     "allow": [
       "Bash(claude plugin update *)",
+      "Bash(claude plugin marketplace update *)",
       "Bash(node \"*/scripts/add-category.mjs\" *)",
       "Bash(node \"*/scripts/build-index.mjs\" *)",
       "Bash(node \"*/scripts/engine.mjs\" *)",

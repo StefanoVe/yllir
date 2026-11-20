@@ -377,7 +377,7 @@ Migrazione post-aggiornamento, decisione del 2026-11-15 sulla mappa della trama 
 
 ## Questioni aperte
 
-- Dove si trova, sul computer del master, la cartella del plugin pubblicato (la sorgente delle novità): per ora il controllo la legge dalla variabile `YLLIR_PUBLISHED_SOURCE`, e senza di essa tace. Va verificato come il marketplace la rende disponibile.
+- Risolta: la cartella del plugin pubblicato è il clone del marketplace in `~/.claude/plugins/marketplaces/yllir/yllir`. Il clone si aggiorna con `claude plugin marketplace update yllir` al massimo una volta al giorno (stampa in `.campaign/state/update-refresh.yaml`), e la skill di update lo rinfresca prima di `claude plugin update yllir@yllir --json`. La variabile `YLLIR_PUBLISHED_SOURCE` resta come override per i test: se è impostata, il rinfresco è saltato.
 - Come si aggiorna in Codex: si usa `codex plugin marketplace upgrade yllir --json` (verificato 2026-11-09: aggiorna il plugin installato da 0.1.0 a 0.2.0). Il comando funziona solo se il marketplace è stato aggiunto da Git e non da cartella locale. **Superata dalla Riprogettazione (2026-11-11), decisione 11:** il framework non si distribuisce più per Codex.
 - Qual è la fonte dell’ultima versione pubblicata (plugin, repository con tag, archivio) e chi la pubblica.
 - Come funziona in dettaglio la versione di Baltimora: formato del file di versione, comando di controllo, skill di update. Serve un confronto diretto con l’autore.

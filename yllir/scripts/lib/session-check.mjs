@@ -11,7 +11,7 @@ import { checkFingerprints } from './instructions.mjs';
 import { listVersions, status } from './versions.mjs';
 import { parseYamlLite } from './yaml-lite.mjs';
 import { workNote } from './work-note.mjs';
-import { checkUpdate, formatUpdateNotice } from './update-check.mjs';
+import { checkUpdate, formatUpdateNotice, refreshMarketplace } from './update-check.mjs';
 import { UPDATE_STATE_PATH, parseUpdateState, pendingMigrations } from './update-state.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
@@ -82,6 +82,7 @@ export function sessionCheck(root) {
   result.campaign_framework_version = attempt(() => readCampaignVersion(dir), null);
   result.post_update = attempt(() => readPostUpdate(dir), null);
   result.work_note = attempt(() => workNote(dir), null);
+  attempt(() => refreshMarketplace(dir), false);
   result.update = attempt(() => checkUpdate(dir), null);
   return result;
 }

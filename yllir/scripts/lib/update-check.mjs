@@ -1,15 +1,22 @@
 // Update notice: compares the installed framework version with the latest
 // published one and reports a newer version, at most once a day, so the
-// assistant can ask the master whether to update. checkUpdate only reads.
-// recordNotice is the only writer, and it writes nothing but
-// .campaign/state/update-notice.yaml. Any failure means "no notice": nothing is
-// printed or thrown.
+// assistant can ask the master whether to update. The published version is the
+// plugin folder of the marketplace clone, refreshed at most once a day by
+// refreshMarketplace. checkUpdate only reads. recordNotice writes only
+// .campaign/state/update-notice.yaml, and refreshMarketplace writes only
+// .campaign/state/update-refresh.yaml. Any failure means "no notice" or "no
+// refresh": nothing is printed or thrown.
 
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { parseYamlLite } from './yaml-lite.mjs';
 
 const PLUGIN_JSON = path.resolve(import.meta.dirname, '../../.claude-plugin/plugin.json');
+const MARKETPLACE_SOURCE = ['.claude', 'plugins', 'marketplaces', 'yllir', 'yllir'];
+const REFRESH_PATH = '.campaign/state/update-refresh.yaml';
+const REFRESH_TIMEOUT_MS = 15000;
 const NOTICE_PATH = '.campaign/state/update-notice.yaml';
 const CONFIG_PATH = 'campaign.yaml';
 const ENTRY_LIMIT = 2000;
@@ -46,13 +53,14 @@ export function compareVersions(a, b) {
  * Decides whether a notice is due for the campaign.
  * @param {string} campaignRoot
  * @param {{ sourceDir?: string, installed?: string, today?: string, language?: string | null }} [options]
- *   sourceDir defaults to the YLLIR_PUBLISHED_SOURCE variable, installed to the
+ *   sourceDir defaults to the YLLIR_PUBLISHED_SOURCE variable when it is set and
+ *   non-empty, else to the plugin folder of the marketplace clone; installed to the
  *   version in plugin.json, today to the local date, language to campaign.yaml.
  * @returns {{ installed: string, published: string, news: string | null } | null}
  */
 export function checkUpdate(campaignRoot, options = {}) {
   return attempt(() => {
-    const sourceDir = options.sourceDir === undefined ? process.env.YLLIR_PUBLISHED_SOURCE : options.sourceDir;
+    const sourceDir = options.sourceDir === undefined ? defaultSourceDir() : options.sourceDir;
     if (typeof sourceDir !== 'string' || sourceDir === '') {
       return null;
     }
@@ -99,6 +107,36 @@ export function recordNotice(campaignRoot, { version, today, snoozeDays = 0 } = 
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, `${lines.join('\n')}\n`, 'utf8');
   return file;
+}
+
+/**
+ * Refreshes the marketplace clone with `claude plugin marketplace update yllir`,
+ * at most once a day. Skipped when YLLIR_PUBLISHED_SOURCE is set (tests and
+ * development use their own source). The stamp is written even when the command
+ * fails, so a failing command is not retried all day. Never throws.
+ * @param {string} campaignRoot
+ * @param {{ today?: string, run?: () => unknown }} [options]
+ *   today defaults to the local date; run defaults to starting the claude CLI.
+ * @returns {boolean} true when the command was run
+ */
+export function refreshMarketplace(campaignRoot, { today, run } = {}) {
+  return attempt(() => {
+    const override = process.env.YLLIR_PUBLISHED_SOURCE;
+    if (typeof override === 'string' && override !== '') {
+      return false;
+    }
+    const root = path.resolve(campaignRoot);
+    const day = today === undefined ? localDateString(new Date()) : today;
+    if (readRefreshStamp(root) === day) {
+      return false;
+    }
+    const runCommand = run === undefined ? runMarketplaceUpdate : run;
+    attempt(() => runCommand(), null);
+    const file = path.join(root, REFRESH_PATH);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `last_refreshed_on: "${day}"\n`, 'utf8');
+    return true;
+  }, false);
 }
 
 /** Text block for the assistant. News lines are indented by two spaces. */
@@ -216,6 +254,33 @@ function newsTextFor(newsDir, version, language) {
     }
   }
   return null;
+}
+
+/** YLLIR_PUBLISHED_SOURCE when it is set and non-empty, else the plugin folder of the marketplace clone. */
+function defaultSourceDir() {
+  const override = process.env.YLLIR_PUBLISHED_SOURCE;
+  if (typeof override === 'string' && override !== '') {
+    return override;
+  }
+  return path.join(os.homedir(), ...MARKETPLACE_SOURCE);
+}
+
+/** The day of the last marketplace refresh, or null when there is no stamp. */
+function readRefreshStamp(root) {
+  const text = readTextSafe(path.join(root, REFRESH_PATH));
+  if (text === null) {
+    return null;
+  }
+  const parsed = parseYamlLite(text);
+  const day = parsed.data !== null && typeof parsed.data === 'object' ? parsed.data.last_refreshed_on : undefined;
+  return typeof day === 'string' ? day : null;
+}
+
+function runMarketplaceUpdate() {
+  return spawnSync('claude', ['plugin', 'marketplace', 'update', 'yllir'], {
+    timeout: REFRESH_TIMEOUT_MS,
+    stdio: 'ignore',
+  });
 }
 
 function readPublishedVersion(sourceDir) {

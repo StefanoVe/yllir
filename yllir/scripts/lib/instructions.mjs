@@ -38,7 +38,7 @@ const FIXED_RULES = [
   'Edit(.campaign/image-providers/**)',
   'Edit(.campaign/styles/**)',
 ];
-const PLUGIN_UPDATE_COMMAND = 'claude plugin update *';
+const PLUGIN_UPDATE_COMMANDS = new Set(['claude plugin update *', 'claude plugin marketplace update *']);
 const ALLOWED_TOOLS_LINE = /^allowed-tools:[ \t]*(.*)$/m;
 const BASH_ENTRY_RE = /Bash\(([^()]*)\)/g;
 const PLUGIN_NODE_SCRIPT_RE = /^node "\$\{CLAUDE_PLUGIN_ROOT\}\/(.+)" \*$/;
@@ -372,7 +372,7 @@ export function projectAllowRules(skillsDir = SKILLS_DIR) {
       const command = match[1];
       const script = PLUGIN_NODE_SCRIPT_RE.exec(command);
       if (script !== null) rules.add(`Bash(node "*/${script[1]}" *)`);
-      else if (command === PLUGIN_UPDATE_COMMAND) rules.add(`Bash(${PLUGIN_UPDATE_COMMAND})`);
+      else if (PLUGIN_UPDATE_COMMANDS.has(command)) rules.add(`Bash(${command})`);
     }
   }
   return [...rules].sort(compareStrings);
