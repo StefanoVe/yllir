@@ -5,7 +5,7 @@ import { after, describe, it } from 'node:test';
 import { createCtx, type Ctx } from '../context.js';
 import { JOB_BUSY_TEXT } from '../jobs.js';
 import { makeCampaign } from '../live/test-support.js';
-import { ATLAS_STATUS_CACHE_MS, createAtlasService, type AtlasService } from './service.js';
+import { ATLAS_STATUS_CACHE_MS, createAtlasService, isApproved, readFrameworkAtlas, type AtlasService } from './service.js';
 import { atlasSiteDir } from './site.js';
 import { ATLAS_TEXTS } from './texts.js';
 import { atlasStatus, makeFakeAtlasCli, NO_ATLAS, type FakeAtlasCli } from './test-support.js';
@@ -86,6 +86,42 @@ describe('atlas status', () => {
     const s = await setup();
     await s.fake.respond('status', { code: 0, raw: 'not json at all' });
     await assert.rejects(() => s.service.status());
+  });
+});
+
+describe('atlas approval from the framework status', () => {
+  it('is false without an atlas folder', async () => {
+    const s = await setup();
+    await s.fake.respond('status', NO_ATLAS);
+    assert.deepEqual(await readFrameworkAtlas(s.ctx), { exists: false, approved: false, pending: 0 });
+  });
+
+  it('is false when the terrain is present but not locked', async () => {
+    const s = await setup();
+    await s.fake.respond('status', atlasStatus(2));
+    assert.deepEqual(await readFrameworkAtlas(s.ctx), { exists: true, approved: false, pending: 2 });
+  });
+
+  it('is true when the terrain is locked', async () => {
+    const s = await setup();
+    await s.fake.respond('status', atlasStatus(0, { locked: true }));
+    assert.deepEqual(await readFrameworkAtlas(s.ctx), { exists: true, approved: true, pending: 0 });
+  });
+
+  it('follows the ground of an urban atlas', async () => {
+    const s = await setup();
+    await s.fake.respond('status', atlasStatus(0, { layer: 'ground', locked: false }));
+    assert.equal((await readFrameworkAtlas(s.ctx)).approved, false);
+    await s.fake.respond('status', atlasStatus(0, { layer: 'ground', locked: true }));
+    assert.equal((await readFrameworkAtlas(s.ctx)).approved, true);
+  });
+
+  it('needs every present approval layer locked, and none present means not approved', () => {
+    assert.equal(isApproved(undefined), false);
+    assert.equal(isApproved({}), false);
+    assert.equal(isApproved({ terrain: { present: false, locked: true } }), false);
+    assert.equal(isApproved({ terrain: { present: true, locked: true }, ground: { present: true, locked: false } }), false);
+    assert.equal(isApproved({ terrain: { present: true, locked: true }, ground: { present: false, locked: false } }), true);
   });
 });
 

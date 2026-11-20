@@ -141,8 +141,11 @@ export function renderPreview({ canvas, layers = {}, width = 1024 }) {
     };
     const isLine = (path) => Array.isArray(path) && path.length >= 2 && path.every(isFinitePoint);
 
-    for (let index = 0; index < w * h; index++) setPixel(index, URBAN_RGB.ground, false);
+    // Without an island the land is the whole canvas; with one, the canvas is water and the island is painted over it.
+    const island = features('ground').some((f) => f.type === 'land' && isUsablePolygon(f.polygon));
+    for (let index = 0; index < w * h; index++) setPixel(index, island ? URBAN_RGB.water : URBAN_RGB.ground, false);
     for (const f of features('ground')) if (f.type === 'water') paint(f.polygon, URBAN_RGB.water, false);
+    for (const f of features('ground')) if (f.type === 'land') paint(f.polygon, URBAN_RGB.ground, false);
     for (const f of features('green')) paint(f.polygon, URBAN_RGB.green, false);
     for (const f of features('walls')) {
       if (f.type === 'wall' && isLine(f.path)) {

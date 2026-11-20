@@ -437,9 +437,27 @@ test('ground constraints: each kind is checked field by field', () => {
 test('ground features: water polygons need a type of water and at least three points', () => {
   const pond = (extra) => ({ id: 'mill-pond', type: 'water', kind: 'pond', polygon: square(1140, 340, 1260, 460), ...shown, ...extra });
   assert.deepEqual(problemsOf({ ground: layer('ground', { features: [pond({})] }) }), []);
-  assert.deepEqual(problemsOf({ ground: layer('ground', { features: [pond({ type: 'land' })] }) }), ['bad-feature features[0].type']);
+  assert.deepEqual(problemsOf({ ground: layer('ground', { features: [pond({ type: 'wetland' })] }) }), ['bad-feature features[0].type']);
   assert.deepEqual(
     problemsOf({ ground: layer('ground', { features: [pond({ polygon: [[0, 0], [10, 10]] })] }) }),
+    ['bad-feature features[0].polygon'],
+  );
+});
+
+test('an island is a ground constraint with a point and a radius pair; its land feature is a polygon', () => {
+  const island = { kind: 'island', id: 'home-isle', at: [1200, 900], radius: [900, 600], roughness: 0.3, ...master };
+  assert.deepEqual(problemsOf({ ground: layer('ground', { constraints: [island] }) }), []);
+  const ground = (extra) => problemsOf({ ground: layer('ground', { constraints: [{ ...island, ...extra }] }) });
+  assert.deepEqual(ground({ at: [1200] }), ['bad-constraint constraints[0].at']);
+  assert.deepEqual(ground({ radius: 900 }), ['bad-constraint constraints[0].radius']);
+  assert.deepEqual(ground({ radius: [900, 0] }), ['bad-constraint constraints[0].radius']);
+  assert.deepEqual(ground({ roughness: 1.5 }), ['bad-constraint constraints[0].roughness']);
+  assert.deepEqual(ground({ id: 'Home Isle' }), ['bad-constraint constraints[0].id']);
+
+  const land = (extra) => ({ id: 'home-isle', type: 'land', kind: 'island', polygon: square(300, 300, 2100, 1500), ...shown, ...extra });
+  assert.deepEqual(problemsOf({ ground: layer('ground', { features: [land({})] }) }), []);
+  assert.deepEqual(
+    problemsOf({ ground: layer('ground', { features: [land({ polygon: [[0, 0], [10, 10]] })] }) }),
     ['bad-feature features[0].polygon'],
   );
 });

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateBlocks } from './blocks.mjs';
-import { bufferPath, rectsOverlap } from './shapes.mjs';
+import { bufferPath, centroid, rectsOverlap } from './shapes.mjs';
 import { pointInPolygon } from '../geometry.mjs';
 
 const CANVAS = { width: 400, height: 300 };
@@ -67,6 +67,35 @@ test('blocks exist and none reaches the water, the street or the wall', () => {
       assert.ok(!pointInPolygon(p, streetBand), `block ${block.id} touches the street at ${p}`);
       assert.ok(pointInPolygon(p, ring), `block ${block.id} lies outside the wall at ${p}`);
     }
+  }
+});
+
+test('a land feature of the ground layer is not blocked, a water feature is', () => {
+  const land = [[20, 20], [380, 20], [380, 280], [20, 280]];
+  // A bay cut into the south side of the land: no hole, so the outer contour stays on the land.
+  const sea = [[150, 200], [250, 200], [250, 300], [150, 300]];
+  const layers = {
+    ground: [
+      { id: 'isle', type: 'land', kind: 'island', polygon: land, provenance: 'master', visibility: 'public', sources: [] },
+      { id: 'bay', type: 'water', kind: 'sea', polygon: sea, provenance: 'agent-choice', visibility: 'public', sources: [] },
+    ],
+    green: [],
+    walls: [],
+    streets: [],
+  };
+  const { features, problems } = generateBlocks({ canvas: CANVAS, seed: 7, constraints: [{ kind: 'fill', id: 'town' }], layers });
+  assert.deepEqual(problems, []);
+  assert.ok(features.length > 0, 'the land must hold blocks');
+  for (const block of features) {
+    for (const p of samplesOf(block.polygon)) {
+      if (pointInPolygon(p, sea)) {
+        assert.ok(distanceToEdges(p, sea) <= 2.5, `block ${block.id} runs into the water at ${p}`);
+      }
+    }
+    assert.equal(pointInPolygon(centroid(block.polygon), land), true, `block ${block.id} is off the land`);
+  }
+  for (const block of features) {
+    for (const lot of block.lots) assert.equal(pointInPolygon(lot.at, sea), false, `lot in the water at ${lot.at}`);
   }
 });
 

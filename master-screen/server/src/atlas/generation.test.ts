@@ -118,7 +118,7 @@ describe('atlas generation: the run', () => {
     if (!started.ok) return;
     assert.equal(s.service.generation.snapshot().mode, 'create');
 
-    await s.fake.respond('status', atlasStatus(2));
+    await s.fake.respond('status', atlasStatus(2, { locked: true }));
     const done = await until(s.service, 'done');
     assert.equal(done.conversationId, started.conversationId);
     assert.equal(done.mode, 'create');
@@ -134,11 +134,55 @@ describe('atlas generation: the run', () => {
     await s.fake.respond('status', NO_ATLAS);
     const started = await s.service.generation.start('create');
     assert.equal(started.ok, true);
-    await s.fake.respond('status', atlasStatus(0));
+    await s.fake.respond('status', atlasStatus(0, { locked: true }));
     const done = await until(s.service, 'done');
     assert.equal(done.conversationId, started.ok ? started.conversationId : null);
     assert.equal(done.mode, 'create');
     assert.equal(s.service.generation.running(), false);
+  });
+
+  it('waits for the master when the atlas exists and the last message is not a question, but the land is not approved', async () => {
+    const s = await setup([{ type: 'delta', text: 'The land is drawn. Open the Atlas section to see it.' }, { type: 'done' }], { delayMs: 150 });
+    await s.fake.respond('status', NO_ATLAS);
+    await s.service.generation.start('create');
+    await s.fake.respond('status', atlasStatus(0));
+    await until(s.service, 'waiting-answer');
+  });
+
+  it('is done when the atlas exists, the land is locked and the last message is not a question', async () => {
+    const s = await setup([{ type: 'delta', text: 'The land is locked. Open the Atlas section to see it.' }, { type: 'done' }], { delayMs: 150 });
+    await s.fake.respond('status', NO_ATLAS);
+    await s.service.generation.start('create');
+    await s.fake.respond('status', atlasStatus(0, { locked: true }));
+    await until(s.service, 'done');
+  });
+
+  it('is done for an urban atlas only when its ground is locked', async () => {
+    const s = await setup([{ type: 'delta', text: 'The ground is locked. Open the Atlas section to see it.' }, { type: 'done' }], { delayMs: 150 });
+    await s.fake.respond('status', NO_ATLAS);
+    const started = await s.service.generation.start('create');
+    assert.equal(started.ok, true);
+    if (!started.ok) return;
+    await s.fake.respond('status', atlasStatus(0, { layer: 'ground', locked: false }));
+    await until(s.service, 'waiting-answer');
+
+    await s.fake.respond('status', atlasStatus(0, { layer: 'ground', locked: true }));
+    await s.chat.runner.submit(started.conversationId, 'Yes, lock the ground.', {});
+    await until(s.service, 'done');
+  });
+
+  it('settles to done after the master answers and the assistant locks the land', async () => {
+    const s = await setup([{ type: 'delta', text: 'Here is the land. Open the Atlas section to see it.' }, { type: 'done' }], { delayMs: 150 });
+    await s.fake.respond('status', NO_ATLAS);
+    const started = await s.service.generation.start('create');
+    assert.equal(started.ok, true);
+    if (!started.ok) return;
+    await s.fake.respond('status', atlasStatus(0));
+    await until(s.service, 'waiting-answer');
+
+    await s.fake.respond('status', atlasStatus(0, { locked: true }));
+    await s.chat.runner.submit(started.conversationId, 'Yes, lock the land.', {});
+    await until(s.service, 'done');
   });
 
   it('stays waiting for the master when the assistant ends with a question, even if the atlas exists', async () => {
@@ -180,7 +224,7 @@ describe('atlas generation: the run', () => {
     const started = await s.service.generation.start('update');
     assert.equal(started.ok, true);
     assert.equal(s.provider.calls[0]?.prompt, ATLAS_PROMPTS.update);
-    await s.fake.respond('status', atlasStatus(0));
+    await s.fake.respond('status', atlasStatus(0, { locked: true }));
     const done = await until(s.service, 'done');
     assert.equal(done.mode, 'update');
   });

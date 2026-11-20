@@ -8,6 +8,7 @@ import { generateWalls } from './urban/walls.mjs';
 import { generateStreets } from './urban/streets.mjs';
 import { generateBlocks } from './urban/blocks.mjs';
 import { generateDistricts } from './urban/districts.mjs';
+import { lotSvg } from './urban-assets.mjs';
 
 const ASSET_BASE = 'assets/';
 const STYLE = loadStyle('fantasy-color');
@@ -304,4 +305,87 @@ test('in the demo setup no two labels overlap', () => {
       assert.equal(overlaps(labels[i].box, labels[j].box), false, `${labels[i].text} overlaps ${labels[j].text}`);
     }
   }
+});
+
+// Island: a land feature of the ground layer over a water canvas. The sea pieces have no edge stroke.
+const ISLAND_POLYGON = [[200, 150], [800, 150], [800, 650], [200, 650]];
+const ringPath = (polygon) => `M${polygon.map(([x, y]) => `${x} ${y}`).join(' L')} Z`;
+const groundOf = (svg) => svg.slice(svg.indexOf('data-layer="ground"'), svg.indexOf('data-layer="green"'));
+const withIsland = (ground = []) => renderUrbanSvg({
+  manifest: { canvas: { width: 1000, height: 800 }, seed: 3 },
+  style: STYLE,
+  assetBase: ASSET_BASE,
+  layers: {
+    ground: { layer: 'ground', features: [
+      { id: 'home-isle', type: 'land', kind: 'island', polygon: ISLAND_POLYGON, provenance: 'master', visibility: 'public', sources: [] },
+      { id: 'home-isle-sea-ne', type: 'water', kind: 'sea', polygon: [[500, 0], [1000, 0], [1000, 400], [800, 400]], provenance: 'master', visibility: 'public', sources: [] },
+      { id: 'home-isle-sea-sw', type: 'water', kind: 'sea', polygon: [[0, 400], [200, 400], [200, 800], [0, 800]], provenance: 'master', visibility: 'public', sources: [] },
+      ...ground,
+    ] },
+  },
+}).svg;
+
+test('an island: its outline is stroked with the water edge, over a soft shore; sea pieces have no stroke', () => {
+  const svg = withIsland();
+  const ground = groundOf(svg);
+  const outline = `<path d="${ringPath(ISLAND_POLYGON)}" fill="none" stroke="${U.waterEdge}" stroke-width="0.8" stroke-linejoin="round"/>`;
+  assert.ok(ground.includes(outline), 'the island outline is stroked with waterEdge at 0.8');
+  assert.ok(ground.includes(`<path d="${ringPath(ISLAND_POLYGON)}" fill="none" stroke="${U.water}" stroke-width="6"`), 'a wide water shore under it');
+  assert.ok(ground.includes(`stroke-width="6" stroke-linejoin="round" opacity="0.35"`), 'the shore is at opacity 0.35');
+  const strokes = ground.match(/stroke="[^"]+"/g) ?? [];
+  assert.equal(strokes.filter((x) => x === `stroke="${U.waterEdge}"`).length, 1, 'only the island outline has the water edge');
+});
+
+test('an island: the canvas is water and the island is the land (no ground colour over the whole canvas)', () => {
+  const ground = groundOf(withIsland());
+  assert.ok(ground.includes(`<rect x="0" y="0" width="1000" height="800" fill="${U.water}"/>`));
+  const rects = ground.match(/<rect [^>]*>/g) ?? [];
+  assert.equal(rects.some((r) => r.includes(`fill="${U.ground}"`)), false, 'no canvas-wide ground colour');
+  assert.ok(ground.includes(`<path d="${ringPath(ISLAND_POLYGON)}" fill="${U.ground}"/>`), 'the island is filled with the ground colour');
+});
+
+test('without an island the ground is the whole canvas, as before', () => {
+  const svg = renderUrbanSvg({
+    manifest: { canvas: { width: 1000, height: 800 }, seed: 3 },
+    style: STYLE,
+    assetBase: ASSET_BASE,
+    layers: { ground: { layer: 'ground', features: [
+      { id: 'mill-pond', type: 'water', kind: 'pond', polygon: [[400, 300], [600, 300], [600, 500], [400, 500]], provenance: 'master', visibility: 'public', sources: [] },
+    ] } },
+  }).svg;
+  const ground = groundOf(svg);
+  assert.ok(ground.includes(`<rect x="0" y="0" width="1000" height="800" fill="${U.ground}"/>`), 'the canvas is the ground colour');
+  assert.ok(ground.includes(`<path d="${ringPath([[400, 300], [600, 300], [600, 500], [400, 500]])}" fill="none" stroke="${U.waterEdge}" stroke-width="0.8" stroke-linejoin="round"/>`), 'water keeps its edge');
+  assert.equal(ground.includes('stroke-width="6"'), false, 'no shore without an island');
+});
+
+test('an island: the sea pieces are drawn with fill only, and the ground group stays data-layer ground', () => {
+  const svg = withIsland();
+  assert.ok(svg.includes('<g id="layer-ground" data-layer="ground">'));
+  assert.ok(groundOf(svg).includes(`<path d="${ringPath([[500, 0], [1000, 0], [1000, 400], [800, 400]])}" fill="${U.water}"/>`));
+});
+
+test('the lots of a block are grouped by kind: at most 10 paths for 300 lots of 3 kinds, and a smaller string', () => {
+  const KINDS = ['house', 'rowhouse', 'shop'];
+  const lots = [];
+  for (let n = 0; n < 300; n++) {
+    const col = n % 20;
+    const row = Math.floor(n / 20);
+    lots.push({ kind: KINDS[n % 3], at: [100 + col * 20, 100 + row * 16], size: [10, 8], angle: (n % 4) * 0.2 });
+  }
+  const layers = { blocks: { layer: 'blocks', features: [
+    { id: 'block-big', type: 'block', character: 'common', provenance: 'agent-choice', sources: [],
+      polygon: [[60, 60], [720, 60], [720, 620], [60, 620]], lots },
+  ] } };
+  const { svg, stats } = renderUrbanSvg({ manifest: { canvas: { width: 800, height: 700 }, seed: 1 }, layers, style: STYLE, assetBase: ASSET_BASE });
+  assert.equal(stats.lots, 300);
+  const start = svg.indexOf('<g id="layer-blocks"');
+  const end = svg.indexOf('<g id="layer-buildings"');
+  const group = svg.slice(start, end);
+  // One path for the block outline, then the lots: at most 10 paths in all (6 for the lots here).
+  assert.ok((group.match(/<path /g) ?? []).length <= 10);
+  assert.equal((group.match(/<path /g) ?? []).length, 1 + 2 * KINDS.length);
+  // The former output was one lotSvg fragment per lot: the whole group is now smaller than those fragments alone.
+  const before = lots.reduce((sum, lot) => sum + lotSvg({ ...lot, urban: U }).length, 0);
+  assert.ok(group.length < before, `grouped ${group.length} is not smaller than ${before}`);
 });

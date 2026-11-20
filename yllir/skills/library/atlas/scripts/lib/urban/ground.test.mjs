@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { generateGround } from './ground.mjs';
 import { pointInPolygon } from '../geometry.mjs';
-import { polygonArea } from './shapes.mjs';
+import { centroid, inAnyPolygon, polygonArea } from './shapes.mjs';
+import { generateBlocks } from './blocks.mjs';
 
 const CANVAS = { width: 2400, height: 1800 };
 const generate = (constraints, extra = {}) => generateGround({ canvas: CANVAS, seed: 7, constraints, ...extra });
@@ -161,4 +162,106 @@ test('provenance and visibility are copied; a document without sources becomes a
   assert.equal(features[1].provenance, 'document');
   assert.equal(features[1].visibility, 'master');
   assert.deepEqual(features[1].sources, [{ file: 'notes.md' }]);
+});
+
+const ISLAND = { kind: 'island', id: 'home-isle', at: [1200, 900], radius: [1000, 700], provenance: 'master', sources: [] };
+const islandOf = (features) => features.find((f) => f.type === 'land');
+const seasOf = (features) => features.filter((f) => f.kind === 'sea');
+const CANVAS_AREA = CANVAS.width * CANVAS.height;
+
+test('an island gives one land feature and four sea pieces, one per quadrant, with the island meta', () => {
+  const { features, problems } = generate([ISLAND]);
+  assert.deepEqual(problems, []);
+  assert.deepEqual(features.map((f) => [f.id, f.type, f.kind]), [
+    ['home-isle', 'land', 'island'],
+    ['home-isle-sea-ne', 'water', 'sea'],
+    ['home-isle-sea-se', 'water', 'sea'],
+    ['home-isle-sea-sw', 'water', 'sea'],
+    ['home-isle-sea-nw', 'water', 'sea'],
+  ]);
+  for (const f of features) {
+    assert.deepEqual([f.provenance, f.visibility, f.sources], ['master', 'public', []]);
+    assert.ok(insideCanvas(f.polygon));
+  }
+});
+
+test('the island outline is closed, with 96 points and the four axis points present', () => {
+  const land = islandOf(generate([ISLAND]).features);
+  const [ax, ay] = ISLAND.at;
+  assert.equal(land.polygon.length, 96);
+  assert.deepEqual(land.polygon[0], [land.polygon[0][0], ay]); // east: same y as the centre
+  assert.ok(land.polygon[0][0] > ax);
+  assert.equal(land.polygon[24][0], ax); // south
+  assert.ok(land.polygon[24][1] > ay);
+  assert.equal(land.polygon[48][1], ay); // west
+  assert.ok(land.polygon[48][0] < ax);
+  assert.equal(land.polygon[72][0], ax); // north
+  assert.ok(land.polygon[72][1] < ay);
+});
+
+test('the island and its four sea pieces cover the canvas: areas sum to the canvas within 1 percent', () => {
+  const { features } = generate([ISLAND]);
+  const total = features.reduce((sum, f) => sum + polygonArea(f.polygon), 0);
+  assert.ok(Math.abs(total - CANVAS_AREA) / CANVAS_AREA < 0.01, `total ${total}`);
+});
+
+test('no sea piece contains the island centre', () => {
+  const { features } = generate([ISLAND]);
+  for (const sea of seasOf(features)) {
+    assert.equal(pointInPolygon(ISLAND.at, sea.polygon), false);
+  }
+});
+
+test('the island outline is the same for the same seed and changes with the seed', () => {
+  const a = islandOf(generateGround({ canvas: CANVAS, seed: 1, constraints: [ISLAND] }).features);
+  assert.deepEqual(a, islandOf(generateGround({ canvas: CANVAS, seed: 1, constraints: [ISLAND] }).features));
+  const b = islandOf(generateGround({ canvas: CANVAS, seed: 2, constraints: [ISLAND] }).features);
+  assert.notDeepEqual(a.polygon, b.polygon);
+});
+
+test('an island that leaves the canvas gives a problem and no feature', () => {
+  const far = { ...ISLAND, at: [1200, 900], radius: [1400, 700] };
+  const { features, problems } = generate([far]);
+  assert.deepEqual(features, []);
+  assert.deepEqual(problems, [{
+    code: 'bad-constraint', file: 'ground.json', path: 'constraints[0]', message: 'the island must fit inside the canvas',
+  }]);
+});
+
+test('a second island is a problem; the first one stays', () => {
+  const second = { ...ISLAND, id: 'other-isle', at: [400, 400], radius: [200, 150] };
+  const { features, problems } = generate([ISLAND, second]);
+  assert.deepEqual(problems, [{
+    code: 'bad-constraint', file: 'ground.json', path: 'constraints[1]', message: 'only one island per ground layer',
+  }]);
+  assert.ok(features.every((f) => !f.id.startsWith('other-isle')));
+  assert.equal(islandOf(features).id, 'home-isle');
+});
+
+test('a river and a pond work on an island as they do on land', () => {
+  const river = { kind: 'river', id: 'the-river', source: [0, 300], mouth: [2400, 1500], width: 60, provenance: 'master', sources: [] };
+  const { features, problems } = generate([ISLAND, river, POND]);
+  assert.deepEqual(problems, []);
+  assert.deepEqual(features.filter((f) => f.type === 'water' && f.kind !== 'sea').map((f) => f.kind), ['river', 'pond']);
+});
+
+test('end to end: blocks fill the island, and no block centroid is in the sea', () => {
+  const ring = [[700, 650], [1700, 650], [1700, 1150], [700, 1150]];
+  const { features } = generate([ISLAND]);
+  const sea = seasOf(features).map((f) => f.polygon);
+  const land = islandOf(features).polygon;
+  const layers = {
+    ground: { features },
+    green: { features: [] },
+    walls: { features: [{ id: 'town-wall', type: 'wall', path: [...ring, ring[0]], closed: true, thickness: 4 }] },
+    streets: { features: [{ id: 'main', type: 'street', rank: 'main', width: 14, path: [[700, 900], [1700, 900]] }] },
+  };
+  const blocks = generateBlocks({ canvas: CANVAS, seed: 7, constraints: [{ kind: 'fill', id: 'town' }], layers });
+  assert.deepEqual(blocks.problems, []);
+  assert.ok(blocks.features.length > 0, 'the island must hold blocks');
+  for (const block of blocks.features) {
+    const c = centroid(block.polygon);
+    assert.equal(inAnyPolygon(c, sea), false, `${block.id} centroid is in the sea`);
+    assert.equal(pointInPolygon(c, land), true, `${block.id} centroid is off the island`);
+  }
 });

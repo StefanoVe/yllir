@@ -41,14 +41,21 @@ process.exitCode = code;
 /** The status a campaign with no atlas folder gets. */
 export const NO_ATLAS: AtlasCannedAnswer = { code: 1, json: { folder: null, exists: false, pending: [] } };
 
-/** The status of a campaign with an atlas and the given pending places. */
-export function atlasStatus(pending: number): AtlasCannedAnswer {
+/**
+ * The status of a campaign with an atlas and the given pending places. The first layer (terrain by
+ * default, ground for an urban atlas) is present, and locked only when `locked` is true.
+ */
+export function atlasStatus(
+  pending: number,
+  opts: { layer?: 'terrain' | 'ground'; locked?: boolean } = {},
+): AtlasCannedAnswer {
+  const layer = opts.layer ?? 'terrain';
   return {
     code: 0,
     json: {
       folder: 'Atlante',
       exists: true,
-      layers: {},
+      layers: { [layer]: { present: true, locked: opts.locked === true, features: 0 } },
       problems: [],
       pending: Array.from({ length: pending }, (_, i) => ({ id: `place-${i}` })),
     },

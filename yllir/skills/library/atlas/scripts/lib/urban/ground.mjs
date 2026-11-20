@@ -8,6 +8,12 @@
 // no feature. The river meander moves the inner path points only, so source and mouth stay in place.
 // The meander noise runs along the arc length (one noise unit per 150 canvas units).
 // A constraint without a usable kebab-case id is a bad-constraint problem too.
+// Island (the only land): without an island the land is the rest of the canvas. An island gives one
+// land feature (its outline, a closed noisy ellipse of ISLAND_POINTS points, the axis points included)
+// and four sea features, one per canvas quadrant around the centre, each a simple polygon with no hole.
+// The four sea pieces and the island cover the canvas. Only one island per layer: a later one is a
+// problem and gives no feature. An island that leaves the canvas by more than 1 unit gives a problem
+// and no feature; within 1 unit its points are clamped.
 
 import { isFinitePoint } from '../geometry.mjs';
 import { fbm } from '../noise.mjs';
@@ -15,14 +21,24 @@ import { subSeed } from '../scatter.mjs';
 import { blob, bufferPath, densify, polygonArea, r1, smoothPath } from './shapes.mjs';
 
 const FILE = 'ground.json';
-const KINDS = new Set(['river', 'coast', 'pond', 'canal']);
+const KINDS = new Set(['river', 'coast', 'pond', 'canal', 'island']);
 const SIDES = new Set(['north', 'south', 'east', 'west']);
 const KEBAB = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const MIN_AREA = 100;
 const MEANDER_DEFAULT = 0.3;
 const MEANDER_WAVE = 150;
+const ISLAND_POINTS = 96;
+const ISLAND_ROUGHNESS = 0.4;
+const ISLAND_TOLERANCE = 1;
+// Outline indices of the four axis points (y grows downwards): east, south, west, north.
+const ISLAND_EAST = 0;
+const ISLAND_SOUTH = ISLAND_POINTS / 4;
+const ISLAND_WEST = ISLAND_POINTS / 2;
+const ISLAND_NORTH = (3 * ISLAND_POINTS) / 4;
 
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const isRadiusPair = (value) => Array.isArray(value) && value.length === 2
+  && value.every((n) => typeof n === 'number' && Number.isFinite(n) && n > 0);
 const clamp01 = (value) => Math.min(1, Math.max(0, value));
 
 /** Raised for a constraint that cannot become a feature; the message goes into the problem. */
@@ -115,6 +131,63 @@ function canalPolygon(c) {
   return bufferPath(c.path, c.width);
 }
 
+/** Closed noisy outline of an island: the ellipse radius at each angle, varied by fbm as blob does. */
+function islandOutline(c, seed) {
+  need(isFinitePoint(c.at), 'an island needs an at point');
+  need(isRadiusPair(c.radius), 'island radius is [rx, ry], both above 0');
+  const [rx, ry] = c.radius;
+  const roughness = Number.isFinite(c.roughness) ? clamp01(c.roughness) : ISLAND_ROUGHNESS;
+  const noise = subSeed(seed, c.id);
+  const outline = [];
+  for (let i = 0; i < ISLAND_POINTS; i++) {
+    const angle = (2 * Math.PI * i) / ISLAND_POINTS;
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    const ellipse = (rx * ry) / Math.hypot(ry * cos, rx * sin);
+    const f = fbm(noise, 10 + 1.5 * cos, 10 + 1.5 * sin);
+    const r = ellipse * Math.max(0.4, 1 + (2 * f - 1) * roughness * 0.35);
+    outline.push([c.at[0] + r * cos, c.at[1] + r * sin]);
+  }
+  return outline;
+}
+
+/**
+ * The land and the four sea pieces of an island, or null when the outline leaves the canvas by more
+ * than the tolerance. Quadrant pieces: the outline arc of the quadrant, then the canvas edge points
+ * that close it (north-east: (at.x, 0), (width, 0), (width, at.y); the others by symmetry).
+ */
+function islandFeatures(c, seed, width, height) {
+  const outline = islandOutline(c, seed);
+  const fits = outline.every(([x, y]) => x >= -ISLAND_TOLERANCE && x <= width + ISLAND_TOLERANCE
+    && y >= -ISLAND_TOLERANCE && y <= height + ISLAND_TOLERANCE);
+  if (!fits) return null;
+  const land = clipToCanvas(outline, width, height);
+  need(land.length >= 3 && polygonArea(land) >= MIN_AREA, 'the polygon has fewer than 3 points or is under 100 square units');
+  const arc = (start, direction) => Array.from(
+    { length: ISLAND_POINTS / 4 + 1 },
+    (_, j) => land[(start + direction * j + ISLAND_POINTS) % ISLAND_POINTS],
+  );
+  const ax = r1(c.at[0]);
+  const ay = r1(c.at[1]);
+  const pieces = {
+    ne: [...arc(ISLAND_EAST, -1), [ax, 0], [width, 0], [width, ay]],
+    se: [...arc(ISLAND_EAST, 1), [ax, height], [width, height], [width, ay]],
+    sw: [...arc(ISLAND_SOUTH, 1), [0, ay], [0, height], [ax, height]],
+    nw: [...arc(ISLAND_WEST, 1), [ax, 0], [0, 0], [0, ay]],
+  };
+  const features = [{ id: c.id, type: 'land', kind: 'island', polygon: land, ...metaOf(c) }];
+  for (const [quadrant, polygon] of Object.entries(pieces)) {
+    features.push({
+      id: `${c.id}-sea-${quadrant}`,
+      type: 'water',
+      kind: 'sea',
+      polygon: clipToCanvas(polygon, width, height),
+      ...metaOf(c),
+    });
+  }
+  return features;
+}
+
 const BUILDERS = {
   river: riverPolygon,
   coast: coastPolygon,
@@ -136,11 +209,26 @@ export function generateGround({ canvas, seed, constraints = [], layers = {}, lo
   const lockedFeatures = locked && Array.isArray(locked.features) ? locked.features.filter(isPlainObject) : [];
   const features = [...lockedFeatures];
   const problems = [];
+  const firstIsland = list.find(([c]) => c.kind === 'island')?.[1];
 
   for (const [c, k] of list) {
-    if (!KINDS.has(c.kind) || k < firstNew) continue;
+    if (!KINDS.has(c.kind)) continue;
+    if (c.kind === 'island' && k !== firstIsland) {
+      problems.push({ code: 'bad-constraint', file: FILE, path: `constraints[${k}]`, message: 'only one island per ground layer' });
+      continue;
+    }
+    if (k < firstNew) continue;
     try {
       need(typeof c.id === 'string' && KEBAB.test(c.id), 'id must be kebab-case');
+      if (c.kind === 'island') {
+        const islands = islandFeatures(c, seed, width, height);
+        if (islands === null) {
+          problems.push({ code: 'bad-constraint', file: FILE, path: `constraints[${k}]`, message: 'the island must fit inside the canvas' });
+        } else {
+          features.push(...islands);
+        }
+        continue;
+      }
       const polygon = clipToCanvas(BUILDERS[c.kind](c, seed, width, height), width, height);
       need(polygon.length >= 3 && polygonArea(polygon) >= MIN_AREA, 'the polygon has fewer than 3 points or is under 100 square units');
       features.push({ id: c.id, type: 'water', kind: c.kind, polygon, ...metaOf(c) });

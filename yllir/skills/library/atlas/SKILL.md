@@ -19,7 +19,7 @@ You draw and keep the atlas. Its data lives in the atlas folder of the campaign:
 5. **Outside sources.** When the world seed or the sheets say the campaign is set in a published setting (a known published world), search its geography with WebSearch and WebFetch, and use it as a source. The model accepts only campaign files as sources, so record outside facts in the constraint `note`, with the URL. Never put in a search any text from the reserved block (`<!-- master -->` onward), from the world seed, or from a master-only category. Search only public names.
 6. **Secrets.** A place or feature that the players must not know gets `visibility: "master"`. Its name and position then never reach the players' version.
 7. **Words.** Never say to the master: script, JSON, layer ids, constraint, seed, canvas, hash, lock, exit codes, file paths. Say «terre e mari», «montagne», «fiumi», «confini», «carta», «approvare la forma delle terre». For a city map, also «mura», «strade», «isolati», «quartieri», «edifici».
-8. **Previews.** You look at every preview yourself with the Read tool before showing it. The master sees it through the preview and render commands with `--open` (rule 10 says where). Ask the master's approval twice in a creation: once for the land and sea, once for the whole atlas.
+8. **Previews.** You look at every preview yourself with the Read tool before showing it. The master sees it through the preview and render commands with `--open` (rule 10 says where). Ask the master's approval twice in a creation: once for the land and sea, once for the whole atlas. When the conversation runs inside the master screen, a message that waits for the master's approval of the land and sea or of the whole atlas MUST end with the question itself (for example "Ti va bene, o vuoi cambiare qualcosa?") and never with a pointer to a section or a closing remark, because the screen only offers an answer box after a question.
 9. **Style.** The look of the atlas has a style. The game system picks it (`auto`), or the master picks one.
    - When the master asks for a different look («fai l'atlante in stile pergamena», «più cupo»), list the installed styles, pick the one whose name matches, set it, render, and save a version:
      ```
@@ -68,6 +68,7 @@ and read `exists`, `layers` and `pending`. Then follow the first case that match
 - Then ask, one at a time, only what you cannot derive: the extent, if more than one is plausible; the relative position of regions with no stated direction; names the map needs and nothing gives, only when the master wants them shown.
 - Ask in plain words, with concrete options when possible: «Il Lago Grigio è a nord o a sud di Borgo Cenere? I documenti non lo dicono.»
 - When the documents describe one city or village (or the master asks for a city map), the extent is `settlement` (whole town with surroundings) or `district` (a quarter, a harbour, a castle with its village), and the urban steps of the "Urban scale" section apply instead of Steps 5 and 6. If there is a world and a described capital, propose the wider map and offer the second in one sentence.
+- When the documents say that the whole world, or the area to map, is a city that stands on an island (a city-island), the extent is `settlement` with an island, not a geographic map with one dot: the city map covers the island, with its districts and named buildings on it. Say it to the master in one sentence, for example «Il mondo della campagna è una città su un'isola: ti propongo la carta della città, con l'isola, i quartieri e gli edifici nominati.»
 
 **Step 4: create.**
 - Write `.campaign/state/atlas/scope.json` with the Write tool: `{ "scope": { "kind": "world"|"continent"|"region", "places": [<top place ids>], "note": "<one line>" } }`. Leave out `seed`, `canvas` and `style`: the script gives them. For a settlement or a district, follow "Urban scale" (a) instead.
@@ -248,6 +249,7 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" render . --a
 - `coast`: `id`, `side` north|south|east|west, `depth` > 0 (how far the water enters from that canvas edge), optional `roughness` 0..1.
 - `pond`: `id`, `at` [x,y], `radius` > 0, optional `roughness`.
 - `canal`: `id`, `path` [[x,y]...] with at least 2 points, `width` > 0.
+- `island`: the city is on an island. The whole canvas is sea and the land is ONE island (a noisy ellipse around its centre): `{ "kind": "island", "id": "<kebab>", "at": [x, y], "radius": [rx, ry], "roughness": 0.4, "provenance", "sources" }`. Use it only for an island city, at most one per map. `radius` at most [0.42 * width, 0.42 * height] of the canvas, so the island fits inside it with a margin. The script then writes the sea as four water polygons and one `land` feature (the island outline). Rivers, canals and ponds may be added on the island, as above.
 
 Every constraint has `id` (kebab-case, unique in the layer), `provenance`, `sources`, and optional `note` and `visibility`. Add only the water that the documents mention or the master asks for; a position you choose is `agent-choice`. Then:
 ```
@@ -259,7 +261,9 @@ node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" generate . g
 ```
 node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" preview .
 ```
-Look at `.campaign/cache/atlas/preview.png` with the Read tool, check the water against the documents, and fix it at most 3 rounds. Then show it (outside the master screen only, rule 10):
+Look at `.campaign/cache/atlas/preview.png` with the Read tool, check the water against the documents, and fix it at most 3 rounds. The island of an island city is approved with the rest of the water, in the same approval.
+
+Walls of an island city follow its coast, and this is done in (c): read the generated `ground.json` in the atlas folder of the campaign (the folder the `status` command reports, for example `Atlante/ground.json`) with the Read tool, take the `features` of type `land` and their field `polygon` (the island outline), and write a wall ring of 10 to 16 points taken from that outline, moved inward by about the wall thickness times 2. Streets, blocks and districts then fill the inside; the outside stays fields and shore. Then show it (outside the master screen only, rule 10):
 ```
 node "${CLAUDE_PLUGIN_ROOT}/skills/library/atlas/scripts/atlas.mjs" preview . --open
 ```

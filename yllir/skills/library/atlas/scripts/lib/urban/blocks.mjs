@@ -90,7 +90,8 @@ function blockedMask(layers, gw, gh) {
   const mark = (mask) => {
     for (let k = 0; k < mask.length; k++) if (mask[k]) blocked[k] = 1;
   };
-  mark(rasterize(polygonsOf(featuresOf(layers.ground)), gw, gh));
+  // Only water blocks: a land feature (an island outline) is the ground that blocks are made on.
+  mark(rasterize(polygonsOf(featuresOf(layers.ground).filter((f) => f.type === 'water')), gw, gh));
   mark(rasterize(polygonsOf(featuresOf(layers.green)), gw, gh));
 
   const streets = featuresOf(layers.streets);

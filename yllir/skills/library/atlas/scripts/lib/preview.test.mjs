@@ -83,3 +83,14 @@ test('an urban layer set with only a district still takes the urban branch', () 
   assert.deepEqual([...png.subarray(0, 8)], SIGNATURE);
   assert.deepEqual(pngSize(png), { width: 200, height: 200 });
 });
+
+test('an island is painted over the water: the PNG changes, its size does not', () => {
+  const canvas = { width: 1000, height: 800 };
+  const sea = { id: 'home-isle-sea-se', type: 'water', kind: 'sea', polygon: [[0, 0], [1000, 0], [1000, 800], [0, 800]] };
+  const withoutIsland = renderPreview({ canvas, width: 500, layers: { ground: { features: [sea] } } });
+  const island = { id: 'home-isle', type: 'land', kind: 'island', polygon: [[200, 200], [800, 200], [800, 600], [200, 600]] };
+  const withIsland = renderPreview({ canvas, width: 500, layers: { ground: { features: [sea, island] } } });
+  assert.deepEqual([...withIsland.subarray(0, 8)], SIGNATURE);
+  assert.deepEqual(pngSize(withIsland), pngSize(withoutIsland));
+  assert.notDeepEqual(withIsland, withoutIsland);
+});

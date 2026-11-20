@@ -17,10 +17,31 @@ export const ATLAS_CLI = 'skills/library/atlas/scripts/atlas.mjs';
 /** How long the framework answer about the atlas is kept while no run is active. */
 export const ATLAS_STATUS_CACHE_MS = 10_000;
 
+const layerStatusSchema = z.object({
+  present: z.boolean().optional(),
+  locked: z.boolean().optional(),
+});
+
 const statusSchema = z.object({
   exists: z.boolean().optional(),
+  layers: z.record(z.string(), layerStatusSchema).optional(),
   pending: z.array(z.unknown()).optional(),
 });
+
+/** The layers whose lock approves the atlas: the land and sea of a geographic atlas, the ground of an urban one. */
+const APPROVAL_LAYERS = ['terrain', 'ground'];
+
+/**
+ * True when the atlas has a present approval layer and every present approval layer is locked.
+ * A geographic atlas has terrain, an urban one has ground; the other one is simply not present.
+ */
+export function isApproved(layers: Record<string, { present?: boolean; locked?: boolean }> | undefined): boolean {
+  const present = APPROVAL_LAYERS.flatMap((name) => {
+    const layer = layers?.[name];
+    return layer?.present === true ? [layer] : [];
+  });
+  return present.length > 0 && present.every((layer) => layer.locked === true);
+}
 
 /**
  * Reads the atlas state from the framework CLI. Exit 1 means no atlas folder (nothing exists).
@@ -29,11 +50,15 @@ const statusSchema = z.object({
 export async function readFrameworkAtlas(ctx: Ctx): Promise<AtlasFrameworkState> {
   const result = await runFrameworkCli(ctx, ATLAS_CLI, ['status', ctx.campaignRoot]);
   if (result.code === TIMED_OUT_CODE) throw new Error('atlas status timed out');
-  if (result.code === 1) return { exists: false, pending: 0 };
+  if (result.code === 1) return { exists: false, approved: false, pending: 0 };
   const parsed = statusSchema.safeParse(result.json);
   if (result.code !== 0 || !parsed.success) throw new Error('atlas status could not be read');
-  if (parsed.data.exists !== true) return { exists: false, pending: 0 };
-  return { exists: true, pending: parsed.data.pending?.length ?? 0 };
+  if (parsed.data.exists !== true) return { exists: false, approved: false, pending: 0 };
+  return {
+    exists: true,
+    approved: isApproved(parsed.data.layers),
+    pending: parsed.data.pending?.length ?? 0,
+  };
 }
 
 /** The text of the last assistant message of a conversation, or null. */

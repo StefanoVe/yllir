@@ -42,7 +42,7 @@ export const CONSTRAINT_KINDS_BY_LAYER = {
   routes: ['road', 'trail', 'sea-route'],
   places: [],
   labels: [],
-  ground: ['river', 'coast', 'pond', 'canal'],
+  ground: ['river', 'coast', 'pond', 'canal', 'island'],
   green: ['park'],
   walls: ['wall'],
   streets: ['street', 'square', 'grid'],
@@ -60,7 +60,7 @@ export const FEATURE_TYPES = {
   places: null,
   routes: ['road', 'trail', 'sea-route'],
   labels: null,
-  ground: ['water'],
+  ground: ['water', 'land'],
   green: ['park', 'garden', 'field', 'wood', 'orchard'],
   walls: ['wall', 'tower', 'gate'],
   streets: ['street', 'square', 'bridge'],
@@ -424,6 +424,11 @@ function checkUrbanConstraintFields(c, base, file, ctx, out) {
     case 'canal':
       if (!pointsOf(c.path, 2)) bad('path', 'path needs at least two points');
       positive('width');
+      break;
+    case 'island':
+      constraintPoint(c, 'at', base, file, out);
+      if (!isSizePair(c.radius)) bad('radius', 'radius is [rx, ry], both above 0');
+      constraintRoughness(c, base, file, out);
       break;
     case 'park':
       oneOf('type', FEATURE_TYPES.green);

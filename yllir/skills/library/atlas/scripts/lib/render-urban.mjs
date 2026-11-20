@@ -17,23 +17,33 @@
 // - A lot is skipped when its rectangle overlaps a building that the audience sees.
 // - The labels layer can override the text, size and position of a label, or hide it, as in render.mjs.
 // - Opacities keep three decimals (one decimal would turn 0.12 into 0.1).
+// - An island (a land feature of ground) is drawn over a water canvas: sea pieces are filled without an edge,
+//   the island has a soft shore (a 6-unit water stroke at 0.35 opacity, under the land fill) and its own edge.
 
 import { escapeXml } from './render.mjs';
 import { isFinitePoint, isUsablePolygon } from './geometry.mjs';
 import { DEFAULT_STYLE, FONT_FILES, loadStyle } from './styles.mjs';
-import { buildingSvg, defaultSize, gateSvg, lotSvg, namedSize, towerSvg } from './urban-assets.mjs';
-import { centroid, polygonArea, rectsOverlap } from './urban/shapes.mjs';
+import { buildingSvg, defaultSize, gateSvg, namedSize, towerSvg } from './urban-assets.mjs';
+import { centroid, polygonArea, rectCorners, rectsOverlap } from './urban/shapes.mjs';
 
 const AUDIENCES = ['master', 'players'];
 const URBAN_LAYERS = ['ground', 'green', 'walls', 'streets', 'blocks', 'buildings', 'districts'];
 const STREET_RANKS = ['main', 'secondary', 'lane'];
 const DEFAULT_STREET_WIDTH = { main: 14, secondary: 9, lane: 5 };
 const DEFAULT_GATE_WIDTH = 6;
+// The island's soft shore: a wide water stroke under its outline, at this opacity.
+const SHORE_WIDTH = 6;
+const SHORE_OPACITY = 0.35;
 const HEX_RE = /^#[0-9a-f]{6}$/i;
 // District names are drawn fainter than the style's district opacity: they sit beneath the buildings.
 const DISTRICT_LABEL_FACTOR = 0.6;
 const LABEL_SHIFTS = 3;
 const LABEL_WIDTH = 0.6; // average glyph width, in font sizes
+// The ridge lines of the lots: one path per kind, at this opacity.
+const RIDGE_OPACITY = 0.35;
+const LOT_STROKE = 0.4;
+// A lot kind without a roof colour is drawn in the house colour, as in urban-assets.mjs.
+const FALLBACK_LOT_KIND = 'house';
 
 const isPositive = (value) => typeof value === 'number' && Number.isFinite(value) && value > 0;
 const isAngle = (value) => typeof value === 'number' && Number.isFinite(value);
@@ -52,6 +62,14 @@ const patternId = (role) => `tex-${role}`;
 const ringD = (polygon) => `M${polygon.map(([x, y]) => `${num(x)} ${num(y)}`).join(' L')} Z`;
 const lineD = (points) => `M${points.map(([x, y]) => `${num(x)} ${num(y)}`).join(' L')}`;
 const isLine = (path) => Array.isArray(path) && path.length >= 2 && path.every(isFinitePoint);
+const midpoint = (p, q) => [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];
+/** The ridge of a lot: the segment between the midpoints of its two short sides, so it runs along the long side. */
+function ridgeOf(lot) {
+  const [c0, c1, c2, c3] = rectCorners(lot);
+  return lot.size[0] >= lot.size[1]
+    ? [midpoint(c0, c3), midpoint(c1, c2)]
+    : [midpoint(c0, c1), midpoint(c2, c3)];
+}
 
 /** Visible features of a layer for the audience: master-only items are dropped for the players. */
 function visibleFeatures(layer, audience) {
@@ -112,14 +130,30 @@ export function renderUrbanSvg({ manifest, layers = {}, style, names = {}, audie
     );
   }
 
-  // 1. Ground: the land over the whole canvas, then the water polygons with their edge.
-  const ground = [`<rect x="0" y="0" width="${W}" height="${H}" fill="${colour(U.ground)}"/>`];
-  if (textured.land) ground.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${textured.land}"/>`);
+  // 1. Ground. Without an island the land is the whole canvas, as before. With an island the canvas is
+  // water, the water polygons follow (sea pieces without an edge, they would show seams), then the island:
+  // a soft shore, the land fill, and its outline.
+  const islands = features.ground.filter((f) => f.type === 'land' && isUsablePolygon(f.polygon));
+  const ground = [];
+  if (islands.length > 0) {
+    ground.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${colour(U.water)}"/>`);
+    if (textured.sea) ground.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${textured.sea}"/>`);
+  } else {
+    ground.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${colour(U.ground)}"/>`);
+    if (textured.land) ground.push(`<rect x="0" y="0" width="${W}" height="${H}" fill="${textured.land}"/>`);
+  }
   for (const f of features.ground) {
     if (f.type !== 'water' || !isUsablePolygon(f.polygon)) continue;
     const d = ringD(f.polygon);
     ground.push(`<path d="${d}" fill="${colour(U.water)}"/>`);
     if (textured.sea) ground.push(`<path d="${d}" fill="${textured.sea}"/>`);
+    if (f.kind !== 'sea') ground.push(`<path d="${d}" fill="none" stroke="${colour(U.waterEdge)}" stroke-width="0.8" stroke-linejoin="round"/>`);
+  }
+  for (const f of islands) {
+    const d = ringD(f.polygon);
+    ground.push(`<path d="${d}" fill="none" stroke="${colour(U.water)}" stroke-width="${SHORE_WIDTH}" stroke-linejoin="round" opacity="${fmt(SHORE_OPACITY)}"/>`);
+    ground.push(`<path d="${d}" fill="${colour(U.ground)}"/>`);
+    if (textured.land) ground.push(`<path d="${d}" fill="${textured.land}"/>`);
     ground.push(`<path d="${d}" fill="none" stroke="${colour(U.waterEdge)}" stroke-width="0.8" stroke-linejoin="round"/>`);
   }
 
@@ -183,11 +217,14 @@ export function renderUrbanSvg({ manifest, layers = {}, style, names = {}, audie
     }
   }
 
-  // 5. Blocks, with their lots. A lot under a building the audience sees is left out.
+  // 5. Blocks, with their lots. A lot under a building the audience sees is left out. The lots are
+  // grouped by kind: one path for their roofs (a closed rectangle each, in the roof colour of the kind)
+  // and one path for their ridge lines, so that a city of thousands of lots stays a few elements.
   const buildingBoxes = features.buildings
     .filter((f) => isFinitePoint(f.at) && typeof f.kind === 'string')
     .map((f) => ({ at: f.at, size: drawnSize(f), angle: angleOf(f) }));
   const blocks = [];
+  const lotsByKind = new Map();
   let lotCount = 0;
   for (const f of features.blocks) {
     if (f.type !== 'block' || !isUsablePolygon(f.polygon)) continue;
@@ -196,9 +233,18 @@ export function renderUrbanSvg({ manifest, layers = {}, style, names = {}, audie
       if (!isFinitePoint(lot?.at) || typeof lot.kind !== 'string') continue;
       const box = { at: lot.at, size: sizeOf(lot), angle: angleOf(lot) };
       if (buildingBoxes.some((building) => rectsOverlap(box, building))) continue;
-      blocks.push(lotSvg({ kind: lot.kind, at: box.at, size: box.size, angle: box.angle, urban: U }));
+      if (!lotsByKind.has(lot.kind)) lotsByKind.set(lot.kind, []);
+      lotsByKind.get(lot.kind).push(box);
       lotCount++;
     }
+  }
+  for (const [kind, lots] of lotsByKind) {
+    const roof = Object.hasOwn(U.roof, kind) ? U.roof[kind] : U.roof[FALLBACK_LOT_KIND];
+    const outline = colour(U.outline);
+    blocks.push(
+      `<path d="${lots.map((lot) => ringD(rectCorners(lot))).join(' ')}" fill="${colour(roof)}" stroke="${outline}" stroke-width="${num(LOT_STROKE)}"/>`,
+      `<path d="${lots.map((lot) => lineD(ridgeOf(lot))).join(' ')}" fill="none" stroke="${outline}" stroke-width="${num(LOT_STROKE)}" opacity="${fmt(RIDGE_OPACITY)}"/>`,
+    );
   }
 
   // 6. Buildings: a named one is wrapped as a place (clickable in the viewer).

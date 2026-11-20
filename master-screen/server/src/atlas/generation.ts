@@ -16,6 +16,8 @@ export type AtlasStartResult =
 /** What the framework says about the atlas now. */
 export interface AtlasFrameworkState {
   exists: boolean;
+  /** True when the first generated layer of the atlas (terrain or ground) is locked by the master. */
+  approved: boolean;
   pending: number;
 }
 
@@ -121,9 +123,9 @@ export class AtlasGenerationService {
 
   /**
    * Decides the state when the atlas turns have ended. A finished turn is 'done' when the atlas
-   * exists and the assistant's last message is not a question; otherwise the master is asked to
-   * answer. Places may legitimately stay unplaced, so pending places do not block 'done'. A turn that
-   * did not finish is 'failed'.
+   * exists, its first layer is approved (locked) and the assistant's last message is not a question;
+   * otherwise the master is asked to answer. Places may legitimately stay unplaced, so pending places
+   * do not block 'done'. A turn that did not finish is 'failed'.
    */
   private async settle(outcome: Turn['state']): Promise<void> {
     let finished = false;
@@ -142,6 +144,6 @@ export class AtlasGenerationService {
     if (this.conversationId === null) return false;
     if (asksQuestion(this.deps.lastAnswer(this.conversationId))) return false;
     const framework = await this.deps.framework();
-    return framework.exists;
+    return framework.exists && framework.approved;
   }
 }
