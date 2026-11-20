@@ -181,6 +181,10 @@ Le due skill di terze parti sono fissate a un commit del repository agent-sprite
 
 Due osservazioni dalle prove. Primo: le integrazioni più utili sono quelle che fanno un passaggio che il master farebbe a mano, come verificare una pagina o impaginare un foglio, e non quelle che aggiungono funzioni nuove. Secondo: nessuna integrazione deve poter cambiare un contenuto della campagna senza passare dai processi del core (audit, collegamenti, separazione pubblico/riservato).
 
+### ChatGPT, fornitore `openai` (integrato)
+
+ChatGPT, tramite l'API immagini di OpenAI con un modello scelto dal master (predefinito `gpt-image-1`), è un fornitore integrato del framework con id `openai`. Fa solo generazione. La chiave sta in `OPENAI_API_KEY` oppure nel file `.campaign/state/keys.json`, nel campo `openai`, e non viene mai ripetuta in messaggi, file o commit. Essendo un servizio esterno, il consenso del master si chiede una volta, come per Codex. Riceve solo la parte pubblica della descrizione dell'immagine, mai le note del master.
+
 ### Ricerca immagini (Proposta, 2026-11-12)
 
 Richiesta dell'autore il 2026-11-12, non deciso. Serve a trovare illustrazioni già esistenti online (per personaggi, creature, luoghi, oggetti e mappe di battaglia) da proporre al master, come alternativa a generare immagini. La skill è [Ricerca artwork](Skill%20di%20libreria.md#l23-ricerca-artwork) (L23).

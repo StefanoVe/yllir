@@ -298,3 +298,58 @@ test('invalid campaign provider is listed under invalid and absent from provider
   assert.equal(table.providers.broken, undefined);
   assert.deepEqual(readTable(root).invalid, ['broken']);
 });
+
+test('openai comes from the injected probe, with no network call', async () => {
+  const root = tempRoot();
+  const seen = [];
+  const table = await probeAll({
+    campaignRoot: root,
+    photoshop: 'no',
+    codexCommand: MISSING_CODEX,
+    fetchImpl: unreachableFetch,
+    dataDir: tempRoot(),
+    g2dProbe: notInstalled,
+    openaiProbe: async (options) => {
+      seen.push(options);
+      return { available: false, reason: 'no-key' };
+    },
+  });
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].campaignRoot, root);
+  assert.ok('env' in seen[0]);
+  assert.deepEqual(table.providers.openai, { available: false, reason: 'no-key' });
+});
+
+test('openai consent recorded earlier is kept by a new probe', async () => {
+  const root = tempRoot();
+  writeTable(root, { checked: 'old', providers: { openai: { available: false, consent: true } } });
+  const table = await probeAll({
+    campaignRoot: root,
+    photoshop: 'no',
+    codexCommand: MISSING_CODEX,
+    fetchImpl: unreachableFetch,
+    dataDir: tempRoot(),
+    g2dProbe: notInstalled,
+    openaiProbe: async () => ({ available: true, reason: null }),
+  });
+  assert.equal(table.providers.openai.available, true);
+  assert.equal(table.providers.openai.consent, true);
+  assert.equal(readTable(root).providers.openai.consent, true);
+});
+
+test('openai model stored earlier survives a new probe', async () => {
+  const root = tempRoot();
+  writeTable(root, { checked: 'old', providers: { openai: { available: true, reason: null, model: 'gpt-image-1.5' } } });
+  const table = await probeAll({
+    campaignRoot: root,
+    photoshop: 'no',
+    codexCommand: MISSING_CODEX,
+    fetchImpl: unreachableFetch,
+    dataDir: tempRoot(),
+    g2dProbe: notInstalled,
+    openaiProbe: async () => ({ available: false, reason: 'no-key' }),
+  });
+  assert.equal(table.providers.openai.available, false);
+  assert.equal(table.providers.openai.model, 'gpt-image-1.5');
+  assert.equal(readTable(root).providers.openai.model, 'gpt-image-1.5');
+});
