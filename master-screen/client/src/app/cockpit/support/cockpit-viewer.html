@@ -25,6 +25,14 @@
     </button>
     <button
       class="icon-button"
+      (click)="viewer.openImagePopup()"
+      [attr.aria-label]="i18n.t('liveAgent.viewer.popup')"
+      [msTooltip]="i18n.t('liveAgent.viewer.popup')"
+    >
+      <ui-icon name="external" />
+    </button>
+    <button
+      class="icon-button"
       (click)="viewer.toggleFullscreen()"
       [attr.aria-label]="i18n.t('liveAgent.viewer.fullscreen')"
       [msTooltip]="i18n.t('liveAgent.viewer.fullscreen')"
