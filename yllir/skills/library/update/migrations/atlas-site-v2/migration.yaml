@@ -1,0 +1,7 @@
+id: atlas-site-v2
+after: [metadata-comment-v1, atlas-site-v1, place-kinds-v1]
+introduced_in: 0.95.0
+needed: detect
+deterministic: deterministic.mjs
+guided: null
+complete: null
