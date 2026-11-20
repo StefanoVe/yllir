@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { markReviewed, placeKindCandidates, STATE_FILE } from './place-kinds.mjs';
-import { detect, apply } from '../../migrations/place-kinds-v1/deterministic.mjs';
+import { apply } from '../../migrations/place-kinds-v1/deterministic.mjs';
 import { complete } from '../../migrations/place-kinds-v1/complete.mjs';
 import {
   campaignYaml, cleanupCampaigns, emptyLabels, makeCampaign, writeAtlas,
@@ -23,10 +23,9 @@ function atlasCampaign(places) {
   return root;
 }
 
-test('no atlas: no candidates, detect is false, apply and complete are complete', () => {
+test('no atlas: no candidates, apply and complete are complete', () => {
   const root = makeCampaign({}, { yaml: campaignYaml([{ id: 'luoghi', folder: 'World', type: 'places' }]) });
   assert.deepEqual(placeKindCandidates(root), []);
-  assert.equal(detect(root), false);
   assert.deepEqual(apply(root), { status: 'complete', changed: [], errors: [] });
   assert.deepEqual(complete(root), { status: 'complete', errors: [] });
 });
@@ -41,9 +40,8 @@ test('a landmark chosen by the document is a candidate; a landmark chosen by the
   assert.deepEqual(placeKindCandidates(root), [{ id: 'forge', place: 'forge-sheet' }]);
 });
 
-test('with candidates: detect is true and apply is pending, changes nothing and creates no file', () => {
+test('with candidates: apply is pending, changes nothing and creates no file', () => {
   const root = atlasCampaign([item('forge', 'landmark')]);
-  assert.equal(detect(root), true);
   assert.deepEqual(apply(root), { status: 'pending', changed: [], errors: [] });
   assert.equal(fs.existsSync(path.join(root, '.campaign')), false);
   assert.equal(complete(root).status, 'pending');
@@ -55,7 +53,6 @@ test('markReviewed records the id; afterwards nothing is pending and complete pa
   const result = markReviewed(root);
   assert.deepEqual(result, { status: 'complete', reviewed: ['forge', 'well'] });
   assert.deepEqual(placeKindCandidates(root), []);
-  assert.equal(detect(root), false);
   assert.deepEqual(complete(root), { status: 'complete', errors: [] });
 
   const saved = JSON.parse(fs.readFileSync(path.join(root, STATE_FILE), 'utf8'));
@@ -77,5 +74,4 @@ test('an invalid state file is treated as empty', () => {
   fs.mkdirSync(path.dirname(path.join(root, STATE_FILE)), { recursive: true });
   fs.writeFileSync(path.join(root, STATE_FILE), 'this is { not json');
   assert.deepEqual(placeKindCandidates(root), [{ id: 'forge', place: 'forge-sheet' }]);
-  assert.equal(detect(root), true);
 });

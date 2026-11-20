@@ -3,15 +3,6 @@
 // This module writes nothing: apply reports 'pending' while candidates remain.
 import { placeKindCandidates } from '../../scripts/lib/place-kinds.mjs';
 
-/** True while at least one place still needs its kind reviewed. */
-export function detect(root) {
-  try {
-    return placeKindCandidates(root).length > 0;
-  } catch {
-    return false;
-  }
-}
-
 /** Complete when no place is left to review; pending otherwise. Nothing is written. */
 export function apply(root, { dryRun = false } = {}) {
   void dryRun;
