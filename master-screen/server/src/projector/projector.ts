@@ -1,10 +1,11 @@
 // The projector: what the second window (/projector) shows to the players. The server keeps
 // the last projection in memory and streams it over SSE, so a projector that reconnects gets
-// it at once. The server decides what may be projected (resolveSrc): only images the public
-// part of a non-master-only document embeds or links, or images the master uploaded to his
-// live board. A projected fight (kind 'combat') is rebuilt from the server state, never from
-// the client, and carries only what the players may read. Owner: projector.
-import fsp from 'node:fs/promises';
+// it at once. The server decides what may be projected (resolveSrc): any image file of the
+// campaign (png, jpg, jpeg, webp, gif, svg) or any image the master uploaded to his live board.
+// The server does not check whether a document shows the image: the master's click is the check.
+// It still rebuilds the URL and refuses absolute URLs, data:, protocol-relative sources, '..'
+// and non-image files. A projected fight (kind 'combat') is rebuilt from the server state, never
+// from the client, and carries only what the players may read. Owner: projector.
 import type { ServerResponse } from 'node:http';
 import path from 'node:path';
 import type {
@@ -18,10 +19,8 @@ import type {
 } from '../../../shared/src/types.js';
 import type { BattleHost } from '../cockpit-host/battle.js';
 import type { Ctx } from '../context.js';
-import { imageRefsOf } from '../cockpit-host/refs.js';
-import { fileUrl, RASTER_EXTENSIONS } from '../cockpit-host/files.js';
-import { partsForView } from '../docs/markdown.js';
-import { listCampaignDocuments, loadDocModules, readCampaignConfig, resolveCampaignFile } from '../docs/scan.js';
+import { fileUrl } from '../cockpit-host/files.js';
+import { resolveCampaignFile } from '../docs/scan.js';
 import { buildSnapshot, liveRevision } from '../live/snapshot.js';
 
 const RETRY_MS = 3000;
@@ -38,6 +37,8 @@ const SSE_HEADERS = {
 /** The base the relative sources are read against; any source with another origin is refused. */
 const BASE = 'http://x';
 const SESSION_SEGMENT = /^[A-Za-z0-9._-]+$/;
+/** The image files the projector accepts, campaign files and live-board files alike. */
+const PROJECTABLE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg']);
 
 function frameOf(projection: Projection): string {
   return `event: projection\ndata: ${JSON.stringify(projection)}\n\n`;
@@ -324,35 +325,15 @@ function parseSource(src: string): URL | null {
   return url.origin === BASE ? url : null;
 }
 
-/** Whether a campaign image is embedded or linked by the public part of a document that is not master-only. */
-async function isShownToPlayers(ctx: Ctx, imageRel: string): Promise<boolean> {
-  const mods = await loadDocModules(ctx);
-  const config = await readCampaignConfig(ctx, mods);
-  for (const doc of await listCampaignDocuments(ctx.campaignRoot)) {
-    const masterOnly = !config.isPublic(doc.rel);
-    if (masterOnly) continue;
-    let text: string;
-    try {
-      text = await fsp.readFile(path.join(ctx.campaignRoot, doc.rel), 'utf8');
-    } catch {
-      continue;
-    }
-    const body = mods.frontmatter.parseFrontmatter(text).body;
-    const parts = partsForView(body, masterOnly, 'public', mods.publicText.MASTER_MARKER);
-    if (parts.some((part) => imageRefsOf(doc.rel, part.source).some((ref) => ref.path === imageRel))) return true;
-  }
-  return false;
-}
-
-async function resolvePublicImage(ctx: Ctx, rawPath: string | null): Promise<string | null> {
+/** A campaign image file, rebuilt as its /api/file URL. Any image of the campaign may be projected. */
+async function resolveCampaignImage(ctx: Ctx, rawPath: string | null): Promise<string | null> {
   const resolved = await resolveCampaignFile(ctx.campaignRoot, rawPath);
   if (resolved === null) return null;
-  if (!RASTER_EXTENSIONS.has(path.posix.extname(resolved.rel).toLowerCase())) return null;
-  if (!(await isShownToPlayers(ctx, resolved.rel))) return null;
+  if (!PROJECTABLE_EXTENSIONS.has(path.posix.extname(resolved.rel).toLowerCase())) return null;
   return fileUrl(resolved.rel);
 }
 
-/** A live-board image: /api/cockpit/sessions/<id>/files/<name>, both segments plain names. */
+/** A live-board image: /api/cockpit/sessions/<id>/files/<name>, both segments plain names, a projectable extension. */
 function resolveSessionImage(pathname: string): string | null {
   const parts = pathname.split('/');
   // ['', 'api', 'cockpit', 'sessions', id, 'files', name]
@@ -364,7 +345,7 @@ function resolveSessionImage(pathname: string): string | null {
   for (const segment of [id, name]) {
     if (!SESSION_SEGMENT.test(segment) || segment === '.' || segment === '..') return null;
   }
-  if (!RASTER_EXTENSIONS.has(path.posix.extname(name).toLowerCase())) return null;
+  if (!PROJECTABLE_EXTENSIONS.has(path.posix.extname(name).toLowerCase())) return null;
   return `/api/cockpit/sessions/${encodeURIComponent(id)}/files/${encodeURIComponent(name)}`;
 }
 
@@ -378,11 +359,12 @@ function decodeSegment(segment: string): string | null {
 
 /**
  * The security gate of the projector. Returns the normalized URL to project, rebuilt by the
- * server, or null when the source may not be shown to the players.
+ * server, or null when the source is not a campaign image or a live-board image. The server
+ * does not check whether a document shows the image: the master decides by clicking Project.
  */
 export async function resolveSrc(ctx: Ctx, src: string): Promise<string | null> {
   const url = parseSource(src);
   if (url === null) return null;
-  if (url.pathname === '/api/file') return resolvePublicImage(ctx, url.searchParams.get('path'));
+  if (url.pathname === '/api/file') return resolveCampaignImage(ctx, url.searchParams.get('path'));
   return resolveSessionImage(url.pathname);
 }

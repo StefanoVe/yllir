@@ -86,6 +86,8 @@ describe('projector routes', () => {
     await write('img/hidden-plan.png', PNG);
     await write('img/npc-portrait.png', PNG);
     await write('img/orphan.png', PNG);
+    await write('img/sketch.svg', '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"/>');
+    await write('img/banner.gif', Buffer.from('GIF89a', 'ascii'));
     await write('img/notes.txt', 'not an image');
     h = await startApp(tmp, REAL_FRAMEWORK);
   });
@@ -119,28 +121,59 @@ describe('projector routes', () => {
     assert.deepEqual(res.json, { kind: 'image', src: MAP });
   });
 
-  it('refuses an image that only the master block of a public document shows', async () => {
+  it('projects an image that only the master block shows, answering the normalized source', async () => {
     const res = await send(h, 'POST', '/projector', {
       kind: 'image',
       src: '/api/file?path=img%2Fhidden-plan.png',
     });
-    assert.equal(res.status, 403);
-    assert.deepEqual(res.json, { error: 'This image cannot be shown to the players.' });
-    assert.deepEqual(await projection(), { kind: 'image', src: MAP });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json, { kind: 'image', src: '/api/file?path=img%2Fhidden-plan.png' });
+    assert.deepEqual(await projection(), { kind: 'image', src: '/api/file?path=img%2Fhidden-plan.png' });
+    await send(h, 'POST', '/projector', { kind: 'image', src: MAP });
   });
 
-  it('refuses an image that only a master-only document shows', async () => {
+  it('projects an image that only a master-only document shows', async () => {
     const res = await send(h, 'POST', '/projector', {
       kind: 'image',
       src: '/api/file?path=img%2Fnpc-portrait.png',
     });
-    assert.equal(res.status, 403);
-    assert.deepEqual(res.json, { error: 'This image cannot be shown to the players.' });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json, { kind: 'image', src: '/api/file?path=img%2Fnpc-portrait.png' });
+    await send(h, 'POST', '/projector', { kind: 'image', src: MAP });
   });
 
-  it('refuses an image no document references', async () => {
+  it('projects an image no document references', async () => {
     const res = await send(h, 'POST', '/projector', { kind: 'image', src: '/api/file?path=img%2Forphan.png' });
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.json, { kind: 'image', src: '/api/file?path=img%2Forphan.png' });
+    await send(h, 'POST', '/projector', { kind: 'image', src: MAP });
+  });
+
+  it('projects an svg and a gif campaign file', async () => {
+    for (const name of ['sketch.svg', 'banner.gif']) {
+      const src = `/api/file?path=img%2F${name}`;
+      const res = await send(h, 'POST', '/projector', { kind: 'image', src });
+      assert.equal(res.status, 200, name);
+      assert.deepEqual(res.json, { kind: 'image', src }, name);
+      assert.equal(await check(src), true, name);
+    }
+    await send(h, 'POST', '/projector', { kind: 'image', src: MAP });
+  });
+
+  it('refuses a markdown file of the campaign', async () => {
+    const src = '/api/file?path=places%2Fruins.md';
+    const res = await send(h, 'POST', '/projector', { kind: 'image', src });
     assert.equal(res.status, 403);
+    assert.deepEqual(res.json, { error: 'This image cannot be shown to the players.' });
+    assert.equal(await check(src), false);
+    assert.deepEqual(await projection(), { kind: 'image', src: MAP });
+  });
+
+  it('refuses a campaign image that does not exist', async () => {
+    const src = '/api/file?path=img%2Fmissing.png';
+    const res = await send(h, 'POST', '/projector', { kind: 'image', src });
+    assert.equal(res.status, 403);
+    assert.equal(await check(src), false);
   });
 
   it('refuses sources that are not campaign images', async () => {
@@ -216,8 +249,9 @@ describe('projector routes', () => {
 
   it('checks whether a source is projectable', async () => {
     assert.equal(await check(MAP), true);
-    assert.equal(await check('/api/file?path=img%2Fhidden-plan.png'), false);
-    assert.equal(await check('/api/file?path=img%2Fnpc-portrait.png'), false);
+    assert.equal(await check('/api/file?path=img%2Fhidden-plan.png'), true);
+    assert.equal(await check('/api/file?path=img%2Fnpc-portrait.png'), true);
+    assert.equal(await check('/api/file?path=img%2Forphan.png'), true);
     assert.equal(await check('https://evil.example/x.png'), false);
     assert.equal(await check('/api/cockpit/sessions/sess-1/files/board.png'), true);
     const missing = (await get(h, '/projector/check')).json as ProjectableResponse;

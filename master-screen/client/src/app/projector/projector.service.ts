@@ -68,7 +68,7 @@ export class ProjectorService {
     return !!this.win && !this.win.closed;
   }
 
-  /** Whether the server allows this image on the projector (false for master-only images, and on any error). */
+  /** Whether the server allows this image on the projector (false when the server refuses the source, and on any error). */
   async check(src: string): Promise<boolean> {
     try {
       const response = await fetch(`/api/projector/check?src=${encodeURIComponent(src)}`);
