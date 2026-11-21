@@ -72,7 +72,7 @@ export async function buildEncyclopedia(root) {
   if (validated.errors.length > 0) return failedReport(root, 'config', text['config-invalid']);
   if (config.modules?.encyclopedia !== true) return failedReport(root, 'module', text['module-off']);
 
-  const siteTitle = config.encyclopedia?.title ?? config.campaign?.name ?? 'Encyclopedia';
+  const siteTitle = config.encyclopedia?.title ?? config.campaign?.name ?? 'Codex';
   const baseUrl = config.encyclopedia?.base_url ?? DEFAULT_BASE_URL;
   const cacheDir = path.join(root, CACHE_SUBDIR);
   const dest = buildDir(root);

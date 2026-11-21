@@ -122,7 +122,7 @@ describe('EncyclopediaPage', () => {
     await settle(fixture);
 
     expect(fake.buildCalls).toBe(1);
-    expect(root(fixture).textContent).toContain('The encyclopedia has 3 entries.');
+    expect(root(fixture).textContent).toContain('The Codex has 3 entries.');
 
     const rows = [...root(fixture).querySelectorAll<HTMLElement>('li.check')];
     expect(rows.map((row) => row.dataset['status'])).toEqual(['pass', 'fail', 'skipped']);

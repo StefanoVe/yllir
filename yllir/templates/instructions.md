@@ -58,7 +58,7 @@ When the adapter is not `none`, the engine checks creature and item sheets again
 {{/if}}
 
 {{#if modules.encyclopedia}}
-Encyclopedia is active.
+Encyclopedia is active (public name «Codex», the same in every language).
 
 {{/if}}
 {{#if modules.master_screen}}

@@ -54,7 +54,7 @@ export const STRINGS = {
     },
     documentPath: 'Documento',
     openDocument: 'Apri il documento',
-    openEncyclopedia: 'Apri la voce dell\'enciclopedia',
+    openEncyclopedia: 'Apri la voce del Codex',
     notablePlaces: 'Luoghi notevoli',
   },
   en: {
@@ -108,7 +108,7 @@ export const STRINGS = {
     },
     documentPath: 'Document',
     openDocument: 'Open the document',
-    openEncyclopedia: 'Open the encyclopedia entry',
+    openEncyclopedia: 'Open the Codex entry',
     notablePlaces: 'Notable places',
   },
 };

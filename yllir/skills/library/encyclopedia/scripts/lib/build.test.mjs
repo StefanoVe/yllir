@@ -195,6 +195,24 @@ test('Italian campaigns get Italian pages and messages', async () => {
   assert.match(fs.readFileSync(path.join(buildDir(root), 'e/ilde-vecchia/index.html'), 'utf8'), /unita a/);
 });
 
+test('the site calls itself Codex in every language, and no page shows the word Encyclopedia or Enciclopedia', async () => {
+  for (const lang of ['en', 'it']) {
+    const root = fixture(FILES, { yaml: campaignYaml({ lang, extra: 'encyclopedia:\n  title: "Atlas of Test"' }) });
+    assert.equal((await buildEncyclopedia(root)).ok, true, lang);
+    const dir = buildDir(root);
+    const index = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
+    assert.match(index, /<title>Codex · Atlas of Test<\/title>/, lang);
+    assert.match(index, /<h1>Codex<\/h1>/, lang);
+    assert.match(index, /<p class="site-name"><a href="[^"]*">Codex<\/a><\/p>/, lang);
+    const entry = fs.readFileSync(path.join(dir, 'e/porto-di-selce/index.html'), 'utf8');
+    assert.match(entry, /<title>[^<]*· Codex<\/title>/, lang);
+    for (const file of Object.keys(listAll(dir)).filter((f) => f.endsWith('.html'))) {
+      const html = fs.readFileSync(path.join(dir, file), 'utf8');
+      assert.equal(/enciclopedia|>[^<]*encyclopedia/i.test(html), false, `${lang} ${file}`);
+    }
+  }
+});
+
 test('a module that is off, or a broken configuration, refuses the build with a plain message', async () => {
   const off = fixture(FILES, { yaml: campaignYaml({ encyclopedia: false }) });
   const offReport = await buildEncyclopedia(off);

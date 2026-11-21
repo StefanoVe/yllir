@@ -1,6 +1,6 @@
 ---
 name: encyclopedia
-description: Library skill. Builds or refreshes the public encyclopedia of the campaign, a local static site with one page per public entry, only when the encyclopedia module is on. Runs every pre-publish check before anything is replaced, and tells the master in plain words what was included, what was left out and why. Invoked by the entry skill when the master asks to build, refresh or preview the encyclopedia.
+description: Library skill. Builds or refreshes the public encyclopedia of the campaign, a local static site with one page per public entry, only when the encyclopedia module is on. Runs every pre-publish check before anything is replaced, and tells the master in plain words what was included, what was left out and why. Invoked by the entry skill when the master asks to build, refresh or preview the encyclopedia (public name: Codex).
 user-invocable: false
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/encyclopedia/scripts/encyclopedia.mjs" *), Read, Glob, Grep
 ---
@@ -9,10 +9,12 @@ allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/encyclopedia/scri
 
 You build the public encyclopedia of the campaign. It is a set of static pages written under `.campaign/cache/encyclopedia/`, a derived folder that can always be rebuilt. It is never canon and it is never published: hosting is not configured, so the site stays local and the master screen previews it.
 
+**Public name.** To players and to the master the encyclopedia is called «Codex», the same word in every language (in Italian it is masculine: «il Codex»). Never call it «enciclopedia» or «encyclopedia» when talking to the master.
+
 **Commands.** Run the command exactly as written, as one single command: nothing before it, nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Run it from the campaign root, with `<root>` as the campaign folder. The script ends its output with `exit: <code>`.
 
 **Rules.**
-- Only when `modules.encyclopedia` is `true` in `campaign.yaml`. If it is off, say so plainly in the campaign language (for example: «L'enciclopedia non è attiva in questa campagna. Vuoi attivarla?») and stop. Turning the module on is a separate decision, asked for on its own.
+- Only when `modules.encyclopedia` is `true` in `campaign.yaml`. If it is off, say so plainly in the campaign language (for example: «Il Codex non è attivo in questa campagna. Vuoi attivarlo?») and stop. Turning the module on is a separate decision, asked for on its own.
 - Never publish, upload, send or share anything. Hosting and domain are not decided. If the master asks to put the site online, say that publishing is not set up yet and that the site is local.
 - The reserved block (`<!-- master -->` to the end of a file), the world seed, the sheets in master-only categories and the folders `Giocatori/`, `Players/`, `Fonti/`, `Sources/`, `Appunti/`, `Notes/` never leave the campaign. The script enforces it; never copy such text into a prompt, a reply or a file yourself.
 - Never open, edit or delete files under `.campaign/cache/encyclopedia/` by hand. It is rebuilt by the script only.

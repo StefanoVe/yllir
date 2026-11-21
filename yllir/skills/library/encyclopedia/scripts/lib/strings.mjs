@@ -3,7 +3,7 @@
 
 const SITE = {
   it: {
-    title: 'Enciclopedia',
+    title: 'Codex',
     search: 'Filtra le voci',
     searchHint: 'Scrivi un nome o una parola',
     count: (n) => (n === 1 ? '1 voce' : `${n} voci`),
@@ -26,7 +26,7 @@ const SITE = {
     filterNone: 'Nessuna voce corrisponde.',
   },
   en: {
-    title: 'Encyclopedia',
+    title: 'Codex',
     search: 'Filter entries',
     searchHint: 'Type a name or a word',
     count: (n) => (n === 1 ? '1 entry' : `${n} entries`),
@@ -52,8 +52,8 @@ const SITE = {
 
 const REPORT = {
   it: {
-    'module-off': 'Il modulo enciclopedia è disattivato nelle impostazioni della campagna.',
-    'config-invalid': 'Le impostazioni della campagna (campaign.yaml) hanno errori: vanno corrette prima di costruire l’enciclopedia.',
+    'module-off': 'Il Codex è disattivato nelle impostazioni della campagna.',
+    'config-invalid': 'Le impostazioni della campagna (campaign.yaml) hanno errori: vanno corrette prima di costruire il Codex.',
     'config-missing': 'Non riesco a leggere le impostazioni della campagna.',
     'build-error': 'La costruzione si è interrotta per un errore interno. La versione precedente è rimasta com’era.',
     reasonPrivateFolder: 'cartella privata: non esce mai',
@@ -80,8 +80,8 @@ const REPORT = {
     duplicateIdPath: 'Due schede hanno lo stesso id: nessuna delle due è pubblicata.',
   },
   en: {
-    'module-off': 'The encyclopedia module is switched off in the campaign settings.',
-    'config-invalid': 'The campaign settings (campaign.yaml) have errors: fix them before building the encyclopedia.',
+    'module-off': 'The Codex is switched off in the campaign settings.',
+    'config-invalid': 'The campaign settings (campaign.yaml) have errors: fix them before building the Codex.',
     'config-missing': 'The campaign settings cannot be read.',
     'build-error': 'The build stopped on an internal error. The previous version was left as it was.',
     reasonPrivateFolder: 'private folder: never published',
@@ -117,7 +117,7 @@ const CHECKS = {
     },
     'no-private-folders': {
       ok: 'Nessun file delle cartelle private è incluso.',
-      fail: 'Un file di una cartella privata è finito nell’enciclopedia: non è stato costruito nulla.',
+      fail: 'Un file di una cartella privata è finito nel Codex: non è stato costruito nulla.',
     },
     'no-secret-shapes': {
       ok: 'Nessuna forma di chiave o segreto nei file generati.',
@@ -161,7 +161,7 @@ const CHECKS = {
     },
     'no-private-folders': {
       ok: 'No file from a private folder is included.',
-      fail: 'A file from a private folder reached the encyclopedia: nothing was built.',
+      fail: 'A file from a private folder reached the Codex: nothing was built.',
     },
     'no-secret-shapes': {
       ok: 'No key or secret shape in the generated files.',

@@ -38,7 +38,7 @@ describe('encyclopedia routes with the module off', () => {
   it('refuses a build without running it', async () => {
     const res = await f.call('POST', '/api/encyclopedia/build');
     assert.equal(res.status, 409);
-    assert.equal((res.json as { error: string }).error, 'The encyclopedia is not turned on for this campaign.');
+    assert.equal((res.json as { error: string }).error, 'The Codex is not turned on for this campaign.');
     assert.deepEqual(await f.fake.calls(), []);
   });
 
@@ -74,7 +74,7 @@ describe('encyclopedia status and build', () => {
     await f.fake.respond('status', { code: 0, raw: 'garbage' });
     const res = await f.call('GET', '/api/encyclopedia');
     assert.equal(res.status, 500);
-    assert.equal((res.json as { error: string }).error, 'The encyclopedia status could not be read. Try again.');
+    assert.equal((res.json as { error: string }).error, 'The Codex status could not be read. Try again.');
     assert.doesNotMatch(res.text, /garbage/);
   });
 
@@ -123,7 +123,7 @@ describe('encyclopedia status and build', () => {
     await f.fake.respond('build', { code: 0, raw: 'not json /Users/x/secret' });
     const res = await f.call('POST', '/api/encyclopedia/build');
     assert.equal(res.status, 500);
-    assert.equal((res.json as { error: string }).error, 'The encyclopedia could not be built. Try again.');
+    assert.equal((res.json as { error: string }).error, 'The Codex could not be built. Try again.');
     assert.doesNotMatch(res.text, /secret|Users/);
   });
 
@@ -224,7 +224,7 @@ describe('the site with the module on but no build yet', () => {
   it('answers 404 in plain words and does not run the framework', async () => {
     const res = await f.call('GET', '/enc/');
     assert.equal(res.status, 404);
-    assert.equal((res.json as { error: string }).error, 'The encyclopedia has not been built yet. Build it first.');
+    assert.equal((res.json as { error: string }).error, 'The Codex has not been built yet. Build it first.');
     assert.notEqual(res.headers['content-security-policy'], SITE_CSP);
     assert.deepEqual(await f.fake.calls(), []);
   });

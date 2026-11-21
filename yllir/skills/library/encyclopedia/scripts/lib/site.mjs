@@ -49,7 +49,7 @@ ${head}<link rel="stylesheet" href="${prefix}assets/site.css">
 <body>
 <a class="skip-link" href="#main">${escapeHtml(t.skip)}</a>
 <header class="site-header">
-<p class="site-name"><a href="${prefix}">${escapeHtml(siteTitle)}</a></p>
+<p class="site-name"><a href="${prefix}">${escapeHtml(t.title)}</a></p>
 </header>
 ${body}
 <footer class="site-footer">
@@ -102,7 +102,7 @@ ${parts.filter((p) => p !== '').join('\n')}
 </main>`;
 
   return {
-    html: page({ lang, title: `${entry.title} · ${siteTitle}`, prefix: '../../', siteTitle, body }),
+    html: page({ lang, title: `${entry.title} · ${t.title}`, prefix: '../../', siteTitle, body }),
     locks,
   };
 }
@@ -142,7 +142,8 @@ ${items}
 
   const count = t.count(entries.length);
   const body = `<main id="main" class="index-main">
-<h1>${escapeHtml(siteTitle)}</h1>
+<h1>${escapeHtml(t.title)}</h1>
+<p class="site-subtitle">${escapeHtml(siteTitle)}</p>
 <form class="filter" role="search" action="" method="get">
 <label for="filter">${escapeHtml(t.search)}</label>
 <input id="filter" name="q" type="search" placeholder="${escapeHtml(t.searchHint)}" autocomplete="off">
@@ -151,7 +152,7 @@ ${items}
 ${entries.length === 0 ? `<p class="empty">${escapeHtml(t.empty)}</p>` : groups}
 <p class="none" hidden>${escapeHtml(t.noResults)}</p>
 </main>`;
-  return page({ lang, title: siteTitle, prefix: '', siteTitle, body });
+  return page({ lang, title: `${t.title} · ${siteTitle}`, prefix: '', siteTitle, body });
 }
 
 /** A page for a merged id: a meta refresh to the surviving entry and a plain link. */
@@ -169,11 +170,11 @@ export function renderRedirect({ lang, siteTitle, target }) {
 export function renderGone({ lang, siteTitle }) {
   const t = siteText(lang);
   const body = `<main id="main" class="notice-main">
-<h1>${escapeHtml(siteTitle)}</h1>
+<h1>${escapeHtml(t.title)}</h1>
 <p>${escapeHtml(t.gone)}</p>
 <p><a href="../../">${escapeHtml(t.home)}</a></p>
 </main>`;
-  return page({ lang, title: `${t.notFound} · ${siteTitle}`, prefix: '../../', siteTitle, body });
+  return page({ lang, title: `${t.notFound} · ${t.title}`, prefix: '../../', siteTitle, body });
 }
 
 /** The 404 page at the root of the site. */
@@ -184,7 +185,7 @@ export function render404({ lang, siteTitle }) {
 <p>${escapeHtml(t.notFoundText)}</p>
 <p><a href="./">${escapeHtml(t.home)}</a></p>
 </main>`;
-  return page({ lang, title: `${t.notFound} · ${siteTitle}`, prefix: '', siteTitle, body });
+  return page({ lang, title: `${t.notFound} · ${t.title}`, prefix: '', siteTitle, body });
 }
 
 /** The search index: id, title, category and plain text of each entry (locked texts are never in it). */

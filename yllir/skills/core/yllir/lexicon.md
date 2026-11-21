@@ -46,7 +46,7 @@ Use only the words in the language column of the campaign: the Italian column fo
 | Condition | «Condizione» | «Condition» |
 | Session log | «Registro della partita» | «Game log» |
 | Open thread | «Filo aperto» | «Open thread» |
-| Derived index | «Mappa» o «Enciclopedia» | «Map» or «Encyclopedia» |
+| Derived index | «Mappa» o «Codex» | «Map» or «Codex» |
 | Subject index | Non visibile | Not visible |
 | Aliases | «Altri nomi» | «Other names» |
 | Plot map | «Mappa della trama» | «Plot map» |

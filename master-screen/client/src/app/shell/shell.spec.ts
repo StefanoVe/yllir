@@ -121,7 +121,7 @@ describe('Shell encyclopedia entry', () => {
   it('shows the encyclopedia icon only when its module is on', () => {
     const fixture = setupModules({ music: false, encyclopedia: true });
     const encyclopedia = fixture.nativeElement.querySelector('a[href="/encyclopedia"]') as HTMLAnchorElement | null;
-    expect(encyclopedia?.getAttribute('aria-label')).toBe('Encyclopedia');
+    expect(encyclopedia?.getAttribute('aria-label')).toBe('Codex');
     expect(encyclopedia?.hasAttribute('title')).toBe(false);
   });
 
