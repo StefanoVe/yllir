@@ -44,5 +44,7 @@ export const routes: Routes = [
     path: 'docs',
     loadComponent: () => import('./documents/documents').then((m) => m.DocumentsPage),
   },
+  // The projector window is a page of its own (app.ts shows it without the shell); this route only keeps its URL.
+  { path: 'projector', children: [] },
   { path: '**', redirectTo: '' },
 ];

@@ -1,10 +1,10 @@
 // The projector: what the second window (/projector) shows to the players. The server keeps
 // the last projection in memory and streams it over SSE, so a projector that reconnects gets
 // it at once. The server decides what may be projected (resolveSrc): any image file of the
-// campaign (png, jpg, jpeg, webp, gif, svg) or any image the master uploaded to his live board.
+// campaign (png, jpg, jpeg, webp, gif, svg, avif, bmp) or any image the master uploaded to his live board.
 // The server does not check whether a document shows the image: the master's click is the check.
-// It still rebuilds the URL and refuses absolute URLs, data:, protocol-relative sources, '..'
-// and non-image files. A projected fight (kind 'combat') is rebuilt from the server state, never
+// It still rebuilds the URL: a same-origin absolute URL is accepted as its relative form, and other
+// absolute URLs, data:, protocol-relative sources, '..' and non-image files are refused. A projected fight (kind 'combat') is rebuilt from the server state, never
 // from the client, and carries only what the players may read. Owner: projector.
 import type { ServerResponse } from 'node:http';
 import path from 'node:path';
@@ -36,9 +36,8 @@ const SSE_HEADERS = {
 
 /** The base the relative sources are read against; any source with another origin is refused. */
 const BASE = 'http://x';
-const SESSION_SEGMENT = /^[A-Za-z0-9._-]+$/;
 /** The image files the projector accepts, campaign files and live-board files alike. */
-const PROJECTABLE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg']);
+const PROJECTABLE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.avif', '.bmp']);
 
 function frameOf(projection: Projection): string {
   return `event: projection\ndata: ${JSON.stringify(projection)}\n\n`;
@@ -322,15 +321,21 @@ export function projectorFor(ctx: Ctx, battle: BattleHost): Projector {
   return projector;
 }
 
-/** Parses a source into a URL on the base, or null when it has another origin (absolute, data:, //host). */
-function parseSource(src: string): URL | null {
+/**
+ * Parses a source into a URL on the base, or null when it has another origin (data:, //host, other hosts).
+ * A same-origin absolute URL (http or https, the server's own `host`) is accepted as its relative form.
+ */
+function parseSource(src: string, host?: string): URL | null {
   let url: URL;
   try {
     url = new URL(src, BASE);
   } catch {
     return null;
   }
-  return url.origin === BASE ? url : null;
+  if (url.origin === BASE) return url;
+  const sameHost = typeof host === 'string' && host !== '' && url.host.toLowerCase() === host.toLowerCase();
+  if (!sameHost || (url.protocol !== 'http:' && url.protocol !== 'https:')) return null;
+  return new URL(url.pathname + url.search, BASE);
 }
 
 /** A campaign image file, rebuilt as its /api/file URL. Any image of the campaign may be projected. */
@@ -351,10 +356,16 @@ function resolveSessionImage(pathname: string): string | null {
   const name = decodeSegment(parts[6]);
   if (id === null || name === null) return null;
   for (const segment of [id, name]) {
-    if (!SESSION_SEGMENT.test(segment) || segment === '.' || segment === '..') return null;
+    if (!isPlainSegment(segment)) return null;
   }
   if (!PROJECTABLE_EXTENSIONS.has(path.posix.extname(name).toLowerCase())) return null;
   return `/api/cockpit/sessions/${encodeURIComponent(id)}/files/${encodeURIComponent(name)}`;
+}
+
+/** A decoded path segment: non-empty, not '.' or '..', and with no slash, backslash or NUL character. */
+function isPlainSegment(segment: string): boolean {
+  if (segment === '' || segment === '.' || segment === '..') return false;
+  return !/[/\\\0]/.test(segment);
 }
 
 function decodeSegment(segment: string): string | null {
@@ -370,8 +381,8 @@ function decodeSegment(segment: string): string | null {
  * server, or null when the source is not a campaign image or a live-board image. The server
  * does not check whether a document shows the image: the master decides by clicking Project.
  */
-export async function resolveSrc(ctx: Ctx, src: string): Promise<string | null> {
-  const url = parseSource(src);
+export async function resolveSrc(ctx: Ctx, src: string, host?: string): Promise<string | null> {
+  const url = parseSource(src, host);
   if (url === null) return null;
   if (url.pathname === '/api/file') return resolveCampaignImage(ctx, url.searchParams.get('path'));
   return resolveSessionImage(url.pathname);

@@ -41,7 +41,7 @@ export function registerProjectorRoutes(app: Router, ctx: Ctx, battle: BattleHos
     '/projector/check',
     wrap(async (req, res) => {
       const src = typeof req.query.src === 'string' ? req.query.src : '';
-      const body: ProjectableResponse = { projectable: (await resolveSrc(ctx, src)) !== null };
+      const body: ProjectableResponse = { projectable: (await resolveSrc(ctx, src, req.headers.host)) !== null };
       res.json(body);
     }),
   );
@@ -64,7 +64,7 @@ export function registerProjectorRoutes(app: Router, ctx: Ctx, battle: BattleHos
         res.json(await projector.showCombat());
         return;
       }
-      const src = await resolveSrc(ctx, request.src);
+      const src = await resolveSrc(ctx, request.src, req.headers.host);
       if (src === null) {
         res.status(403).json({ error: 'This image cannot be shown to the players.' });
         return;

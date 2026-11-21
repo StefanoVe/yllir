@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ProjectorService } from './projector.service';
+import { ProjectorService, projectorSrc } from './projector.service';
 
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -25,6 +25,22 @@ class FakeEventSource {
 async function settle(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
 }
+
+describe('projectorSrc', () => {
+  it('reduces an absolute same-origin URL to the relative form', () => {
+    expect(projectorSrc('http://127.0.0.1:4317/api/file?path=a%2Fb.png', 'http://127.0.0.1:4317')).toBe(
+      '/api/file?path=a%2Fb.png',
+    );
+  });
+
+  it('leaves a relative URL unchanged', () => {
+    expect(projectorSrc('/api/file?path=x.png', 'http://127.0.0.1:4317')).toBe('/api/file?path=x.png');
+  });
+
+  it('leaves a URL from another origin unchanged', () => {
+    expect(projectorSrc('http://evil.example/x.png', 'http://127.0.0.1:4317')).toBe('http://evil.example/x.png');
+  });
+});
 
 describe('ProjectorService', () => {
   let service: ProjectorService;
@@ -76,6 +92,12 @@ describe('ProjectorService', () => {
     expect(url).toBe('/api/projector');
     expect(init.method).toBe('POST');
     expect(JSON.parse(String(init.body))).toEqual({ kind: 'image', src: '/media/a b.png' });
+  });
+
+  it('POSTs the relative src when given an absolute same-origin image URL', async () => {
+    await service.project(`${location.origin}/api/file?path=a%2Fb.png`);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ kind: 'image', src: '/api/file?path=a%2Fb.png' });
   });
 
   it('does not open a second window while one is open', async () => {

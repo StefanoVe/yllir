@@ -5,6 +5,7 @@
 import { DestroyRef, ElementRef, Directive, afterRenderEffect, inject, input, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { I18n } from '../i18n';
+import { ProjectorService } from '../projector/projector.service';
 import { currentTheme, drawDiagrams, loadMermaidEngine, watchTheme } from '../reader/mermaid';
 
 const LIGHTBOX_STYLE_ID = 'ms-chat-lightbox-style';
@@ -16,6 +17,9 @@ dialog.chat-lightbox::backdrop { background: rgb(0 0 0 / 0.75); }
 dialog.chat-lightbox img { max-width: 92vw; max-height: 88vh; object-fit: contain; border-radius: var(--radius-md); background: var(--color-surface); }
 dialog.chat-lightbox .chat-lightbox-close { position: fixed; top: var(--space-1); right: var(--space-1); width: 40px; height: 40px; border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 1.5rem; line-height: 1; cursor: pointer; }
 dialog.chat-lightbox .chat-lightbox-close:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+dialog.chat-lightbox .chat-lightbox-project { position: fixed; top: var(--space-1); right: calc(var(--space-1) + 48px); height: 40px; padding: 0 var(--space-1); border: 1px solid var(--color-border); border-radius: 999px; background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 0.9rem; cursor: pointer; }
+dialog.chat-lightbox .chat-lightbox-project:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+dialog.chat-lightbox .chat-lightbox-project[hidden] { display: none; }
 `;
 
 interface OpenLightbox {
@@ -30,6 +34,7 @@ export class ChatRich {
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly router = inject(Router);
   private readonly i18n = inject(I18n);
+  private readonly projector = inject(ProjectorService);
   private readonly destroyRef = inject(DestroyRef);
   /** The Markdown text the host shows. Each change, and each theme change, runs the after-render work. */
   readonly msChatRich = input<string>('');
@@ -118,11 +123,28 @@ export class ChatRich {
     close.setAttribute('aria-label', closeLabel);
     close.title = closeLabel;
     close.textContent = '×';
-    dialog.append(large, close);
+    const projectLabel = this.i18n.t('liveAgent.viewer.project');
+    const project = document.createElement('button');
+    project.type = 'button';
+    project.className = 'chat-lightbox-project';
+    project.setAttribute('aria-label', projectLabel);
+    project.title = projectLabel;
+    project.textContent = projectLabel;
+    // Shown only once the server confirms it can project this image.
+    project.hidden = true;
+    project.addEventListener('click', (event) => {
+      event.stopPropagation();
+      // Called synchronously from the click, so the projector pop-up is not blocked.
+      void this.projector.project(large.src);
+    });
+    dialog.append(large, close, project);
 
     // A click on the dialog itself (the backdrop around the picture) or on the close button closes it.
     dialog.addEventListener('click', (event) => {
       if (event.target === dialog || event.target === close) this.closeLightbox();
+    });
+    void this.projector.check(large.src).then((ok) => {
+      if (this.lightbox?.dialog === dialog) project.hidden = !ok;
     });
     // Escape closes a modal dialog natively; the close event then tidies up.
     dialog.addEventListener('close', () => this.finishLightbox());

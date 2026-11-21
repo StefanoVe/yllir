@@ -7,6 +7,7 @@ import { ApiService } from '../core/api.service';
 import { LiveService } from '../core/live.service';
 import { StatusService } from '../core/status.service';
 import { ViewModeService } from '../core/view-mode.service';
+import { ViewerService } from '../cockpit/support/viewer.service';
 import { Reader } from './reader';
 
 function docWith(partial: Partial<DocResponse>): DocResponse {
@@ -25,6 +26,7 @@ describe('Reader', () => {
   let api: { readDoc: ReturnType<typeof vi.fn> };
   let live: { on: () => Subject<unknown>; resync$: Subject<void> };
   let router: Router;
+  let viewer: { openImage: ReturnType<typeof vi.fn> };
 
   function setup(doc: DocResponse, view: 'master' | 'public' = 'master') {
     api.readDoc.mockResolvedValue(doc);
@@ -45,12 +47,14 @@ describe('Reader', () => {
   beforeEach(() => {
     api = { readDoc: vi.fn() };
     live = { on: () => new Subject<unknown>(), resync$: new Subject<void>() };
+    viewer = { openImage: vi.fn() };
     TestBed.configureTestingModule({
       imports: [Reader],
       providers: [
         provideRouter([]),
         { provide: ApiService, useValue: api },
         { provide: LiveService, useValue: live },
+        { provide: ViewerService, useValue: viewer },
         { provide: StatusService, useValue: { campaign: () => ({ name: 'Test campaign' }) } },
       ],
     });
@@ -143,6 +147,22 @@ describe('Reader', () => {
     const element: HTMLElement = fixture.nativeElement;
     expect(element.querySelector('h2#history')?.textContent).toBe('History');
     expect(element.querySelector('h2#family')?.textContent).toBe('Family');
+  });
+
+  it('opens a clicked image in the viewer with its source, instead of doing nothing', async () => {
+    const fixture = setup(
+      docWith({
+        blocks: [{ kind: 'public', html: '<p><img src="/doc/assets/map.png" alt="Map"></p>' }],
+      }),
+    );
+    await settle(fixture);
+    const img = (fixture.nativeElement as HTMLElement).querySelector<HTMLImageElement>('.block-body img');
+    expect(img).not.toBeNull();
+    const src = img?.getAttribute('src');
+    expect(src).toBeTruthy();
+    img?.click();
+    expect(viewer.openImage).toHaveBeenCalledWith(src, img);
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('shows the plain-language error from the server when the document cannot be read', async () => {

@@ -15,7 +15,7 @@ import type {
   Projection,
 } from '../../../shared/src/types.js';
 import { get, makeCampaign, makeFramework, send, sendRaw, startApp, type Harness } from '../live/test-support.js';
-import { projectCombat } from '../projector/projector.js';
+import { projectCombat, resolveSrc } from '../projector/projector.js';
 
 // The real framework in this repository (four levels up from src/routes/).
 const REAL_FRAMEWORK = fileURLToPath(new URL('../../../../yllir', import.meta.url));
@@ -207,7 +207,6 @@ describe('projector routes', () => {
       '/api/cockpit/sessions/sess-1/files/board-sketch.txt',
       '/api/cockpit/sessions/sess-1/files/..',
       '/api/cockpit/sessions/..%2F..%2Fx/files/a.png',
-      '/api/cockpit/sessions/sess-1/files/a%20b.png',
       '/api/cockpit/sessions/sess-1/files/a.png/extra',
       '/api/cockpit/sessions/sess-1/files/%E0%A4%A.png',
     ];
@@ -256,6 +255,58 @@ describe('projector routes', () => {
     assert.equal(await check('/api/cockpit/sessions/sess-1/files/board.png'), true);
     const missing = (await get(h, '/projector/check')).json as ProjectableResponse;
     assert.deepEqual(missing, { projectable: false });
+  });
+
+  it('checks a same-origin absolute URL of this server as its relative form, and refuses other origins', async () => {
+    const host = `127.0.0.1:${h.port}`;
+    const getWithHost = (route: string): Promise<{ status: number; json: unknown }> =>
+      new Promise((resolve, reject) => {
+        const req = http.get({ host: '127.0.0.1', port: h.port, path: route, headers: { host } }, (res) => {
+          let text = '';
+          res.setEncoding('utf8');
+          res.on('data', (chunk: string) => {
+            text += chunk;
+          });
+          res.on('end', () => resolve({ status: res.statusCode ?? 0, json: JSON.parse(text) }));
+          res.on('error', reject);
+        });
+        req.on('error', reject);
+      });
+    const checkAt = async (src: string): Promise<boolean> =>
+      ((await getWithHost(`/api/projector/check?src=${encodeURIComponent(src)}`)).json as ProjectableResponse).projectable;
+
+    assert.equal(await checkAt(`http://${host}/api/file?path=img%2Fmap.png`), true);
+    assert.equal(await checkAt(`http://evil.example/api/file?path=img%2Fmap.png`), false);
+    assert.equal(await checkAt('data:image/png;base64,AAAA'), false);
+  });
+
+  it('accepts a live-board file name with a space and an accented letter, and projectable extensions avif and bmp', async () => {
+    const accepted = [
+      '/api/cockpit/sessions/s1/files/mappa%20citt%C3%A0.png',
+      '/api/cockpit/sessions/sess-1/files/a%20b.png',
+      '/api/cockpit/sessions/s1/files/scan.avif',
+      '/api/cockpit/sessions/s1/files/scan.BMP',
+    ];
+    for (const src of accepted) {
+      assert.equal(typeof (await resolveSrc(h.ctx, src)), 'string', src);
+    }
+    assert.equal(
+      await resolveSrc(h.ctx, '/api/cockpit/sessions/s1/files/mappa%20citt%C3%A0.png'),
+      '/api/cockpit/sessions/s1/files/mappa%20citt%C3%A0.png',
+    );
+  });
+
+  it('refuses a live-board file name that is a dot segment or holds a slash', async () => {
+    const refused = [
+      '/api/cockpit/sessions/s1/files/%2E%2E',
+      '/api/cockpit/sessions/s1/files/%2E',
+      '/api/cockpit/sessions/s1/files/a%2Fb.png',
+      '/api/cockpit/sessions/s1/files/a%5Cb.png',
+      '/api/cockpit/sessions/s1/files/a%00b.png',
+    ];
+    for (const src of refused) {
+      assert.equal(await resolveSrc(h.ctx, src), null, src);
+    }
   });
 
   it('the event stream sends the current projection in its first frame', async () => {

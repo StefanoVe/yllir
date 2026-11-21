@@ -223,6 +223,17 @@ describe('Shell density, motion and start page', () => {
   });
 });
 
+describe('Shell image viewer', () => {
+  afterEach(() => {
+    TestBed.resetTestingModule();
+  });
+
+  it('renders the image viewer once, so every page can open an image in it', () => {
+    const fixture = create(ALL_MODULES).fixture;
+    expect(fixture.nativeElement.querySelectorAll('cockpit-viewer')).toHaveLength(1);
+  });
+});
+
 describe('Shell logo', () => {
   afterEach(() => {
     TestBed.resetTestingModule();

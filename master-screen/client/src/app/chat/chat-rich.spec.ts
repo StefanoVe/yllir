@@ -4,6 +4,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter, Router } from '@angular/router';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { I18n } from '../i18n';
+import { ProjectorService } from '../projector/projector.service';
 import { renderChatMarkdown } from './chat-markdown';
 import { ChatRich } from './chat-rich';
 
@@ -34,11 +35,17 @@ describe('ChatRich', () => {
   let host: HTMLElement;
   let router: Router;
   let label: (key: 'chat.rich.imageUnavailable' | 'chat.rich.close' | 'chat.rich.lightbox') => string;
+  let projector: { check: ReturnType<typeof vi.fn>; project: ReturnType<typeof vi.fn> };
 
   beforeEach(async () => {
+    projector = { check: vi.fn(async () => false), project: vi.fn(async () => true) };
     TestBed.configureTestingModule({
       imports: [Host],
-      providers: [provideZonelessChangeDetection(), provideRouter([])],
+      providers: [
+        provideZonelessChangeDetection(),
+        provideRouter([]),
+        { provide: ProjectorService, useValue: projector },
+      ],
     });
     fixture = TestBed.createComponent(Host);
     router = TestBed.inject(Router);
@@ -80,6 +87,22 @@ describe('ChatRich', () => {
 
     dialog?.querySelector<HTMLButtonElement>('.chat-lightbox-close')?.click();
     expect(document.querySelector('dialog.chat-lightbox')).toBeNull();
+  });
+
+  it('shows the Project button in the lightbox only when the server allows the image', async () => {
+    const project = () => document.querySelector<HTMLButtonElement>('dialog.chat-lightbox .chat-lightbox-project');
+
+    projector.check.mockResolvedValue(false);
+    host.querySelector<HTMLImageElement>('.chat-image img')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(project()?.hidden).toBe(true);
+    document.querySelector<HTMLButtonElement>('dialog.chat-lightbox .chat-lightbox-close')?.click();
+
+    projector.check.mockResolvedValue(true);
+    host.querySelector<HTMLImageElement>('.chat-image img')?.click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(project()?.hidden).toBe(false);
+    expect(project()?.textContent).toBe(TestBed.inject(I18n).t('liveAgent.viewer.project'));
   });
 
   it('closes the lightbox on a click on its backdrop, not on the picture', () => {

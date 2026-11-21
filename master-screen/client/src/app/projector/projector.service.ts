@@ -34,6 +34,21 @@ export type Projection =
 /** What the master sends: the server answers with the new current projection. */
 type ProjectionRequest = { kind: 'blank' } | { kind: 'image'; src: string } | { kind: 'combat' };
 
+/**
+ * The server accepts only the relative form of a same-origin image URL (`/api/file?path=...`). An absolute URL
+ * on this origin is reduced to that form; anything from another origin is returned unchanged.
+ */
+export function projectorSrc(src: string, origin: string = location.origin): string {
+  // Already relative: keep it byte for byte (re-parsing would re-encode spaces and break existing callers).
+  if (src.startsWith('/') && !src.startsWith('//')) return src;
+  try {
+    const url = new URL(src, origin);
+    return url.origin === origin ? url.pathname + url.search : src;
+  } catch {
+    return src;
+  }
+}
+
 export const PROJECTOR_WINDOW_NAME = 'yllir-projector';
 const PROJECTOR_FEATURES = 'popup=yes,width=1280,height=720';
 /** While the stream is down, the projector window polls the current projection this often... */
@@ -139,7 +154,7 @@ export class ProjectorService {
   /** Whether the server allows this image on the projector (false when the server refuses the source, and on any error). */
   async check(src: string): Promise<boolean> {
     try {
-      const response = await fetch(`/api/projector/check?src=${encodeURIComponent(src)}`);
+      const response = await fetch(`/api/projector/check?src=${encodeURIComponent(projectorSrc(src))}`);
       if (!response.ok) return false;
       const body = (await response.json()) as { projectable?: boolean };
       return body.projectable === true;
@@ -151,7 +166,7 @@ export class ProjectorService {
   /** Projects an image. The window is opened first, synchronously, so the click still counts as a user gesture. */
   async project(src: string): Promise<boolean> {
     if (!this.isOpen()) this.open();
-    return this.post({ kind: 'image', src });
+    return this.post({ kind: 'image', src: projectorSrc(src) });
   }
 
   /** Projects the live fight. Like project(), the window opens first; the server then pushes each new frame by itself. */
@@ -179,20 +194,4 @@ export class ProjectorService {
     }
   }
 
-  /** The server sends the current projection as the first frame, then each change. EventSource reconnects by itself. */
-  private connect(): void {
-    if (typeof EventSource === 'undefined') return;
-    try {
-      const source = new EventSource('/api/projector/events');
-      source.addEventListener('projection', (message) => {
-        try {
-          this.current.set(JSON.parse(String((message as MessageEvent).data)) as Projection);
-        } catch {
-          /* malformed frame: keep the last known projection */
-        }
-      });
-    } catch {
-      /* the stream is unavailable: the rail simply shows no projection state */
-    }
-  }
 }

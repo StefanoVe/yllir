@@ -13,6 +13,7 @@ import { PrefsService } from '../core/prefs.service';
 import { StatusService } from '../core/status.service';
 import { UpdateService } from '../core/update';
 import { ThemeService } from '../core/theme.service';
+import { CockpitViewer } from '../cockpit/support/cockpit-viewer';
 import { UpdateAlign } from '../update-align/update-align';
 import { UpdateNotice } from '../update-notice/update-notice';
 import { ViewModeService } from '../core/view-mode.service';
@@ -25,7 +26,7 @@ import { applyTextScale, readTextScale } from './text-scale';
 
 @Component({
   selector: 'ms-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock, UpdateAlign, UpdateNotice, TooltipDirective],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, LucideAngularModule, Palette, MusicDock, CockpitViewer, UpdateAlign, UpdateNotice, TooltipDirective],
   templateUrl: './shell.html',
   styleUrl: './shell.css',
 })

@@ -18,7 +18,6 @@ import { DocumentModal } from "./modals/document-modal";
 import { SessionModal } from "./modals/session-modal";
 import { DocumentsService } from "./support/documents.service";
 import { ViewerService } from "./support/viewer.service";
-import { CockpitViewer } from "./support/cockpit-viewer";
 import { CombatOverlay } from "./combat/combat-overlay";
 import { I18n } from "../i18n";
 
@@ -33,7 +32,7 @@ const MAX_CHAT = 640;
  */
 @Component({
   selector: "app-cockpit",
-  imports: [Board, Chat, TurnStatus, Icon, DocumentModal, SessionModal, CockpitViewer, CombatOverlay],
+  imports: [Board, Chat, TurnStatus, Icon, DocumentModal, SessionModal, CombatOverlay],
   templateUrl: "./cockpit.html",
   styleUrl: "./cockpit.css",
   providers: [{ provide: ChatSource, useExisting: CockpitService }],

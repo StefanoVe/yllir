@@ -27,6 +27,7 @@ import { StatusService } from '../core/status.service';
 import { ViewModeService } from '../core/view-mode.service';
 import { I18n, type TranslationKey } from '../i18n';
 import { DocBody } from './doc-body';
+import { ViewerService } from '../cockpit/support/viewer.service';
 
 function normalizeText(value: string | null): string {
   return (value ?? '').replace(/\s+/g, ' ').trim();
@@ -58,6 +59,7 @@ export class Reader {
   private readonly titleService = inject(Title);
   private readonly injector = inject(Injector);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly viewer = inject(ViewerService);
   /** The scroll container of this pane. In a split view each pane scrolls on its own. */
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
   private readonly destroyRef = inject(DestroyRef);
@@ -171,6 +173,12 @@ export class Reader {
 
   /** Link clicks in the document body: `/doc/...` links navigate, `#id` scrolls, web links open in a new tab. */
   onArticleClick(event: MouseEvent): void {
+    const image = event.target instanceof Element ? event.target.closest('img') : null;
+    if (image) {
+      event.preventDefault();
+      this.viewer.openImage(image.getAttribute('src') ?? image.src, image);
+      return;
+    }
     if (event.button !== 0 || !(event.target instanceof Element)) return;
     const anchor = event.target.closest('a[href]');
     if (!(anchor instanceof HTMLAnchorElement)) return;
