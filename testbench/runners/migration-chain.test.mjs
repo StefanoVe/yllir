@@ -28,14 +28,16 @@ const OLD = '0.0.1';
 // (item-knowledge-v1, economy-v1), the content ones by detect (scene-checks-v1, combat-statistics-v1).
 // shortcut-v1 and encounters-v1 (no fight events in the fixture) leave nothing pending. links-review-v1,
 // plot-flowchart-v1 and prose-style-v1 are guided too, so they stay pending on a 0.0.1 campaign.
+// public-knowledge-v1 is a content migration by detect (sheets whose public part still shows secrets).
 const PENDING = [
   'category-first-geography-v1', 'item-descriptions-v1', 'item-knowledge-v1', 'statistics-tables-v1',
   'scene-checks-v1', 'combat-statistics-v1', 'economy-v1', 'links-review-v1', 'plot-flowchart-v1', 'prose-style-v1',
+  'public-knowledge-v1',
 ];
 const ORDER = [
   'session-layout-v1', 'category-first-geography-v1', 'item-descriptions-v1', 'item-knowledge-v1', 'statistics-tables-v1',
   'world-graph-v1', 'metadata-comment-v1', 'scene-checks-v1', 'combat-statistics-v1', 'shortcut-v1', 'economy-v1', 'encounters-v1',
-  'links-review-v1', 'plot-flowchart-v1', 'prose-style-v1', 'atlas-site-v1', 'place-kinds-v1', 'atlas-site-v2',
+  'links-review-v1', 'plot-flowchart-v1', 'prose-style-v1', 'atlas-site-v1', 'place-kinds-v1', 'atlas-site-v2', 'public-knowledge-v1',
 ];
 
 const tempDirs = [];

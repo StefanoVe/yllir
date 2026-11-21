@@ -1,0 +1,7 @@
+id: public-knowledge-v1
+after: [item-knowledge-v1, metadata-comment-v1, atlas-site-v2]
+introduced_in: 0.97.0
+needed: detect
+deterministic: deterministic.mjs
+guided: guided.md
+complete: complete.mjs

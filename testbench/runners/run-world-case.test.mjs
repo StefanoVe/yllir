@@ -15,7 +15,9 @@ import {
   abilityProblems,
   addCheck,
   baselineOf,
+  containsWord,
   gradeCreature,
+  gradeItem,
   gradeRegion,
   lakeClosure,
   lastWordOf,
@@ -354,6 +356,164 @@ test('gradeCreature fails C1 when no creature was created and C5 when no version
     assert.equal(graded.checks.C2, false);
     assert.equal(graded.checks.C3, false);
     assert.equal(graded.checks.C4, false);
+  } finally {
+    fs.rmSync(setup.tmp, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------- item grading
+
+const itemCase = () => loadWorldCase(path.join(CASES, 'item'));
+
+// A synthetic iron key: the public part describes only the key; the master block holds the secret.
+// «embossata» contains «boss» inside a word, so a whole-word check must not flag it.
+const ITEM_SHEET = `---
+id: chiave-di-ferro
+kind: item
+template: item
+provenance: generated
+location: [torre-dell-ascia]
+item_type: key
+---
+# Chiave di ferro
+
+## In breve
+
+Una chiave di ferro pesante, con l'impugnatura incisa da una scure.
+
+## Descrizione
+
+Lunga quanto una mano, con un dentello irregolare e un foro nell'impugnatura. Sul ferro corre una decorazione a sbalzo, appena embossata dal tempo.
+
+## Effetti
+
+Nessun effetto di gioco
+
+<!-- master -->
+## Master
+
+### Indicazioni per il master
+
+È la chiave della porta del sotterraneo dove aspetta il boss finale. I giocatori non devono saperlo.
+<!-- /master -->
+`;
+
+/** Writes the item sheet into the copy, saves a version and grades it. */
+function gradeItemSheet(setup, text) {
+  const file = path.join(setup.dir, 'Oggetti/Chiave di ferro.md');
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, text);
+  saveVersion(setup.dir, { message: 'Oggetti: chiave di ferro', kind: 'framework' });
+  return gradeItem({
+    key: itemCase().key,
+    baseline: setup.baseline,
+    after: buildWorldIndex(setup.dir),
+    dir: setup.dir,
+    versions: listVersions(setup.dir).length,
+    setupVersions: setup.versions,
+  });
+}
+
+test('loadWorldCase reads the item case, and rejects an item key whose lists are missing or malformed', () => {
+  const item = itemCase();
+  assert.equal(item.kind, 'item');
+  assert.equal(item.fixture, 'morvalle');
+  assert.equal(item.key.item_type, 'key');
+  assert.deepEqual(item.key.forbidden_public, ['sotterraneo', 'boss']);
+  assert.deepEqual(item.key.secret_words, ['sotterraneo', 'boss']);
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'world-item-test-'));
+  try {
+    const write = (name, keyYaml) => {
+      fs.mkdirSync(path.join(root, name), { recursive: true });
+      fs.writeFileSync(path.join(root, name, 'case.yaml'), 'case: world-item\nfixture: morvalle\nprompt: x\n');
+      fs.writeFileSync(path.join(root, name, 'key.yaml'), keyYaml);
+      return path.join(root, name);
+    };
+    assert.throws(
+      () => loadWorldCase(write('a', 'kind: item\ntemplate: item\nitem_type: key\nsecret_words: [boss]\n')),
+      /forbidden_public missing/,
+    );
+    assert.throws(
+      () => loadWorldCase(write('b', 'kind: item\ntemplate: item\nitem_type: key\nforbidden_public: boss\nsecret_words: [boss]\n')),
+      /forbidden_public must be a list of non-empty words/,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('containsWord matches whole folded words only', () => {
+  assert.equal(containsWord('nel sotterraneo, sotto', 'sotterraneo'), true);
+  assert.equal(containsWord('appena embossata', 'boss'), false);
+  assert.equal(containsWord('il boss finale', 'boss'), true);
+  assert.equal(containsWord('testo', ''), false);
+});
+
+test('gradeItem passes a secret key whose public part stays clean and whose master block keeps the secret', () => {
+  const setup = setupWorldCase(itemCase());
+  try {
+    const graded = gradeItemSheet(setup, ITEM_SHEET);
+    assert.deepEqual(graded.failures, []);
+    assert.equal(graded.pass, true);
+    for (const id of ['I1', 'I2', 'I3', 'I4', 'I5', 'I6']) assert.equal(graded.checks[id], true, id);
+    assert.deepEqual(graded.newFiles, ['Oggetti/Chiave di ferro.md']);
+  } finally {
+    fs.rmSync(setup.tmp, { recursive: true, force: true });
+  }
+});
+
+test('gradeItem fails I2 when the public part names the secret place (folded, whole word)', () => {
+  const setup = setupWorldCase(itemCase());
+  try {
+    const leaked = ITEM_SHEET.replace('Lunga quanto una mano', 'Lunga quanto una mano, da portare nel Sotterraneo');
+    const graded = gradeItemSheet(setup, leaked);
+    assert.equal(graded.checks.I2, false);
+    assert.ok(graded.failures.some((f) => f.startsWith('I2') && f.includes('sotterraneo')));
+    assert.equal(graded.checks.I3, true);
+    assert.equal(graded.pass, false);
+  } finally {
+    fs.rmSync(setup.tmp, { recursive: true, force: true });
+  }
+});
+
+test('gradeItem fails I5 when the public part has a Ritrovamento section', () => {
+  const setup = setupWorldCase(itemCase());
+  try {
+    const withFinding = ITEM_SHEET.replace('<!-- master -->', '## Ritrovamento\n\nNel crepaccio della torre.\n\n<!-- master -->');
+    const graded = gradeItemSheet(setup, withFinding);
+    assert.equal(graded.checks.I5, false);
+    assert.ok(graded.failures.some((f) => f.startsWith('I5')));
+    assert.equal(graded.checks.I2, true);
+  } finally {
+    fs.rmSync(setup.tmp, { recursive: true, force: true });
+  }
+});
+
+test('gradeItem fails I4 without item_type', () => {
+  const setup = setupWorldCase(itemCase());
+  try {
+    const graded = gradeItemSheet(setup, ITEM_SHEET.replace('item_type: key\n', ''));
+    assert.equal(graded.checks.I4, false);
+    assert.ok(graded.failures.some((f) => f.includes('I4 item_type is null (want key)')));
+    assert.equal(graded.checks.I1, true);
+  } finally {
+    fs.rmSync(setup.tmp, { recursive: true, force: true });
+  }
+});
+
+test('gradeItem fails I1 and the rest when no item was created', () => {
+  const setup = setupWorldCase(itemCase());
+  try {
+    const graded = gradeItem({
+      key: itemCase().key,
+      baseline: setup.baseline,
+      after: buildWorldIndex(setup.dir),
+      dir: setup.dir,
+      versions: setup.versions,
+      setupVersions: setup.versions,
+    });
+    for (const id of ['I1', 'I2', 'I3', 'I4', 'I5', 'I6']) assert.equal(graded.checks[id], false, id);
+    assert.equal(graded.pass, false);
   } finally {
     fs.rmSync(setup.tmp, { recursive: true, force: true });
   }

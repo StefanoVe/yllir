@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { completeItemDescriptions, prepareItemDescriptions, stageItemDescriptionDraft, verifyItemDescriptionDrafts } from './item-descriptions.mjs';
 import { toCommentMetadata } from '../../../../../scripts/lib/frontmatter.mjs';
+import { complete as completePublicKnowledge } from '../../migrations/public-knowledge-v1/complete.mjs';
 
 const roots = [];
 after(() => roots.forEach((root) => fs.rmSync(root, { recursive: true, force: true })));
@@ -219,4 +220,107 @@ test('a complete item rewritten without its brief becomes pending, not changed',
   const result = prepareItemDescriptions(root);
   assert.equal(result.items[0].status, 'pending');
   assert.equal(result.items[0].current_source, undefined);
+});
+
+// ---------------------------------------------------------------- public-knowledge-v1
+
+const P = 'public-knowledge-v1';
+const MASTER = '<!-- master -->\n## Master\n### Indicazioni per il master\n\nsecret\n<!-- /master -->\n';
+const KEY = `---\nid: key\ntemplate: item\n---\n\n# Key\n\n## Descrizione\n\nA silver key.\n\n## Ritrovamento\n\nFound under the old bridge.\n\n${MASTER}`;
+const KEY_DRAFT = '---\nid: key\ntemplate: item\nitem_type: key\n---\n\n# Key\n\n## Descrizione\n\nA silver key.\n\n<!-- master -->\n## Master\n### Indicazioni per il master\n\nsecret\nFound under the old bridge.\n<!-- /master -->\n';
+const ROPE = `---\nid: rope\ntemplate: item\n---\n\n# Rope\n\n## Descrizione\n\nHemp rope.\n\n${MASTER}`;
+const LAMP = `---\nid: lamp\ntemplate: item\nitem_type: equipment\n---\n\n# Lamp\n\n## Descrizione\n\nA brass lamp.\n\n${MASTER}`;
+const MARTA = `---\nid: marta\nkind: character\n---\n\n# Marta\n\n## Ruolo\n\nInnkeeper.\n\n${MASTER}`;
+const MARTA_DRAFT = `---\nid: marta\nkind: character\n---\n\n# Marta\n\n## Sinossi\n\nInnkeeper of Morvalle.\n\n## Ruolo\n\nInnkeeper.\n\n${MASTER}`;
+const MARTA_EMPTY = `---\nid: marta\nkind: character\n---\n\n# Marta\n\n## Sinossi\n\n\n## Ruolo\n\nInnkeeper.\n\n${MASTER}`;
+const OSTE = `---\nid: oste\nkind: character\n---\n\n# Oste\n\n## Sinossi\n\nKeeps the inn.\n\n## Ruolo\n\nInnkeeper.\n\n${MASTER}`;
+const OMBRA = `---\nid: ombra\nkind: character\nsketch: true\n---\n\n# Ombra\n\n## Ruolo\n\nTo be written.\n`;
+const AVVISO = `---\nid: avviso\ntemplate: notice\nkind: character\n---\n\n# Avviso\n\n## Ruolo\n\nA notice.\n`;
+const PORTO = `---\nid: porto\nkind: place\n---\n\n# Porto\n\n## Sinossi\n\nA harbour.\n\n${MASTER}`;
+
+/** A campaign with one folder per category type that the public-knowledge profile scans. */
+function publicCampaign(files) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-public-knowledge-')); roots.push(root);
+  for (const folder of ['Objects', 'Characters', 'Places']) fs.mkdirSync(path.join(root, folder));
+  fs.writeFileSync(path.join(root, 'campaign.yaml'), 'structure:\n  - id: objects\n    folder: Objects\n    type: objects\n  - id: characters\n    folder: Characters\n    type: subjects\n  - id: places\n    folder: Places\n    type: places\n');
+  for (const [file, body] of files) fs.writeFileSync(path.join(root, file), body);
+  return root;
+}
+
+test('public knowledge: the inventory lists only sheets whose public part shows what the players may not know', () => {
+  const root = publicCampaign([
+    ['Objects/key.md', KEY],
+    ['Objects/rope.md', ROPE],
+    ['Objects/lamp.md', LAMP],
+    ['Characters/marta.md', MARTA],
+    ['Characters/oste.md', OSTE],
+    ['Characters/ombra.md', OMBRA],
+    ['Characters/avviso.md', AVVISO],
+    ['Places/porto.md', PORTO],
+  ]);
+  const result = prepareItemDescriptions(root, { migration: P });
+  assert.deepEqual(result.items.map((x) => x.file).sort(), ['Characters/marta.md', 'Objects/key.md', 'Objects/rope.md']);
+});
+
+test('public knowledge: moving a Finding into the master block and adding item_type verifies', () => {
+  const root = publicCampaign([['Objects/key.md', KEY]]);
+  prepareItemDescriptions(root, { migration: P });
+  assert.equal(stageItemDescriptionDraft(root, 'Objects/key.md', KEY_DRAFT, P).status, 'staged');
+  assert.equal(verifyItemDescriptionDrafts(root, ['Objects/key.md'], P).status, 'verified');
+});
+
+test('public knowledge: a changed title fails with head-changed', () => {
+  const root = publicCampaign([['Objects/key.md', KEY]]);
+  prepareItemDescriptions(root, { migration: P });
+  const result = stageItemDescriptionDraft(root, 'Objects/key.md', KEY_DRAFT.replace('# Key', '# Big key'), P);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.errors[0].code, 'head-changed');
+});
+
+test('public knowledge: dropping an old master line fails with master-notes-lost', () => {
+  const root = publicCampaign([['Objects/key.md', KEY]]);
+  prepareItemDescriptions(root, { migration: P });
+  const draft = KEY_DRAFT.replace('secret\n', 'other\n');
+  assert.equal(stageItemDescriptionDraft(root, 'Objects/key.md', draft, P).status, 'staged');
+  const result = verifyItemDescriptionDrafts(root, ['Objects/key.md'], P);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.errors[0].code, 'master-notes-lost');
+});
+
+test('public knowledge: an item type outside the list fails with still-needed', () => {
+  const root = publicCampaign([['Objects/key.md', KEY]]);
+  prepareItemDescriptions(root, { migration: P });
+  const draft = KEY_DRAFT.replace('item_type: key', 'item_type: sword');
+  assert.equal(stageItemDescriptionDraft(root, 'Objects/key.md', draft, P).status, 'staged');
+  const result = verifyItemDescriptionDrafts(root, ['Objects/key.md'], P);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.errors[0].code, 'still-needed');
+});
+
+test('public knowledge: an npc with a Synopsis first and text verifies', () => {
+  const root = publicCampaign([['Characters/marta.md', MARTA]]);
+  prepareItemDescriptions(root, { migration: P });
+  assert.equal(stageItemDescriptionDraft(root, 'Characters/marta.md', MARTA_DRAFT, P).status, 'staged');
+  assert.equal(verifyItemDescriptionDrafts(root, ['Characters/marta.md'], P).status, 'verified');
+});
+
+test('public knowledge: an empty Synopsis fails with synopsis-empty', () => {
+  const root = publicCampaign([['Characters/marta.md', MARTA]]);
+  prepareItemDescriptions(root, { migration: P });
+  assert.equal(stageItemDescriptionDraft(root, 'Characters/marta.md', MARTA_EMPTY, P).status, 'staged');
+  const result = verifyItemDescriptionDrafts(root, ['Characters/marta.md'], P);
+  assert.equal(result.status, 'failed');
+  assert.equal(result.errors[0].code, 'synopsis-empty');
+});
+
+test('public knowledge: completion waits for the verified draft and the migration completes with its complete step', () => {
+  const root = publicCampaign([['Objects/key.md', KEY]]);
+  assert.equal(completePublicKnowledge(root).status, 'pending');
+  prepareItemDescriptions(root, { migration: P });
+  assert.equal(stageItemDescriptionDraft(root, 'Objects/key.md', KEY_DRAFT, P).status, 'staged');
+  assert.equal(verifyItemDescriptionDrafts(root, ['Objects/key.md'], P).status, 'verified');
+  assert.equal(completeItemDescriptions(root, ['Objects/key.md'], P).status, 'pending');
+  fs.writeFileSync(path.join(root, 'Objects/key.md'), KEY_DRAFT);
+  assert.equal(completeItemDescriptions(root, ['Objects/key.md'], P).status, 'complete');
+  assert.equal(completePublicKnowledge(root).status, 'complete');
 });

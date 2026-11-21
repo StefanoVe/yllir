@@ -8,7 +8,9 @@
 //   world-region    fixture morvalle-seeded: the seed holds constraints; new villages and their
 //                   chiefs around the lake, and a fishermen's faction (checks W1 to W10)
 //   world-creature  fixture morvalle with system.adapter dnd-2024: one enemy sheet (C1 to C5)
-// Both cases: L-time and L-calls from case.yaml limits. With --judge, a distinct model grades
+//   world-item      fixture morvalle: a key whose real purpose the players do not know; its public part
+//                   stays clean and its master block holds the secret (I1 to I6)
+// All cases: L-time and L-calls from case.yaml limits. With --judge, a distinct model grades
 // the creative quality (Q-grid, quality_min).
 //
 // Usage: node testbench/runners/run-world-case.mjs <caseDir> [--runs N] [--model sonnet] [--agent claude]
@@ -52,6 +54,7 @@ import { loadAdapter } from '../../yllir/scripts/lib/adapter.mjs';
 import { validateSheet } from '../../yllir/scripts/lib/adapter-ops.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { foldForm } from '../../yllir/scripts/lib/fold.mjs';
+import { MASTER_MARKER, publicBody } from '../../yllir/scripts/lib/public-text.mjs';
 
 const USAGE =
   'usage: node testbench/runners/run-world-case.mjs <caseDir> [--runs N] [--model sonnet] [--agent claude] [--keep] [--delegation auto|always|never] [--judge] [--judge-model opus] [--setup-only] [--grade-only <dir> --run-json <file>]';
@@ -62,6 +65,7 @@ const VERSION_MESSAGE = 'Creata la campagna di prova';
 const CASE_KINDS = new Map([
   ['world-region', 'region'],
   ['world-creature', 'creature'],
+  ['world-item', 'item'],
 ]);
 const REQUIRED_KEYS = {
   region: [
@@ -75,6 +79,7 @@ const REQUIRED_KEYS = {
     'min_checkable_characters',
   ],
   creature: ['template', 'kind', 'location', 'abilities'],
+  item: ['kind', 'template', 'item_type', 'forbidden_public', 'secret_words'],
 };
 // The labels of the characteristics table, by language (the heading of the table under Statistics).
 const CHARACTERISTICS = { it: 'Caratteristiche', en: 'Characteristics' };
@@ -101,6 +106,13 @@ export function loadWorldCase(caseDir) {
   }
   for (const name of REQUIRED_KEYS[kind].filter((n) => n.startsWith('min_'))) {
     if (!Number.isInteger(key[name]) || key[name] < 0) throw new Error(`key.yaml: ${name} must be a whole number`);
+  }
+  if (kind === 'item') {
+    for (const name of ['forbidden_public', 'secret_words']) {
+      const list = key[name];
+      const valid = Array.isArray(list) && list.length > 0 && list.every((word) => typeof word === 'string' && word.trim() !== '');
+      if (!valid) throw new Error(`key.yaml: ${name} must be a list of non-empty words`);
+    }
   }
   return { ...data, kind, key, qualityMin, limits: parseLimits(data) };
 }
@@ -476,10 +488,89 @@ export async function gradeCreature({ key, adapterId, lang, baseline, after, dir
   return finish({ newSubjects: fresh.map((item) => item.id), newFiles: subject === null ? [] : [subject.file] });
 }
 
-/** Grades the copy after the run, for either case. Returns the graded result with the new files. */
+/** True when the folded text holds the folded word as a whole word (no letter or digit on either side). */
+export function containsWord(foldedText, foldedWord) {
+  if (foldedWord === '') return false;
+  const escaped = foldedWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(foldedText);
+}
+
+/** The master block of a campaign document: from the first master marker to the end, or '' when there is none. */
+function masterBlockOf(markdown) {
+  const index = markdown.indexOf(MASTER_MARKER);
+  return index < 0 ? '' : markdown.slice(index);
+}
+
+/**
+ * The item checks I1 to I6 (an item whose real purpose is hidden: the public part stays clean, the master
+ * block keeps the secret). The sheet is read from the copy; words are compared folded, as whole words.
+ * Returns the same shape as gradeRegion.
+ */
+export function gradeItem({ key, baseline, after, dir, versions, setupVersions }) {
+  const { record, finish } = checkBook();
+  const fresh = newSubjectsOf(after, baseline);
+  const subject = fresh.length === 1 ? fresh[0] : null;
+  let text = null;
+  if (subject !== null) {
+    try {
+      text = fs.readFileSync(path.join(dir, subject.file), 'utf8');
+    } catch {
+      text = null;
+    }
+  }
+  const missing = text === null ? ['no new document to check'] : null;
+
+  // I1: one new document, an item with the item template.
+  const i1 = [];
+  if (fresh.length !== 1) i1.push(`${fresh.length} new documents (want 1)`);
+  if (subject !== null) {
+    if (subject.kind !== key.kind) i1.push(`kind is ${subject.kind} (want ${key.kind})`);
+    const template = text === null ? null : parseFrontmatter(text).data?.template;
+    if (template !== key.template) i1.push(`template is ${JSON.stringify(template ?? null)} (want ${key.template})`);
+  }
+  record('I1', i1);
+
+  // I2: the public part holds none of the forbidden words.
+  const publicPart = text === null ? '' : publicBody(text);
+  const foldedPublic = foldForm(publicPart);
+  record(
+    'I2',
+    missing ?? key.forbidden_public.filter((word) => containsWord(foldedPublic, foldForm(word))).map((word) => `the public part contains «${word}»`),
+  );
+
+  // I3: the master block holds at least one of the secret words.
+  const master = text === null ? '' : masterBlockOf(text);
+  const foldedMaster = foldForm(master);
+  let i3 = missing;
+  if (i3 === null && master === '') i3 = ['no master block'];
+  if (i3 === null && !key.secret_words.some((word) => containsWord(foldedMaster, foldForm(word)))) {
+    i3 = [`the master block names none of ${key.secret_words.join(', ')}`];
+  }
+  record('I3', i3 ?? []);
+
+  // I4: the item type is the one the request asked for.
+  const itemType = text === null ? null : parseFrontmatter(text).data?.item_type;
+  record('I4', missing ?? (itemType === key.item_type ? [] : [`item_type is ${JSON.stringify(itemType ?? null)} (want ${key.item_type})`]));
+
+  // I5: the public part has no finding section (the place where it was found is part of the secret).
+  record(
+    'I5',
+    missing ?? (/^##[ \t]+(Ritrovamento|Finding)[ \t]*$/m.test(publicPart) ? ['the public part has a Ritrovamento / Finding section'] : []),
+  );
+
+  // I6: one saved version more than the setup.
+  record('I6', versions === setupVersions + 1 ? [] : [`${versions} saved versions (want ${setupVersions + 1})`]);
+
+  return finish({ newSubjects: fresh.map((item) => item.id), newFiles: subject === null ? [] : [subject.file] });
+}
+
+/** Grades the copy after the run, for any case. Returns the graded result with the new files. */
 async function gradeWorld({ caseData, dir, setup, report }) {
   const after = buildWorldIndex(dir);
   const versions = listVersions(dir).length;
+  if (caseData.kind === 'item') {
+    return gradeItem({ key: caseData.key, baseline: setup.baseline, after, dir, versions, setupVersions: setup.versions });
+  }
   if (caseData.kind === 'region') {
     return gradeRegion({
       key: caseData.key,

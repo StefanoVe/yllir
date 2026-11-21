@@ -30,6 +30,7 @@ Delimiters: line 1 of the file is exactly `<!-- yllir`; the block ends at the fi
 | `when` | **required for `kind: event`**, forbidden otherwise | a number, integer or decimal, may be negative | position on the world timeline; the calendar convention is in the seed |
 | `participants` | only for `kind: event` | flow list of subject ids | subjects taking part in the event |
 | `aliases` | optional | flow list of names | other names of the subject |
+| `item_type` | optional, only for `kind: item` with `template: item` | one of `book`, `weapon`, `armor`, `equipment`, `consumable`, `key`, `other` | picks the placeholder picture of the Codex when the item has no image. Every new item sheet has it |
 | `sketch` | optional | only `true` | marks a sketch (4.12) |
 | `depends_on` | plot sessions and events | flow list of ids; `[]` when none | prerequisites (section 2) |
 | `session`, `characters`, `items`, `appearances` | plot event files | see section 2 | |
@@ -66,6 +67,8 @@ Everything above the master block is public. Exports and the encyclopedia read o
 Testo riservato al master.
 <!-- /master -->
 ```
+
+The public part holds only what the players may know: what they can see, what anyone in the world would know, and what the master needs at the table without spoiling the story (statistics, stock, voice and manner). A purpose, a destination, a true nature or a link to the plot that the players have not learned goes only in the master block. Example: a key whose players do not know it opens the door of the final dungeon says, in public, only what the key looks like. When the players learn a secret in play, the sheet is not changed. The Codex (public encyclopedia) shows only the sections that each template in section 4 marks as **Codex**.
 
 - At most one block per file. Each marker stands alone on its line.
 - The first line of the block is `## Master`; only `###` or lower headings follow.
@@ -238,20 +241,24 @@ Sections are listed in their required order. Optional sections keep the order gi
 ### 4.1 Place (`kind: place`)
 
 - Category: nested folders under the places category.
+- Optional first section: `## Sinossi` (English: `## Synopsis`), one to three sentences for the players, with no spoiler (1.3). Every full document written by the framework has it. The Codex shows it.
 - Metadata block: `id`, `kind: place`, `provenance`, `location` (the containing place, `[]` for a top place). **No `template` field.**
 - Required: the title and `## Descrizione` (English: `## Description`), opening with an italic paragraph.
 - Optional, after the description: `## Abitanti` (English: `## Inhabitants`), `## Punti d'interesse` (English: `## Points of interest`); `## Da definire` (English: `## To define`), required when gaps remain.
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), optionally `### Agganci` (English: `### Hooks`).
+- Codex: `Sinossi`, and the battle map and the atlas plan of the place when they exist. The battle map is drawn from the public part only.
 
 **Not yet validated:** no script checks place sections yet.
 
 ### 4.2 Character (`template: npc`)
 
 - Category: `Personaggi/`. Metadata block: `id`, `kind: character`, `template: npc`, `provenance`, `location` (where it normally is).
+- Optional first section: `## Sinossi` (English: `## Synopsis`), one to three sentences for the players, with no spoiler (1.3). Every full document written by the framework has it. The Codex shows it.
 - Required: the title, `## Ruolo` (English: `## Role`), `## Aspetto e modi` (English: `## Appearance and manner`), `## Al tavolo` (English: `## At the table`) with voice, manner of speech and what the character wants, and `## Statistiche` (English: `## Statistics`) with the tables of 4.3 and at least one combat action, even for a character who does not seek a fight (a minimal profile, such as an unarmed strike).
 - Optional, in order: an image (portrait), before `## Ruolo`; `## Da definire` (English: `## To define`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), then any of `### Motivazioni` (English: `### Motives`), `### Segreti` (English: `### Secrets`), `### Agganci` (English: `### Hooks`).
 - Links to other subjects go in `relations`; the prose of `Ruolo` may describe them.
+- Codex: `Sinossi` only.
 
 Validated: the sections, their order, `location` as a list of place ids, the statistics tables.
 
@@ -290,21 +297,24 @@ Validated: the stock columns and order, and the required sections.
 ### 4.5 Enemy and creature (`template: enemy` or `creature`)
 
 - Category: `Creature/`. Metadata block: `id`, `kind: creature`, `template`, `provenance`, `location` (every place where it lives; `[]` when it wanders).
+- Optional first section: `## Sinossi` (English: `## Synopsis`), one to three sentences for the players, with no spoiler (1.3). Every full document written by the framework has it. The Codex shows it.
 - `enemy` fights; `creature` does not (animals, mounts).
 - Required: the title, `## Natura` (English: `## Nature`), public lore, and `## Statistiche` (English: `## Statistics`). An `enemy` has the tables (4.3), with at least one combat action. A `creature` writes in that section the sentence `Nessuna statistica: non combatte` (English: `No statistics: it does not fight`).
 - Optional, in order: an image; `## Bottino` (English: `## Loot`); `## Da definire` (English: `## To define`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`): conduct, tactics, when it flees.
+- Codex: `Sinossi` only.
 
 Validated: the sections and their order, the no-statistics sentence for `creature`, the statistics tables for `enemy`.
 
 ### 4.6 Item (`template: item`)
 
-- Category: `Oggetti/`. Metadata block: `id`, `kind: item`, `template: item`, `provenance`, `location` (where it is now).
+- Category: `Oggetti/`. Metadata block: `id`, `kind: item`, `template: item`, `item_type`, `provenance`, `location` (where it is now).
 - Required, in order: the title; `## In breve` (English: `## In brief`), a public summary of the item as the players know it; `## Descrizione` (English: `## Description`); `## Effetti` (English: `## Effects`), with only the effects known to the players, in the adapter's format, or the sentence `Nessun effetto di gioco` (English: `No game effect`) when no effect is known to the players.
-- Optional, in order after Effects: `## Origine` (English: `## Origin`); `## Ritrovamento` (English: `## Finding`); `## Testo` (English: `## Text`), full text of a letter or book, ordinary prose; `## Valore` (English: `## Value`).
-- Master block: `### Indicazioni per il master` (English: `### Master notes`), with the full context of the item: what it really is, its true origin, its complete real effects, its secrets, its plot uses, and what the players do not know yet. Public sections never state or hint at these.
+- Optional, in order after Effects: `## Origine` (English: `## Origin`); `## Testo` (English: `## Text`), full text of a letter or book, ordinary prose; `## Valore` (English: `## Value`).
+- Master block: `### Indicazioni per il master` (English: `### Master notes`), with the full context of the item: what it really is, its true origin, its complete real effects, its secrets, its plot uses, and what the players do not know yet, and where and how the party can find it (this was the public section `Ritrovamento` before). Public sections never state or hint at these.
+- Codex: `In breve`, `Descrizione`, `Effetti`, `Testo`.
 
-Validated: exactly one public level-1 title; `In breve`, `Descrizione`, `Effetti` in this order and non-empty; optional sections in order without duplicates; master block.
+Validated: exactly one public level-1 title; `In breve`, `Descrizione`, `Effetti` in this order and non-empty; optional sections in order without duplicates; master block. An old `## Ritrovamento` section is still accepted; the update moves it into the master block.
 
 ### 4.7 Notice (`template: notice`)
 
@@ -312,30 +322,37 @@ Validated: exactly one public level-1 title; `In breve`, `Descrizione`, `Effetti
 - Required, in order: the title; `## Testo` (English: `## Text`), the text as posted; `## Premio` (English: `## Reward`), written as `<number> <currency>` in a currency of the economy document (4.11), for example `10 scudi`, or `Nessun premio` (English: `No reward`).
 - Optional: `## Indizi` (English: `## Clues`) after the title's image.
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), with the real client and hidden conditions.
+- Codex: `Testo`, `Premio`.
 
 **Not yet validated:** the item check skips notices.
 
 ### 4.8 Faction (`template: faction`)
 
 - Category: `Fazioni/`. Metadata block: `id`, `kind: faction`, `template: faction`, `provenance`, `location` (its seat; `[]` when none).
+- Optional first section: `## Sinossi` (English: `## Synopsis`), one to three sentences for the players, with no spoiler (1.3). Every full document written by the framework has it. The Codex shows it.
 - Required: the title and `## Chi sono` (English: `## Who they are`), what characters can know.
 - Optional, in order: an image; `## Obiettivi` (English: `## Goals`); `## Membri` (English: `## Members`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), `### Segreti` (English: `### Secrets`), `### Agganci` (English: `### Hooks`).
 - A member points to the faction with a `member-of` entry in its own `relations`.
+- Codex: `Sinossi` only.
 
 **Not yet validated:** no script checks faction sections yet.
 
 ### 4.9 Historical event (`kind: event`, `template: event`)
 
 - Category: `Storia/`. Not a plot event: no `depends_on`, not in `Trama/`. Metadata block: `id`, `kind: event`, `template: event`, `provenance`, `when` (required), optional `participants` and `location` (lists).
+- Optional first section: `## Sinossi` (English: `## Synopsis`), one to three sentences for the players, with no spoiler (1.3). Every full document written by the framework has it. The Codex shows it.
 - Required: the title and `## Accaduto` (English: `## What happened`), prose in the past tense. Optional: `## Conseguenze` (English: `## Consequences`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`).
+- Codex: `Sinossi` only.
 
 Validated by the world graph: `when` is a number, `participants` and `location` are lists, the timeline rules. **Not yet validated:** the sections.
 
 ### 4.10 Concept of history (`free`)
 
 - Category: `Storia/`. Metadata block: `id`, `kind`, `provenance`. Required: the title and `## Definizione` (English: `## Definition`). Optional: `## Come appare` (English: `## How it appears`), `## Da definire`. Master block: `### Indicazioni per il master`.
+- Optional first section: `## Sinossi` (English: `## Synopsis`), one to three sentences for the players, with no spoiler (1.3). Every full document written by the framework has it. The Codex shows it.
+- Codex: `Sinossi` only.
 
 ### 4.11 Economy document
 
@@ -402,6 +419,7 @@ I prezzi vengono dal regno; le corone sono monete del nord.
 - Content: the title and one sentence under the first required section of its template. The other sections are not written yet.
 - Validated: the title and the first required section only. A sketch has no statistics.
 - When the master names a sketch, or a session uses it, it is expanded into a full document.
+- A sketch has no `Sinossi` yet; it gets one when it is expanded.
 
 ### 4.13 Player character (`master-only`)
 

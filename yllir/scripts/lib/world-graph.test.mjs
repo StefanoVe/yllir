@@ -126,6 +126,7 @@ test('a subject entry carries the metadata of its document', (t) => {
     provenance: 'generated',
     sketch: false,
     status: 'alive',
+    itemType: null,
     ended: null,
     when: null,
     location: ['borgo-cenere'],
@@ -378,4 +379,36 @@ test('a free document with kind event but no when is still an error', (t) => {
     'Storia/caduta.md': doc(['id: caduta', 'kind: event', 'provenance: master'], 'La caduta'),
   });
   assert.ok(codesOf(buildWorldIndex(root)).includes('missing-when'));
+});
+
+test('an item with a valid item_type gives no error and keeps the type', (t) => {
+  const root = makeCampaign(t, {
+    'Oggetti/chiave.md': doc(['id: chiave-ferro', 'kind: item', 'provenance: master', 'item_type: key'], 'Chiave di ferro'),
+  });
+  const index = buildWorldIndex(root);
+  assert.deepEqual(index.errors, []);
+  assert.equal(index.subjects.find((subject) => subject.id === 'chiave-ferro').itemType, 'key');
+});
+
+test('an item with an item_type outside the list is bad-item-type', (t) => {
+  const root = makeCampaign(t, {
+    'Oggetti/spada.md': doc(['id: spada', 'kind: item', 'provenance: master', 'item_type: sword'], 'Spada'),
+  });
+  const index = buildWorldIndex(root);
+  assert.ok(codesOf(index).includes('bad-item-type'));
+  assert.equal(index.subjects.find((subject) => subject.id === 'spada').itemType, null);
+});
+
+test('item_type on a character is item-type-not-item', (t) => {
+  const root = makeCampaign(t, {
+    'Personaggi/anonimo.md': doc(['id: anonimo', 'kind: character', 'provenance: master', 'item_type: book'], 'Anonimo'),
+  });
+  assert.ok(codesOf(buildWorldIndex(root)).includes('item-type-not-item'));
+});
+
+test('an item without item_type gives no item-type error', (t) => {
+  const index = buildWorldIndex(makeCampaign(t));
+  assert.equal(codesOf(index).includes('bad-item-type'), false);
+  assert.equal(codesOf(index).includes('item-type-not-item'), false);
+  assert.equal(index.subjects.find((subject) => subject.id === 'lanterna-di-morvalle').itemType, null);
 });

@@ -1,0 +1,8 @@
+case: world-item
+fixture: morvalle
+prompt: |
+  Crea una chiave di ferro che il gruppo troverà nella Torre dell'Ascia. In realtà apre la porta del sotterraneo dove aspetta il boss finale, ma i giocatori non lo sanno.
+limits:
+  max_minutes: 3
+  max_tool_calls: 60
+quality_min: 3.5

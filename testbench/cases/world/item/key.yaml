@@ -1,0 +1,13 @@
+# Answer key of world/item. Never copied next to the campaign the agent works on.
+#
+# I1 exactly one new document, kind item with template item.
+# I2 the public part (before <!-- master -->) contains none of the forbidden words (folded match).
+# I3 the master block contains at least one of the secret words (folded match).
+# I4 item_type is key.
+# I5 the public part has no Ritrovamento / Finding section.
+# I6 the saved versions are the setup's version plus one.
+kind: item
+template: item
+item_type: key
+forbidden_public: [sotterraneo, boss]
+secret_words: [sotterraneo, boss]

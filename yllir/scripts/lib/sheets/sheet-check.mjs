@@ -22,11 +22,12 @@ import {
 // `required` the subset that must be present and have text.
 const MODELS = {
   npc: {
-    order: ['role', 'appearance', 'table', 'statistics', 'stock', 'todefine'],
+    order: ['synopsis', 'role', 'appearance', 'table', 'statistics', 'stock', 'todefine'],
     required: ['role', 'appearance', 'table', 'statistics'],
   },
   vendor: {
     order: [
+      'synopsis',
       'role',
       'appearance',
       'table',
@@ -39,11 +40,11 @@ const MODELS = {
     required: ['role', 'appearance', 'table', 'statistics', 'stock'],
   },
   enemy: {
-    order: ['nature', 'statistics', 'loot', 'todefine'],
+    order: ['synopsis', 'nature', 'statistics', 'loot', 'todefine'],
     required: ['nature', 'statistics'],
   },
   creature: {
-    order: ['nature', 'statistics', 'loot', 'todefine'],
+    order: ['synopsis', 'nature', 'statistics', 'loot', 'todefine'],
     required: ['nature', 'statistics'],
   },
 };
@@ -53,6 +54,7 @@ const SHEET_TEMPLATES = new Set(Object.keys(MODELS));
 // Section names per campaign language. Other languages skip the section checks.
 const HEADINGS = {
   it: {
+    synopsis: 'Sinossi',
     role: 'Ruolo',
     appearance: 'Aspetto e modi',
     table: 'Al tavolo',
@@ -65,6 +67,7 @@ const HEADINGS = {
     todefine: 'Da definire',
   },
   en: {
+    synopsis: 'Synopsis',
     role: 'Role',
     appearance: 'Appearance and manner',
     table: 'At the table',

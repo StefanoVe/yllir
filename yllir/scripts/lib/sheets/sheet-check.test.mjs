@@ -793,3 +793,61 @@ test('creature: a sheet without combat actions is not asked for an action', () =
     assert.deepEqual(checkSheets(root).errors, []);
   });
 });
+
+test('npc: an optional Sinossi section before Ruolo passes', () => {
+  const body = IT_BODY.replace('## Ruolo\n', '## Sinossi\n\nLa fabbra del borgo.\n\n## Ruolo\n');
+  assert.notEqual(body, IT_BODY);
+  withCampaign({ 'Personaggi/Oria Valdes.md': sheet({ body }) }, (root) => {
+    assert.deepEqual(checkSheets(root).errors, []);
+  });
+});
+
+test('npc: a Sinossi section after Ruolo is section-order', () => {
+  const body = IT_BODY.replace('## Aspetto e modi\n', '## Sinossi\n\nLa fabbra del borgo.\n\n## Aspetto e modi\n');
+  assert.notEqual(body, IT_BODY);
+  withCampaign({ 'Personaggi/Oria Valdes.md': sheet({ body }) }, (root) => {
+    assert.deepEqual(codesOf(checkSheets(root)), ['section-order']);
+  });
+});
+
+test('npc: a sheet without Sinossi still passes', () => {
+  withCampaign({ 'Personaggi/Oria Valdes.md': sheet({ body: IT_BODY }) }, (root) => {
+    assert.deepEqual(checkSheets(root).errors, []);
+  });
+});
+
+test('enemy: an English Synopsis section first passes', () => {
+  const body = [
+    '# Wolf',
+    '',
+    '## Synopsis',
+    '',
+    'A grey hunter of the hills.',
+    '',
+    '## Nature',
+    '',
+    'A grey hunter.',
+    '',
+    '## Statistics',
+    '',
+    '### Characteristics',
+    '',
+    '| Characteristic | Value |',
+    '| --- | --- |',
+    '| AC | 12 |',
+    '',
+    '### Attacks and abilities',
+    '',
+    '| Attack or ability | Details |',
+    '| --- | --- |',
+    '| Bite | Hits: 1d6 + 1 piercing damage. |',
+    '',
+  ].join('\n');
+  withCampaign(
+    { 'Creature/Wolf.md': sheet({ id: 'wolf', template: 'enemy', body }) },
+    (root) => {
+      assert.deepEqual(checkSheets(root).errors, []);
+    },
+    'en',
+  );
+});

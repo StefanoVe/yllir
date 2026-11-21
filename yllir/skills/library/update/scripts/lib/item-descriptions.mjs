@@ -1,18 +1,24 @@
 // Resumable inventory and verification for the semantic item migrations.
 // The model writes drafts; scripts only inventory, protect source hashes and verify scope.
-// Two profiles share this machinery: item-descriptions-v1 (public descriptions only) and
-// item-knowledge-v1 (public and master-only knowledge split, title frozen, master notes kept).
+// Three profiles share this machinery: item-descriptions-v1 (public descriptions only),
+// item-knowledge-v1 (public and master-only knowledge split, title frozen, master notes kept) and
+// public-knowledge-v1 (the public part of any sheet holds only what the players may know).
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { readStructure, listSheets } from '../../../../../scripts/lib/subjects.mjs';
 import { parseFrontmatter, toCommentMetadata } from '../../../../../scripts/lib/frontmatter.mjs';
+import { ITEM_TYPES } from '../../../../../scripts/lib/world-graph.mjs';
 
 const DRAFT = '.campaign/state/write/draft';
 const DEFAULT = 'item-descriptions-v1';
+const isItemSheet = (text, data) => data?.template === 'item';
+// Each profile: the category types it scans, the sheets it inventories (select), the test of a finished
+// sheet (done), and the scope checks of a draft (stageError, verifyError).
 const PROFILES = {
-  'item-descriptions-v1': { state: '.campaign/state/update/item-descriptions.json', stageError: descriptionsStageError, verifyError: descriptionsVerifyError },
-  'item-knowledge-v1': { state: '.campaign/state/update/item-knowledge.json', stageError: knowledgeStageError, verifyError: knowledgeVerifyError },
+  'item-descriptions-v1': { state: '.campaign/state/update/item-descriptions.json', types: ['objects'], select: isItemSheet, done: hasBriefAndDescription, stageError: descriptionsStageError, verifyError: descriptionsVerifyError },
+  'item-knowledge-v1': { state: '.campaign/state/update/item-knowledge.json', types: ['objects'], select: isItemSheet, done: hasBriefAndDescription, stageError: knowledgeStageError, verifyError: knowledgeVerifyError },
+  'public-knowledge-v1': { state: '.campaign/state/update/public-knowledge.json', types: ['places', 'subjects', 'objects', 'free'], select: needsPublicKnowledge, done: publicKnowledgeDone, stageError: publicKnowledgeStageError, verifyError: publicKnowledgeVerifyError },
 };
 const hash = (s) => createHash('sha256').update(s).digest('hex');
 // Source fingerprint: the same for both metadata forms, so converting the block is not an edit.
@@ -37,15 +43,15 @@ export function prepareItemDescriptions(root, { persist = true, migration = DEFA
   root = path.resolve(root);
   const { structure, errors } = readStructure(root);
   if (!structure) return { status: 'failed', items: [], errors };
-  const items = [], seen = new Set();
-  for (const category of structure.filter((c) => c.type === 'objects')) for (const file of listSheets(root, category.folder)) {
+  const p = profile(migration), items = [], seen = new Set();
+  for (const category of structure.filter((c) => p.types.includes(c.type))) for (const file of listSheets(root, category.folder)) {
     if (seen.has(file)) continue;
     seen.add(file);
     try {
       const full = path.join(root, file);
       if (fs.lstatSync(full).isSymbolicLink()) continue;
       const text = fs.readFileSync(full, 'utf8');
-      if (parseFrontmatter(text).data?.template !== 'item') continue;
+      if (!p.select(text, parseFrontmatter(text).data)) continue;
       items.push({ file, source: sourceHash(text), status: 'pending', legacy: legacyHash(text) });
     } catch (e) { errors.push({ file, message: e.message }); }
   }
@@ -58,7 +64,7 @@ export function prepareItemDescriptions(root, { persist = true, migration = DEFA
     if (old?.status === 'complete' && old.source === item.source) return { ...old };
     if (old?.status === 'complete' && old.source !== item.source) {
       const text = fs.readFileSync(path.join(root, item.file), 'utf8');
-      return hasBriefAndDescription(text) ? { ...old, source: item.source } : item;
+      return p.done(text) ? { ...old, source: item.source } : item;
     }
     if (old?.status === 'changed' && old.source !== item.source) return { ...old, current_source: item.source };
     if (old?.source && old.source !== item.source) return { ...old, status: 'changed', current_source: item.source };
@@ -130,7 +136,7 @@ export function completeItemDescriptions(root, files = [], migration = DEFAULT) 
     if (!fs.existsSync(full)) return { status: 'pending', errors: [{ code: 'unverified-publication', file }] };
     const text = fs.readFileSync(full, 'utf8');
     const item = state.items.find((x) => x.file === file);
-    if (!item?.draft_verified || !item.draft || hash(text) !== item.draft || !hasBriefAndDescription(text)) return { status: 'pending', errors: [{ code: 'unverified-publication', file }] };
+    if (!item?.draft_verified || !item.draft || hash(text) !== item.draft || !profile(migration).done(text)) return { status: 'pending', errors: [{ code: 'unverified-publication', file }] };
     item.source = sourceHash(text); item.status = 'complete';
   }
   writeState(root, state, migration);
@@ -144,7 +150,7 @@ export function acceptUnchangedItem(root, file, reason, migration = DEFAULT) {
   const state = readState(root, migration), item = state.items.find((entry) => entry.file === file);
   if (!item || item.status !== 'pending' || typeof reason !== 'string' || reason.trim().length < 12) return { status: 'failed', errors: [{ code: 'invalid-unchanged-review', file }] };
   const source = fs.readFileSync(path.join(root, file), 'utf8');
-  if (sourceHash(source) !== item.source || !hasBriefAndDescription(source)) return { status: 'failed', errors: [{ code: 'source-changed-or-incomplete', file }] };
+  if (sourceHash(source) !== item.source || !profile(migration).done(source)) return { status: 'failed', errors: [{ code: 'source-changed-or-incomplete', file }] };
   item.draft = hash(source); item.draft_verified = true; item.semantic_review = 'accepted-unchanged'; item.review_reason = reason.trim();
   writeState(root, state, migration);
   return { status: 'reviewed-unchanged', file, source: item.source };
@@ -207,6 +213,44 @@ function hasSingleMasterBlockAtEnd(text) {
   return text.slice(text.indexOf(close) + close.length).trim() === '';
 }
 function lines(text) { return text.split('\n').map((line) => line.trim()).filter(Boolean); }
+
+// public-knowledge-v1: the public part of a sheet (everything before its master block) holds only what
+// the players may know. The item rule and the non-item rule (a Synopsis first) are checked here.
+const PUBLIC_KINDS = new Set(['place', 'character', 'creature', 'faction', 'event']);
+const SYNOPSIS_HEADINGS = ['## Sinossi', '## Synopsis'];
+/** The text the players may read: everything before the master block, or the whole text without one. */
+function publicPart(text) { return text.split('<!-- master -->')[0]; }
+/** True when the sheet still needs the public-knowledge pass. */
+function needsPublicKnowledge(text, data) {
+  if (data?.template === 'item') return /^## (?:Ritrovamento|Finding)\s*$/m.test(publicPart(text)) || !ITEM_TYPES.includes(data.item_type);
+  if (data?.template === 'notice' || !data?.kind || data.sketch === 'true') return false;
+  if (!PUBLIC_KINDS.has(data.kind)) return false;
+  const first = publicPart(text).split('\n').find((line) => line.startsWith('## '));
+  return first !== undefined && !SYNOPSIS_HEADINGS.includes(first.trimEnd());
+}
+/** The text of the Sinossi/Synopsis section, trimmed; empty when there is no such section. */
+function synopsisText(text) {
+  return /^## (?:Sinossi|Synopsis)[ \t]*\n([\s\S]*?)(?=^## |^<!-- master -->|$(?![\s\S]))/im.exec(text)?.[1].trim() ?? '';
+}
+function publicKnowledgeDone(text) {
+  const data = parseFrontmatter(text).data;
+  return !needsPublicKnowledge(text, data) && (data?.template === 'item' || synopsisText(text) !== '');
+}
+/** head() without the item_type line that this migration adds, so adding it is not a title change. */
+function headWithoutItemType(text) { return head(text).replace(/^item_type:.*\n?/gm, ''); }
+function publicKnowledgeStageError(before, after) {
+  return headWithoutItemType(before) !== headWithoutItemType(after) ? 'head-changed' : null;
+}
+function publicKnowledgeVerifyError(before, after) {
+  if (publicKnowledgeStageError(before, after)) return 'head-changed';
+  if (!hasSingleMasterBlockAtEnd(after)) return 'master-block-invalid';
+  const oldLines = lines(containsReserved(before)), newLines = new Set(lines(containsReserved(after)));
+  if (oldLines.some((line) => !newLines.has(line))) return 'master-notes-lost';
+  const data = parseFrontmatter(after).data;
+  if (needsPublicKnowledge(after, data)) return 'still-needed';
+  if (data?.template !== 'item' && synopsisText(after) === '') return 'synopsis-empty';
+  return null;
+}
 
 function readState(root, migration = DEFAULT) {
   try { return JSON.parse(fs.readFileSync(path.join(root, profile(migration).state), 'utf8')); } catch { return { items: [] }; }

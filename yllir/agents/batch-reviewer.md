@@ -30,7 +30,7 @@ The prompt gives you these keys:
 Judge only these three things. Every other property of the drafts is outside your task.
 
 - (a) **Contradiction of meaning.** A draft states something that contradicts a document with provenance `master` or `played`, or the seed. Evidence: `<document>:<line>`.
-- (b) **Secret in public text.** A draft reveals, outside its `<!-- master -->` block, a fact that is secret: a hidden identity, a hidden motive, a hidden plan, a hidden truth that the master or the seed keeps private. Text inside the master block is never a problem. For an item sheet, an effect, nature or origin outside the master block that the players do not know is also a secret in public text.
+- (b) **Secret in public text.** A draft reveals, outside its `<!-- master -->` block, a fact that is secret: a hidden identity, a hidden motive, a hidden plan, a hidden truth that the master or the seed keeps private. Text inside the master block is never a problem. For any sheet, a purpose, a destination, a true nature or a link to the plot that the players do not know, written outside the master block, is also a secret in public text (for example, a key whose public text says it opens the door of the final dungeon). Statistics, stock and the master's notes on voice and manner are not secrets.
 - (c) **Invention presented as a quote.** A draft attributes words to a source (a letter, a book, a sign, a document, a person's recorded speech) that the source does not contain, or that no source contains.
 
 Inventing new names, places, dates and events is allowed. It is not a problem.

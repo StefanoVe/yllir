@@ -12,6 +12,7 @@ import { analyzeMarkdown } from './zones.mjs';
 export const KINDS = ['place', 'character', 'creature', 'item', 'faction', 'event'];
 export const PROVENANCES = ['master', 'played', 'generated'];
 export const STATUSES = ['alive', 'dead', 'missing', 'active', 'destroyed', 'unknown'];
+export const ITEM_TYPES = ['book', 'weapon', 'armor', 'equipment', 'consumable', 'key', 'other'];
 export const RELATION_TYPES = ['member-of', 'kin-of', 'ally-of', 'rival-of', 'depends-on'];
 
 const INDEXED_TYPES = new Set(['places', 'subjects', 'objects', 'free', 'plot', 'chronicle']);
@@ -233,6 +234,16 @@ function readDocument(file, text, category, seenIds, errors) {
     if (status === null) report('bad-status', `status must be one of ${STATUSES.join(', ')}`);
   }
 
+  let itemType = null;
+  if (fields.item_type !== undefined) {
+    if (kind !== 'item') {
+      report('item-type-not-item', 'item_type is allowed only for kind item');
+    } else {
+      itemType = choice(fields.item_type, ITEM_TYPES);
+      if (itemType === null) report('bad-item-type', `item_type must be one of ${ITEM_TYPES.join(', ')}`);
+    }
+  }
+
   let ended = null;
   if (fields.ended !== undefined) {
     const value = parseNumber(fields.ended);
@@ -326,6 +337,7 @@ function readDocument(file, text, category, seenIds, errors) {
       provenance,
       sketch,
       status,
+      itemType,
       ended,
       when,
       location,

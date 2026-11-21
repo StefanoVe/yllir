@@ -79,6 +79,9 @@ Rules:
 - Write full names and no rhetorical tics in spoken or player text, as section 1.12 of the content format reference says.
 - The main file of a plot session (`<Plot folder>/<Session>/<Session>.md`) is derived. The engine regenerates it from the event files at each commit. Never draft it.
 - Plot events and their scenes are written by the process skills, which follow these same engine rules.
+- `item_type`: for `template: item` only, one of `book`, `weapon`, `armor`, `equipment`, `consumable`, `key`, `other`. Always set it on a new item.
+- Every full document except items and notices opens with `## Sinossi` (English: `## Synopsis`): one to three sentences for the players, with no spoiler. A sketch has none until it is expanded.
+- The public part holds only what the players may know (content format reference, 1.3). A purpose, a destination, a true nature or a link to the plot that the players have not learned goes in the master block. Where and how the party finds an item goes in the master block too, never in a public section.
 
 ## 5. Outline line
 
