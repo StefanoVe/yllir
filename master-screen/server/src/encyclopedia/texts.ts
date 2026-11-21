@@ -1,4 +1,4 @@
-// Plain-language sentences of the encyclopedia and print routes, in it and en.
+// Plain-language sentences of the encyclopedia routes, in it and en.
 // Owner: master-screen server. No paths, no code words.
 import type { Lang } from '../chat/text.js';
 

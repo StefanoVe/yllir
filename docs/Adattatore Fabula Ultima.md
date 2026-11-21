@@ -92,7 +92,7 @@ Casi di prova già disponibili dalle fonti (scheda compilata di Cross, livello 5
 
 - **Personaggio giocante:** nome, pronomi, identità, tema, origine, attributi a taglia di dado, status, affinità ai tipi di danno (assorbe, immune, resiste, vulnerabile), equipaggiamento, legami, abilità eroiche, punti (PF, PX, PV, PM, PI), zenit.
 - **PNG:** livello, specie, grado, tratti, attributi, affinità, attacchi base, abilità, incantesimi, PU se cattivo.
-- **Oggetto:** costo in zenit, categoria, qualità. La carta stampabile contiene solo titolo e descrizione, come in D&D.
+- **Oggetto:** costo in zenit, categoria, qualità.
 - **Orologio e legame:** voci di campagna, non schede (da decidere).
 
 ## Cosa non va nel manifest

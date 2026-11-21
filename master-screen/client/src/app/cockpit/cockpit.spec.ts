@@ -93,7 +93,7 @@ describe('Cockpit (live table)', () => {
       providers: [
         provideRouter([]),
         { provide: SettingsService, useValue: fakeSettingsService() },
-        { provide: StatusService, useValue: { modules: () => ({ music: false, print: false, encyclopedia: false }) } },
+        { provide: StatusService, useValue: { modules: () => ({ music: false, encyclopedia: false }) } },
         { provide: MusicPlayerService, useValue: { current: () => null, toggle() {}, playTrack() {} } },
         { provide: MusicApiService, useValue: { tracks: async () => ({ enabled: false, tracks: [] }) } },
       ],

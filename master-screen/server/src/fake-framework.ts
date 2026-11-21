@@ -1,4 +1,4 @@
-// Test helper: a fake framework folder whose two CLIs (encyclopedia.mjs and print.mjs) record
+// Test helper: a fake framework folder whose CLI (encyclopedia.mjs) records
 // every call and print a canned answer per command. The campaign.yaml reader (yaml-lite) is the
 // real one. Used only by *.test.ts files.
 import fs from 'node:fs/promises';
@@ -10,7 +10,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 const REAL_YAML_LITE = fileURLToPath(new URL('../../../yllir/scripts/lib/yaml-lite.mjs', import.meta.url));
 
 export const FAKE_ENCYCLOPEDIA_CLI = 'skills/library/encyclopedia/scripts/encyclopedia.mjs';
-export const FAKE_PRINT_CLI = 'skills/library/print/scripts/print.mjs';
 
 export interface CannedAnswer {
   code?: number;
@@ -60,7 +59,7 @@ export async function makeFakeFramework(): Promise<FakeFramework> {
   const yamlLite = path.join(root, 'scripts', 'lib', 'yaml-lite.mjs');
   await fs.mkdir(path.dirname(yamlLite), { recursive: true });
   await fs.writeFile(yamlLite, `export * from ${JSON.stringify(pathToFileURL(REAL_YAML_LITE).href)};\n`, 'utf8');
-  for (const rel of [FAKE_ENCYCLOPEDIA_CLI, FAKE_PRINT_CLI]) {
+  for (const rel of [FAKE_ENCYCLOPEDIA_CLI]) {
     const file = path.join(root, rel);
     await fs.mkdir(path.dirname(file), { recursive: true });
     await fs.writeFile(file, source, 'utf8');

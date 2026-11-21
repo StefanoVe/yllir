@@ -48,7 +48,7 @@ Il framework è diviso in tre strati. Ogni strato ha responsabilità precise. Lo
 
 Le operazioni che nel progetto precedente erano skill di libreria sono diventate librerie di script usate dal motore o dal core: collegamenti (`scripts/lib/links/`), mappa della trama (`scripts/lib/plot/`), schede (`scripts/lib/sheets/`), oggetti (`scripts/lib/items/`). Sono superate come skill separate la ricerca nel canone, che l'autore fa con il motore e la lettura dei documenti, e la gestione dei personaggi (**Implementato in 0.30.0**; Riprogettazione, sezione 9).
 
-Le altre skill di libreria del progetto precedente (intrecci dei personaggi, artwork, carte, stampa, mappe, tracker degli scontri, musica, bilanciamento degli incontri, economia, dottore della campagna, registro della partita, manutenzione della continuità) non sono realizzate in 0.30.0 e la Riprogettazione non le cita. Restano **Proposta** da riesaminare dopo la Riprogettazione.
+Le altre skill di libreria del progetto precedente (intrecci dei personaggi, artwork, mappe, tracker degli scontri, musica, bilanciamento degli incontri, economia, dottore della campagna, registro della partita, manutenzione della continuità) non sono realizzate in 0.30.0 e la Riprogettazione non le cita. Restano **Proposta** da riesaminare dopo la Riprogettazione.
 
 **Regole.** Le regole seguenti sono **Proposta**.
 
@@ -62,8 +62,8 @@ Le altre skill di libreria del progetto precedente (intrecci dei personaggi, art
 **Responsabilità.** Parti del framework attivate dalla configurazione della campagna. Sono di tre tipi:
 
 - **Adattatori di sistema di gioco.** **Deciso** per l'idea che l'adattatore sia uno schema (Riprogettazione, sezione 7). **Implementato in 0.30.0** per D&D 2024 (`modules/systems/dnd-2024/`, con `adapter.yaml` e `checks.mjs`). Il sistema descrive la forma delle schede, la scala delle difficoltà, le risorse e le condizioni; non contiene le tabelle delle regole (Riprogettazione, decisione 10). Un modello generico per i giochi narrativi è **Proposta** (vedi [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md)).
-- **Profili di stile.** Indicazioni visive per artwork, carte e mappe. **Proposta**: non realizzati in 0.30.0.
-- **Moduli di output.** Stampa, enciclopedia pubblica, strumento grafico del master, ricerca musicale. **Proposta**: non realizzati in 0.30.0.
+- **Profili di stile.** Indicazioni visive per artwork e mappe. **Proposta**: non realizzati in 0.30.0.
+- **Moduli di output.** Enciclopedia pubblica, strumento grafico del master, ricerca musicale. **Proposta**: non realizzati in 0.30.0.
 
 **Regole.** Le regole seguenti sono **Proposta**.
 
@@ -85,7 +85,7 @@ La tabella riassume chi può chiamare chi. Le righe del motore e dell'autore son
 | Revisore di lotto | Solo lettura dei file forniti (bozze, canone, seme, piano geografico) | Scrittura, domande dirette al master | Nulla: restituisce un esito, che l'autore registra per il motore |
 | Skill di libreria | Altre skill dichiarate, script | Il core, i moduli | I soli contenuti dichiarati |
 | Moduli di sistema e di stile | Solo le interfacce del core e le operazioni dichiarate | Altri moduli direttamente, la libreria | Il solo stato del proprio modulo |
-| Moduli di output | Lettura della sola parte pubblica dei contenuti | Scrittura nei contenuti del canone | Solo la propria uscita (enciclopedia e stampa in `.campaign/cache/encyclopedia/` e `.campaign/cache/print/`, **Deciso** 2026-11-12; altre uscite in `Uscite/`, **Proposta**) |
+| Moduli di output | Lettura della sola parte pubblica dei contenuti | Scrittura nei contenuti del canone | Solo la propria uscita (enciclopedia in `.campaign/cache/encyclopedia/`, **Deciso** 2026-11-12; altre uscite in `Uscite/`, **Proposta**) |
 
 Due regole trasversali:
 
@@ -179,7 +179,7 @@ mia-campagna/
   Giocatori/                     Proposta: personaggi giocanti, tutto riservato al master
   Fonti/                         Originali acquisiti (foto, PDF, scansioni)
   Appunti/                       Proposta: spunti e bozze fuori dal canone
-  Uscite/                        Proposta: ciò che si rigenera e non è ancora deciso, per esempio le viste per luogo (enciclopedia e fogli di stampa stanno in .campaign/cache/, Deciso 2026-11-12)
+  Uscite/                        Proposta: ciò che si rigenera e non è ancora deciso, per esempio le viste per luogo (l'enciclopedia sta in .campaign/cache/, Deciso 2026-11-12)
 ```
 
 Note sulla struttura:
@@ -207,7 +207,7 @@ Ripetere le stesse aree in più categorie, con lo stesso nome da mantenere allin
 |---|---|---|
 | Nome di un soggetto | Il titolo `#` della scheda | Nome del file, voci dell'enciclopedia, testo dei link |
 | Forme alternative del nome | `aliases` nei metadati | Indice dei soggetti (`.campaign/cache/subjects.json`), che non si scrive a mano |
-| Identità stabile | `id` nei metadati in testa alla scheda | Route dell'enciclopedia, `<base_url>/e/<id>/` (**Deciso** 2026-11-12); QR delle carte (**Proposta**) |
+| Identità stabile | `id` nei metadati in testa alla scheda | Route dell'enciclopedia, `<base_url>/e/<id>/` (**Deciso** 2026-11-12) |
 | Tipo di soggetto | `kind` nei metadati (**Implementato in 0.30.0**) | Regole di creazione, controlli del grafo, indice del mondo |
 | Modello della scheda (solo per le categorie con più modelli) | `template` nei metadati | Validazione della forma della scheda |
 | Relazione fra soggetti | `relations`, con il tipo (appartenenza, parentela, alleanza, rivalità, dipendenza) | Indice del mondo, pacchetto di contesto |
@@ -223,19 +223,18 @@ Ripetere le stesse aree in più categorie, con lo stesso nome da mantenere allin
 | Stato attuale di un soggetto dopo il gioco | La scheda, aggiornata dal processo `after-session`, che applica i fatti dichiarati dal master (**Implementato in 0.30.0**) | — |
 | Documento del mondo | Il seme, nominato in `campaign.seed` | Contesto di ogni scrittura |
 | Parte riservata | Il blocco master in fondo alla scheda (vedi [Principi](Principi.md), principio 4) | Esclusione automatica da ogni uscita |
-| Stato di stampa di una carta | `print` nei metadati della scheda dell'oggetto (**Proposta**) | Fogli di stampa |
 | Regole economiche (valute, prezzi base, salari, variazioni per luogo) | `Storia/Economia.md` (**Proposta**) | Controllo dei prezzi nelle schede |
 | Forma standard di una scheda | Il modello del suo tipo, in `templates/` | Validazione delle schede |
 | Stato di lavoro (nota, esiti del motore) | `.campaign/state/` | Riepilogo di ripresa, pacchetto di contesto |
 
 Regole che ne discendono:
 
-- **Metadati minimi.** In testa alla scheda stanno solo i dati che non sono già nel testo: `id`, `kind` e `provenance`, e quando servono `location`, `relations`, `status`, `ended`, `when`, `sketch`, `appearances`, `depends_on`, `merged_ids` (dopo un'unione), `aliases` e `template` (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md#12-metadati-in-testa)). Il nome non si ripete nei metadati. I metadati li scrive e li legge il framework; il master non deve toccarli, ma se apre il file li trova leggibili. Il campo `print` è **Proposta**.
+- **Metadati minimi.** In testa alla scheda stanno solo i dati che non sono già nel testo: `id`, `kind` e `provenance`, e quando servono `location`, `relations`, `status`, `ended`, `when`, `sketch`, `appearances`, `depends_on`, `merged_ids` (dopo un'unione), `aliases` e `template` (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md#12-metadati-in-testa)). Il nome non si ripete nei metadati. I metadati li scrive e li legge il framework; il master non deve toccarli, ma se apre il file li trova leggibili.
 - **Il tipo nei metadati.** Il tipo non si deduce più dalla cartella: lo dichiara `kind`, e la cartella è solo la categoria di collocazione (Riprogettazione, sezione 3). Il criterio «il tipo lo dice la cartella» del progetto precedente è superato.
 - **Una sola dichiarazione della presenza.** `characters` elenca chi agisce o parla; da solo non dice dove si trova. Solo `appearances` dichiara che un soggetto è presente in uno o più luoghi per una specifica scena. Menzioni, personaggi, oggetti e link non bastano per inferire la presenza (**Deciso**, indice, 2026-11-10).
 - **Una sola posizione, quella attuale.** Il luogo nei metadati è quello di adesso. La storia degli spostamenti non si tiene in un campo: è già nella cronaca, ed è da lì che l'audit di continuità la ricava se serve (**Proposta**).
 - **Preparato e accaduto sono separati.** `Trama/` contiene ciò che il master prepara e non si riscrive dopo il gioco per farlo coincidere con ciò che è successo. `Cronaca/` registra gli eventi giocati. I cambiamenti di canone finiscono nelle schede; la cronaca racconta, non ridefinisce (**Proposta**).
-- **Rinomine sicure.** Il nome del file segue il titolo. Rinomine, unioni, divisioni, spostamenti e cancellazioni passano dalla [manutenzione della continuità](Skill%20di%20libreria.md#l19-manutenzione-della-continuità): è una skill **Proposta**, non realizzata in 0.30.0. L'`id` resta stabile, quindi QR stampati ed enciclopedia continuano a funzionare.
+- **Rinomine sicure.** Il nome del file segue il titolo. Rinomine, unioni, divisioni, spostamenti e cancellazioni passano dalla [manutenzione della continuità](Skill%20di%20libreria.md#l19-manutenzione-della-continuità): è una skill **Proposta**, non realizzata in 0.30.0. L'`id` resta stabile, quindi i link dell'enciclopedia continuano a funzionare.
 - **Una scheda senza parte pubblica non si pubblica.** Un soggetto interamente segreto ha tutto nel blocco riservato; le uscite pubbliche lo saltano, titolo compreso. Non serve un campo di visibilità (**Proposta**).
 - **Immagini accanto alla scheda.** Ogni categoria, e ogni cartella di `Mondo/`, ha la sua `img/`. L'immagine finale e il suo sorgente a livelli stanno insieme, con lo stesso nome base (**Proposta**).
 - **Le uscite non sono canone.** `Uscite/`, `.campaign/cache/` e i file principali delle sessioni si possono cancellare e rigenerare. Nessun processo legge un'uscita come fonte (**Implementato in 0.30.0** per cache e file di sessione; **Proposta** per `Uscite/`).
@@ -308,7 +307,7 @@ Il framework distingue i tipi di dati che vivono in luoghi diversi. La regola ge
 | Stato di lavoro (nota sul lavoro in corso, esiti del motore) | `.campaign/state/` | Il motore (a ogni `commit`) | L'autore, il riepilogo all'avvio | Aggiornato a ogni scrittura; non è canone |
 | Bozze del lotto in preparazione | `.campaign/drafts/` (ignorata da git) | L'autore e gli esecutori economici | Il motore | Sostituite a ogni lotto; cancellabili |
 | Derivati (indice dei soggetti, indice del mondo, file principali delle sessioni) | `.campaign/cache/` e i file di sessione in `Trama/` | Il motore | L'autore, il core | Rigenerati dopo ogni scrittura; si possono cancellare (**Implementato in 0.30.0**) |
-| Derivati di uscita: enciclopedia e fogli di stampa | `.campaign/cache/encyclopedia/` e `.campaign/cache/print/`, nella cache git-ignorata (**Deciso**, 2026-11-12) | Il motore e le skill `encyclopedia` e `print` | Il master, nel master screen | Rigenerati a ogni build; si possono cancellare |
+| Derivati di uscita: enciclopedia | `.campaign/cache/encyclopedia/`, nella cache git-ignorata (**Deciso**, 2026-11-12) | Il motore e la skill `encyclopedia` | Il master, nel master screen | Rigenerati a ogni build; si possono cancellare |
 | Derivati di uscita: viste per luogo | `Uscite/` (**Proposta**) | Script deterministici | Il master | Rigenerati dopo ogni scrittura |
 | Versioni salvate | Storico git della cartella della campagna, invisibile al master | Il motore, dopo ogni `commit` riuscito | Solo il ripristino | Mai modificate (**Implementato in 0.30.0**) |
 | Pacchetto del framework | Installazione del plugin di Claude Code | Solo il distributore | Il core | Sostituito dall'aggiornamento, senza toccare la campagna |

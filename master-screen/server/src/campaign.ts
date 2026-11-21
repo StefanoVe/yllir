@@ -7,7 +7,7 @@ import type { ModuleId, StatusResponse } from '../../shared/src/types.js';
 import type { Ctx } from './context.js';
 import { loadFrameworkModule } from './engine.js';
 
-export const MODULE_IDS: ModuleId[] = ['music', 'print', 'encyclopedia'];
+export const MODULE_IDS: ModuleId[] = ['music', 'encyclopedia'];
 
 interface YamlLiteModule {
   parseYamlLite(text: string): { data: unknown; errors: unknown[] };
@@ -37,7 +37,7 @@ function slugify(value: string): string {
 }
 
 function noModules(): StatusResponse['modules'] {
-  return { music: false, print: false, encyclopedia: false };
+  return { music: false, encyclopedia: false };
 }
 
 /** Never throws: an unreadable or invalid campaign.yaml gives ok false and defaults. */

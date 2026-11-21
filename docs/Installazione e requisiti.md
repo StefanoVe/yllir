@@ -36,7 +36,7 @@ Convenzioni: **Deciso** indica ciò che è nell'indice o è una decisione dell'a
 |---|---|---|
 | Account Claude con un piano che consente l'uso di Claude Code | L'assistente, che esegue quasi tutto il lavoro sulla campagna | Sì. Il piano minimo è **da verificare** sul sito del fornitore. |
 | Account OpenAI con accesso a ImageGen | Illustrazioni, se si sceglie questo fornitore di immagini. Codex non è più un plugin (**Deciso**, decisione 11) | No. Requisiti di accesso **da verificare**. |
-| Account Adobe con Photoshop | Carte a livelli, rifiniture generative, anteprime | No. Le funzioni generative dipendono dal piano Adobe (**da verificare**). |
+| Account Adobe con Photoshop | Rifiniture generative, anteprime | No. Le funzioni generative dipendono dal piano Adobe (**da verificare**). |
 | Account presso un fornitore di immagini via API, con chiave | Generazione di immagini alternativa | No. Il fornitore va scelto e verificato al momento dell'adozione. |
 | Account di hosting e dominio | Pubblicazione dell'enciclopedia | No. Nessun servizio è ancora scelto. |
 
@@ -58,8 +58,7 @@ Regole:
 
 1. Un solo runtime dà lo stesso esito su macOS e Windows. Uno script di shell, invece, cambia fra i due sistemi, e il controllo deterministico deve produrre risultati identici (vedi [Principi](Principi.md)).
 2. La specifica già nomina Node tra i requisiti degli strumenti di impaginazione e di verifica nel browser, e il master screen futuro è pensato per girare in locale (vedi [Integrazioni esterne](Integrazioni%20esterne.md) e [Master screen](Master%20screen.md)). Un solo ambiente serve a tutto, senza installarne un secondo per gli script.
-3. Python non è garantito di default su entrambi i sistemi (**da verificare**). La specifica della stampa, inoltre, evita esplicitamente la dipendenza da Python per leggere i modelli ([Master screen](Master%20screen.md)).
-4. Le librerie necessarie possono essere incluse nel pacchetto del framework, così l'installatore non deve installare programmi separati per la composizione dei fogli o dei QR. Questo riduce i requisiti ma va verificato sulle licenze delle librerie (**da verificare**).
+3. Python non è garantito di default su entrambi i sistemi (**da verificare**).
 
 **Deciso (2026-11-12): installazione automatica di Node.js.** Il launcher controlla la presenza di Node.js, versione minima 20, nel PATH e in `~/.yllir/node`. Se manca, lo scarica da nodejs.org in `~/.yllir/node`: la versione LTS è fissata dal framework e il file è verificato con checksum SHA256. Non servono permessi di amministratore né un installer, e il master non deve installare nulla a mano.
 
@@ -74,7 +73,7 @@ Regole:
 **Connessione.**
 
 - Serve per installare, per accedere a Claude, per usare l'assistente, per cercare aggiornamenti, per i servizi online e per scaricare il master screen al primo avvio o dopo un aggiornamento del framework che cambia la sua versione.
-- Senza connessione restano disponibili: la lettura e la modifica a mano delle schede, i controlli deterministici dei collegamenti, la stampa dei fogli già generati, le versioni salvate e il master screen già scaricato.
+- Senza connessione restano disponibili: la lettura e la modifica a mano delle schede, i controlli deterministici dei collegamenti, le versioni salvate e il master screen già scaricato.
 - Non sono disponibili: l'assistente, la generazione di immagini con servizi online e i flussi musicali online.
 - La generazione locale di immagini, se mai sarà un'opzione, dovrebbe funzionare senza rete dopo l'installazione (**da verificare**).
 
@@ -87,16 +86,15 @@ Regole:
 | Modulo | Che cosa serve | Che cosa succede se manca |
 |---|---|---|
 | **Generazione di immagini** con un fornitore facoltativo (per esempio ImageGen, con un account OpenAI) | Account e accesso del fornitore scelto (**da verificare**). Codex non è più un plugin del framework: al più è un fornitore di immagini, come dice la decisione 4 della [Riprogettazione](Riprogettazione.md) | Le illustrazioni non si generano; il resto prosegue, e il framework lo dice una volta sola (**Proposta**). |
-| **Photoshop e il suo server MCP** (carte a livelli, rifiniture generative) | Photoshop installato; server MCP collegato; funzioni generative attive con il piano Adobe (**da verificare**) | Le carte si producono senza PSD a livelli, oppure non si producono (da decidere, vedi [Integrazioni esterne](Integrazioni%20esterne.md)). Le rifiniture generative non sono disponibili. Il framework lo dichiara sulla carta. |
+| **Photoshop e il suo server MCP** (rifiniture generative) | Photoshop installato; server MCP collegato; funzioni generative attive con il piano Adobe (**da verificare**) | Le rifiniture generative non sono disponibili. Il framework lo dichiara sulla carta. |
 | **Chiavi API dei fornitori di immagini** | Account presso il fornitore e chiave, conservata sul computer e mai nei file della campagna ([Integrazioni esterne](Integrazioni%20esterne.md), sezione 6) | Il fornitore resta spento; gli altri fornitori attivi restano disponibili. |
 | **Generazione locale di immagini** | Computer con scheda grafica adeguata, spazio su disco, installazione guidata (requisiti **da verificare**) | Non attiva. Nessuna conseguenza sul resto. |
 | **Musica** (riproduzione dei sottofondi e dei cue) | Un programma di riproduzione, da scegliere (**da verificare**); connessione per i flussi online | Il pannello musica non compare. I link musicali restano nelle schede. Per i flussi online, la liceità dipende dai termini dei servizi (**da verificare**). |
-| **Stampa** (fogli 5×7 e A4, carte, annunci) | Strumenti di composizione inclusi nel pacchetto (**Proposta**, vedi sezione 1.4); font dichiarati e installati dal framework; stampante non richiesta, il PDF basta | I fogli non si generano. Lo stato di stampa resta nelle schede. |
 | **Pubblicazione dell'enciclopedia** | Account di hosting, programma a riga di comando del servizio scelto, dominio (**da verificare**) | L'enciclopedia resta una raccolta di pagine locali, consultabile sul computer. Nulla viene pubblicato. |
 | **Browser di verifica** (controllo visivo dell'enciclopedia) | Un browser e gli strumenti di verifica (**da verificare**) | Il controllo dei collegamenti resta, perché è deterministico. Manca il controllo visivo, e il framework dichiara che non è stato fatto. |
 | **Lettura di PDF scansionati** (importazione di appunti) | Uno strumento di riconoscimento del testo (**da verificare**) | I PDF scansionati non si leggono come testo. Le foto restano leggibili dall'assistente, se il servizio lo consente (**da verificare**). |
 | **Master screen** | **Deciso:** non è nella prima versione. In seguito, un'app locale che si apre nel browser e usa l'assistente come il terminale | Nessun master screen: si lavora dal terminale di Claude Code. Nulla cambia nel resto. |
-| **Skill documentali** (PDF, Word, presentazioni) | Disponibili nell'ambiente di Claude, non nel pacchetto | Dispense e schede stampabili restano in formato Markdown o si producono con i fogli di stampa. |
+| **Skill documentali** (PDF, Word, presentazioni) | Disponibili nell'ambiente di Claude, non nel pacchetto | Dispense e schede stampabili restano in formato Markdown. |
 
 ## 3. Percorso di installazione per chi non ha mai aperto un terminale
 
@@ -188,7 +186,6 @@ Ogni messaggio dice tre cose: che cosa non funziona, che cosa non è cambiato, c
 | Versione della campagna più nuova del framework installato | «Questa campagna è stata creata con una versione più recente del framework. Aggiorna il framework prima di continuare.» | Aggiornare il framework (vedi [Aggiornamenti e migrazioni](Aggiornamenti%20e%20migrazioni.md)). | Blocco delle scritture: la campagna non viene modificata da una versione più vecchia. |
 | Chiave di un fornitore di immagini scaduta o revocata | «La chiave del servizio X non funziona più. Inseriscine una nuova, oppure continuiamo senza quel servizio.» | Inserire una nuova chiave o disattivare il fornitore. | Il fornitore resta spento. |
 | Generatore di immagini non collegato all'account | «Il generatore di immagini non è collegato al tuo account, quindi non posso creare illustrazioni. Accedi al servizio, oppure continuiamo senza.» | Accedere al servizio di immagini. | Solo le illustrazioni; il resto prosegue. |
-| Programma di grafica chiuso | «Per fare le carte devi aprire il programma di grafica con il documento della carta.» | Aprire il programma di grafica. | Le carte attendono; nessun file viene toccato. |
 | Connessione assente | «Non riesco a raggiungere l'assistente: controlla la connessione. Le schede restano leggibili.» | Ristabilire la connessione. | Solo le funzioni online sono ferme. |
 | Disco pieno o cartella non scrivibile | «Non posso salvare: il computer non ha più spazio, oppure la cartella è protetta. Nessuna modifica è stata fatta.» | Liberare spazio, o scegliere un'altra cartella. | Blocco delle scritture. |
 | Cartella sincronizzata con il cloud | «La cartella della campagna è copiata online, e le versioni salvate potrebbero confondersi. Ti consiglio di spostarla in una cartella locale.» | Spostare la campagna, se il master è d'accordo. | Avviso; nessun blocco. |
@@ -235,7 +232,7 @@ Regole (**Proposta**):
 | Personalizzazioni del master (`.campaign/customizations.md`) | **Restano**. Sono del master. |
 | Storia delle versioni (la cartella Git della campagna) | **Resta**. Può essere eliminata solo su richiesta esplicita del master, con l'avviso che il ritorno indietro non sarà più possibile. |
 | Stato di lavoro (partite, scontri, registro) in `.campaign/state/` | **Resta** per impostazione predefinita, perché contiene registri di partite in corso. Si cancella su richiesta. |
-| Uscite (enciclopedia, fogli di stampa, mappe derivate) | **Restano** come file statici, che si possono consultare o cancellare. Non sono canone. |
+| Uscite (enciclopedia, mappe derivate) | **Restano** come file statici, che si possono consultare o cancellare. Non sono canone. |
 | Istruzioni generate per gli agenti (`.campaign/instructions/`) | **Restano** ma sono inutili senza il framework. Si possono cancellare. |
 | Pacchetto del framework, collegamento di avvio, comandi aggiunti, `~/.yllir/framework-path`, `~/.yllir/node` (il Node scaricato dal launcher), `~/.yllir/master-screen` (il pacchetto del master screen) | **Vengono rimossi** dal disinstallatore. |
 | Collegamenti `Apri master screen.*` / `Open master screen.*` dentro le cartelle delle campagne | **Restano**, a meno che il master non chieda di rimuoverli. |
@@ -252,14 +249,12 @@ Regole (**Proposta**):
 1. **Sistemi operativi.** Confermare macOS e Windows 11 come obiettivi della prima versione; decidere se Windows 10 entra e a quali condizioni. Le versioni minime vanno misurate sulle versioni rilasciate (**da verificare**).
 2. **Piano Claude.** Quale piano consente l'uso di Claude Code, e il framework deve dichiararlo come requisito o limitarsi a un rimando al sito (**da verificare**).
 3. **App di Claude come percorso.** Verificare se l'app esegue hook, script e sub-agent del framework. Se no, l'app non è un percorso supportato nella prima versione, e questo va scritto in [Esperienza utente](Esperienza%20utente.md).
-4. **Librerie di composizione.** Va decisa se le librerie di composizione (stampa, QR) sono incluse nel pacchetto, con verifica delle licenze, o restano dipendenze esterne come ImageMagick e qrencode, che [Integrazioni esterne](Integrazioni%20esterne.md) elenca fra i requisiti di stampa.
-5. **Installatore e fiducia.** Scegliere la forma dell'installatore per macOS e per Windows. Va verificato se serve una firma del programma e che costo comporta (**da verificare**). Va deciso dove vive la pagina ufficiale. Questo risponde in parte alla domanda di [Esperienza utente](Esperienza%20utente.md) sulla provenienza del pacchetto.
-6. **Registro tecnico.** Esperienza utente e questo documento parlano di un registro tecnico in cui finiscono i dettagli degli errori. [Architettura](Architettura.md) non lo prevede nell'albero della campagna. Va deciso dove vive, e aggiunto all'albero.
-7. **Carte a livelli senza Photoshop.** Se il PSD a livelli diventa una funzione per chi ha Photoshop, il requisito della sezione 2 resta; altrimenti il modulo carte ha un'alternativa da descrivere.
-8. **Musica e flussi online.** Scegliere il programma di riproduzione e decidere se i flussi online restano nel pacchetto, con verifica dei termini (**da verificare**), oppure si escludono o si sostituiscono con file caricati dal master.
-9. **Spazio e consumo.** Le stime della sezione 1.5 vanno misurate. Va deciso se il framework avverte quando la storia delle versioni supera una soglia, come chiede [Architettura](Architettura.md) in questioni aperte.
-10. **Cartelle sincronizzate.** Il controllo le segnala e non blocca. Va confermato che un avviso basta, o se la sincronizzazione deve impedire la scrittura.
-11. **Chiavi e loro posto.** Va scelto dove si conservano le chiavi API sul computer, fuori dalla campagna: portachiavi di sistema, file personale o variabile d'ambiente. [Integrazioni esterne](Integrazioni%20esterne.md) fissa solo che non stanno nella campagna.
-12. **Disinstallatore e strumenti condivisi.** Va confermato che Git, Node e Claude Code non vengono rimossi per impostazione predefinita, e che la storia delle versioni può restare dopo la disinstallazione.
-13. **Connessione e lavoro offline.** La sezione 1.5 elenca cosa resta disponibile senza rete. Va verificato con l'esperienza reale, soprattutto per la stampa e per la lettura dei controlli.
-14. **Permesso di scrittura di Codex sul Git.** **Superata dalla Riprogettazione (decisione 11, 2026-11-11):** Codex non è più un plugin del framework e non scrive nella cartella `.git`; le versioni salvate le scrive solo il motore.
+4. **Installatore e fiducia.** Scegliere la forma dell'installatore per macOS e per Windows. Va verificato se serve una firma del programma e che costo comporta (**da verificare**). Va deciso dove vive la pagina ufficiale. Questo risponde in parte alla domanda di [Esperienza utente](Esperienza%20utente.md) sulla provenienza del pacchetto.
+5. **Registro tecnico.** Esperienza utente e questo documento parlano di un registro tecnico in cui finiscono i dettagli degli errori. [Architettura](Architettura.md) non lo prevede nell'albero della campagna. Va deciso dove vive, e aggiunto all'albero.
+6. **Musica e flussi online.** Scegliere il programma di riproduzione e decidere se i flussi online restano nel pacchetto, con verifica dei termini (**da verificare**), oppure si escludono o si sostituiscono con file caricati dal master.
+7. **Spazio e consumo.** Le stime della sezione 1.5 vanno misurate. Va deciso se il framework avverte quando la storia delle versioni supera una soglia, come chiede [Architettura](Architettura.md) in questioni aperte.
+8. **Cartelle sincronizzate.** Il controllo le segnala e non blocca. Va confermato che un avviso basta, o se la sincronizzazione deve impedire la scrittura.
+9. **Chiavi e loro posto.** Va scelto dove si conservano le chiavi API sul computer, fuori dalla campagna: portachiavi di sistema, file personale o variabile d'ambiente. [Integrazioni esterne](Integrazioni%20esterne.md) fissa solo che non stanno nella campagna.
+10. **Disinstallatore e strumenti condivisi.** Va confermato che Git, Node e Claude Code non vengono rimossi per impostazione predefinita, e che la storia delle versioni può restare dopo la disinstallazione.
+11. **Connessione e lavoro offline.** La sezione 1.5 elenca cosa resta disponibile senza rete. Va verificato con l'esperienza reale, soprattutto per la lettura dei controlli.
+12. **Permesso di scrittura di Codex sul Git.** **Superata dalla Riprogettazione (decisione 11, 2026-11-11):** Codex non è più un plugin del framework e non scrive nella cartella `.git`; le versioni salvate le scrive solo il motore.

@@ -48,7 +48,7 @@ import {
   readTextScale,
 } from '../shell/text-scale';
 
-const MODULE_ORDER: ModuleId[] = ['music', 'print', 'encyclopedia'];
+const MODULE_ORDER: ModuleId[] = ['music', 'encyclopedia'];
 const QUIT_CONFIRM_MS = 4000;
 const THEME_OPTIONS: Array<{ pref: ThemePref; key: TranslationKey; icon: 'monitor' | 'sun' | 'moon' }> = [
   { pref: 'system', key: 'theme.system', icon: 'monitor' },
@@ -112,7 +112,6 @@ const RAIL_OPTIONS: { key: RailKey; label: TranslationKey; module: ModuleId | nu
   { key: 'music', label: 'nav.music', module: 'music' },
   { key: 'encyclopedia', label: 'nav.encyclopedia', module: 'encyclopedia' },
   { key: 'atlas', label: 'nav.atlas', module: null },
-  { key: 'print', label: 'nav.print', module: 'print' },
 ];
 
 /** One block of the update news: a paragraph (one line of text) or a list. */

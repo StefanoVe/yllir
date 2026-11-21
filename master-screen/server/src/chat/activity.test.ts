@@ -51,7 +51,6 @@ describe('describeTool steps', () => {
   it('gives each skill its sentence and the images skill the image kind', () => {
     assert.deepEqual(describeTool('Skill', { skill: 'yllir:images' }, 'it'), { kind: 'image', text: 'Sto preparando l’immagine…' });
     assert.deepEqual(describeTool('Skill', { skill: 'yllir:build-world' }, 'en'), { kind: 'skill', text: 'Building the world…' });
-    assert.deepEqual(describeTool('Skill', { skill: 'yllir:print' }, 'it'), { kind: 'skill', text: 'Sto preparando la stampa…' });
     assert.deepEqual(describeTool('Skill', { skill: 'yllir:unknown-thing' }, 'it'), { kind: 'skill', text: 'Sto preparando la risposta…' });
   });
 

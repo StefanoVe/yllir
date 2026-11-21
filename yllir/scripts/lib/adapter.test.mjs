@@ -38,7 +38,6 @@ test('discovers installed adapters in sorted order and loads the D&D manifest', 
     brief: { it: 'In breve', en: 'In brief' },
   });
   assert.equal(loaded.adapter.creature_sheet.required.length, 9);
-  assert.deepEqual(loaded.adapter.item_sheet.printable_fields, ['title', 'description']);
   assert.deepEqual(battleGrid(loaded.adapter), { square: 5, unit: 'ft' });
 });
 
@@ -84,7 +83,7 @@ test('validates manifest identity, required values, and unknown top-level keys',
   });
 });
 
-test('validates required creature fields, unique ids, printable fields and do_not', () => {
+test('validates required creature fields, unique ids and do_not', () => {
   withRoot((temp) => {
     let broken = replace(source, 'label_en: AC', 'label_en: ""');
     write(temp, 'dnd-2024', broken);
@@ -92,9 +91,6 @@ test('validates required creature fields, unique ids, printable fields and do_no
     broken = replace(source, 'id: hp\n      label_it: PF', 'id: ac\n      label_it: PF');
     write(temp, 'dnd-2024', broken);
     assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.code === 'duplicate-field-id'));
-    broken = replace(source, 'printable_fields: [title, description]', 'printable_fields: []');
-    write(temp, 'dnd-2024', broken);
-    assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.path === 'item_sheet.printable_fields'));
     broken = replace(source, 'do_not:\n  - roll dice for the master\n  - choose targets\n  - decide the outcome of attacks, saves or checks\n  - add resistances, immunities or reductions the sheet does not declare\n  - rewrite a player character sheet', 'do_not: []');
     write(temp, 'dnd-2024', broken);
     assert.ok(loadAdapter(temp, 'dnd-2024').errors.some((e) => e.path === 'do_not'));

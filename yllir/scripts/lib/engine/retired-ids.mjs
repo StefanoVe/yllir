@@ -1,5 +1,5 @@
 // Retired subject ids. An id that belonged to a deleted or merged subject is never used
-// again, because printed cards and links elsewhere may still point at it. The retired ids
+// again, because links elsewhere may still point at it. The retired ids
 // live in .campaign/retired-ids.json ({ "ids": [...] }), which is campaign state saved in the
 // same version as the batch that retires them. Pure except for reading and writing that file.
 

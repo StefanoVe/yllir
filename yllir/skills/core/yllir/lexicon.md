@@ -61,7 +61,6 @@ Use only the words in the language column of the campaign: the Italian column fo
 | Session document | «Sessione» | «Session» |
 | Event (plot event file) | «Scena» | «Scene» |
 | Session map (main file of a session) | «Mappa della sessione» | «Session map» |
-| Print status | «Da stampare», «Stampata», «Da ristampare» | «To print», «Printed», «To reprint» |
 | Free canvas | «Tela libera» | «Free canvas» |
 | Master screen | «Schermo del master» | «Master screen» |
 | PSD | «File di lavoro del disegno» | «Working drawing file» |

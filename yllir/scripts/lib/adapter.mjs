@@ -397,7 +397,6 @@ function validate(adapter, folderId, folder) {
       });
     }
   }
-  if (!isMapping(adapter.item_sheet) || !Array.isArray(adapter.item_sheet.printable_fields) || adapter.item_sheet.printable_fields.length === 0) error('bad-value', 'item_sheet.printable_fields', 'item_sheet.printable_fields must be a nonempty list');
   if (!Array.isArray(adapter.do_not) || adapter.do_not.length === 0) error('bad-value', 'do_not', 'do_not must be a nonempty list');
   // Optional style of the atlas for this system (a style id; whether it is installed is checked by the atlas, not here).
   if (adapter.atlas_style !== undefined && (typeof adapter.atlas_style !== 'string' || !SLUG_RE.test(adapter.atlas_style))) {

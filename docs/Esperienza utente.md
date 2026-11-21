@@ -117,7 +117,7 @@ Quando completa una scheda, il framework separa ciò che la campagna già dice d
 - Il materiale pubblico sta nella parte alta della scheda.
 - Le note riservate stanno in fondo, nel blocco riservato, che è l'ultimo contenuto del file. Le regole del blocco sono in [Formato dei contenuti](Formato%20dei%20contenuti.md).
 - Quando il master dice «questo resta tra noi» o «questo lo scopriranno», il framework lo sposta nel blocco riservato e lo conferma in una frase.
-- Quando il framework genera materiale da mostrare ai giocatori (una scheda stampata, un'enciclopedia pubblica), il blocco riservato non entra mai. Il master può verificarlo in anteprima.
+- Quando il framework genera materiale da mostrare ai giocatori (un'enciclopedia pubblica), il blocco riservato non entra mai. Il master può verificarlo in anteprima.
 
 **Proposta.** Il framework non decide da solo se un contenuto è segreto quando il dubbio riguarda la trama: chiede. Quando è un dettaglio tecnico, come l'ordine delle sezioni, decide e non lo segnala.
 

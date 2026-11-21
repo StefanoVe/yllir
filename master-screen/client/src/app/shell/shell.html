@@ -33,12 +33,6 @@
         <lucide-angular [img]="icons.MapIcon" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
       </a>
     }
-    @if (showPrint()) {
-      <a class="rail-item" routerLink="/print" routerLinkActive="active" ariaCurrentWhenActive="page"
-         [attr.aria-label]="i18n.t('nav.print')" [msTooltip]="i18n.t('nav.print')" [msTooltipPosition]="tooltipSide()">
-        <lucide-angular [img]="icons.Printer" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />
-      </a>
-    }
     <button type="button" class="rail-item rail-sep" aria-haspopup="dialog" [class.active]="palette.open()"
             [attr.aria-label]="i18n.t('nav.search')" [msTooltip]="i18n.t('nav.search')" [msTooltipPosition]="tooltipSide()" (click)="palette.show()">
       <lucide-angular [img]="icons.Search" [size]="20" [strokeWidth]="1.5" aria-hidden="true" />

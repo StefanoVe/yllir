@@ -1,6 +1,6 @@
 # Linee guida dell'interfaccia e restyling
 
-Regole visive del master screen. Valgono per tutte le sue viste; non valgono per l'enciclopedia pubblica né per la stampa (vedi sotto).
+Regole visive del master screen. Valgono per tutte le sue viste; non valgono per l'enciclopedia pubblica (vedi sotto).
 
 ## Decisione dell'autore (Deciso, 2026-11-13)
 
@@ -56,7 +56,7 @@ I divisori interni usano il bordo chiaro; il bordo forte resta ai contorni dei c
 
 ## Restyling
 
-- **Copertura (Deciso, 2026-11-13).** Il restyling copre tutte le viste esistenti del master screen: barra laterale, chat, cosa è cambiato, documenti, ricerca, mappa della trama, cockpit, scontro, musica, stampa, impostazioni, anteprima dell'enciclopedia.
+- **Copertura (Deciso, 2026-11-13).** Il restyling copre tutte le viste esistenti del master screen: barra laterale, chat, cosa è cambiato, documenti, ricerca, mappa della trama, cockpit, scontro, musica, impostazioni, anteprima dell'enciclopedia.
 - **Come (Deciso, 2026-11-13).** Si fa con variabili di tema comuni nel foglio di stile globale del client (`master-screen/client/src/styles.css`), non vista per vista.
 - **Principi validi (Deciso, 2026-11-13).** Restano validi i principi già decisi: icone con tooltip, dimensione del testo e «animazioni ridotte» delle impostazioni.
 
@@ -136,11 +136,6 @@ I divisori interni usano il bordo chiaro; il bordo forte resta ai contorni dei c
 - **Elenco.** Sono schede quadrate con copertina a colori e titolo sotto; il brano che suona ha la scheda invertita.
 - **Barra.** È in basso, piatta, separata da una linea, con i comandi come icone a tratto; l'indicatore che si muove resta fermo con animazioni ridotte.
 
-### Stampa
-
-- **Elenco.** Le carte sono righe con casella di spunta squadrata.
-- **Stato.** Da stampare, stampata, da ristampare: lo stato è una parola e un simbolo, non un colore. Le anteprime delle carte restano come sono, perché la stampa è fuori ambito.
-
 ### Enciclopedia
 
 - **Pagina di controllo.** Controlli prima della pubblicazione, indirizzo e pulsanti sono piatti, come le impostazioni; i controlli superati hanno la spunta, quelli falliti la croce e il bordo in rosso spento.
@@ -154,8 +149,8 @@ I divisori interni usano il bordo chiaro; il bordo forte resta ai contorni dei c
 
 ## Fuori ambito
 
-- **Enciclopedia e stampa (Deciso, 2026-11-13).** Enciclopedia pubblica e stampa non seguono queste linee guida: sono per i giocatori, la stampa vuole il bianco puro e l'enciclopedia ha lo stile della campagna.
+- **Enciclopedia (Deciso, 2026-11-13).** L'enciclopedia pubblica non segue queste linee guida: è per i giocatori e ha lo stile della campagna.
 
 ## Questioni aperte
 
-- Un eventuale profilo di stile «taccuino» per enciclopedia e stampa, nei profili di stile (vedi [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md)).
+- Un eventuale profilo di stile «taccuino» per l'enciclopedia, nei profili di stile (vedi [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md)).

@@ -48,7 +48,7 @@ Le prime tre sono la parte pubblica. Le note del master stanno nel blocco riserv
   - adattatore del sistema di gioco: la sezione degli effetti nel formato del sistema, validata dal motore contro lo schema dell'adattatore prima della scrittura (Riprogettazione, sezione 7). La skill `system-adapter` e il controllo `validate-sheet` non esistono più;
   - documento di economia, in sola lettura, per la sola verifica del valore (opzionale);
   - il motore (`commit`) per la scrittura e i collegamenti, `query` del motore per cercare l'oggetto già stabilito altrove (Riprogettazione, sezione 2). `write-sequence`, `linker` e `canon-research` non esistono più;
-  - moduli di output (carte, stampa, enciclopedia), che leggono soltanto la parte pubblica.
+  - moduli di output (enciclopedia), che leggono soltanto la parte pubblica.
 - **Modello:** vedi [Orchestrazione degli agenti](Orchestrazione%20degli%20agenti.md); le istruzioni sono scritte per funzionare con il più debole degli esecutori.
 
 ## Modello della scheda
@@ -56,14 +56,14 @@ Le prime tre sono la parte pubblica. Le note del master stanno nel blocco riserv
 **Deciso (2026-11-10).** Il modello estende quello già descritto in [Formato dei contenuti](Formato%20dei%20contenuti.md), sezione 4.5, dividendo la descrizione in una breve e una completa.
 
 **Categoria:** `Oggetti/`, tipo `objects`, `template: item`.
-**Metadati:** `id`; `template: item`; `kind: item` e `provenance` (Riprogettazione, sezione 3); `location` (dove si trova adesso, lista di `id` di luoghi, `[]` se non ha un luogo fisso); `aliases` facoltativo; `print` solo se la categoria produce carte. Nei metadati non c'è nulla di riservato.
+**Metadati:** `id`; `template: item`; `kind: item` e `provenance` (Riprogettazione, sezione 3); `location` (dove si trova adesso, lista di `id` di luoghi, `[]` se non ha un luogo fisso); `aliases` facoltativo. Nei metadati non c'è nulla di riservato.
 
 **Sezioni, in ordine (Deciso):**
 
 | Sezione | Pubblica | Contenuto |
 | --- | --- | --- |
 | titolo `#` | sì | il nome dell'oggetto |
-| `## In breve` | sì | una o due frasi su aspetto fisico e funzione essenziale, come li conoscono i giocatori; è il testo che le uscite brevi (carta, tooltip, elenchi) possono riusare. |
+| `## In breve` | sì | una o due frasi su aspetto fisico e funzione essenziale, come li conoscono i giocatori; è il testo che le uscite brevi (tooltip, elenchi) possono riusare. |
 | `## Descrizione` | sì | descrizione completa: aggiunge il contesto che i giocatori conoscono o possono cogliere, come provenienza apparente, materiali o usi, quando disponibile, in prosa nel registro della campagna; non si limita a ripetere la breve. |
 | `## Effetti` | sì | gli effetti noti ai giocatori, nel formato dell'adattatore del sistema; senza effetti noti, «Nessun effetto di gioco». |
 | sezioni facoltative | sì | `## Origine`, `## Ritrovamento`, `## Testo`, `## Valore`, in quest’ordine; ciascuna può essere omessa. |
@@ -110,7 +110,7 @@ La sigla è quella della nave scomparsa. Chi la riconosce sa dove è stata fabbr
 - **Fonte di verità.** La scheda è la fonte per che cosa è l'oggetto (aspetto, effetti, origine). Non lo è per ciò che accade in trama: chi lo trova, chi lo perde, che cosa ne fa un personaggio stanno nei documenti di trama e, una volta giocati, nella cronaca. La scheda non registra mai «nella sessione 2 viene rubata».
 - **Identità e trama.** Un testo di trama che ha bisogno di un fatto sull'identità dell'oggetto lo scrive prima nella scheda. Se la trama contraddice la scheda, l'autore lo chiede al master.
 - **Posizione.** `location` è il luogo attuale, aggiornato dopo la sessione da `after-session` su dichiarazione del master.
-- **Riservato.** Le note del master non compaiono mai nelle descrizioni, nelle carte, nelle ricerche web, nei prompt per le immagini né nei revisori di testi destinati ai giocatori. Il passaggio da riservato a pubblico avviene solo per azione esplicita del master. Un rimando a una nota riservata usa l'ancora `#master`.
+- **Riservato.** Le note del master non compaiono mai nelle descrizioni, nelle ricerche web, nei prompt per le immagini né nei revisori di testi destinati ai giocatori. Il passaggio da riservato a pubblico avviene solo per azione esplicita del master. Un rimando a una nota riservata usa l'ancora `#master`.
 - **Descrizioni brevi e complete (Deciso, 2026-11-10).** La breve descrive concisamente l’aspetto fisico e la funzione essenziale stabilita. La completa aggiunge il contesto stabilito disponibile, come provenienza, materiali e usi, invece di ripetere soltanto la breve. Entrambe restano coerenti con i fatti noti ai personaggi; non si inventano fatti salvo l’immaginazione descrittiva autorizzata nella richiesta. **Superata dalla Riprogettazione (2026-11-11), decisione 7:** il framework può inventare ciò che le fonti non danno, ma lo dichiara al master.
 - **Conoscenza dei giocatori (Deciso, dall'autore, 2026-11-11).** La descrizione breve e quella completa descrivono l'oggetto come lo conoscono i giocatori: ciò che vedono, ciò che è stato detto o identificato al tavolo, ciò che chiunque nel mondo saprebbe. Non anticipano ciò che non sanno (natura nascosta, maledizioni, effetti non identificati, origine vera) e non lo lasciano intuire. Le note del master contengono invece il contesto pieno dell'oggetto, non solo i segreti: che cosa è davvero, origine vera, effetti reali completi, usi in trama e la differenza fra ciò che i giocatori sanno e la verità, così che il master non debba ricostruirlo dalla parte pubblica. Quando i giocatori scoprono qualcosa, il passaggio alla parte pubblica avviene solo per azione esplicita del master (vedi «Riservato»). **Schede esistenti (Deciso, dall'autore, 2026-11-11):** la migrazione `item-knowledge-v1` (dalla 0.37.0) le riesamina. Per ogni fatto pubblico l'autore guarda la cronaca: ciò che i giocatori non sanno passa nel blocco master, e nulla si cancella. Nel dubbio fa una domanda al master e la scheda resta in sospeso. Lo script verifica che metadati e titolo restino invariati, che le sezioni pubbliche obbligatorie non siano vuote, che il blocco master resti unico e in fondo, e che nessuna riga delle note del master vada persa.
 - **Tono delle descrizioni (Deciso, 2026-11-10).** Sia la descrizione breve sia quella completa seguono, nell’ordine, le regole del master in `.campaign/customizations.md`, il registro `prose.register` di `campaign.yaml`, e gli esempi già scritti nella campagna per ciò che le prime due fonti non specificano. Il framework non ha un tono suo e non ne inventa uno. Il revisore giudica la coerenza; un tono dubbio è una domanda per il master.
@@ -127,7 +127,6 @@ La sigla è quella della nave scomparsa. Chi la riconosce sa dove è stata fabbr
 2. Prepara la bozza della scheda con nome, luogo e dettagli del master, nel lotto di scrittura (Riprogettazione, sezione 8). Non c'è più una skill dedicata.
 3. Nel lotto la bozza è un documento come gli altri, con la sua provenienza (Riprogettazione, sezione 6).
 4. Il motore (`commit`) valida formato e schema dell'adattatore, controlla il grafo, risolve i collegamenti e salva la versione. La revisione di un modello distinto si fa solo se il lotto aggiunge fatti al canone (Riprogettazione, decisione 5 e sezione 2).
-5. Se c'è una carta, le uscite leggono solo la parte pubblica.
 
 ## Rischi da evitare
 

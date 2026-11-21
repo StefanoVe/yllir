@@ -76,7 +76,7 @@ describe('Settings page', () => {
       update: vi.fn(),
       reset: vi.fn(),
     };
-    modules = signal<Record<ModuleId, boolean> | null>({ music: true, print: false, encyclopedia: false });
+    modules = signal<Record<ModuleId, boolean> | null>({ music: true, encyclopedia: false });
     api = {
       checks: vi.fn(async () => EMPTY_CHECKS),
       runChecks: vi.fn(async () => EMPTY_CHECKS),
@@ -136,7 +136,7 @@ describe('Settings page', () => {
     expect(ids).toEqual(['s-table', 's-combat', 's-music', 's-appearance', 's-update', 's-checks', 's-about']);
     expect(root.querySelectorAll('nav.toc a').length).toBe(7);
 
-    modules.set({ music: false, print: false, encyclopedia: false });
+    modules.set({ music: false, encyclopedia: false });
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();

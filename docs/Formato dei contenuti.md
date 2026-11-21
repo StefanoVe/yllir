@@ -39,17 +39,16 @@ Sono ammessi solo i campi della tabella. Ogni altro campo è un errore: un campo
 
 | Campo | Obbligatorio per | Forma | Significato |
 | --- | --- | --- | --- |
-| `id` | ogni documento della campagna | slug unico in tutta la campagna | identità stabile: route, codici QR, collegamenti |
+| `id` | ogni documento della campagna | slug unico in tutta la campagna | identità stabile: route, collegamenti |
 | `location` | soggetti con una posizione: personaggi, creature, oggetti, annunci | lista di `id` di luoghi; `[]` se non ha un luogo fisso | luogo attuale del soggetto; una creatura che vive in più luoghi li elenca tutti |
 | `played` | pagine di cronaca (**Deciso**, 2026-11-07) | lista di `id` delle sessioni o attività giocate quella sera; `[]` se nessuna | unica fonte per sapere che cosa è stato giocato: la preparazione verifica i prerequisiti da qui; lo scrive il processo «dopo la sessione» |
 | `depends_on` | sessioni e attività di trama | lista di `id` di sessioni o attività; `[]` se non ne ha | prerequisiti (vedi sezione 2) |
 | `characters` | facoltativo, nei file evento di trama | lista di `id` di schede di personaggio; `[]` o assente se l'evento non nomina personaggi | i personaggi che l'evento nomina e fa agire o parlare; **Proposta** |
 | `items` | facoltativo, nei file evento di trama (**Deciso, 2026-11-10**) | lista senza duplicati di `id` di schede oggetto; `[]` o assente se l'evento non nomina oggetti rilevanti | gli ID sono validati meccanicamente; oggetti con scheda coinvolti nell'evento; i candidati nel testo omessi dal campo richiedono giudizio dell'agente |
 | `appearances` | facoltativo, nei file evento di trama (**Deciso, 2026-11-10**) | lista di `{subject: ID, location: [PLACE_IDS]}` | presenza esplicita di un soggetto nella scena e nei luoghi dichiarati; non si deduce da `characters`, `items` o menzioni |
-| `print` | oggetti con carta | `to-print`, `printed` o `reprint` | stato fisico della carta; è l'unico posto in cui sta |
 | `template` | categorie con più modelli: Personaggi (`npc`, `vendor`), Creature (`enemy`, `creature`), Oggetti (`item`, `notice`) | uno dei valori indicati | modello della scheda, da cui il validatore ricava le sezioni obbligatorie |
 | `aliases` | facoltativo, per ogni scheda | lista di nomi alternativi | forme alternative del nome; fonte unica per l'indice dei soggetti |
-| `merged_ids` | solo dopo un'unione di schede (vedi [Skill di libreria](Skill%20di%20libreria.md#l19-manutenzione-della-continuità)) | lista di `id` | identità assorbite: route e QR già stampati restano validi |
+| `merged_ids` | solo dopo un'unione di schede (vedi [Skill di libreria](Skill%20di%20libreria.md#l19-manutenzione-della-continuità)) | lista di `id` | identità assorbite: route già pubblicate restano valide |
 | `kind` | ogni documento delle categorie `places`, `subjects`, `objects`; nelle categorie `free` solo per gli eventi (`kind: event`), perché un concetto della storia non ha `kind` | uno fra `place`, `character`, `creature`, `item`, `faction`, `event` | **Deciso, 2026-11-11.** Il tipo del soggetto, usato dagli script del grafo. Un `kind: place` sta solo nella categoria dei luoghi. |
 | `provenance` | ogni documento delle categorie `places`, `subjects`, `objects`, `free`, `plot`, `chronicle` | `master` (detto dal master), `played` (giocato al tavolo) o `generated` (generato dal framework) | **Deciso, 2026-11-11.** La provenienza dell'intero documento (decisione 12 della riprogettazione). Quando il master modifica a mano un documento `generated`, il motore lo salva come modifica manuale e lo segna `master`. |
 | `sketch` | facoltativo | solo il valore `true` | **Deciso, 2026-11-11.** Segna un abbozzo (vedi 4.12). |
@@ -101,11 +100,11 @@ Regole:
 - Un file ha al massimo un blocco riservato. Il marcatore di apertura e quello di chiusura stanno ciascuno su una riga propria, senza altro testo.
 - La prima riga del blocco è il titolo `## Master`. Sotto di esso compaiono solo titoli di livello `###` o inferiore.
 - Dopo `<!-- /master -->` non c'è altro contenuto.
-- Le uscite (enciclopedia, carte, fogli di stampa, mappe) leggono solo la parte pubblica. Un soggetto interamente riservato non esce affatto, titolo compreso.
+- Le uscite (enciclopedia, mappe) leggono solo la parte pubblica. Un soggetto interamente riservato non esce affatto, titolo compreso.
 - Un rimando da un testo pubblico a una nota riservata punta alla nota con l'ancora `#master`, per esempio `Ilde Varno.md#master`, e non ne riporta il contenuto.
 - Il passaggio di un contenuto da riservato a pubblico avviene solo per azione esplicita del master: il testo si sposta fuori dal blocco.
 - Le categorie di tipo `master-only` (vedi 4.8) non usano il blocco: l'intero file è riservato.
-- **Chi lo legge.** Gli agenti che lavorano sul canone (esecutori, audit di continuità, dottore della campagna, manutenzione della continuità, portineria e handoff) vedono anche il blocco riservato, perché devono controllarlo. Non lo ricevono mai i revisori di testi destinati ai giocatori (enciclopedia, carte, riepiloghi), i fornitori di immagini, le ricerche web e i servizi di pubblicazione.
+- **Chi lo legge.** Gli agenti che lavorano sul canone (esecutori, audit di continuità, dottore della campagna, manutenzione della continuità, portineria e handoff) vedono anche il blocco riservato, perché devono controllarlo. Non lo ricevono mai i revisori di testi destinati ai giocatori (enciclopedia, riepiloghi), i fornitori di immagini, le ricerche web e i servizi di pubblicazione.
 
 **Deciso, 2026-11-11.** Un'invenzione non si presenta mai come citazione di una fonte, e un segreto inventato sta solo nel blocco riservato.
 
@@ -120,7 +119,6 @@ Regole:
 - Il testo alternativo descrive l'immagine e non ripete il nome del file.
 - L'immagine sta nella cartella `img/` della categoria o del luogo cui appartiene la scheda, e si richiama con un link relativo.
 - Il nome del file immagine è in minuscolo, con trattini al posto degli spazi.
-- Una carta (oggetto con `print`) ha accanto un sorgente a livelli con lo stesso nome base, in formato `.psd`. La coppia sta nella stessa `img/`.
 - Un'immagine richiamata deve esistere; il validatore lo verifica.
 
 ### 1.5 Nomi dei file
@@ -544,29 +542,21 @@ Per una campagna in inglese, le intestazioni delle colonne sono `Characteristic`
 | Lanterna da mare | 6 scudi | |
 ```
 
-### 4.5 Oggetto (con carta)
+### 4.5 Oggetto
 
 **Deciso (2026-11-10):** la scheda dell'oggetto ha `## In breve`, `## Descrizione` e `## Effetti`, seguiti dalle sezioni facoltative `## Origine`, `## Ritrovamento`, `## Testo`, `## Valore`, in quest'ordine, e dal blocco riservato finale `### Indicazioni per il master`. La skill `item-manager` crea bozze e controlla le schede senza riscrivere quelle esistenti; le descrizioni delle schede già presenti si adattano una volta, dopo l'aggiornamento del framework, con la migrazione riprendibile descritta in [Gestione degli oggetti](Gestione%20degli%20oggetti.md).
 
-**Categoria:** `Oggetti/`, tipo `objects`, con `template: item`. La categoria produce carte se la sua voce in `structure` dichiara `cards: true`.
-**Metadati:** `id`; `template: item`; `location` (dove si trova adesso, come lista); `print`, solo per gli oggetti con carta.
-**Obbligatorie, in ordine:** titolo; `## In breve`, sintesi pubblica; `## Descrizione`, ciò che i personaggi vedono o sanno; `## Effetti`, nel formato dell'adattatore, oppure «Nessun effetto di gioco». L'immagine di carta, se prevista, segue il titolo e precede le sezioni.
+**Categoria:** `Oggetti/`, tipo `objects`, con `template: item`.
+**Metadati:** `id`; `template: item`; `location` (dove si trova adesso, come lista).
+**Obbligatorie, in ordine:** titolo; `## In breve`, sintesi pubblica; `## Descrizione`, ciò che i personaggi vedono o sanno; `## Effetti`, nel formato dell'adattatore, oppure «Nessun effetto di gioco».
 **Facoltative, in ordine:** `## Origine`, pubblica solo se i personaggi possono conoscerla; `## Ritrovamento`; `## Testo`, per il testo integrale di una lettera o di un libro (prosa normale, senza corsivo); `## Valore`, che segue il documento di economia.
 **Blocco riservato:** `### Indicazioni per il master`, con l'origine vera e i segreti.
-
-**Regole della carta.**
-
-- La carta usa `## In breve`; per una scheda legacy senza questa sezione usa `## Descrizione` come ripiego, senza modificare la scheda.
-- L'immagine finale è `img/<nome-base>.png`, con il sorgente `img/<nome-base>.psd` accanto.
-- Il titolo stampato sulla carta è il titolo `#` della scheda. Quando il titolo cambia, la carta è marcata come da rigenerare: se era `printed`, passa a `reprint`.
-- Una carta già stampata mantiene il nome del file: i codici QR puntano all'`id`, quindi non si rinomina per non rompere la stampa.
 
 ```markdown
 <!-- yllir
 id: lanterna-da-bordo
 template: item
 location: [porto-di-selce]
-print: to-print
 -->
 
 # Lanterna da bordo
@@ -596,10 +586,10 @@ Non contiene segreti.
 
 ### 4.6 Annuncio di bacheca
 
-**Categoria:** `Oggetti/`: un annuncio è un oggetto (la carta appesa alla bacheca) con `template: notice`. Nessuna categoria in più (YAGNI).
-**Metadati:** `id`; `template: notice`; `location`, con il solo luogo della bacheca; `print` se l'annuncio ha una carta.
+**Categoria:** `Oggetti/`: un annuncio è un oggetto (l'avviso appeso alla bacheca) con `template: notice`. Nessuna categoria in più (YAGNI).
+**Metadati:** `id`; `template: notice`; `location`, con il solo luogo della bacheca.
 **Obbligatorie, in ordine:** titolo; `## Testo`, il testo dell'annuncio come è affisso; `## Premio`, con la ricompensa nella forma dei prezzi (vedi 4.4), oppure «Nessun premio».
-**Facoltative, in ordine:** immagine di carta sotto il titolo; `## Indizi`, ciò che il lettore può ricavare dall'annuncio.
+**Facoltative, in ordine:** `## Indizi`, ciò che il lettore può ricavare dall'annuncio.
 **Blocco riservato:** `### Indicazioni per il master`, con il committente vero, le condizioni nascoste e l'esito reale.
 
 ```markdown
@@ -875,7 +865,6 @@ Nei documenti di `Trama/` il controllo sui blocchi con tre backtick non si appli
 | PNG | sezioni obbligatorie e ordine; `location` esistenti | se il PNG combatte e quindi serve `## Statistiche` |
 | Nemico | blocco statistiche conforme allo schema dell'adattatore; `location` presente (anche `[]`); titoli riservati solo nel blocco | se la lore e le regole sono scritte nel registro giusto |
 | Venditore | colonne della tabella; prezzi nell'unità e negli intervalli, o deroga con motivo; oggetti linkati esistenti | se un prezzo è coerente con il tipo di merce |
-| Oggetto | `print` solo con carta; immagine di carta e sorgente `.psd` presenti; `## Effetti` presente; carta marcata da rigenerare se il titolo cambia | se la descrizione è ciò che il personaggio può sapere |
 | Annuncio | `## Premio` presente o dichiarato assente; premio scritto `<numero> <valuta>` con una valuta del documento di economia (nessun intervallo: i premi non hanno categoria. Scelta di implementazione (0.61.0), da confermare dall'autore); `location` esistente | se il testo sembra un avviso credibile nel luogo |
 | Concetto di storia | sezioni obbligatorie; nessuna sezione di tipo personaggio | coerenza con il canone e con le altre voci di `Storia/` |
 | Personaggio giocante | sezioni obbligatorie e ordine; ogni aggancio con le quattro voci e uno stato valido; `level`, se presente, intero positivo; nessun blocco riservato; nessun link pubblico verso `Giocatori/` | se l'integrazione propone canone che va confermato |
@@ -885,13 +874,12 @@ Nei documenti di `Trama/` il controllo sui blocchi con tre backtick non si appli
 
 ## 6. Scelte chiarite
 
-- **Stato di stampa:** solo nel metadato `print`, mai nel testo della scheda.
 - **Annunci:** stanno in `Oggetti/` e si riconoscono da `template: notice`.
 - **Stato dei contenuti:** non serve un campo. Il canone sta nelle schede, gli spunti in `Appunti/`, i segreti nel blocco riservato: la cartella o il blocco dicono già lo stato.
 
 ## 7. Questioni aperte
 
-- **Metadati minimi e categorie.** I metadati minimi (`id`, `location`, `depends_on`, `print`), il blocco riservato in fondo alla scheda e le categorie piatte con `Mondo/` a cascata sono ancora **Proposta** (vedi [Principi](Principi.md), punto 4, e [Architettura](Architettura.md), sezione 3). Vanno confermati prima di diventare decisioni.
+- **Metadati minimi e categorie.** I metadati minimi (`id`, `location`, `depends_on`), il blocco riservato in fondo alla scheda e le categorie piatte con `Mondo/` a cascata sono ancora **Proposta** (vedi [Principi](Principi.md), punto 4, e [Architettura](Architettura.md), sezione 3). Vanno confermati prima di diventare decisioni.
 - **Parte pubblica delle sessioni.** Nessuna uscita legge oggi le sessioni. La sezione 6 presuppone che `Trama/` sia interamente riservata al master: va confermato, oppure va deciso se una sessione ha una parte pubblica.
 - **Titolo delle sessioni.** Il file principale ha il nome della sessione come titolo. Va deciso se la cronaca segue la stessa regola.
 - **Conclusione della sessione.** Con gli eventi in file separati, la sezione conclusiva (2.7) sta nell'ultimo evento. Va confermato.

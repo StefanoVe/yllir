@@ -22,7 +22,7 @@ const OFF = { enabled: false, built: false, report: null, publishing: 'not-confi
 describe('encyclopedia routes with the module off', () => {
   let f: Fixture;
   beforeEach(async () => {
-    f = await openFixture(yamlWithModules({ encyclopedia: false, print: false }));
+    f = await openFixture(yamlWithModules({ encyclopedia: false }));
   });
   afterEach(async () => {
     await f.close();
@@ -56,7 +56,7 @@ describe('encyclopedia routes with the module off', () => {
 describe('encyclopedia status and build', () => {
   let f: Fixture;
   beforeEach(async () => {
-    f = await openFixture(yamlWithModules({ encyclopedia: true, print: false }));
+    f = await openFixture(yamlWithModules({ encyclopedia: true }));
   });
   afterEach(async () => {
     await f.close();
@@ -146,7 +146,7 @@ describe('the built site at /enc', () => {
   let outside: string;
 
   beforeEach(async () => {
-    f = await openFixture(yamlWithModules({ encyclopedia: true, print: false }));
+    f = await openFixture(yamlWithModules({ encyclopedia: true }));
     site = siteDirOf(f.root);
     await fs.mkdir(path.join(site, 'e', 'mappa'), { recursive: true });
     await fs.mkdir(path.join(site, 'empty'), { recursive: true });
@@ -215,7 +215,7 @@ describe('the built site at /enc', () => {
 describe('the site with the module on but no build yet', () => {
   let f: Fixture;
   beforeEach(async () => {
-    f = await openFixture(yamlWithModules({ encyclopedia: true, print: false }));
+    f = await openFixture(yamlWithModules({ encyclopedia: true }));
   });
   afterEach(async () => {
     await f.close();

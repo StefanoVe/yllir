@@ -31,7 +31,6 @@ Delimiters: line 1 of the file is exactly `<!-- yllir`; the block ends at the fi
 | `participants` | only for `kind: event` | flow list of subject ids | subjects taking part in the event |
 | `aliases` | optional | flow list of names | other names of the subject |
 | `sketch` | optional | only `true` | marks a sketch (4.12) |
-| `print` | objects with a card | `to-print`, `printed` or `reprint` | print state of the card |
 | `depends_on` | plot sessions and events | flow list of ids; `[]` when none | prerequisites (section 2) |
 | `session`, `characters`, `items`, `appearances` | plot event files | see section 2 | |
 | `played` | chronicle pages | flow list of session ids; `[]` when none | what was played that evening (section 3) |
@@ -56,7 +55,7 @@ The five types are `member-of` (membership), `kin-of` (kinship), `ally-of` (alli
 
 ### 1.3 Public part and master block
 
-Everything above the master block is public. Exports, encyclopedia and cards read only the public part. The master block is the last content of the file, in this exact form:
+Everything above the master block is public. Exports and the encyclopedia read only the public part. The master block is the last content of the file, in this exact form:
 
 ```markdown
 <!-- master -->
@@ -300,11 +299,10 @@ Validated: the sections and their order, the no-statistics sentence for `creatur
 
 ### 4.6 Item (`template: item`)
 
-- Category: `Oggetti/`; produces cards when its `structure` entry sets `cards: true`. Metadata block: `id`, `kind: item`, `template: item`, `provenance`, `location` (where it is now), `print` for objects with a card.
+- Category: `Oggetti/`. Metadata block: `id`, `kind: item`, `template: item`, `provenance`, `location` (where it is now).
 - Required, in order: the title; `## In breve` (English: `## In brief`), a public summary of the item as the players know it; `## Descrizione` (English: `## Description`); `## Effetti` (English: `## Effects`), with only the effects known to the players, in the adapter's format, or the sentence `Nessun effetto di gioco` (English: `No game effect`) when no effect is known to the players.
 - Optional, in order after Effects: `## Origine` (English: `## Origin`); `## Ritrovamento` (English: `## Finding`); `## Testo` (English: `## Text`), full text of a letter or book, ordinary prose; `## Valore` (English: `## Value`).
 - Master block: `### Indicazioni per il master` (English: `### Master notes`), with the full context of the item: what it really is, its true origin, its complete real effects, its secrets, its plot uses, and what the players do not know yet. Public sections never state or hint at these.
-- Card image, if planned, follows the title: `img/<base-name>.png` with the `.psd` source beside it. A printed card keeps its file name (QR codes point to the `id`).
 
 Validated: exactly one public level-1 title; `In breve`, `Descrizione`, `Effetti` in this order and non-empty; optional sections in order without duplicates; master block.
 

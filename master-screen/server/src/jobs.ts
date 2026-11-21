@@ -1,4 +1,4 @@
-// One build or sheet job at a time per campaign, across the encyclopedia and print modules.
+// One build job at a time per campaign.
 // A second request while one runs gets a busy answer instead of a second process. Owner: master-screen server.
 import type { Ctx } from './context.js';
 import type { Lang } from './chat/text.js';

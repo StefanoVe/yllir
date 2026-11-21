@@ -53,7 +53,7 @@ Il pubblico di riferimento è il master che non ha mai usato un'intelligenza art
 - Ogni soggetto importante (personaggio, luogo, oggetto, creatura, fazione) ha una sola scheda dedicata, con il suo tipo dichiarato nei metadati (`kind`). Lì stanno identità, capacità e stato (**Implementato in 0.30.0**).
 - Le sessioni e gli eventi descrivono che cosa succede e rimandano alla scheda. Non ridefiniscono l'identità di un soggetto.
 - Il documento del seme del mondo sostituisce la frase unica di descrizione in `campaign.yaml`. Contiene genere, temi, conflitti, fazioni, culture, convenzioni dei nomi, livello di potere e cose da evitare, e cresce con il mondo (Riprogettazione, sezione 4; **Implementato in 0.30.0**).
-- Gli indici e i derivati sono **derivati**: si rigenerano dai documenti e non si modificano a mano. Sono derivati l'indice dei soggetti, l'indice del mondo, il file principale di ogni sessione e la mappa della trama (**Implementato in 0.30.0** per i primi tre). L'enciclopedia, i fogli di stampa e le viste per luogo sono **Proposta**.
+- Gli indici e i derivati sono **derivati**: si rigenerano dai documenti e non si modificano a mano. Sono derivati l'indice dei soggetti, l'indice del mondo, il file principale di ogni sessione e la mappa della trama (**Implementato in 0.30.0** per i primi tre). L'enciclopedia e le viste per luogo sono **Proposta**.
 - Un fatto inventato dal framework entra nel canone solo come documento generato, con la sua provenienza dichiarata, e il master ne è avvisato (Riprogettazione, decisioni 7 e 12; vedi principio 14). Un fatto generato non viene mai presentato come detto dal master.
 - Gli abbozzi (righe di un piano non ancora espanse) sono documenti del canone marcati come tali, non appunti separati (Riprogettazione, decisione 13; vedi principio 8). Gli appunti fuori canone, in una cartella `Appunti/`, restano **Proposta**.
 
@@ -61,13 +61,13 @@ Il pubblico di riferimento è il master che non ha mai usato un'intelligenza art
 
 **Deciso** (indice, «Note riservate e agenti»). Le informazioni riservate stanno in fondo alla stessa scheda, nel blocco `## Master`, e non escono mai verso chi non deve vederle. La forma esatta del blocco e le sue regole stanno in [Formato dei contenuti](Formato%20dei%20contenuti.md#13-parte-pubblica-e-blocco-riservato): qui si fissa soltanto chi può leggerlo.
 
-**Motivazione.** Il master vuole preparare e consultare tutto in un unico documento, ma le uscite della campagna (enciclopedia, carte, stampe, prompt per immagini, testi per i giocatori) non devono mai contenere ciò che il master tiene riservato. Se la separazione dipende dalla memoria dell'agente, prima o poi un segreto esce. Deve valere per regola, e uno script la verifica.
+**Motivazione.** Il master vuole preparare e consultare tutto in un unico documento, ma le uscite della campagna (enciclopedia, prompt per immagini, testi per i giocatori) non devono mai contenere ciò che il master tiene riservato. Se la separazione dipende dalla memoria dell'agente, prima o poi un segreto esce. Deve valere per regola, e uno script la verifica.
 
 **Conseguenze pratiche.**
 
 - Gli agenti che lavorano sul canone vedono anche il blocco riservato, perché devono controllarlo: l'autore, il revisore di lotto (che giudica i segreti finiti nel testo pubblico) e, quando è richiesto, l'audit di continuità (Riprogettazione, sezione 1).
 - Per gli esecutori economici che scrivono le schede, la regola non è ancora decisa: vedi Questioni aperte.
-- Non lo ricevono mai: i revisori di testi destinati ai giocatori (enciclopedia, carte, riepiloghi), i fornitori di immagini, le ricerche web (Riprogettazione, decisione 10: una ricerca non riceve mai il blocco riservato) e i servizi di pubblicazione. Le uscite pubbliche leggono solo la parte pubblica.
+- Non lo ricevono mai: i revisori di testi destinati ai giocatori (enciclopedia, riepiloghi), i fornitori di immagini, le ricerche web (Riprogettazione, decisione 10: una ricerca non riceve mai il blocco riservato) e i servizi di pubblicazione. Le uscite pubbliche leggono solo la parte pubblica.
 - L'enciclopedia pubblica non include il seme della campagna né le categorie interamente riservate, nemmeno il loro titolo (decisione dell'autore, 2026-11-12).
 - Un contenuto riservato diventa pubblico solo con un'azione esplicita del master, cioè lo spostamento del testo fuori dal blocco.
 - Un rimando da un testo pubblico a una nota riservata punta alla nota con un'ancora (per esempio `scheda.md#master`), ma non ne riporta il contenuto.
@@ -268,7 +268,7 @@ I termini della colonna «Termine interno» sono usati nei documenti di progetto
 | Skill di libreria | «Strumento» o nulla | Operazione specialistica richiamata dal core |
 | Modulo | «Impostazione» o «Stile» | Estensione opzionale attivata dalla configurazione |
 | Adattatore di sistema | «Regole del gioco» | Modulo che descrive la forma delle schede di un gioco (schema) e la sua aritmetica; non contiene le tabelle delle regole |
-| Profilo di stile | «Stile delle immagini» | Insieme di indicazioni visive per carte, ritratti e mappe (**Proposta**) |
+| Profilo di stile | «Stile delle immagini» | Insieme di indicazioni visive per ritratti e mappe (**Proposta**) |
 | Core | Non visibile | Insieme dei processi e delle regole fisse del framework |
 | Libreria | Non visibile | Insieme degli strumenti specialistici |
 | Autore (agente principale) | «L'assistente» | Agente di alto livello che parla con il master, scrive mondo, schede e scene, e decide |
@@ -322,10 +322,8 @@ I termini della colonna «Termine interno» sono usati nei documenti di progetto
 | Argomento | Non più usato | Superato dalla Riprogettazione (decisione 15): non esistono più argomenti salvati |
 | Handoff | Non più usato | Superato dalla Riprogettazione (decisione 15): sostituito dalla nota sul lavoro in corso |
 | Sessione (documento) | «Sessione» | Documento di una giocata o di un'attività di trama, in `Trama/` |
-| Stato di stampa (metadato `print`) | «Da stampare», «Stampata», «Da ristampare» | Stato fisico della carta di un oggetto (`to-print`, `printed`, `reprint`) (**Proposta**) |
 | Tela libera | «Tela libera» | Area libera del master screen, senza struttura fissa (**Proposta**) |
-| Master screen | «Schermo del master» | Strumento grafico locale del master: chat, consultazione, sessione live, musica, stampa (**Proposta**) |
-| PSD | «File di lavoro del disegno» | File a livelli per la modifica di una carta (**Proposta**) |
+| Master screen | «Schermo del master» | Strumento grafico locale del master: chat, consultazione, sessione live, musica (**Proposta**) |
 | PNG | «Immagine» | Formato di immagine finale (**Proposta**) |
 | JSON, YAML | «Dati» | Formati di file per i dati strutturati |
 

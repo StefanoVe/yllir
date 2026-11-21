@@ -1,8 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(claude plugin update *)",
       "Bash(claude plugin marketplace update *)",
+      "Bash(claude plugin update *)",
       "Bash(node \"*/scripts/add-category.mjs\" *)",
       "Bash(node \"*/scripts/build-index.mjs\" *)",
       "Bash(node \"*/scripts/engine.mjs\" *)",
@@ -51,7 +51,6 @@
       "Bash(node \"*/skills/library/music-search/scripts/verify-link.mjs\" *)",
       "Bash(node \"*/skills/library/new-campaign/scripts/init-campaign.mjs\" *)",
       "Bash(node \"*/skills/library/new-campaign/scripts/set-system.mjs\" *)",
-      "Bash(node \"*/skills/library/print/scripts/print.mjs\" *)",
       "Bash(node \"*/skills/library/session-log/scripts/session-log.mjs\" *)",
       "Bash(node \"*/skills/library/update/scripts/economy-question.mjs\" *)",
       "Bash(node \"*/skills/library/update/scripts/encounters.mjs\" *)",

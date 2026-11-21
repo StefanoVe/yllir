@@ -50,7 +50,7 @@ describe('MusicMini', () => {
   }
 
   it('renders nothing with the music module off', async () => {
-    server.modules.set({ music: false, print: false, encyclopedia: false });
+    server.modules.set({ music: false, encyclopedia: false });
     await render(PLAYING);
     expect(el('.round')).toBeNull();
     expect(el('.card')).toBeNull();

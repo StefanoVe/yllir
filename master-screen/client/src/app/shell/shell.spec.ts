@@ -16,7 +16,7 @@ interface Harness {
   router: Router;
 }
 
-const ALL_MODULES: Record<ModuleId, boolean> = { music: true, print: true, encyclopedia: true } as Record<ModuleId, boolean>;
+const ALL_MODULES: Record<ModuleId, boolean> = { music: true, encyclopedia: true } as Record<ModuleId, boolean>;
 
 /** Builds the shell with fake status, live and settings services. Settings start from the defaults, then `tweak` applies. */
 function create(
@@ -53,7 +53,7 @@ function create(
 }
 
 function setup(music: boolean): ComponentFixture<Shell> {
-  return setupModules({ music, print: false, encyclopedia: false });
+  return setupModules({ music, encyclopedia: false });
 }
 
 function setupModules(flags: Record<ModuleId, boolean>): ComponentFixture<Shell> {
@@ -97,7 +97,7 @@ describe('Shell music entry', () => {
   });
 
   it('hides the music icon when rail.music is off, and keeps the dock when dock is always', () => {
-    const { fixture } = create({ music: true, print: false, encyclopedia: false }, (s) => {
+    const { fixture } = create({ music: true, encyclopedia: false }, (s) => {
       s.ui.rail.music = false;
     });
     expect(fixture.nativeElement.querySelector('a[href="/music"]')).toBeNull();
@@ -105,7 +105,7 @@ describe('Shell music entry', () => {
   });
 
   it('hides the dock when dock is playing and nothing is playing', () => {
-    const { fixture } = create({ music: true, print: false, encyclopedia: false }, (s) => {
+    const { fixture } = create({ music: true, encyclopedia: false }, (s) => {
       s.music.dock = 'playing';
     });
     expect(fixture.nativeElement.querySelector('ms-music-dock')).toBeNull();
@@ -113,39 +113,29 @@ describe('Shell music entry', () => {
   });
 });
 
-describe('Shell encyclopedia and print entries', () => {
+describe('Shell encyclopedia entry', () => {
   afterEach(() => {
     TestBed.resetTestingModule();
   });
 
-  it('shows the encyclopedia and print icons only when their modules are on', () => {
-    const fixture = setupModules({ music: false, print: true, encyclopedia: true });
+  it('shows the encyclopedia icon only when its module is on', () => {
+    const fixture = setupModules({ music: false, encyclopedia: true });
     const encyclopedia = fixture.nativeElement.querySelector('a[href="/encyclopedia"]') as HTMLAnchorElement | null;
-    const print = fixture.nativeElement.querySelector('a[href="/print"]') as HTMLAnchorElement | null;
     expect(encyclopedia?.getAttribute('aria-label')).toBe('Encyclopedia');
     expect(encyclopedia?.hasAttribute('title')).toBe(false);
-    expect(print?.getAttribute('aria-label')).toBe('Print');
-    expect(print?.hasAttribute('title')).toBe(false);
   });
 
-  it('hides each icon when its own module is off', () => {
-    const fixture = setupModules({ music: false, print: false, encyclopedia: true });
-    expect(fixture.nativeElement.querySelector('a[href="/encyclopedia"]')).not.toBeNull();
-    expect(fixture.nativeElement.querySelector('a[href="/print"]')).toBeNull();
-  });
-
-  it('hides both icons when both modules are off', () => {
-    const fixture = setupModules({ music: true, print: false, encyclopedia: false });
+  it('hides the encyclopedia icon when its module is off', () => {
+    const fixture = setupModules({ music: true, encyclopedia: false });
     expect(fixture.nativeElement.querySelector('a[href="/encyclopedia"]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('a[href="/print"]')).toBeNull();
   });
+
 
   it('hides the encyclopedia icon when rail.encyclopedia is off even if the module is on', () => {
     const { fixture } = create(ALL_MODULES, (s) => {
       s.ui.rail.encyclopedia = false;
     });
     expect(fixture.nativeElement.querySelector('a[href="/encyclopedia"]')).toBeNull();
-    expect(fixture.nativeElement.querySelector('a[href="/print"]')).not.toBeNull();
   });
 });
 
@@ -155,7 +145,7 @@ describe('Shell documents entry', () => {
   });
 
   it('shows the documents icon right after the live table icon, whatever the modules', () => {
-    const fixture = setupModules({ music: false, print: false, encyclopedia: false });
+    const fixture = setupModules({ music: false, encyclopedia: false });
     const hrefs = railHrefs(fixture);
     expect(hrefs.indexOf('/docs')).toBe(hrefs.indexOf('/live') + 1);
     const docs = fixture.nativeElement.querySelector('a[href="/docs"]') as HTMLAnchorElement;

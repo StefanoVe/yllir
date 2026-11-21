@@ -82,7 +82,6 @@ structure:                       # facoltativo alla creazione. Categorie di docu
                                  # sources: originali acquisiti (foto, PDF, scansioni) con trascrizione e scheda di acquisizione, scritti dall'ingest. Non entrano nell'indice dei soggetti e non si collegano in automatico; l'audit li legge come ipotesi.
                                  # external: documenti di un'altra campagna o di materiale condiviso, in sola lettura: canone per audit e ricerca, destinazione dei link per il linker. Non vengono mai modificati. Vedi Fonti esterne.
     style: id                    # facoltativo. Profilo di stile per gli artwork di questa categoria.
-    cards: false                 # facoltativo. Se vero, gli oggetti producono carte illustrate.
     exclude: []                  # facoltativo, solo con type external. Percorsi (file o cartelle, relativi alla cartella, con /) che non vengono indicizzati.
 
 audit:                           # facoltativo. Decisione dell'autore (2026-11-07): il registro delle esclusioni sta qui.
@@ -95,7 +94,6 @@ audit:                           # facoltativo. Decisione dell'autore (2026-11-0
                                  # Le voci le scrive il framework su richiesta del master; nessuna migrazione le riscrive.
 
 modules:                         # facoltativo. Solo moduli veri, ciascuno attivabile.
-  print: false                   # facoltativo. Fogli di stampa delle carte.
   encyclopedia: false            # facoltativo. Enciclopedia pubblica della campagna.
   master_screen: false           # facoltativo. Strumento grafico locale del master.
   music: false                   # facoltativo. Ricerca di sottofondi e colonne sonore.
@@ -103,12 +101,7 @@ modules:                         # facoltativo. Solo moduli veri, ciascuno attiv
 
 encyclopedia:                    # facoltativo. Impostazioni dell'enciclopedia pubblica; si usano solo con modules.encyclopedia: true.
   title: testo                   # facoltativo. Titolo del sito. Se manca, si usa campaign.name (Proposta).
-  base_url: http://localhost/    # facoltativo. Indirizzo di base del sito: le voci stanno a <base_url>/e/<id>/ e i QR lo usano. Predefinito: http://localhost/ (solo locale, Deciso 2026-11-12).
-
-print:                           # facoltativo. Impostazioni dei fogli di stampa; si usano solo con modules.print: true.
-  format: 5x7 | a4               # facoltativo. Formato dei fogli. Predefinito: 5x7 (Proposta).
-  cmyk: false                    # facoltativo. Se vero, i file sono in CMYK, solo per le tipografie che lo chiedono. Predefinito: falso (Proposta).
-  renderer: auto | photoshop | node  # facoltativo. auto usa Photoshop tramite MCP se è presente, altrimenti il renderer Node. Predefinito: auto (Deciso 2026-11-12 per il renderer; il valore di default è Proposta).
+  base_url: http://localhost/    # facoltativo. Indirizzo di base del sito: le voci stanno a <base_url>/e/<id>/. Predefinito: http://localhost/ (solo locale, Deciso 2026-11-12).
 
 workflow:                        # facoltativo. Modo di lavoro dei processi di scrittura.
   auto_accept: false             # facoltativo. Se falso (predefinito), prima di scrivere un documento l'assistente riassume i cambiamenti e chiede al master se può procedere. Se vero, scrive senza chiedere e racconta il risultato dopo. Decisione dell'autore, 2026-11-14.
@@ -232,19 +225,17 @@ structure:
     folder: Oggetti
     type: objects
     style: dark-fantasy
-    cards: true
   - id: giocatori
     folder: Giocatori
     type: master-only
 
 modules:
-  print: false
   encyclopedia: false
   master_screen: false
   music: false
 ```
 
-Il file non contiene la versione del framework: sta in `.campaign/version.yaml`. La configurazione non ha un blocco delle regole del canone e non ha un blocco separato per gli stili: lo stile di ogni categoria è in `structure[].style`, e le carte in `structure[].cards`. La descrizione dell'ambientazione sta nel seme, `Seme del mondo.md`.
+Il file non contiene la versione del framework: sta in `.campaign/version.yaml`. La configurazione non ha un blocco delle regole del canone e non ha un blocco separato per gli stili: lo stile di ogni categoria è in `structure[].style`. La descrizione dell'ambientazione sta nel seme, `Seme del mondo.md`.
 
 ## Da configurazione a istruzioni
 
@@ -253,7 +244,7 @@ Il generatore produce i file in `.campaign/instructions/` in questi passaggi:
 1. legge `campaign.yaml` ed esegue il validatore; se fallisce, non genera nulla;
 2. carica il template unico del pacchetto, `templates/instructions.md` (**Implementato in 0.30.0**: un solo template, per Claude Code);
 3. sostituisce i segnaposto con i valori della configurazione (nome, lingua, registro, cartelle delle categorie, adattatore, stili);
-4. include le sezioni condizionate ai moduli attivi: per esempio la sezione della stampa compare solo con `modules.print: true`. Le funzioni di libreria non hanno sezioni condizionate;
+4. include le sezioni condizionate ai moduli attivi: per esempio la sezione dell'enciclopedia compare solo con `modules.encyclopedia: true`. Le funzioni di libreria non hanno sezioni condizionate;
 5. inserisce le regole di processo fisse del framework (revisione della bozza canonica rispetto ai documenti di contesto, collegamenti dopo, derivati aggiornati), che non dipendono dalla campagna e non sono modificabili dalla configurazione; gli audit di continuità partono dai processi che li richiamano esplicitamente;
 6. aggiunge il rimando a `.campaign/customizations.md`, che l'agente legge insieme alle istruzioni;
 7. scrive il file con un'intestazione che dichiara che è generato e indica dove fare le modifiche;
@@ -300,12 +291,11 @@ La validazione è uno script deterministico, non un giudizio dell'agente. Contro
 - il formato di `campaign.slug`, `campaign.created` e `language.main`;
 - il formato di `campaign.seed`: nome di un file `.md` relativo alla radice, senza `..` (il file può non esistere ancora);
 - le chiavi ammesse: una chiave sconosciuta è un errore. `allow_model_imagination` è ammessa con qualunque valore e ignorata;
-- le impostazioni dell'enciclopedia e della stampa (decisione dell'autore, 2026-11-12): `encyclopedia.base_url` è `http` o `https`, senza query (`?`) né frammento (`#`); `print.format`, `print.cmyk` e `print.renderer` accettano solo i valori dello schema;
+- le impostazioni dell'enciclopedia (decisione dell'autore, 2026-11-12): `encyclopedia.base_url` è `http` o `https`, senza query (`?`) né frammento (`#`);
 - l'impostazione del modo di lavoro (decisione dell'autore, 2026-11-14): `workflow.auto_accept` accetta solo vero o falso;
 - l'illustrazione automatica degli oggetti (Deciso, 2026-11-14): `workflow.auto_item_images` accetta solo vero o falso;
 - l'unicità degli `id` di categoria e l'esistenza delle cartelle dichiarate in `structure` (solo quelle: il validatore non controlla altro);
 - l'esistenza dell'adattatore e dei profili di stile citati;
-- la coerenza delle carte: `cards: true` ha senso solo su una categoria di tipo `oggetti`;
 - la compatibilità fra la versione del framework in `.campaign/version.yaml` e la versione installata;
 - l'impronta dei file generati in `.campaign/version.yaml`, per rilevare modifiche a mano.
 

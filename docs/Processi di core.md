@@ -105,7 +105,7 @@ Le parole mostrate al master sono nel lessico della skill di ingresso (`yllir/sk
 6. **Prima versione salvata**, con il messaggio della creazione.
 7. **Chiusura.** Due o tre frasi d'esempio per proseguire («descrivimi il primo luogo», «prepariamo la prima sessione», «ho degli appunti da importare»).
 
-**Deciso.** L'intervista serve solo a creare i primi file core della campagna. Tutto il resto (luoghi, personaggi, oggetti, economia, moduli, stili) lo costruisce il master poco alla volta, quando gli serve, con gli altri processi. *Confermato dalla Riprogettazione, decisione 8 (2026-11-11).* Le altre categorie nascono la prima volta che servono (principio di economia della campagna). Le domande su categorie di documenti, regole del canone, giocatori, ritmo, finali, combattimenti, immagini, stampa, enciclopedia, musica e materiale da importare si pongono quando servono, non all'inizio.
+**Deciso.** L'intervista serve solo a creare i primi file core della campagna. Tutto il resto (luoghi, personaggi, oggetti, economia, moduli, stili) lo costruisce il master poco alla volta, quando gli serve, con gli altri processi. *Confermato dalla Riprogettazione, decisione 8 (2026-11-11).* Le altre categorie nascono la prima volta che servono (principio di economia della campagna). Le domande su categorie di documenti, regole del canone, giocatori, ritmo, finali, combattimenti, immagini, enciclopedia, musica e materiale da importare si pongono quando servono, non all'inizio.
 
 **Deciso (2026-11-09):** l'intervista funziona così.
 
@@ -326,7 +326,6 @@ Le questioni marcate **Superata dalla Riprogettazione (2026-11-11)** restano qui
 
 - **Nomi dei processi.** Le etichette degli otto processi sono comprensibili per il master? Va verificato con un utente che non ha mai usato un'IA, in [Esperienza utente](Esperienza%20utente.md).
 - **Preparazione e dopo la sessione.** La preparazione scrive documenti di sessione: vanno considerati parte del processo dopo la sessione o restano un documento separato? **Superata dalla Riprogettazione (2026-11-11):** sono due processi distinti nella sezione 8.
-- **Confini del processo «dopo la sessione».** La creazione di carte degli oggetti appartiene a questo processo o solo alla manutenzione? Proposta: la carta si genera al momento dell'oggetto, non a fine sessione, per evitare di aspettare. *Aperta:* la versione 0.30.0 non descrive le carte, e questa domanda resta da chiudere con il processo di creazione di oggetti.
 - **Conferme sulle conseguenze.** Quali conseguenze sulle sessioni future richiedono conferma esplicita? Il processo dopo la sessione applica solo le conseguenze dichiarate dal master e propone le altre; le proposte che riscrivono una sessione futura richiedono una conferma. *Aperta.* Aggiunta (2026-11-09): riscrivere una sessione non ancora giocata è esplicito per natura, perché è il master a chiederlo.
 - **Revisione dell'import.** L'import di materiale condiviso senza richiesta deve sempre chiedere il permesso prima di scrivere, o solo quando il materiale tocca il canone? L'import oggi parte subito quando i file sono condivisi. *Aperta:* l'autore decide il limite.
 - **Ordine dei passi «Canone» e «Conseguenze».** **Superata dalla Riprogettazione (2026-11-11):** cronaca e conseguenze sono due fasi di un solo lotto, senza ordine da stabilire (sezione 8).

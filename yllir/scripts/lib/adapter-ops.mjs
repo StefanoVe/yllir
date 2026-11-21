@@ -124,28 +124,6 @@ export async function validateSheet(adapter, kind, markdown, lang) {
   return { ok: errors.length === 0, errors };
 }
 
-export function cardFields(adapter, markdown, lang) {
-  const errors = [];
-  const langIssue = languageError(lang);
-  if (langIssue) return { ok: false, errors: [langIssue], fields: {} };
-  const fields = {};
-  const allowed = adapter.item_sheet?.printable_fields ?? [];
-  const body = publicBody(markdown);
-  const titleMatch = /^#[ \t]+(.+?)[ \t]*#*[ \t]*$/m.exec(body);
-  const briefTitle = adapter.headings?.brief?.[lang] ?? (lang === 'it' ? 'In breve' : 'In brief');
-  const brief = briefTitle ? section(body, briefTitle) : null;
-  const description = brief === null
-    ? section(body, adapter.headings?.description?.[lang] ?? '')
-    : brief;
-
-  for (const name of allowed) {
-    if (name === 'title' && titleMatch) fields.title = titleMatch[1].trim();
-    else if (name === 'description' && description !== null) fields.description = description.trim();
-    else errors.push(error('missing-field', `missing printable field: ${name}`));
-  }
-  return { ok: errors.length === 0, errors, fields };
-}
-
 export function progressionEvent(adapter, event) {
   if (adapter.progression?.method !== 'milestone') {
     return { ok: true, milestone: false, reason: 'adapter-has-no-milestones' };

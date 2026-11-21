@@ -29,7 +29,6 @@ const SAMPLE = lines(
   '  - id: oggetti',
   '    folder: Oggetti',
   '    type: objects',
-  '    cards: true',
   '',
   'scope_note: >',
   '  first line',
@@ -47,7 +46,7 @@ const SAMPLE_EXPECTED = {
   system: { adapter: 'none', options: {} },
   structure: [
     { id: 'trama', folder: 'Trama', type: 'plot' },
-    { id: 'oggetti', folder: 'Oggetti', type: 'objects', cards: true },
+    { id: 'oggetti', folder: 'Oggetti', type: 'objects' },
   ],
   scope_note: 'first line second line\n',
 };

@@ -19,7 +19,7 @@ export interface Fixture {
   close(): Promise<void>;
 }
 
-export function yamlWithModules(modules: { encyclopedia: boolean; print: boolean; music?: boolean }, language = 'en'): string {
+export function yamlWithModules(modules: { encyclopedia: boolean; music?: boolean }, language = 'en'): string {
   return [
     'schema: 1',
     'campaign:',
@@ -29,7 +29,6 @@ export function yamlWithModules(modules: { encyclopedia: boolean; print: boolean
     `  main: ${language}`,
     'modules:',
     `  encyclopedia: ${modules.encyclopedia}`,
-    `  print: ${modules.print}`,
     ...(modules.music !== undefined ? [`  music: ${modules.music}`] : []),
     '',
   ].join('\n');

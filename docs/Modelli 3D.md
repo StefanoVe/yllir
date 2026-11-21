@@ -81,5 +81,5 @@ I difetti semplici si riparano in automatico e si dichiara cosa è stato riparat
 - **Più viste:** serve generare più immagini dello stesso soggetto (fronte, retro, lato), o ne basta una?
 - **Formato:** solo STL, o anche 3MF?
 - **Parametri della stampante:** in `campaign.yaml` o nella configurazione del modulo? Si possono dichiarare più stampanti?
-- **Modulo opzionale:** come la stampa (L10), con un'attivazione nella configurazione, o sempre disponibile?
+- **Modulo opzionale:** con un'attivazione nella configurazione, o sempre disponibile?
 - **Più parti:** figura e base separate, o un solo pezzo?

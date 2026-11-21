@@ -22,7 +22,7 @@ const FULL_PATCH: ScreenSettingsPatch = {
     density: 'compact',
     motion: 'reduced',
     startPage: 'plot',
-    rail: { plot: false, docs: false, music: false, encyclopedia: false, print: false, atlas: false },
+    rail: { plot: false, docs: false, music: false, encyclopedia: false, atlas: false },
   },
 };
 
@@ -49,7 +49,7 @@ describe('sanitizeStored', () => {
       live: { model: 'sonnet' },
       combat: { show_maps: false, auto_hide_seconds: 9, panels: { chat: true } },
       music: { volume: 35, loop: false, dock: 'playing' },
-      ui: { start_page: 'docs', rail: { print: false } },
+      ui: { start_page: 'docs', rail: { docs: false } },
     });
     assert.equal(settings.live.model, 'sonnet');
     assert.equal(settings.combat.showMaps, false);
@@ -59,7 +59,7 @@ describe('sanitizeStored', () => {
     assert.equal(settings.music.loop, false);
     assert.equal(settings.music.dock, 'playing');
     assert.equal(settings.ui.startPage, 'docs');
-    assert.equal(settings.ui.rail.print, false);
+    assert.equal(settings.ui.rail.docs, false);
     assert.deepEqual(
       explicit.sort(),
       [
@@ -70,7 +70,7 @@ describe('sanitizeStored', () => {
         'music.dock',
         'music.loop',
         'music.volume',
-        'ui.rail.print',
+        'ui.rail.docs',
         'ui.startPage',
       ],
     );
@@ -93,7 +93,7 @@ describe('sanitizeStored', () => {
     const { settings, explicit } = sanitizeStored({
       combat: { auto_hide_seconds: 99, show_maps: 'maybe', model: 'gpt' },
       music: { volume: 101, fade_seconds: 0, dock: 'never' },
-      ui: { density: 'huge', rail: { print: 'yes' } },
+      ui: { density: 'huge', rail: { docs: 'yes' } },
       unknown_section: { anything: true },
     });
     assert.deepEqual(settings, DEFAULT_SETTINGS);
@@ -115,11 +115,11 @@ describe('sanitizeStored', () => {
 describe('mergeSettings', () => {
   it('returns a new object and leaves the base and the patch unchanged', () => {
     const base = structuredClone(DEFAULT_SETTINGS);
-    const patch: ScreenSettingsPatch = { combat: { autoHideSeconds: 7 }, ui: { rail: { print: false } } };
+    const patch: ScreenSettingsPatch = { combat: { autoHideSeconds: 7 }, ui: { rail: { docs: false } } };
     const patchCopy = structuredClone(patch);
     const merged = mergeSettings(base, patch);
     assert.equal(merged.combat.autoHideSeconds, 7);
-    assert.equal(merged.ui.rail.print, false);
+    assert.equal(merged.ui.rail.docs, false);
     assert.equal(merged.ui.rail.plot, true);
     assert.notEqual(merged, base);
     assert.deepEqual(base, DEFAULT_SETTINGS);
@@ -138,7 +138,7 @@ describe('explicitPaths', () => {
 
 describe('serializeSettings and the real yaml-lite', () => {
   it('writes the explicit keys only, with a header comment and snake_case keys', () => {
-    const text = serializeSettings({ combat: { autoHideSeconds: 7 }, ui: { rail: { print: false } } });
+    const text = serializeSettings({ combat: { autoHideSeconds: 7 }, ui: { rail: { docs: false } } });
     assert.equal(
       text,
       [
@@ -147,7 +147,7 @@ describe('serializeSettings and the real yaml-lite', () => {
         '  auto_hide_seconds: 7',
         'ui:',
         '  rail:',
-        '    print: false',
+        '    docs: false',
         '',
       ].join('\n'),
     );

@@ -1,13 +1,13 @@
 # Master screen
 
-**Stato:** Bozza di progetto. Fasi 1, 2 e musica (fase 3) implementate (2026-11-12): sorgente in `master-screen/`, pacchetto pubblicato come release di GitHub dalla CI e scaricato dal launcher; chat, modifiche con annullamento, lettura e ricerca, tavolo live (il cockpit importato dal prototipo: tavola, registro, scontri con mappa di battaglia), mappa della trama, player musicale, enciclopedia locale (generazione e anteprima, senza pubblicazione) e stampa (fogli PDF con QR, stato di stampa, carte con Photoshop o renderer Node).
+**Stato:** Bozza di progetto. Fasi 1, 2 e musica (fase 3) implementate (2026-11-12): sorgente in `master-screen/`, pacchetto pubblicato come release di GitHub dalla CI e scaricato dal launcher; chat, modifiche con annullamento, lettura e ricerca, tavolo live (il cockpit importato dal prototipo: tavola, registro, scontri con mappa di battaglia), mappa della trama, player musicale, enciclopedia locale (generazione e anteprima, senza pubblicazione).
 
 **Parte di:** [Framework per campagne di GDR](Framework%20per%20campagne%20di%20GDR.md)
 Allineato alla [Riprogettazione](Riprogettazione.md) (2026-11-11) e alle decisioni dell'autore del 2026-11-12.
 
 ## Scopo
 
-Questo documento descrive il master screen: la parte del framework che il master usa per consultare la campagna, seguire una sessione e vedere il lavoro dell'agente mentre accade. Riunisce in un unico strumento le funzioni che altrimenti si dividerebbero fra più programmi separati (musica, stampa, consultazione) e le fa convergere con la chat con l'agente.
+Questo documento descrive il master screen: la parte del framework che il master usa per consultare la campagna, seguire una sessione e vedere il lavoro dell'agente mentre accade. Riunisce in un unico strumento le funzioni che altrimenti si dividerebbero fra più programmi separati (musica, consultazione) e le fa convergere con la chat con l'agente.
 
 È una specifica ad alto livello. Non fissa tecnologie, layout definitivi né dettagli di implementazione: quelli si decidono quando la fase corrispondente parte.
 
@@ -15,7 +15,7 @@ Questo documento descrive il master screen: la parte del framework che il master
 
 - La prima versione del framework non ha una interfaccia grafica: si usa dal terminale o dall'app di Claude. Il master screen è un passo successivo.
 - Il master screen è locale: gira sul computer del master, legge e scrive i file della sua campagna e non dipende da un servizio esterno per funzionare.
-- Le funzioni di consultazione, sessione live, musica e stampa si progettano da zero e confluiscono in un unico strumento, invece che in strumenti separati.
+- Le funzioni di consultazione, sessione live e musica si progettano da zero e confluiscono in un unico strumento, invece che in strumenti separati.
 - La versione iniziale del master screen è snella: una chat con l'agente in cui si vedono, in tempo reale, le modifiche che l'agente fa ai file.
 - **Interfacce semplici (Deciso).** Icone con tooltip al posto dei testi, nessuna complessità non richiesta.
 - Quali altre funzioni confluiscono (vedute illustrate dei luoghi, carte nautiche) non è ancora stato deciso; l'enciclopedia e l'[atlante](Atlante.md) sono decisi. Le opzioni sono presentate in fondo al documento.
@@ -36,7 +36,7 @@ Questo documento descrive il master screen: la parte del framework che il master
 - **Piattaforme (Deciso, 2026-11-12).** Il master screen gira su macOS e Windows. Linux non è un obiettivo della fase 1 (il launcher ha i file per Linux ma non è provato).
 - **Approvazione delle modifiche (Deciso, 2026-11-12).** Il master non approva le modifiche prima: compaiono subito nel pannello «cosa è cambiato» e si annullano dopo con «torna a com'era». Nessuna approvazione preventiva, nemmeno per i file del canone.
 - **Vista per i giocatori (Deciso, 2026-11-12; superato per il proiettore il 2026-11-20).** Per ora non c'è una vista di consultazione per i giocatori. L'anteprima «vista giocatori» (nasconde il blocco riservato) resta solo un controllo del master. Il [Proiettore](Proiettore.md) è la finestra che il master mostra ai giocatori.
-- **Enciclopedia pubblica (Deciso, 2026-11-12): opzione A.** È una sezione del master screen che genera il sito statico e lo mostra in anteprima. Il sito è il bersaglio dei QR della stampa, quindi gli indirizzi si legano a un identificativo stabile e non al nome del file. **Solo in locale per ora** (decisione dell'autore, 2026-11-12): il sito si genera in `.campaign/cache/encyclopedia/` e non viene pubblicato; nessuna credenziale e nessun dominio. La pubblicazione su un host resta da decidere.
+- **Enciclopedia pubblica (Deciso, 2026-11-12): opzione A.** È una sezione del master screen che genera il sito statico e lo mostra in anteprima. Gli indirizzi si legano a un identificativo stabile e non al nome del file. **Solo in locale per ora** (decisione dell'autore, 2026-11-12): il sito si genera in `.campaign/cache/encyclopedia/` e non viene pubblicato; nessuna credenziale e nessun dominio. La pubblicazione su un host resta da decidere.
 - **Interfaccia (Deciso, 2026-11-12).** Moderna e semplice da usare, ma abbastanza funzionale. È coerente con le icone con tooltip decise sopra.
 - **Impostazioni del master screen (Deciso, 2026-11-13).** L'icona delle impostazioni sta nel gruppo in fondo alla barra laterale, insieme all'anteprima pubblica e al tema, e apre una pagina. Le impostazioni su come funziona il master screen si salvano nel file della campagna `.campaign/master-screen.yaml`, sotto git, e valgono su ogni browser; il file contiene solo ciò che il master ha cambiato, il resto prende i valori predefiniti, uguali al comportamento precedente. Tema, dimensione del testo, preferiti e recenti restano sul computer, separati per campagna.
 - **Stile dell'interfaccia (Deciso, 2026-11-13).** Monocromo secondo il tema, taccuino in flat design squadrato; i nodi della mappa della trama e della tela del cockpit sono pezzi di carta strappata, i popup dei documenti pagine di quaderno. Precisa la decisione «Interfaccia» del 2026-11-12. Regole complete in [Linee guida dell'interfaccia](Linee%20guida%20dell'interfaccia.md).
@@ -71,7 +71,6 @@ Accanto a ciascuna, ciò che il framework deve evitare.
 | Chat e modifiche | Una chat che modifica il master screen in tempo reale; annullamento per gruppi di azioni; un indice ricostruibile dai file senza perdita di dati | Un pannello di modifiche che non si collega ai messaggi che le hanno causate; un indice che diventa fonte di verità |
 | Mappa della trama | Disegno di sessioni e scene in un file del master, tenuto aggiornato dall'assistente; lo schermo lo legge e aggiunge lo stato di ogni sessione (giocata, pronta, in attesa); registro e combattimento come pannelli laterali | Una mappa ricostruita dallo schermo a ogni apertura; dipendenze ricavate solo dall'ordine nel file |
 | Musica | Ricerca per scena e atmosfera nei link che il master ha inserito; lettura dei link dai documenti; comandi essenziali (riproduci, pausa, volume, ciclo, dissolvenza) | Dipendenza da un solo sistema operativo; programmi esterni da installare a mano; sinonimi legati a una sola campagna |
-| Stampa | Stato di stampa dentro la scheda; generazione deterministica; QR verso la voce pubblica; distinzione fra carte e annunci; colore sRGB o CMYK | Layout e font legati a una campagna; dipendenza da un browser e da Python per leggere i modelli; percorsi fissi |
 | Master screen in generale | Un unico punto d'ingresso; interfaccia a icone con tooltip; modifiche sempre visibili e annullabili | Il master screen che non può modificare i documenti; l'assenza di una vista per i giocatori come scelta non discussa |
 
 ## Funzioni del master screen
@@ -98,7 +97,7 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 - **Lettore** con indice della sezione, documento affiancato a un altro, preferiti e recenti.
 - **Separazione pubblico e master.** Ogni blocco riservato al master è marcato in modo visibile e non compare mai nelle viste pubbliche o nelle esportazioni. Il framework genera questa marcatura dalla configurazione, non la lascia da scrivere a mano (vedi `Configurazione.md`).
 - **Mappa della trama (Deciso, 2026-11-15).** La mappa non è più costruita da uno script dal campo `depends_on`. È un file del master, `Mappa della trama.md` (o `Plot map.md`), nella cartella della trama: un diagramma a flusso di sessioni e scene che l'agente `plot-mapper` disegna e aggiorna dopo il lavoro su sessioni e scene. Lo schermo legge il file e aggiunge lo stato di ogni sessione (giocata, pronta, in attesa), calcolato dal motore; non disegna nulla da sé. Le dipendenze reali e il semplice ordine nel file sono resi da frecce diverse, scelte dall'agente. Supera la costruzione della mappa dal campo `depends_on` descritta in questo punto prima della decisione. Resta **Proposta**, come prima, la legenda da spiegare al master, senza icone ambigue.
-- **Galleria** delle immagini e delle carte, con ingrandimento.
+- **Galleria** delle immagini, con ingrandimento.
 - **Controlli.** Un pannello delle Impostazioni mostra i collegamenti rotti, i file non indicizzati e le esclusioni, con un pulsante per ricontrollare.
 - **Impostazioni.** Una pagina divisa in sezioni con un indice: Tavolo (modello dell'agente del tavolo e di quello dello scontro), Scontro (mostra mappe di battaglia, pannelli aperti all'avvio, scomparsa automatica dei pannelli e dopo quanti secondi), Musica (volume iniziale, durata della dissolvenza, ripetizione, barra della musica sempre visibile o solo quando suona), Aspetto e navigazione (tema, dimensione del testo, densità, animazioni ridotte, pagina iniziale, voci della barra laterale da mostrare), Controlli e Informazioni. Ogni modifica si salva da sola e la pagina mostra se il salvataggio è riuscito; ogni sezione ha «ripristina i valori predefiniti». Senza git la pagina lo dice e non salva.
 
@@ -117,14 +116,6 @@ Il master screen raccoglie cinque aree. Ciascuna è raggiungibile da un'icona co
 - Il player resta attivo quando si cambia sezione o documento.
 - In sessione la musica si suggerisce mostrandola nel master screen; parte solo su richiesta esplicita del master.
 - Il suono esce dal computer su cui gira il master screen. La dipendenza dal sistema operativo è da valutare (vedi le questioni aperte).
-
-### Stampa
-
-- Stato di stampa per ogni carta, nel metadato `print`: `to-print` (da stampare), `printed` (stampata), `reprint` (da rifare). Con copie per personaggio giocante quando la carta è personale.
-- Fogli 5×7 e A4 con retro QR, fogli-bacheca perforabili per gli annunci, uscita in PDF e PNG; CMYK solo per le tipografie che lo chiedono.
-- Anteprima prima di generare. Il PDF si scarica o si apre dal master screen.
-- I QR puntano alla voce pubblica della carta. Un indirizzo ricavato dal nome del file si rompe al primo cambio di nome: rinominare un oggetto già stampato romperebbe i QR sulle copie esistenti. Il framework deve legare l'indirizzo a un identificativo stabile, non al nome.
-- Niente programmi esterni per la stampa (decisione dell'autore, 2026-11-12). Il renderer predefinito è Photoshop tramite MCP; quando Photoshop manca si usa un renderer Node, che disegna il layout vettoriale direttamente nei fogli PDF. Le librerie per QR e PDF sono vendorizzate nel framework. Fogli e carte si generano in `.campaign/cache/print/`.
 
 ## Principi di interfaccia
 
@@ -155,7 +146,7 @@ Master screen locale ───────────► Agente (Claude)
                                     ▼
                           Indice ricostruibile (cache)
 
-Moduli attivabili: musica · stampa · enciclopedia · altri (vedi sotto)
+Moduli attivabili: musica · enciclopedia · altri (vedi sotto)
 ```
 
 Componenti:
@@ -165,7 +156,7 @@ Componenti:
 3. **Lettura dei file.** I Markdown e le immagini della campagna sono la fonte di verità. L'indice è una cache: se si cancella, si ricostruisce dai file senza perdere nulla.
 4. **Aggiornamento in tempo reale.** Un osservatore dei file rileva ogni creazione, modifica, rinomina ed eliminazione, qualunque ne sia l'autore: l'agente nel master screen, l'agente nel terminale o il master con un editor. La vista si aggiorna da questo flusso, così il master screen non è un secondo motore.
 5. **Stato di sessione.** Chat, registro, tela libera e combattimento vivono in `.campaign/state/`, separata dal canone (vedi [Architettura](Architettura.md#3-campagna-generata)): è lo stato operativo della campagna e non modifica i file del canone. Se il master chiede una modifica canonica, questa passa dal motore di scrittura (`commit`), con i suoi controlli (Riprogettazione, sezione 2).
-6. **Moduli.** Musica, stampa e le funzioni da decidere sono moduli attivati dalla configurazione della campagna. Se un modulo è spento, la sua sezione non compare.
+6. **Moduli.** Musica e le funzioni da decidere sono moduli attivati dalla configurazione della campagna. Se un modulo è spento, la sua sezione non compare.
 7. **Preferenze e impostazioni (Deciso, 2026-11-13).** Le preferenze del computer (tema, dimensione del testo, preferiti, recenti) restano nel browser. Le impostazioni di funzionamento stanno in `.campaign/master-screen.yaml`: il server le controlla, le scrive e salva una versione con git limitata a quel file. Non sono canone, quindi non passano dal motore di scrittura, e il pannello «cosa è cambiato» non le mostra.
 
 Principio guida: il master screen è un modo di guardare la campagna, non un luogo in cui succedono cose che il terminale non può fare. Ogni operazione deve poter essere eseguita anche dal terminale o dall'app di Claude.
@@ -177,7 +168,7 @@ Principio guida: il master screen è un modo di guardare la campagna, non un luo
 | 0. Prima versione | Nessuna interfaccia grafica: skill di core e di libreria usate da terminale o dall'app di Claude. | Un master senza esperienza crea una campagna e prepara una sessione senza incontrare termini tecnici. |
 | 1. MVP del master screen | Chat con l'agente; pannello «cosa è cambiato» in tempo reale; «torna a com'era»; ricerca e lettura con marcatura pubblico/master; impostazioni essenziali. | Il master prepara e rivede una sessione di prova solo dal master screen, senza usare il terminale. |
 | 2. Sessione e trama | Sessione nel master screen, con la tela libera per schede, cornici e frecce; registro; combattimento con adattatore; mappa della trama. | Una sessione live si gioca e si registra dal master screen, con annullamento dei gruppi. |
-| 3. Moduli principali | Musica e stampa, come moduli attivabili. | La musica parte e si ferma senza bloccare la chat; i fogli si generano e si anteprimano. |
+| 3. Moduli principali | Musica, come modulo attivabile. | La musica parte e si ferma senza bloccare la chat. |
 | 4. Completo | Le funzioni confluite dopo la decisione (vedi sotto), configurazione completa, installazione semplificata. | Tutte le funzioni richieste sono coperte o dichiarate fuori ambito. |
 
 La fase 1 segue la prima versione, come deciso dall'autore: nessun master screen prima che il framework funzioni da solo. La fase 1 deve lasciare predisposta la registrazione di pannelli e moduli, in vista della sessione live che viene dopo.
@@ -194,9 +185,9 @@ Per ciascuna ci sono tre possibilità:
 
 | Funzione | Cosa farebbe | Opzione | Pro | Contro |
 |---|---|---|---|---|
-| Enciclopedia pubblica | Un sito statico con una voce per ogni oggetto, carte consultabili, mappe e testi protetti da codice, pubblicato su un dominio. Sarebbe il bersaglio dei QR della stampa. | A. Sezione del master screen che genera il sito (**scelta**, 2026-11-12) | Un solo strumento per il master; il QR resta coerente con la scheda | Il master screen diventa anche un editor pubblico; la pubblicazione richiede un hosting e delle credenziali (per ora non attiva) |
+| Enciclopedia pubblica | Un sito statico con una voce per ogni oggetto, carte consultabili, mappe e testi protetti da codice, pubblicato su un dominio. | A. Sezione del master screen che genera il sito (**scelta**, 2026-11-12) | Un solo strumento per il master; gli indirizzi restano coerenti con la scheda | Il master screen diventa anche un editor pubblico; la pubblicazione richiede un hosting e delle credenziali (per ora non attiva) |
 | | | B. Modulo di pubblicazione richiamato (*non scelta*) | Parte pubblica separata e riutilizzabile per altri GDR | Un altro strumento da capire; la sincronizzazione dei cambi va progettata |
-| | | C. Strumento separato (*non scelta*) | Nessun lavoro nel framework | Il master usa due strumenti; il QR dipende da un progetto esterno al framework |
+| | | C. Strumento separato (*non scelta*) | Nessun lavoro nel framework | Il master usa due strumenti; il collegamento dipende da un progetto esterno al framework |
 | Atlante | Una carta del mondo per livelli, costruita dai documenti, con visore interattivo e schede dei luoghi. | A + B. Sezione del master screen con visore, e sito statico esportato come l'enciclopedia (**scelta**, 2026-11-19; vedi [Atlante](Atlante.md)) | Mappa e schede nello stesso posto; stessa architettura dell'enciclopedia per il sito | Il territorio va protetto da modifiche non richieste; le posizioni vanno tenute aggiornate quando il mondo cresce |
 | | | C. Progetto a sé (*non scelta*) | Nessun costo per il framework | Perde il collegamento con la trama e con le schede |
 | Vedute illustrate dei luoghi | Vedute a volo d'uccello dei luoghi, con etichette dei soli luoghi attestati, generate con uno script. | A. Galleria nel master screen | Immagini pronte da consultare; nessuna generazione richiesta | Le immagini restano legate alla campagna da cui derivano |

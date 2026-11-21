@@ -93,11 +93,10 @@ Talk normally. These are only examples.
 | **Import** | *"Here are my notes."* · hand over a whole written campaign | Transcribes, keeps originals untouched, asks when a reading is unclear. For a whole campaign, shows an outline and writes only after your yes. |
 | **Images** | *"A portrait of the innkeeper."* · *"A battle map of the warehouse."* · *"Find existing artwork for the duke."* | Makes or finds the picture and places it on the sheet. Objects come with a transparent background. |
 | **Atlas** | *"Make the atlas."* · *"A plan of the capital."* | Builds a map of the world, a region or a city, from your picture or one painted after you agree, with clickable places (symbol per kind, public summary only) and a browsable map site. Approved land never changes unless you ask. |
-| **Cards and print** | *"Make the card for the Lantern of Morvalle."* · *"Print the cards I haven't printed yet."* | Makes card images and printable PDF sheets with QR codes. |
 | **Music** | *"Ambience music for the harbour."* | Finds and verifies links, saved in the master-only part of the sheet. |
 | **Encyclopedia** | *"Build the encyclopedia for my players."* | Builds a public site from public content only, and tells you what was left out and why. |
 
-Music, printing and the encyclopedia are optional modules. Yllir tells you when one is off and how to turn it on.
+Music and the encyclopedia are optional modules. Yllir tells you when one is off and how to turn it on.
 
 ## The master screen
 

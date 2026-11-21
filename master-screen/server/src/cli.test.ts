@@ -5,7 +5,7 @@ import path from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { runFrameworkCli, splitCliOutput, FrameworkCliError, TIMED_OUT_CODE } from './cli.js';
 import { createCtx, type Ctx } from './context.js';
-import { FAKE_PRINT_CLI, makeFakeFramework, type FakeFramework } from './fake-framework.js';
+import { FAKE_ENCYCLOPEDIA_CLI, makeFakeFramework, type FakeFramework } from './fake-framework.js';
 
 describe('splitCliOutput', () => {
   it('takes the text before the last exit line as the body', () => {
@@ -35,14 +35,14 @@ describe('runFrameworkCli', () => {
 
   it('returns the exit code and the JSON printed before the exit line', async () => {
     await fake.respond('list', { code: 1, json: { cards: [], note: 'partial' } });
-    const result = await runFrameworkCli(ctx, FAKE_PRINT_CLI, ['list', campaign]);
+    const result = await runFrameworkCli(ctx, FAKE_ENCYCLOPEDIA_CLI, ['list', campaign]);
     assert.equal(result.code, 1);
     assert.deepEqual(result.json, { cards: [], note: 'partial' });
   });
 
   it('passes the arguments as a list, never through a shell', async () => {
     await fake.respond('weird', { code: 0, json: {} });
-    await runFrameworkCli(ctx, FAKE_PRINT_CLI, ['weird', '$(id); rm -rf /', '--x']);
+    await runFrameworkCli(ctx, FAKE_ENCYCLOPEDIA_CLI, ['weird', '$(id); rm -rf /', '--x']);
     const calls = await fake.calls();
     const last = calls[calls.length - 1];
     assert.deepEqual(last.args, ['weird', '$(id); rm -rf /', '--x']);
@@ -51,7 +51,7 @@ describe('runFrameworkCli', () => {
   it('turns output that is not JSON into a plain domain error without echoing it', async () => {
     await fake.respond('broken', { code: 0, raw: 'not json at all /Users/someone/secret' });
     await assert.rejects(
-      runFrameworkCli(ctx, FAKE_PRINT_CLI, ['broken']),
+      runFrameworkCli(ctx, FAKE_ENCYCLOPEDIA_CLI, ['broken']),
       (err: unknown) => {
         assert.ok(err instanceof FrameworkCliError);
         assert.equal(err.reason, 'bad-output');
@@ -63,7 +63,7 @@ describe('runFrameworkCli', () => {
 
   it('gives code 124 and no JSON when the CLI runs past the timeout', async () => {
     await fake.respond('slow', { code: 0, json: {}, sleepMs: 5000 });
-    const result = await runFrameworkCli(ctx, FAKE_PRINT_CLI, ['slow'], { timeoutMs: 300 });
+    const result = await runFrameworkCli(ctx, FAKE_ENCYCLOPEDIA_CLI, ['slow'], { timeoutMs: 300 });
     assert.equal(result.code, TIMED_OUT_CODE);
     assert.equal(result.json, null);
   });

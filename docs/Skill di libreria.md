@@ -64,7 +64,6 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | [Gestione dei PNG](#l14-gestione-dei-png) (`npc-manager`) | Processi del core e motore; skill rimossa | Creare e mantenere personaggi non giocanti, nemici e venditori con schede sempre standardizzate. | Deciso (indice). Skill rimossa; controlli implementati in 0.30.0 |
 | [Artwork](#l8-artwork) (`artwork`) | Libreria, chiamata dal core | Dipingere una creatura o un personaggio partendo da una descrizione verificata, e collegare il dipinto alla scheda. | Deciso (indice). Implementata come skill `images`; restano fuori `modifica_zona`, `espandi` e `ingrandisci` |
 | [Ricerca artwork](#l23-ricerca-artwork) (`artwork-search`) | Libreria, chiamata dal core | Trovare illustrazioni esistenti online, senza IA generativa, e proporne al master al massimo tre, con lo sfondo tolto da quella scelta. | Proposta (richiesta dell'autore, 2026-11-12). Implementata come skill `artwork-search` |
-| [Carte](#l9-carte) (`cards`) | Libreria, chiamata dal core | Creare la carta illustrata di un oggetto o di un annuncio, con il sorgente a livelli accanto all'esportazione. | Deciso (indice). Prima implementazione (2026-11-12) come skill `cards`; il percorso con Photoshop MCP, predefinito, non è verificato nei test |
 | [Modelli 3D da stampare](#l24-modelli-3d-da-stampare) (`models-3d`) | Libreria, chiamata dal core | Creare il modello 3D, pronto per la stampa 3D, di un personaggio o di una creatura a partire dalla sua scheda. | Processo **Deciso** (2026-11-16), strumenti Proposta. Non implementata; vedi [Modelli 3D](Modelli%203D.md) |
 | [Mappe di luogo e di battaglia](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Creare mappe con livelli separati, per luoghi e scontri. | Deciso (indice; modalità `map` dello strumento `images`, Deciso 2026-11-11). Implementata in 0.41.0 per mappe di luogo e di battaglia |
 | [Mappe del mondo](#l11-mappe) (`maps`) | Libreria, chiamata dal core | Modificare una carta del mondo senza alterarne la geometria. | Superata dall'[atlante](#l25-atlante) (Deciso, 2026-11-19) |
@@ -81,15 +80,14 @@ Il catalogo elenca le funzioni del framework, non gli strumenti che le realizzan
 | Funzione | Strato | Motivazione | Stato |
 |---|---|---|---|
 | Sessione live | Core | È il processo che il master vive al tavolo. La realizzazione tecnica (chat, registro, pannelli) appartiene al master screen. | Proposta |
-| Master screen | Strumento locale unico | Interfaccia locale unica per chat con l'agente, consultazione, sessione live, musica e stampa. Si costruisce dopo la prima versione. | Deciso (strumento unico); forma Proposta |
-| Stampa (`print`) | Modulo opzionale (output fisici) | Fogli di carte (5×7 o A4) e fogli-bacheca, con retro e codici QR, in RGB o CMYK. | Prima implementazione (2026-11-12) come skill `print` (L10), con renderer Node e PDF |
+| Master screen | Strumento locale unico | Interfaccia locale unica per chat con l'agente, consultazione, sessione live e musica. Si costruisce dopo la prima versione. | Deciso (strumento unico); forma Proposta |
 | Enciclopedia pubblica | Modulo opzionale (output digitale) | Pagina statica consultabile dai giocatori, costruita da schede con segnaposto e da carte in formato compresso. | Deciso (2026-11-12, opzione A). Prima implementazione: skill `encyclopedia`, generazione locale con anteprima nel master screen, senza pubblicazione |
 | [Atlante](#l25-atlante) (`atlas`) | Libreria, chiamata dal core; modulo opzionale | Carta del mondo dipinta con dati, dai documenti, nel master screen e come sito statico; le modifiche passano da ritagli ridipinti dal fornitore di immagini. | Deciso (2026-11-19); motore riprogettato (2026-11-20). Implementata in 0.78.0, da riscrivere col nuovo motore |
 | Musica | Modulo opzionale, nel master screen | Colonna sonora di scene e sessioni. | Proposta |
 | Stile per output web | Modulo opzionale | Profilo grafico per le pagine di enciclopedia e master screen. Una skill esterna di design per siti web (design-taste-frontend) è un candidato da valutare in quel contesto. | Proposta |
 | Vedute e carte nautiche | Da valutare | Output non ancora analizzati. Rientrano nella questione aperta sugli strumenti da confluire. | Da valutare |
 
-Dipendenze richiamate dalle funzioni sopra: adattatore del sistema di gioco, profili di stile, moduli di output (`print`, `encyclopedia`, `master_screen`, `music`) e gerarchia delle fonti. Il loro contenuto è nei documenti [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md) e [Configurazione](Configurazione.md).
+Dipendenze richiamate dalle funzioni sopra: adattatore del sistema di gioco, profili di stile, moduli di output (`encyclopedia`, `master_screen`, `music`) e gerarchia delle fonti. Il loro contenuto è nei documenti [Sistemi di gioco e stili](Sistemi%20di%20gioco%20e%20stili.md) e [Configurazione](Configurazione.md).
 
 ## Schede delle funzioni
 
@@ -245,14 +243,12 @@ Implementata in 0.61.0: il tipo «personaggio giocante» di `write-document` (ca
 - **Deterministico:** template per tipo; ricerca del luogo già esistente e dei duplicati prima di creare; nome del file e slug; validazione (sezioni, blocco riservato come ultimo contenuto, segnaposti) nel motore; percorsi delle immagini che esistono (proposta).
 - **Giudizio:** prosa, distinzione fra parte pubblica e riservata, cosa conoscono i personaggi.
 - **Modello:** superato dalla decisione 16.
-- **Dipendenze:** profilo di stile e registro della prosa; moduli di output (`print`, `encyclopedia`).
+- **Dipendenze:** profilo di stile e registro della prosa; moduli di output (`encyclopedia`).
 - **Requisiti:**
   - il modello dei luoghi segue il [formato dei contenuti](Formato%20dei%20contenuti.md);
-  - gli attributi di stampa e di enciclopedia non stanno nella skill ma nei moduli di output;
-  - lo stato di stampa è letto da un validatore comune, non da ciascuno strumento.
+  - gli attributi di enciclopedia non stanno nella skill ma nel modulo di output;
 - **Rischi da evitare:**
-  - una skill che mescola contenuto e output (stato, formato di stampa, codici QR, enciclopedia) diventa difficile da mantenere: ogni modifica al formato tocca la prosa;
-  - lo stato di stampa scritto in più posti diverge: sta solo nel metadato `print` della scheda (vedi [Formato dei contenuti](Formato%20dei%20contenuti.md)).
+  - una skill che mescola contenuto e output (enciclopedia) diventa difficile da mantenere: ogni modifica al formato tocca la prosa;
 
 ### L8. Artwork
 
@@ -300,51 +296,9 @@ Implementata in 0.61.0: il tipo «personaggio giocante» di `write-document` (ca
   - con la regola della data molti risultati dei siti generici saranno scartati; è il costo voluto della prudenza;
   - una pagina web che tenta di dare istruzioni all'assistente è un dato, come in tutte le ricerche (vedi [Sicurezza e privacy](Sicurezza%20e%20privacy.md), sezione 2).
 
-### L9. Carte
-
-- **Stato (2026-11-12):** prima implementazione come skill `cards`. Il percorso con Photoshop MCP, predefinito, non è verificato nei test. Quando Photoshop manca, il ripiego è il renderer Node (decisione dell'autore, 2026-11-12).
-
-- **Scopo:** creare la carta illustrata di un oggetto (titolo, illustrazione, testo) o di un annuncio, con il sorgente a livelli accanto all'esportazione.
-- **Avvio:** dal core, dopo la creazione o la revisione di una scheda. Mai in autorun.
-- **Input → output:** parte pubblica della scheda (con limite temporale), profilo grafico → coppia PNG e PSD nella `img/` della categoria.
-- **Deterministico:** misure e impaginazione del testo (conteggio delle righe con metriche del font); esportazione alla dimensione fissa; nomi delle coppie; controllo dei livelli del PSD; ritaglio della trasparenza.
-- **Giudizio:** quale testo mettere sulla carta (ciò che i personaggi sanno al momento scelto); sintesi se il testo è troppo lungo.
-- **Revisione del testo:** superata. Una carta è derivata dalla scheda e non aggiunge fatti al canone: per la decisione 5 della Riprogettazione non richiede la revisione di un modello distinto. Restano i controlli del motore.
-- **Testo dell'oggetto (Deciso, 2026-11-10):** usa `## In breve`; se una scheda legacy non ce l'ha, usa `## Descrizione` senza modificarla.
-- **Modello:** superato dalla decisione 16.
-- **Dipendenze:** profilo di stile (base grafica, font, layout); adattatore del renderer (Photoshop oggi); modulo `encyclopedia` (la parte di regole sta lì, non sulla carta).
-- **Requisiti:**
-  - il limite «mai modificare la scheda» resta: la carta è un derivato della scheda;
-  - il criterio di conoscenza resta: la carta mostra solo ciò che i personaggi sanno al momento scelto;
-  - base grafica, font e layout sono profilo di stile; il layout per gli annunci di bacheca è un layout del profilo;
-  - le misure del layout sono parametri del profilo, non costanti nel codice.
-- **Rischi da evitare:**
-  - una composizione legata a un renderer e a un font installato a mano non è riproducibile: il font va dichiarato e verificato;
-  - un testo controllato solo a occhio sfugge agli errori di impaginazione: il conteggio delle righe deve usare le metriche del font;
-  - istruzioni al sub-agent con un nome di strumento legato a un host non si trasferiscono.
-
-### L10. Stampa
-
-- **Stato (2026-11-12):** implementata come skill `print`, con renderer Node e PDF; nessun programma esterno per la stampa. Lo stato `print` delle carte cambia solo su indicazione del master, scritta tramite il motore.
-
-- **Scopo:** produrre fogli di carte (5×7 o A4) e fogli-bacheca, con retro e QR, in RGB o CMYK.
-- **Avvio:** solo dal core, su richiesta del master. Non modifica lo stato delle carte: `print` passa a `printed` solo per indicazione dell'autore, scritta tramite il motore.
-- **Input → output:** carte e metadato `print` → PNG o TIFF, PDF, indice con posto e QR, rapporto con carte escluse e senza QR.
-- **Deterministico:** tutto. Il giudizio riguarda solo quali carte includere.
-- **Modello:** superato dalla decisione 16.
-- **Dipendenze:** modulo `print`; profilo di stile (font e gamma); modulo `encyclopedia` (QR verso la voce).
-- **Requisiti:**
-  - parametri di formato e di tipografia sono in configurazione del modulo;
-  - il conteggio dei destinatari delle carte personalizzate viene dall'elenco dei personaggi del progetto;
-  - le dipendenze di sistema (strumenti di elaborazione immagini, generatore di QR, font, profilo colore, stampante) sono dichiarate e verificate prima dell'esecuzione.
-- **Rischi da evitare:**
-  - uno script legato a strumenti di sistema, a un font installato a mano e a una stampante specifica non è portabile;
-  - un conteggio fatto contando le cartelle a mano invece di leggere l'elenco dei personaggi sbaglia appena cambia la composizione del gruppo;
-  - un formato di annuncio con passaggi manuali (estrazione del testo dal sorgente grafico, elenco scritto a mano) perde sincronia con le schede: va generato dai dati.
-
 ### L24. Modelli 3D da stampare
 
-- **Stato:** processo **Deciso** dall'autore (2026-11-16); strumenti e dettagli **Proposta**. Non implementata. Il numero è il primo libero dopo L23; la scheda sta prima di L11 perché, come la stampa (L10), è un output fisico. Il documento dedicato è [Modelli 3D](Modelli%203D.md).
+- **Stato:** processo **Deciso** dall'autore (2026-11-16); strumenti e dettagli **Proposta**. Non implementata. Il numero è il primo libero dopo L23; la scheda sta prima di L11 perché è un output fisico. Il documento dedicato è [Modelli 3D](Modelli%203D.md).
 - **Scopo:** generare, per la scheda di un personaggio o di una creatura, un modello 3D (STL) adatto alla stampa 3D, e collocarlo accanto alla scheda.
 - **Avvio:** dal core, solo su richiesta del master. Mai in autorun.
 - **Processo (Deciso):**
@@ -541,9 +495,9 @@ Implementata in 0.61.0: il tipo «personaggio giocante» di `write-document` (ca
 - **Dipendenze:** [audit di continuità](#l2-audit-di-continuità) prima e dopo, su richiesta; [collegamenti](#l3-collegamenti) per le menzioni (motore); [mappa della trama](#l5-mappa-della-trama) quando cambia una sessione; [gestione dei PNG](#l14-gestione-dei-png) e schede per il formato.
 - **Regole sugli `id`** (una sola fonte, nessun riferimento esterno rotto):
   - *rinomina* e *spostamento*: l'`id` non cambia mai;
-  - *unione*: sopravvive l'`id` della scheda che resta; l'altro si registra nei suoi metadati come `merged_ids`, così QR stampati e route dell'enciclopedia portano alla scheda che resta;
+  - *unione*: sopravvive l'`id` della scheda che resta; l'altro si registra nei suoi metadati come `merged_ids`, così le route dell'enciclopedia portano alla scheda che resta;
   - *divisione*: la parte principale conserva l'`id`; la nuova parte riceve un `id` nuovo;
-  - *cancellazione*: l'`id` non si riusa mai; se il soggetto ha una carta già stampata, la cancellazione chiede una conferma esplicita e la route mostra che la voce non è più disponibile.
+  - *cancellazione*: l'`id` non si riusa mai; se il soggetto ha già una voce pubblica, la cancellazione chiede una conferma esplicita e la route mostra che la voce non è più disponibile.
 - **Regole sulla storia:**
   - la `Cronaca/` racconta ciò che è successo e non si riscrive: i link si aggiornano, il testo resta com'era, con il nome usato allora;
   - le schede e la `Trama/` ancora da giocare si aggiornano al nuovo canone;
@@ -585,7 +539,6 @@ Le tre skill seguenti sono **Deciso (2026-11-11)** come skill di libreria. Sono 
 - **Modelli 3D:** le questioni aperte sono nel documento [Modelli 3D](Modelli%203D.md).
 - **Atlante:** le questioni aperte sono nel documento [Atlante](Atlante.md).
 - **Mappe:** una skill con due modalità o due skill? La scelta incide sulla dimensione della skill, non sul risultato. **Risposta (2026-11-11):** modalità di `images` (Deciso, 2026-11-11).
-- **Stampa:** libreria attivata da un modulo, o modulo puro? Nel documento è trattata come modulo opzionale con una skill di esecuzione; confermare.
 - **Modelli:** Superata dalla Riprogettazione (2026-11-11): non c'è più un modello assegnato per skill. Quando delegare e a quale modello lo decide il framework, tarato con il testbench (decisione 16).
 - **Autorun:** Superata dalla Riprogettazione (2026-11-11) per la ricerca nel canone, rimossa come skill. Restano l'autorun dell'ingest e della ricerca musicale, decisi nell'indice; la domanda sull'ingest è aggiunta sotto.
 - **Esclusioni dell'audit:** **Deciso (2026-11-07):** il registro sta in `campaign.yaml`, nella sezione `audit.exclusions` (vedi [Configurazione](Configurazione.md)).

@@ -11,17 +11,17 @@ import { listAdapters, pluginRootFromHere } from './adapter.mjs';
 const FILE = 'campaign.yaml';
 // allow_model_imagination is no longer read: it is accepted with any value and ignored
 // (the migration removes it from older campaigns).
+// print and the cards flag of a structure entry belonged to a removed feature: older campaigns may still
+// carry them, so they are accepted with any value and ignored.
 const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit', 'encyclopedia', 'print', 'workflow', 'allow_model_imagination'];
 const ENCYCLOPEDIA_KEYS = ['title', 'base_url'];
-const PRINT_KEYS = ['format', 'cmyk', 'renderer'];
 const WORKFLOW_KEYS = ['auto_accept', 'auto_item_images'];
-const PRINT_FORMATS = ['5x7', 'a4'];
-const PRINT_RENDERERS = ['auto', 'photoshop', 'node'];
 const ENCYCLOPEDIA_TITLE_MAX = 120;
 const ENCYCLOPEDIA_URL_MAX = 200;
 const REGISTERS = ['elevated', 'plain', 'colloquial', 'mixed'];
 const STRUCTURE_TYPES = ['plot', 'chronicle', 'places', 'subjects', 'objects', 'free', 'notes', 'sources', 'master-only', 'external', 'atlas'];
-const MODULE_KEYS = ['print', 'encyclopedia', 'master_screen', 'music', 'atlas'];
+const MODULE_KEYS = ['encyclopedia', 'master_screen', 'music', 'atlas'];
+const IGNORED_MODULE_KEYS = ['print'];
 const INSTALLED_ADAPTERS = ['none', ...listAdapters(pluginRootFromHere())];
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const LANG_RE = /^[a-z]{2}$/;
@@ -305,15 +305,12 @@ function validateTopLevel(r, config, campaignRoot) {
   const encyclopedia = mappingField(r, config, '', 'encyclopedia');
   if (encyclopedia !== null) validateEncyclopedia(r, encyclopedia);
 
-  const print = mappingField(r, config, '', 'print');
-  if (print !== null) validatePrint(r, print);
-
   const workflow = mappingField(r, config, '', 'workflow');
   if (workflow !== null) validateWorkflow(r, workflow);
 }
 
 /**
- * encyclopedia (optional): title of the public site and the base address its QR codes point to.
+ * encyclopedia (optional): title of the public site and the base address the site is published at.
  * base_url is an http or https address with no query, no fragment and no credentials; the
  * validated value is stored with exactly one trailing slash.
  */
@@ -348,16 +345,6 @@ function baseUrlProblem(value) {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return 'must start with http:// or https://';
   if (url.username !== '' || url.password !== '') return 'must have no user name or password';
   return null;
-}
-
-/** print (optional): defaults of the printing module (format, cmyk, renderer). */
-function validatePrint(r, print) {
-  checkUnknownKeys(r, print, 'print', PRINT_KEYS);
-  checkEnum(r, print, 'print', 'format', PRINT_FORMATS);
-  if (Object.hasOwn(print, 'cmyk') && typeof print.cmyk !== 'boolean') {
-    r.error('bad-type', 'print.cmyk', 'print.cmyk must be true or false');
-  }
-  checkEnum(r, print, 'print', 'renderer', PRINT_RENDERERS);
 }
 
 /**
@@ -462,7 +449,7 @@ function validateStructure(r, structure, campaignRoot) {
       r.error('bad-type', base, `${base} must be a mapping with id, folder and type`);
       return;
     }
-    checkUnknownKeys(r, entry, base, ['id', 'folder', 'type', 'style', 'cards', 'exclude']);
+    checkUnknownKeys(r, entry, base, ['id', 'folder', 'type', 'style', 'exclude', 'cards']);
 
     const idValid = checkText(r, entry, base, 'id', {
       required: true,
@@ -533,14 +520,6 @@ function validateStructure(r, structure, campaignRoot) {
       }
     }
 
-    if (Object.hasOwn(entry, 'cards')) {
-      if (typeof entry.cards !== 'boolean') {
-        r.error('bad-type', `${base}.cards`, `${base}.cards must be true or false`);
-      } else if (entry.cards && entry.type !== 'objects') {
-        r.error('cards-not-objects', `${base}.cards`, 'cards: true is only valid on a category of type objects');
-      }
-    }
-
     if (Object.hasOwn(entry, 'exclude')) {
       const exclude = listField(r, entry, base, 'exclude');
       if (exclude !== null) {
@@ -567,7 +546,9 @@ function validateStructure(r, structure, campaignRoot) {
 function validateModules(r, modules) {
   for (const key of Object.keys(modules)) {
     const at = `modules.${key}`;
-    if (!MODULE_KEYS.includes(key)) {
+    if (IGNORED_MODULE_KEYS.includes(key)) {
+      continue;
+    } else if (!MODULE_KEYS.includes(key)) {
       r.error('unknown-module', at, `the module ${key} does not exist`);
     } else if (typeof modules[key] !== 'boolean') {
       r.error('bad-type', at, `${at} must be true or false`);

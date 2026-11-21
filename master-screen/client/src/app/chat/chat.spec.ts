@@ -49,7 +49,7 @@ function status(available: boolean, reason?: string): StatusResponse {
     campaign: { name: 'Test', slug: 'test', language: 'en' },
     frameworkVersion: '0.0.0',
     screenVersion: '0.0.0',
-    modules: { music: false, print: false, encyclopedia: false },
+    modules: { music: false, encyclopedia: false },
     agent: available ? { available: true } : { available: false, reason },
     git: { ok: true },
   };

@@ -127,7 +127,6 @@ action_table: [attacchi e capacità, attacks and abilities]
 checks: checks.mjs
 item_sheet:
   mechanical_fields: [cost, category, quality, accuracy, damage, defense, magic_defense]
-  printable_fields: [title, description]
 do_not:
   - roll dice for the master
   - choose targets

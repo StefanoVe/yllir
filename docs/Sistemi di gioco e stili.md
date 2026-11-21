@@ -8,7 +8,7 @@
 Due moduli opzionali dicono al framework come si comporta una campagna sul piano del gioco e su quello visivo:
 
 - l'**adattatore di sistema** descrive la forma delle schede di un sistema di gioco: quali campi hanno le creature e gli oggetti, quali risorse esistono, quali condizioni e durate, come si esprime una difficoltà, come avanza la campagna. Non contiene le tabelle delle regole;
-- il **profilo di stile** descrive l'aspetto visivo di artwork e carte: prompt, palette, cornici, formato, impaginazione.
+- il **profilo di stile** descrive l'aspetto visivo di artwork: prompt, palette, cornici, formato, impaginazione.
 
 Entrambi sono dichiarati in `campaign.yaml` (`system.adapter` per l'adattatore; lo stile per categoria sta in `structure[].style`, vedi [Configurazione](Configurazione.md)). Il core non conosce né D&D né uno stile specifico: li legge attraverso il contratto descritto qui.
 
@@ -50,7 +50,6 @@ Superata: la regola precedente «l'adattatore non contiene codice, e un calcolo 
 | `difficulty` | scala e metodo per misurare un incontro | fasce più GS per incontro |
 | `progression` | come avanza la campagna e quali eventi la attivano | `milestone`: nessun punto esperienza |
 | `creature_sheet` | campi obbligatori e facoltativi della scheda, con etichette in italiano e in inglese | statistiche 2024, capacità, fasi, azioni leggendarie |
-| `item_sheet` | campi meccanici e quali di essi sono stampabili sulla carta | effetti, CD, durate; sulla carta solo la narrazione |
 | `tracking` | quali strutture usa il tracker degli scontri | ordine di iniziativa, fasi con soglie, ricariche, reazioni |
 | `headings` | intestazioni delle sezioni della scheda, in italiano e in inglese | Statistiche, Descrizione, In breve, Effetti |
 | `checks` | file facoltativo con l'aritmetica del sistema | `checks.mjs` (modificatori, PF medi, GS, competenza) |
@@ -63,7 +62,7 @@ Superata: la regola precedente «l'adattatore non contiene codice, e un calcolo 
 
 Il motore valida la forma delle schede e la loro aritmetica (`check`), e l'adattatore è caricato dalla libreria condivisa (`yllir/scripts/lib/adapter.mjs`). Le operazioni sono in `yllir/scripts/lib/adapter-ops.mjs`, senza più una skill `system-adapter` che le esponga (rimossa dalla Riprogettazione):
 
-- **Implementate in 0.30.0:** `validateSheet` (verifica i campi di una scheda di creatura o di oggetto), `cardFields` (restituisce solo i campi che la carta può stampare), `progressionEvent` (dice se un evento è una milestone dichiarata dal master).
+- **Implementate in 0.30.0:** `validateSheet` (verifica i campi di una scheda di creatura o di oggetto), `progressionEvent` (dice se un evento è una milestone dichiarata dal master).
 
 Operazioni previste ma non implementate (**Proposta**):
 
@@ -167,8 +166,6 @@ Il tracker degli scontri sarebbe la skill `combat-tracker`, che usa l'adattatore
 ### Oggetti
 
 - Gli effetti meccanici hanno attivazione, prova e CD, durata, limiti e risorse. Se l'autore non ha stabilito un effetto, la scheda lo dice: non si assegnano poteri per completarla.
-- I campi meccanici restano nella sezione pubblica della scheda, ma la carta illustrata non li stampa: sono esclusi bonus, dadi, CD, sintonia, condizioni, durate, cariche, frequenze d'uso, valori in monete e istruzioni da regolamento. La carta riporta solo testo narrativo conoscibile dai personaggi.
-- La `item_sheet` dichiara quali campi sono stampabili: l'elenco vive nell'adattatore, non nella funzione che produce le carte.
 
 ### Rischi da evitare
 
@@ -182,7 +179,7 @@ Stato nella versione 0.30.0 (**Implementato in 0.30.0**, salvo dove è indicato 
 
 - L'adattatore è in `yllir/modules/systems/dnd-2024/adapter.yaml`, in YAML ristretto. Dichiara `id`, `name`, `version`, `encounters`, `progression`, `difficulty`, `resources`, `conditions`, `condition_durations`, `creature_sheet`, `item_sheet`, `tracking`, `do_not`, `headings` e `checks`.
 - `difficulty` usa il metodo `band-and-cr`, con fasce (`low`, `moderate`, `high`), ma la tabella fascia-GS non è ancora presente.
-- `conditions` comprende le 15 condizioni dell'edizione 2024. `creature_sheet` distingue campi obbligatori, con etichette in italiano e inglese, e campi facoltativi; `item_sheet` dichiara i campi meccanici, mentre la carta stampabile contiene solo titolo e descrizione. `headings` definisce le intestazioni delle sezioni statistiche, descrizione ed effetti in italiano e inglese.
+- `conditions` comprende le 15 condizioni dell'edizione 2024. `creature_sheet` distingue campi obbligatori, con etichette in italiano e inglese, e campi facoltativi; `item_sheet` dichiara i campi meccanici. `headings` definisce le intestazioni delle sezioni statistiche, descrizione ed effetti in italiano e inglese.
 - `checks.mjs` nella cartella del modulo contiene solo l'aritmetica: modificatori dei punteggi, PF medi dalla formula dei dadi, valori di grado di sfida e bonus di competenza che ne deriva.
 - Il caricamento è in `yllir/scripts/lib/adapter.mjs`, condiviso con la configurazione. Le operazioni sono in `yllir/scripts/lib/adapter-ops.mjs`. Il motore (`commit` e `check`) valida lo schema e le schede di creatura e di oggetto, incluse le verifiche aritmetiche del modulo di sistema; il core non contiene nomi di campi o di regole di un sistema.
 - La skill `system-adapter` è rimossa dalla Riprogettazione: il suo compito è passato al motore e alla libreria condivisa.
@@ -238,25 +235,23 @@ Che cosa cambia nel framework, rispetto a D&D 2024:
 - la scheda creatura è sostituita dalla scheda del personaggio non giocante, con tracce al posto dei PF;
 - la progressione è legata a obiettivi, non a milestone di combattimento.
 
-Che cosa resta uguale: le cartelle, il canone con le schede dedicate, la separazione fra pubblico e master, i collegamenti, l'audit di continuità, l'enciclopedia e la stampa. Il sistema narrativo cambia le regole di gioco, non la manutenzione della campagna.
+Che cosa resta uguale: le cartelle, il canone con le schede dedicate, la separazione fra pubblico e master, i collegamenti, l'audit di continuità, l'enciclopedia. Il sistema narrativo cambia le regole di gioco, non la manutenzione della campagna.
 
 ## Contratto del profilo di stile
 
-Un profilo di stile descrive l'aspetto di una famiglia di immagini: artwork di creature o personaggi, carte di oggetti, manifesti, eventualmente mappe. Il profilo non decide i fatti da rappresentare, che restano nelle schede; decide come vengono dipinti. Il prompt base è in inglese, perché è il testo che legge il generatore; il resto del profilo è in italiano.
+Un profilo di stile descrive l'aspetto di una famiglia di immagini: artwork di creature o personaggi, manifesti, eventualmente mappe. Il profilo non decide i fatti da rappresentare, che restano nelle schede; decide come vengono dipinti. Il prompt base è in inglese, perché è il testo che legge il generatore; il resto del profilo è in italiano.
 
 ### Campi del profilo
 
 | Campo | Contenuto | Esempio |
 | --- | --- | --- |
 | `id`, `name` | identità del profilo | `dark-fantasy`, «Dark fantasy dipinto» |
-| `uses` | categorie e formati che lo usano | `items: card`, `creatures: painting` |
+| `uses` | categorie e formati che lo usano | `creatures: painting` |
 | `base_prompt` | testo fisso per il generatore, con segnaposto `{SUBJECT_DESCRIPTION}` o `{ITEM_DESCRIPTION}` | vedi esempi sotto |
 | `constraints` | positivi e negativi: derive da prevenire e attributi da escludere | «nessun cappuccio», «abiti intatti» |
 | `palette` | colori dominanti, colori vietati, toni di riferimento | grigi freddi; dorato escluso |
-| `frames` | nessuna, cornice o bordo della carta | nessuna per i quadri, bordo per le carte |
 | `format` | dimensioni in pixel, proporzioni, risoluzione, sfondo | 1024 × 1536; trasparente per gli oggetti |
 | `typography` | font dei titoli e del corpo, dimensioni, righe massime | il font del profilo, 26–28 pt, massimo 8 righe |
-| `layers` | livelli obbligatori del file sorgente modificabile | Base, Illustrazione, Titolo, Testo |
 | `references` | immagini da allegare alla generazione | base di impaginazione, immagine di oggetto |
 | `checks` | elenco di voci da controllare su ogni immagine | abiti, copricapi, oggetti in mano, numero delle figure |
 
@@ -276,7 +271,6 @@ Profilo per gli oggetti e per le creature. Lo stile di base è lo stesso; cambia
 
 - **Prompt base (in inglese).** Hand-painted digital art with the look of an aged painting: soft brushstrokes, muted shading, imperfect contours; cold, desaturated palette (ash grey, charcoal, dull silver, blue-grey); diffuse light, no rim light, no bloom; no text, frames or signatures.
 - **Vincoli contro le derive.** Lo stile tende a rendere cenciosi, laceri o mostruosi anche personaggi ordinari, e ad aggiungere cappucci, bende e armi. Il profilo porta vincoli espliciti, scritti in inglese nel prompt: «intact clothing, ordinary work, NOT torn» e «no hat, no bandage, no unattested weapon».
-- **Uso `items: card`.** Oggetto isolato su sfondo trasparente, senza piedistallo né ombra; PNG derivato da un PSD con le misure del formato carta del profilo; livelli Base, Illustrazione, Titolo, Testo; il font del profilo; al massimo otto righe di testo; regole meccaniche escluse dalla carta (vedi la sezione sugli oggetti).
 - **Uso `creatures: painting`.** Dipinto verticale 1024 × 1536 px (2:3), creatura intera al 60–70% dell'altezza, sfondo dipinto senza competere con il soggetto, nessuna cornice.
 - **Varianti.** Il manifesto di avviso usa lo stesso stile con intestazioni sovrapposte; il profilo dichiara la variante e il font delle intestazioni per area, invece di creare un profilo nuovo.
 

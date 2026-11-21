@@ -2,7 +2,7 @@ import { Component, DOCUMENT, DestroyRef, ElementRef, HostListener, computed, ef
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Map as MapIcon, Monitor, MonitorOff, Music, Printer, Projector, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
+import { BookOpen, LucideAngularModule, Dices, Eye, EyeOff, GitBranch, Library, Map as MapIcon, Monitor, MonitorOff, Music, Projector, Search, Settings, SunMoon, WifiOff } from 'lucide-angular';
 import { filter, map } from 'rxjs';
 import { LiveService } from '../core/live.service';
 import { SettingsService } from '../core/settings.service';
@@ -51,7 +51,7 @@ export class Shell {
   readonly showUpdateNotice = this.updates.showNotice;
   readonly settingsLabel = computed(() => this.i18n.t(this.showUpdateNotice() ? 'shell.updateNotice' : 'nav.settings'));
 
-  readonly icons = { Dices, GitBranch, Library, Music, BookOpen, MapIcon, Printer, Search, Settings, Eye, EyeOff, SunMoon, WifiOff, Projector, MonitorOff, Monitor };
+  readonly icons = { Dices, GitBranch, Library, Music, BookOpen, MapIcon, Search, Settings, Eye, EyeOff, SunMoon, WifiOff, Projector, MonitorOff, Monitor };
   /** Something is on the projector: the rail offers to clear it. */
   readonly projecting = computed(() => this.projector.current().kind !== 'blank');
   /** The connection notice shows only after the stream has been down for a while, so load and blips do not flash it. */
@@ -60,7 +60,6 @@ export class Shell {
   /** Module entries show only when the module is on for this campaign. */
   readonly musicEnabled = computed(() => this.status.modules()?.music === true);
   readonly encyclopediaEnabled = computed(() => this.status.modules()?.encyclopedia === true);
-  readonly printEnabled = computed(() => this.status.modules()?.print === true);
   /** Rail entries the master can hide in the settings: shown only when the module is on AND the rail flag is on. */
   private readonly railSettings = computed(() => this.settingsService.settings().ui.rail);
   readonly showDocs = computed(() => this.railSettings().docs);
@@ -68,7 +67,6 @@ export class Shell {
   readonly showEncyclopedia = computed(() => this.encyclopediaEnabled() && this.railSettings().encyclopedia);
   /** The atlas is always reachable: generating it turns its module on, so no module gates this entry. */
   readonly showAtlas = computed(() => this.railSettings().atlas);
-  readonly showPrint = computed(() => this.printEnabled() && this.railSettings().print);
   /** The bottom bar: 'always' shows it whenever music is on; 'playing' only while a track or a suggestion is there. */
   readonly dockVisible = computed(() => {
     const playing = this.music.current() !== null || this.musicApi.suggestions().length > 0;
@@ -156,7 +154,7 @@ export class Shell {
       : path.startsWith('/live') ? this.i18n.t('nav.liveTable') : path.startsWith('/plot') ? this.i18n.t('nav.plot')
       : path.startsWith('/music') ? this.i18n.t('nav.music')
       : path.startsWith('/docs') ? this.i18n.t('nav.documents')
-      : path.startsWith('/encyclopedia') ? this.i18n.t('nav.encyclopedia') : path.startsWith('/print') ? this.i18n.t('nav.print') : '';
+      : path.startsWith('/encyclopedia') ? this.i18n.t('nav.encyclopedia') : '';
     if (path.startsWith('/doc/')) return campaign;
     if (page === '') return campaign;
     return campaign === '' ? page : `${page} · ${campaign}`;

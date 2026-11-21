@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS: ScreenSettings = {
     density: 'comfortable',
     motion: 'system',
     startPage: 'plot',
-    rail: { plot: true, docs: true, music: true, encyclopedia: true, print: true, atlas: true },
+    rail: { plot: true, docs: true, music: true, encyclopedia: true, atlas: true },
   },
 };
 
@@ -64,7 +64,6 @@ export const LEAVES: readonly Leaf[] = [
   { path: 'ui.rail.docs', file: 'ui.rail.docs', kind: BOOL },
   { path: 'ui.rail.music', file: 'ui.rail.music', kind: BOOL },
   { path: 'ui.rail.encyclopedia', file: 'ui.rail.encyclopedia', kind: BOOL },
-  { path: 'ui.rail.print', file: 'ui.rail.print', kind: BOOL },
   { path: 'ui.rail.atlas', file: 'ui.rail.atlas', kind: BOOL },
 ];
 
@@ -137,7 +136,6 @@ export const settingsPatchSchema: z.ZodType<ScreenSettingsPatch> = z
             docs: bool.optional(),
             music: bool.optional(),
             encyclopedia: bool.optional(),
-            print: bool.optional(),
             atlas: bool.optional(),
           })
           .strict()

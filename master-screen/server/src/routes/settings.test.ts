@@ -54,13 +54,13 @@ describe('GET and PUT /api/settings', () => {
   it('PUT merges the patch, writes only the explicit keys, makes one commit and leaves the tree clean', async () => {
     const root = gitCampaign();
     const h = await harnessFor(root);
-    const res = await send(h, 'PUT', '/settings', { combat: { autoHideSeconds: 7 }, ui: { rail: { print: false } } });
+    const res = await send(h, 'PUT', '/settings', { combat: { autoHideSeconds: 7 }, ui: { rail: { docs: false } } });
     assert.equal(res.status, 200, res.text);
     const body = res.json as SettingsResponse;
     assert.equal(body.settings.combat.autoHideSeconds, 7);
-    assert.equal(body.settings.ui.rail.print, false);
+    assert.equal(body.settings.ui.rail.docs, false);
     assert.equal(body.settings.ui.rail.plot, true);
-    assert.deepEqual(body.explicit.sort(), ['combat.autoHideSeconds', 'ui.rail.print']);
+    assert.deepEqual(body.explicit.sort(), ['combat.autoHideSeconds', 'ui.rail.docs']);
     assert.ok(h.events.some((e) => e.event === 'settings'));
 
     const file = fs.readFileSync(path.join(root, SETTINGS_PATH), 'utf8');
@@ -105,14 +105,14 @@ describe('GET and PUT /api/settings', () => {
     const root = gitCampaign();
     const h = await harnessFor(root);
     assert.equal((await send(h, 'PUT', '/settings', { combat: { autoHideSeconds: 7 } })).status, 200);
-    const res = await send(h, 'PUT', '/settings', { ui: { rail: { print: false } } });
+    const res = await send(h, 'PUT', '/settings', { ui: { rail: { docs: false } } });
     assert.equal(res.status, 200, res.text);
     const body = res.json as SettingsResponse;
     assert.equal(body.settings.combat.autoHideSeconds, 7);
-    assert.equal(body.settings.ui.rail.print, false);
-    assert.deepEqual(body.explicit.sort(), ['combat.autoHideSeconds', 'ui.rail.print']);
+    assert.equal(body.settings.ui.rail.docs, false);
+    assert.deepEqual(body.explicit.sort(), ['combat.autoHideSeconds', 'ui.rail.docs']);
 
     const again = await get(h, '/settings');
-    assert.deepEqual((again.json as SettingsResponse).explicit.sort(), ['combat.autoHideSeconds', 'ui.rail.print']);
+    assert.deepEqual((again.json as SettingsResponse).explicit.sort(), ['combat.autoHideSeconds', 'ui.rail.docs']);
   });
 });

@@ -93,7 +93,7 @@ L'agente non riceve mai il valore della chiave. Gli script che la usano la leggo
 - prompt e istruzioni inviati ai modelli o ai servizi;
 - log, registri tecnici e messaggi di errore mostrati o salvati;
 - pacchetti di diagnosi (raccolte di informazioni per risolvere un problema);
-- metadati delle schede, file delle uscite, enciclopedia, carte e stampe;
+- metadati delle schede, file delle uscite, enciclopedia;
 - file della campagna e file generati, comprese le immagini con i metadati di sintesi (vedi [Integrazioni esterne](Integrazioni%20esterne.md), sezione 2).
 
 Il registro degli errori, che il master può consultare (vedi [Esperienza utente](Esperienza%20utente.md)), passa dalla stessa **redazione**: le chiavi e le intestazioni di autenticazione vengono sostituite con un segnaposto prima di essere scritte.
@@ -125,7 +125,7 @@ Se trova qualcosa, **blocca il salvataggio** e lo dice in una frase: «Ho trovat
 | Fornitore di immagini via API di terzi | Descrizione pubblica verificata; immagini pubbliche di riferimento; chiave del servizio (dal portachiavi, non nel contenuto) | Servizio scelto dal master | Solo per le immagini richieste | All'attivazione del servizio, con il costo da verificare (**DA VERIFICARE**) |
 | Photoshop (con le funzioni generative) | Immagine interessata dall'operazione generativa | Servizio di Adobe per la sola operazione generativa; il resto resta sul computer | Solo per le operazioni generative | All'attivazione, con la precisazione che le funzioni generative inviano l'immagine |
 | Generazione locale | Nulla verso l'esterno, dopo l'installazione | Solo il computer del master | Sempre | Nessuno, ma va verificato che non ci siano servizi remoti (**DA VERIFICARE**) |
-| Pubblicazione dell'enciclopedia (servizio di hosting, non ancora scelto) | Solo le voci pubbliche e le carte già generate; il servizio registra gli accessi secondo le proprie regole (**DA VERIFICARE**) | Servizio di hosting scelto | Solo quando il master pubblica | All'attivazione, una volta (**Deciso**). Ogni pubblicazione è una richiesta del master e va confermata (sezione 5). Per ora non esiste: l'enciclopedia è solo locale (decisione dell'autore, 2026-11-12) |
+| Pubblicazione dell'enciclopedia (servizio di hosting, non ancora scelto) | Solo le voci pubbliche già generate; il servizio registra gli accessi secondo le proprie regole (**DA VERIFICARE**) | Servizio di hosting scelto | Solo quando il master pubblica | All'attivazione, una volta (**Deciso**). Ogni pubblicazione è una richiesta del master e va confermata (sezione 5). Per ora non esiste: l'enciclopedia è solo locale (decisione dell'autore, 2026-11-12) |
 | Repository git remoto privato dell'utente (facoltativo) | Tutto lo storico della cartella: anche riservato, schede dei giocatori, chiavi se finite lì | Repository remoto che l'utente tiene privato | Quando è attivo, con le versioni salvate | All'attivazione, una volta (**Deciso**). È una copia dell'utente, non un servizio del framework |
 | Cartelle sincronizzate con servizi cloud | Copia dell'intera cartella della campagna, riservato compreso | Servizio di sincronizzazione | Continuamente, per come è configurato il sistema | Il framework avvisa al primo avvio e consiglia di non usare cartelle sincronizzate (vedi [Esperienza utente](Esperienza%20utente.md)) |
 | Condivisione di documenti (handout ai giocatori) | Solo i file che il master sceglie | Servizio di condivisione scelto | Solo quando il master lo chiede | All'attivazione, una volta (**Deciso**). Ogni invio è una scelta del master |
@@ -155,7 +155,7 @@ Il consenso si può revocare con una frase; la revoca ferma gli invii futuri e l
 
 ### 5.1 Che cosa è pubblico
 
-**Proposta.** Sono uscite pubbliche: l'enciclopedia della campagna, i riepiloghi «dove eravamo rimasti» da leggere ai giocatori, le carte e i fogli di stampa per il tavolo, gli handout, le schede condivise. Il master screen è uno strumento privato del master (vedi [Master screen](Master%20screen.md)), e ha accesso anche alla parte riservata; non è un'uscita.
+**Proposta.** Sono uscite pubbliche: l'enciclopedia della campagna, i riepiloghi «dove eravamo rimasti» da leggere ai giocatori, gli handout, le schede condivise. Il master screen è uno strumento privato del master (vedi [Master screen](Master%20screen.md)), e ha accesso anche alla parte riservata; non è un'uscita.
 
 Nelle uscite pubbliche la parte riservata non compare, nemmeno il titolo di una scheda interamente riservata (vedi [Architettura](Architettura.md), sezione 3).
 

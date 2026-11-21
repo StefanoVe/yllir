@@ -86,9 +86,9 @@ test('awkward strings, dates, booleans and empty collections round-trip', () => 
     system: { adapter: 'none', options: {} },
     structure: [
       { id: 'trama', folder: 'Trama', type: 'plot' },
-      { id: 'note', folder: "Nota 'x'", type: 'notes', cards: false },
+      { id: 'note', folder: "Nota 'x'", type: 'notes' },
     ],
-    modules: { print: true, music: false },
+    modules: { atlas: true, music: false },
     audit: {
       exclusions: [
         {
@@ -109,13 +109,13 @@ test('awkward strings, dates, booleans and empty collections round-trip', () => 
 test('dates, booleans, numbers and empty values are written in the expected form', () => {
   const text = stringifyConfig({
     campaign: { created: '2026-11-07', name: 'Prova' },
-    modules: { print: true },
+    modules: { atlas: true },
     audit: { exclusions: [{ values: ['30'], tags: [] , meta: {} }] },
     language: { main: 'it' },
   });
   assert.match(text, /^campaign:\n/m);
   assert.match(text, /^  created: "2026-11-07"$/m);
-  assert.match(text, /^  print: true$/m);
+  assert.match(text, /^  atlas: true$/m);
   assert.match(text, /values: \["30"\]/);
   assert.match(text, /tags: \[\]/);
   assert.match(text, /meta: \{\}/);
@@ -351,7 +351,7 @@ test('workflow.auto_item_images is written under workflow and reads back', () =>
 
 test('workflow is written right after modules and reads back', () => {
   const config = parse(MINIMAL);
-  config.modules = { print: false };
+  config.modules = { atlas: false };
   config.workflow = { auto_accept: true };
   const text = stringifyConfig(config);
   const topKeys = text.split('\n').filter((line) => /^[a-z]/.test(line)).map((line) => line.split(':')[0]);

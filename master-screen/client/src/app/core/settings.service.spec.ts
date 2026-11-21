@@ -175,10 +175,10 @@ describe('SettingsService', () => {
 
   it('patch type is accepted by update (compile-time check of the shape)', async () => {
     const service = await started();
-    const patch: ScreenSettingsPatch = { ui: { rail: { print: false } } };
+    const patch: ScreenSettingsPatch = { ui: { rail: { atlas: false } } };
     service.update(patch);
     await service.flush();
-    expect(api.saveSettings).toHaveBeenCalledWith({ ui: { rail: { print: false } } });
+    expect(api.saveSettings).toHaveBeenCalledWith({ ui: { rail: { atlas: false } } });
   });
   /** A save whose response the test resolves by hand. */
   function holdNextSave(): { resolve: (value: SettingsResponse) => void } {

@@ -249,7 +249,6 @@ checks: checks.mjs
 atlas_style: fantasy-color
 item_sheet:
   mechanical_fields: [activation, check, dc, duration, limits, resources, attunement, charges, frequency, bonus, dice, conditions, value]
-  printable_fields: [title, description]
 tracking: [initiative_order, phases_with_thresholds, recharges, reactions]
 do_not:
   - roll dice for the master

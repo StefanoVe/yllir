@@ -69,7 +69,7 @@ export class FakeMusicServer {
   /** When true, the tracks request fails. */
   failSearch = false;
   private readonly bus = new Subject<{ event: string; data: unknown }>();
-  readonly modules = signal({ music: true, print: false, encyclopedia: false });
+  readonly modules = signal({ music: true, encyclopedia: false });
 
   readonly live = {
     on: <T>(name: string): Observable<T> =>

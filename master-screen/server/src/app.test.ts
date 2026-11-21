@@ -67,7 +67,6 @@ describe('app and status route', () => {
     assert.match(body.frameworkVersion, /^\d+\.\d+\.\d+$/);
     assert.ok(body.screenVersion === 'unknown' || /^\d+\.\d+\.\d+$/.test(body.screenVersion));
     assert.equal(body.modules.music, true);
-    assert.equal(body.modules.print, false);
     assert.deepEqual(body.agent, { available: false, reason: 'Not configured' });
     assert.equal(typeof body.git.ok, 'boolean');
   });

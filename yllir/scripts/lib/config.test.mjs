@@ -77,13 +77,11 @@ const FULL = lines(
   '  - id: oggetti',
   '    folder: Oggetti',
   '    type: objects',
-  '    cards: true',
   '  - id: giocatori',
   '    folder: Giocatori',
   '    type: master-only',
   '',
   'modules:',
-  '  print: false',
   '  encyclopedia: true',
   '',
   'audit:',
@@ -298,13 +296,13 @@ test('a sources category is a valid type', () => {
   assert.deepEqual(errorsOf(yaml, ['Fonti']), []);
 });
 
-test('a style is not installed, and cards only makes sense on objects', () => {
+test('a style is not installed; the old cards flag of a structure entry is accepted and ignored', () => {
   const styled = `${MINIMAL}structure:\n  - id: creature\n    folder: Creature\n    type: subjects\n    style: dark-fantasy\n`;
   assert.deepEqual(pairsOf(errorsOf(styled, ['Creature'])), ['unknown-style structure[0].style']);
-  const cards = `${MINIMAL}structure:\n  - id: trama\n    folder: Trama\n    type: plot\n    cards: true\n`;
-  assert.deepEqual(pairsOf(errorsOf(cards, ['Trama'])), ['cards-not-objects structure[0].cards']);
-  const notBool = `${MINIMAL}structure:\n  - id: oggetti\n    folder: Oggetti\n    type: objects\n    cards: "yes"\n`;
-  assert.deepEqual(pairsOf(errorsOf(notBool, ['Oggetti'])), ['bad-type structure[0].cards']);
+  const cards = `${MINIMAL}structure:\n  - id: oggetti\n    folder: Oggetti\n    type: objects\n    cards: true\n`;
+  assert.deepEqual(errorsOf(cards, ['Oggetti']), []);
+  const onPlot = `${MINIMAL}structure:\n  - id: trama\n    folder: Trama\n    type: plot\n    cards: "yes"\n`;
+  assert.deepEqual(errorsOf(onPlot, ['Trama']), []);
 });
 
 test('a style is valid when the campaign has its folder with a prompt.md', () => {
@@ -348,7 +346,17 @@ test('unknown keys inside a category are reported', () => {
 
 test('modules accept only the known keys, with boolean values', () => {
   assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}modules:\n  sauna: true\n`)), ['unknown-module modules.sauna']);
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}modules:\n  print: "yes"\n`)), ['bad-type modules.print']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}modules:\n  encyclopedia: "yes"\n`)), ['bad-type modules.encyclopedia']);
+});
+
+test('a campaign with the old print settings still validates, with no errors and no warnings', () => {
+  const yaml = `${MINIMAL}encyclopedia:\n  title: "Atlante di Calvane"\n  base_url: "https://example.org/calvane"\nprint:\n  format: letter\n  cmyk: yes\n  renderer: gimp\n  dpi: 300\nmodules:\n  print: true\n  encyclopedia: true\n`;
+  const result = validateConfig(makeCampaign(yaml));
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.warnings.filter((warning) => warning.code !== 'no-structure'), []);
+  assert.equal(result.ok, true);
+  assert.equal(result.config.encyclopedia.title, 'Atlante di Calvane');
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}modules:\n  print: "yes"\n`)), []);
 });
 
 test('an atlas category with the atlas module is valid', () => {
@@ -548,15 +556,12 @@ test('campaign.seed rejects paths outside the campaign, other extensions and non
   assert.deepEqual(pairsOf(errorsOf(withSeed('[Seme.md]'))), ['bad-type campaign.seed']);
 });
 
-test('encyclopedia and print are optional mappings; a valid pair is accepted', () => {
-  const yaml = `${MINIMAL}encyclopedia:\n  title: "Atlante di Calvane"\n  base_url: "https://example.org/calvane"\nprint:\n  format: a4\n  cmyk: true\n  renderer: node\n`;
+test('encyclopedia is an optional mapping; a valid one is accepted', () => {
+  const yaml = `${MINIMAL}encyclopedia:\n  title: "Atlante di Calvane"\n  base_url: "https://example.org/calvane"\n`;
   const result = validateConfig(makeCampaign(yaml));
   assert.deepEqual(result.errors, []);
   assert.equal(result.ok, true);
   assert.equal(result.config.encyclopedia.title, 'Atlante di Calvane');
-  assert.equal(result.config.print.format, 'a4');
-  assert.equal(result.config.print.cmyk, true);
-  assert.equal(result.config.print.renderer, 'node');
 });
 
 test('encyclopedia.base_url is stored with exactly one trailing slash', () => {
@@ -588,21 +593,12 @@ test('encyclopedia.base_url must be an http or https address without query, frag
   assert.deepEqual(bad(''), ['bad-value encyclopedia.base_url']);
 });
 
-test('unknown keys inside encyclopedia and print are reported', () => {
+test('unknown keys inside encyclopedia are reported', () => {
   assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  colour: red\n`)), ['unknown-key encyclopedia.colour']);
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print:\n  dpi: 300\n`)), ['unknown-key print.dpi']);
 });
 
-test('print values are checked for enumerations and type', () => {
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print:\n  format: letter\n`)), ['bad-value print.format']);
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print:\n  cmyk: yes\n`)), ['bad-type print.cmyk']);
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print:\n  renderer: gimp\n`)), ['bad-value print.renderer']);
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print:\n  renderer: photoshop\n  cmyk: false\n`)), []);
-});
-
-test('encyclopedia and print must be mappings', () => {
+test('encyclopedia must be a mapping', () => {
   assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia: yes\n`)), ['bad-type encyclopedia']);
-  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}print: a4\n`)), ['bad-type print']);
 });
 
 test('workflow with auto_accept true or false validates with no errors', () => {

@@ -41,10 +41,6 @@ export const routes: Routes = [
     loadComponent: () => import('./atlas/atlas').then((m) => m.AtlasPage),
   },
   {
-    path: 'print',
-    loadComponent: () => import('./print/print').then((m) => m.PrintPage),
-  },
-  {
     path: 'docs',
     loadComponent: () => import('./documents/documents').then((m) => m.DocumentsPage),
   },
