@@ -1,4 +1,4 @@
-import { Component, DOCUMENT, computed, effect, inject, signal } from '@angular/core';
+import { Component, DOCUMENT, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Title } from '@angular/platform-browser';
 import { I18n, type TranslationKey } from '../i18n';
 import { StatusService } from '../core/status.service';
@@ -23,6 +23,29 @@ export interface ProjectedToken {
   defeated: boolean;
   left: number;
   top: number;
+}
+
+/**
+ * Resolves once the picture is decoded, or once it has failed to load. Never rejects, so the caller always
+ * gets to swap: a broken picture must not leave the screen black.
+ */
+export async function preloadImage(src: string): Promise<void> {
+  try {
+    const img = new Image();
+    img.src = src;
+    try {
+      await img.decode();
+    } catch {
+      if (!img.complete) {
+        await new Promise<void>((resolve) => {
+          img.addEventListener('load', () => resolve(), { once: true });
+          img.addEventListener('error', () => resolve(), { once: true });
+        });
+      }
+    }
+  } catch {
+    /* no Image support: swap anyway */
+  }
 }
 
 /** The first letters of the first two words of a name: "Mira Vell" is MV, "Ogre" is O. */
@@ -59,6 +82,16 @@ export class ProjectorPage {
     const projection = this.projector.current();
     return projection.kind === 'image' ? projection.src : null;
   });
+  /**
+   * The two stacked picture layers. `front` is the visible one; the other is loaded first and then
+   * cross-faded in, so the previous picture stays on screen until the next one is ready.
+   */
+  readonly layers = signal<[string | null, string | null]>([null, null]);
+  readonly front = signal<0 | 1>(0);
+  /** The combat map picture; it changes only after the new one is preloaded, so the map never goes blank. */
+  readonly mapSrc = signal<string | null>(null);
+  private imageRequest = 0;
+  private mapRequest = 0;
   /** The fight on screen; null when no fight runs, which shows the rest screen. */
   readonly combat = computed<ProjectedCombat | null>(() => {
     const projection = this.projector.current();
@@ -96,12 +129,52 @@ export class ProjectorPage {
   });
 
   constructor() {
+    this.projector.listen();
     effect(() => {
       const name = this.campaignName();
       const label = this.i18n.t('projector.title');
       this.i18n.language();
       this.title.setTitle(name ? `${name} · ${label}` : label);
     });
+    effect(() => {
+      const src = this.imageSrc();
+      untracked(() => void this.showImage(src));
+    });
+    effect(() => {
+      const src = this.combat()?.map?.src ?? null;
+      untracked(() => void this.showMap(src));
+    });
+  }
+
+  /** Shows a projected image: preloads it, then cross-fades it onto the hidden layer. Stale loads are dropped. */
+  private async showImage(src: string | null): Promise<void> {
+    const request = ++this.imageRequest;
+    if (src === null) {
+      this.layers.set([null, null]);
+      this.front.set(0);
+      return;
+    }
+    if (src === this.layers()[this.front()]) return;
+    await preloadImage(src);
+    if (request !== this.imageRequest) return;
+    const back: 0 | 1 = this.front() === 0 ? 1 : 0;
+    const next: [string | null, string | null] = [...this.layers()];
+    next[back] = src;
+    this.layers.set(next);
+    this.front.set(back);
+  }
+
+  /** Shows the combat map: the new picture replaces the old one only once it has loaded. */
+  private async showMap(src: string | null): Promise<void> {
+    const request = ++this.mapRequest;
+    if (src === null) {
+      this.mapSrc.set(null);
+      return;
+    }
+    if (src === this.mapSrc()) return;
+    await preloadImage(src);
+    if (request !== this.mapRequest) return;
+    this.mapSrc.set(src);
   }
 
   /** Remembers the image's own proportions for a map without a grid. */

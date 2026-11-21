@@ -133,7 +133,7 @@ describe('docs routes', () => {
     await fs.rm(outside, { recursive: true, force: true });
   });
 
-  const get = (p: string) => request(server.port, { path: p });
+  const get = (p: string, headers?: Record<string, string>) => request(server.port, { path: p, headers });
   const readDoc = async (rel: string, view?: string): Promise<DocResponse> => {
     const query = view === undefined ? '' : `&view=${view}`;
     const res = await get(`/api/docs/read?path=${encodeURIComponent(rel)}${query}`);
@@ -268,6 +268,41 @@ describe('docs routes', () => {
       const res = await get(`/api/file?path=${encodeURIComponent(rel)}`);
       assert.equal(res.status, 404, `${rel} should not be served`);
     }
+  });
+
+  it('images carry validators, always revalidate and answer 304 to conditional requests', async () => {
+    const first = await get('/api/file?path=img/map.png');
+    assert.equal(first.status, 200);
+    assert.equal(first.headers['cache-control'], 'private, no-cache');
+    assert.match(String(first.headers.etag), /^W\/"\d+-\d+"$/);
+    assert.ok(first.headers['last-modified'], 'Last-Modified missing');
+    const size = (await fs.stat(path.join(tmp, 'img/map.png'))).size;
+    assert.equal(first.headers['content-length'], String(size));
+    const etag = String(first.headers.etag);
+
+    const cached = await get('/api/file?path=img/map.png', { 'If-None-Match': etag });
+    assert.equal(cached.status, 304);
+    assert.equal(cached.text, '');
+
+    const since = await get('/api/file?path=img/map.png', {
+      'If-Modified-Since': String(first.headers['last-modified']),
+    });
+    assert.equal(since.status, 304);
+    assert.equal(since.text, '');
+
+    const stale = await get('/api/file?path=img/map.png', { 'If-None-Match': 'W/"0-0"' });
+    assert.equal(stale.status, 200);
+    assert.equal(stale.text, first.text);
+
+    const svg = await get('/api/file?path=img/icon.svg', { 'If-None-Match': 'W/"0-0"' });
+    assert.equal(svg.status, 200);
+    assert.equal(svg.headers['content-security-policy'], 'sandbox');
+    assert.match(String(svg.headers['content-disposition']), /^attachment/);
+
+    const outsideRes = await get(`/api/file?path=${encodeURIComponent(`../${path.basename(outside)}/pic.png`)}`, {
+      'If-None-Match': etag,
+    });
+    assert.equal(outsideRes.status, 404);
   });
 
   it('search is case and accent insensitive, prefix based, not substring based', async () => {

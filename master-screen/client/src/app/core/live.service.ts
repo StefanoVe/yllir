@@ -47,7 +47,10 @@ export class LiveService {
   }
 
   private connect(): void {
+    // The projector window holds no live stream: browsers allow only ~6 HTTP/1.1 connections per origin,
+    // and the images it must show would queue behind this one. Same test as app.ts `isProjector`.
     if (typeof EventSource === 'undefined') return;
+    if (location.pathname === '/projector' || location.pathname.startsWith('/projector/')) return;
     const source = new EventSource('/api/events');
     this.source = source;
     source.onopen = () => {

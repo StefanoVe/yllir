@@ -238,15 +238,23 @@ class Projector {
     return { kind: 'combat', combat: projectCombat(state, view, mapSrc) };
   }
 
-  /** The battle map through the same gate as any image; null when it may not be shown. */
+  /**
+   * The battle map through the same gate as any image. The gridless twin comes first (the players'
+   * tokens are drawn by cell, so the baked-in grid would fight them); the map itself is the fallback.
+   * Null when neither may be shown.
+   */
   private async mapSource(view: BattleView | null): Promise<string | null> {
-    const ref = view?.map?.ref;
-    if (!ref) return null;
-    try {
-      return await resolveSrc(this.ctx, fileUrl(ref));
-    } catch {
-      return null;
+    const candidates = [view?.map?.plain, view?.map?.ref];
+    for (const ref of candidates) {
+      if (!ref) continue;
+      try {
+        const src = await resolveSrc(this.ctx, fileUrl(ref));
+        if (src !== null) return src;
+      } catch {
+        // the next candidate
+      }
     }
+    return null;
   }
 
   private ensureLive(): void {

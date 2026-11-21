@@ -1,12 +1,15 @@
 <main class="projector">
-  @if (imageSrc(); as src) {
-    <img class="projection" [src]="src" alt="" />
+  @if (imageSrc() !== null) {
+    <div class="stage">
+      <img class="projection" [class.on]="front() === 0" [attr.src]="layers()[0]" alt="" />
+      <img class="projection" [class.on]="front() === 1" [attr.src]="layers()[1]" alt="" />
+    </div>
   } @else if (combat(); as c) {
     <div class="fight" [class.with-map]="!!c.map">
       @if (c.map; as map) {
         <div class="map-area">
           <div class="map-frame" [style.--ratio]="ratio()">
-            <img class="map-image" [src]="map.src" alt="" (load)="onMapLoad($event)" />
+            <img class="map-image" [attr.src]="mapSrc()" alt="" (load)="onMapLoad($event)" />
             @for (t of tokens(); track t.id) {
               <span
                 class="token"

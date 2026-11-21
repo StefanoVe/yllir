@@ -257,14 +257,42 @@ async function serveFile(ctx: Ctx, req: Request, res: Response): Promise<void> {
     res.status(404).json({ error: 'There is no such file.' });
     return;
   }
+  const stat = await fsp.stat(resolved.abs);
+  const etag = `W/"${stat.size}-${Math.floor(stat.mtimeMs)}"`;
   res.setHeader('Content-Type', type);
   res.setHeader('Content-Security-Policy', 'sandbox');
   if (ext === '.svg') res.setHeader('Content-Disposition', 'attachment');
+  // Always revalidate, so an edited or regenerated image is never shown stale.
+  res.setHeader('Cache-Control', 'private, no-cache');
+  res.setHeader('ETag', etag);
+  res.setHeader('Last-Modified', stat.mtime.toUTCString());
+  if (isNotModified(req, etag, stat.mtime)) {
+    res.status(304).end();
+    return;
+  }
+  res.setHeader('Content-Length', String(stat.size));
   const stream = fs.createReadStream(resolved.abs);
   stream.on('error', () => {
     if (!res.headersSent) res.status(404).json({ error: 'There is no such file.' });
     else res.destroy();
   });
   stream.pipe(res);
+}
+
+/** Conditional request check (RFC 7232): If-None-Match wins over If-Modified-Since when present. */
+function isNotModified(req: Request, etag: string, mtime: Date): boolean {
+  const ifNoneMatch = req.headers['if-none-match'];
+  if (typeof ifNoneMatch === 'string') {
+    const opaque = etag.replace(/^W\//, '');
+    return ifNoneMatch
+      .split(',')
+      .map((tag) => tag.trim().replace(/^W\//, ''))
+      .some((tag) => tag === '*' || tag === opaque);
+  }
+  const ifModifiedSince = req.headers['if-modified-since'];
+  if (typeof ifModifiedSince !== 'string') return false;
+  const since = Date.parse(ifModifiedSince);
+  if (Number.isNaN(since)) return false;
+  return Math.floor(mtime.getTime() / 1000) * 1000 <= since;
 }
 

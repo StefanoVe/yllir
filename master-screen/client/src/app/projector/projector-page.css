@@ -18,11 +18,31 @@
   cursor: none;
 }
 
+/* Two stacked layers: the visible one is .on, the other fades out while the new one fades in. */
+.stage {
+  position: absolute;
+  inset: 0;
+}
+
 .projection {
+  position: absolute;
+  inset: 0;
   width: 100vw;
   height: 100vh;
   object-fit: contain;
   display: block;
+  opacity: 0;
+  transition: opacity 250ms ease;
+}
+
+.projection.on {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .projection {
+    transition: none;
+  }
 }
 
 .rest {

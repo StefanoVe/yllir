@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { signal, type WritableSignal } from '@angular/core';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ProjectorPage, tokenLabel } from './projector-page';
 import { ProjectorService, type Projection, type ProjectedCombat } from './projector.service';
 import { StatusService } from '../core/status.service';
@@ -17,17 +17,70 @@ const FIGHT: ProjectedCombat = {
   positions: {},
 };
 
+/**
+ * A stand-in for the browser's Image: decode() resolves at once, unless the test holds it, and then the test
+ * releases or fails each held decode by its picture's address.
+ */
+class FakeImage {
+  static holdDecode = false;
+  static failDecode = false;
+  static held: Array<{ src: string; resolve: () => void; reject: (error: Error) => void }> = [];
+  src = '';
+  complete = false;
+  decode(): Promise<void> {
+    if (FakeImage.failDecode) {
+      this.complete = true;
+      return Promise.reject(new Error('broken picture'));
+    }
+    if (!FakeImage.holdDecode) return Promise.resolve();
+    return new Promise((resolve, reject) => FakeImage.held.push({ src: this.src, resolve, reject }));
+  }
+  addEventListener(): void {}
+}
+
+function releaseDecode(src: string): void {
+  const index = FakeImage.held.findIndex((h) => h.src === src);
+  if (index < 0) throw new Error(`no held decode for ${src}`);
+  const [held] = FakeImage.held.splice(index, 1);
+  held.resolve();
+}
+
+/** Lets pending promise callbacks of the preload run. */
+async function settle(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+/** The picture on screen: the layer that is shown (.on). */
+function shownSrc(el: HTMLElement): string | null {
+  return el.querySelector('.projection.on')?.getAttribute('src') ?? null;
+}
+
 describe('ProjectorPage', () => {
   let projection: WritableSignal<Projection>;
+  let listen: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     projection = signal<Projection>({ kind: 'blank' });
+    listen = vi.fn();
+    FakeImage.holdDecode = false;
+    FakeImage.failDecode = false;
+    FakeImage.held = [];
+    vi.stubGlobal('Image', FakeImage);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProjectorService, useValue: { current: projection } },
+        { provide: ProjectorService, useValue: { current: projection, listen } },
         { provide: StatusService, useValue: { campaign: signal({ name: 'Yllir' }) } },
       ],
     });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('starts listening to the projector stream when it is created', () => {
+    render();
+    expect(listen).toHaveBeenCalledTimes(1);
   });
 
   function render(): HTMLElement {
@@ -116,6 +169,85 @@ describe('ProjectorPage', () => {
     expect(mira?.textContent?.trim()).toBe('MV');
     expect(mira?.style.left).toBe('95%');
     expect(mira?.style.top).toBe('93.75%');
+  });
+
+  it('keeps the old image on screen until the new one has loaded, then switches', async () => {
+    projection.set({ kind: 'image', src: '/a.png' });
+    const fixture = TestBed.createComponent(ProjectorPage);
+    const el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    await settle();
+    fixture.detectChanges();
+    expect(shownSrc(el)).toBe('/a.png');
+
+    FakeImage.holdDecode = true;
+    projection.set({ kind: 'image', src: '/b.png' });
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    await settle();
+    fixture.detectChanges();
+    expect(FakeImage.held.map((h) => h.src)).toEqual(['/b.png']);
+    expect(shownSrc(el)).toBe('/a.png');
+
+    releaseDecode('/b.png');
+    await settle();
+    fixture.detectChanges();
+    expect(shownSrc(el)).toBe('/b.png');
+    expect(el.querySelectorAll('.projection.on')).toHaveLength(1);
+  });
+
+  it('drops a load that a newer request has overtaken', async () => {
+    const fixture = TestBed.createComponent(ProjectorPage);
+    const el = fixture.nativeElement as HTMLElement;
+    FakeImage.holdDecode = true;
+    projection.set({ kind: 'image', src: '/b.png' });
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    projection.set({ kind: 'image', src: '/c.png' });
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    await settle();
+
+    releaseDecode('/b.png');
+    await settle();
+    fixture.detectChanges();
+    expect(shownSrc(el)).toBeNull();
+
+    releaseDecode('/c.png');
+    await settle();
+    fixture.detectChanges();
+    expect(shownSrc(el)).toBe('/c.png');
+  });
+
+  it('still switches when the new picture fails to decode, and never throws', async () => {
+    FakeImage.failDecode = true;
+    projection.set({ kind: 'image', src: '/broken.png' });
+    const fixture = TestBed.createComponent(ProjectorPage);
+    const el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    await settle();
+    fixture.detectChanges();
+    expect(shownSrc(el)).toBe('/broken.png');
+  });
+
+  it('clears the picture when the projection becomes something else', async () => {
+    projection.set({ kind: 'image', src: '/a.png' });
+    const fixture = TestBed.createComponent(ProjectorPage);
+    const el = fixture.nativeElement as HTMLElement;
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    await settle();
+    fixture.detectChanges();
+
+    projection.set({ kind: 'combat', combat: null });
+    fixture.detectChanges();
+    TestBed.flushEffects();
+    await settle();
+    fixture.detectChanges();
+    expect(el.querySelector('.projection')).toBeNull();
+    expect(el.querySelector('.rest')).not.toBeNull();
   });
 
   it('labels tokens with the first letters of the first two words', () => {

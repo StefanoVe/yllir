@@ -6,22 +6,48 @@ function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 }
 
+/** A minimal EventSource: records the listeners the service adds so a test can fire them. */
+class FakeEventSource {
+  static instances: FakeEventSource[] = [];
+  readonly listeners = new Map<string, (message: MessageEvent) => void>();
+  onopen: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  constructor(readonly url: string) {
+    FakeEventSource.instances.push(this);
+  }
+  addEventListener(name: string, listener: (message: MessageEvent) => void): void {
+    this.listeners.set(name, listener);
+  }
+  close(): void {}
+}
+
+/** Lets pending promise callbacks run. */
+async function settle(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 describe('ProjectorService', () => {
   let service: ProjectorService;
   let fakeWindow: { closed: boolean; focus: ReturnType<typeof vi.fn> };
   let openSpy: ReturnType<typeof vi.spyOn>;
   let fetchMock: ReturnType<typeof vi.fn>;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     TestBed.configureTestingModule({});
     fakeWindow = { closed: false, focus: vi.fn() };
     openSpy = vi.spyOn(window, 'open').mockImplementation(() => fakeWindow as unknown as Window);
     fetchMock = vi.fn(async () => jsonResponse(200, { kind: 'image', src: '/x.png' }));
     vi.stubGlobal('fetch', fetchMock);
+    FakeEventSource.instances = [];
+    vi.stubGlobal('EventSource', FakeEventSource);
     service = TestBed.inject(ProjectorService);
+    // The constructor fetches the current projection once; the tests below count their own calls.
+    await settle();
+    fetchMock.mockClear();
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
   });
@@ -106,5 +132,52 @@ describe('ProjectorService', () => {
       throw new TypeError('offline');
     });
     await expect(service.check('/a.png')).resolves.toBe(false);
+  });
+
+  it('does not open an EventSource until listen() is called', () => {
+    expect(FakeEventSource.instances).toHaveLength(0);
+    service.listen();
+    expect(FakeEventSource.instances).toHaveLength(1);
+    expect(FakeEventSource.instances[0].url).toBe('/api/projector/events');
+  });
+
+  it('listen() is idempotent: a second call opens no second stream', () => {
+    service.listen();
+    service.listen();
+    expect(FakeEventSource.instances).toHaveLength(1);
+  });
+
+  it('listen() fetches the current projection and polls while no stream is open', async () => {
+    vi.useFakeTimers();
+    service.listen();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/projector')).toHaveLength(1);
+
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/projector')).toHaveLength(2);
+  });
+
+  it('listen() stops polling once the stream is open and frames arrive', async () => {
+    vi.useFakeTimers();
+    service.listen();
+    const source = FakeEventSource.instances[0];
+    source.onopen?.();
+    source.listeners.get('projection')?.({ data: JSON.stringify({ kind: 'blank' }) } as MessageEvent);
+    fetchMock.mockClear();
+
+    await vi.advanceTimersByTimeAsync(15000);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(service.current()).toEqual({ kind: 'blank' });
+  });
+
+  it('listen() fetches again on every stream error', async () => {
+    vi.useFakeTimers();
+    service.listen();
+    await vi.advanceTimersByTimeAsync(0);
+    fetchMock.mockClear();
+
+    FakeEventSource.instances[0].onerror?.();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(fetchMock).toHaveBeenCalledWith('/api/projector');
   });
 });

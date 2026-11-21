@@ -462,6 +462,86 @@ describe('projector combat, end to end', () => {
   });
 });
 
+describe('projector battle map, end to end', () => {
+  let tmp: string;
+  let h: Harness;
+  let sessionId = '';
+
+  const MAP_FILES = {
+    // Cited by no document: the old public-only gate would have refused it.
+    'img/loose-map.png': 'map',
+    // Images skill naming: the grid version and its plain twin.
+    'img/harbor-map-grid.png': 'grid',
+    'img/harbor-map.png': 'plain',
+    // A grid version with no plain twin.
+    'img/ruins-map-grid.png': 'grid',
+    'notes.txt': 'not an image',
+  };
+
+  before(async () => {
+    tmp = makeCampaign(MAP_FILES);
+    h = await startApp(tmp, makeFramework({ libs: true }));
+    const opened = await send(h, 'POST', '/live/open', {});
+    assert.equal(opened.status, 200, opened.text);
+    sessionId = (opened.json as { session: { id: string } }).session.id;
+    await send(h, 'POST', '/live/combat', { op: 'start' });
+    await send(h, 'POST', '/live/combat', { op: 'add', name: 'Mira', side: 'pc', initiative: 18 });
+    await send(h, 'POST', '/live/combat', { op: 'add', name: 'Goblin', side: 'enemy', initiative: 14 });
+    await send(h, 'POST', '/live/combat', { op: 'next' });
+  });
+
+  after(async () => {
+    await send(h, 'POST', '/projector', { kind: 'blank' });
+    await h.server.close();
+    await h.ctx.closeAll();
+  });
+
+  /** Puts a map on the battle screen through its own route, which refuses anything but a campaign image. */
+  const setMap = async (ref: string): Promise<void> => {
+    const res = await send(h, 'PUT', '/battle', { map: { ref, cols: 10, rows: 8 } });
+    assert.equal(res.status, 200, res.text);
+  };
+
+  /** Projects the fight and returns the projected map, or null when the fight shows none. */
+  const projectedMap = async (): Promise<ProjectedCombat['map']> => {
+    const res = await send(h, 'POST', '/projector', { kind: 'combat' });
+    assert.equal(res.status, 200, res.text);
+    const combat = (res.json as { kind: 'combat'; combat: ProjectedCombat }).combat;
+    assert.ok(combat);
+    return combat.map;
+  };
+
+  it('projects a battle map that no document cites: the public gate is gone', async () => {
+    await setMap('img/loose-map.png');
+    assert.deepEqual(await projectedMap(), { src: '/api/file?path=img%2Floose-map.png', cols: 10, rows: 8 });
+  });
+
+  it('projects the gridless twin of a battle map when it exists', async () => {
+    await setMap('img/harbor-map-grid.png');
+    assert.deepEqual(await projectedMap(), { src: '/api/file?path=img%2Fharbor-map.png', cols: 10, rows: 8 });
+  });
+
+  it('projects the map itself when its gridless twin does not exist', async () => {
+    await setMap('img/ruins-map-grid.png');
+    assert.deepEqual(await projectedMap(), { src: '/api/file?path=img%2Fruins-map-grid.png', cols: 10, rows: 8 });
+  });
+
+  it('projects no map, and still the order, when the map ref is outside the campaign or not an image', async () => {
+    const battleFile = path.join(tmp, '.campaign', 'state', 'live', sessionId, 'battle.json');
+    const bad = ['../outside.png', 'notes.txt', '/etc/passwd.png'];
+    for (const ref of bad) {
+      fsSync.writeFileSync(battleFile, JSON.stringify({ map: { ref, cols: 10, rows: 8 }, positions: {}, revision: 99 }));
+      const res = await send(h, 'POST', '/projector', { kind: 'combat' });
+      assert.equal(res.status, 200, ref);
+      const combat = (res.json as { kind: 'combat'; combat: ProjectedCombat }).combat;
+      assert.equal(combat.map, null, ref);
+      assert.deepEqual(combat.order.map((row) => row.id), ['c-1', 'c-2'], ref);
+      assert.deepEqual(combat.positions, {}, ref);
+    }
+    await send(h, 'POST', '/projector', { kind: 'blank' });
+  });
+});
+
 /** Opens the SSE stream on a real connection, reads until the first projection frame, then closes it. */
 function firstFrame(port: number, route: string): Promise<{ status: number; contentType: string; text: string }> {
   return new Promise((resolve, reject) => {
