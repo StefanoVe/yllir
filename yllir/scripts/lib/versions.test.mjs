@@ -12,6 +12,7 @@ import {
   saveManualChanges,
   listVersions,
   restore,
+  saveFilesVersion,
 } from './versions.mjs';
 import { stripExitLine } from './cli-exit.mjs';
 
@@ -322,4 +323,20 @@ test('CLI smoke for every command', () => {
   const usage = runCli(['save', dir]);
   assert.equal(usage.code, 2);
   assert.equal(usage.json.error, 'usage');
+});
+
+test('saveFilesVersion commits only the given files and leaves the other change uncommitted', () => {
+  const dir = newRepo();
+  write(dir, 'campaign.yaml', 'schema: 1\n');
+  write(dir, 'notes.md', 'first\n');
+  saveVersion(dir, { message: 'Two files.', kind: 'framework' });
+  write(dir, 'campaign.yaml', 'schema: 2\n');
+  write(dir, 'notes.md', 'changed\n');
+  const saved = saveFilesVersion(dir, ['campaign.yaml'], { message: 'Impostazioni prova', kind: 'framework' });
+  assert.equal(saved.saved, true);
+  assert.equal(git(dir, 'log', '-1', '--format=%s'), 'Impostazioni prova');
+  assert.equal(git(dir, 'show', '--name-only', '--format=', 'HEAD'), 'campaign.yaml');
+  assert.deepEqual(status(dir).changed.map((c) => c.path), ['notes.md']);
+  const nothing = saveFilesVersion(dir, ['campaign.yaml'], { message: 'Nulla', kind: 'framework' });
+  assert.equal(nothing.saved, false);
 });

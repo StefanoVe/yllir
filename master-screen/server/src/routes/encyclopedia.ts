@@ -9,6 +9,7 @@ import {
   encyclopediaEnabled,
   encyclopediaTexts,
   readEncyclopediaStatus,
+  saveEncyclopediaSettings,
 } from '../encyclopedia/service.js';
 import { resolveSiteFile, resolveSiteRoot } from '../encyclopedia/site.js';
 
@@ -21,7 +22,7 @@ export function registerEncyclopediaRoutes(api: Router, ctx: Ctx): void {
     '/encyclopedia',
     wrap(async (_req, res) => {
       if (!(await encyclopediaEnabled(ctx))) {
-        res.json({ enabled: false, built: false, report: null, publishing: 'not-configured' });
+        res.json({ enabled: false, built: false, report: null, publishing: 'not-configured', settings: null, changes: null });
         return;
       }
       try {
@@ -42,6 +43,19 @@ export function registerEncyclopediaRoutes(api: Router, ctx: Ctx): void {
       } catch (err) {
         ctx.log(`encyclopedia build failed: ${err instanceof Error ? err.message : String(err)}`);
         res.status(500).json({ error: encyclopediaTexts(ctx).buildFailed });
+      }
+    }),
+  );
+
+  api.put(
+    '/encyclopedia/settings',
+    wrap(async (req, res) => {
+      try {
+        const answer = await saveEncyclopediaSettings(ctx, req.body);
+        res.status(answer.status).json(answer.body);
+      } catch (err) {
+        ctx.log(`encyclopedia settings failed: ${err instanceof Error ? err.message : String(err)}`);
+        res.status(500).json({ error: encyclopediaTexts(ctx).settingsFailed });
       }
     }),
   );

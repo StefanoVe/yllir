@@ -1,10 +1,12 @@
 import { provideZonelessChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { afterEach, describe, expect, it } from 'vitest';
-import type { EncyclopediaReport, EncyclopediaStatus } from '@shared/types';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import type { EncyclopediaReport, EncyclopediaSettings, EncyclopediaStatus } from '@shared/types';
 import { CallFailure } from './call-json';
 import { EncyclopediaApiService, reportFromBody } from './encyclopedia-api.service';
-import { EncyclopediaPage } from './encyclopedia';
+import { EncyclopediaPage, entryName, sameSettings } from './encyclopedia';
+
+const ITEMS_ONLY: EncyclopediaSettings = { kinds: ['item'], flavourText: true, list: 'full' };
 
 function report(overrides: Partial<EncyclopediaReport> = {}): EncyclopediaReport {
   return {
@@ -16,15 +18,30 @@ function report(overrides: Partial<EncyclopediaReport> = {}): EncyclopediaReport
     baseUrl: 'http://localhost/',
     generatedAt: '2026-11-12T10:00:00Z',
     previewUrl: '/enc/',
+    settings: ITEMS_ONLY,
     ...overrides,
   };
 }
 
-/** A fake of the API: `current` is what GET returns; `buildResult` is what POST does. */
+function built(overrides: Partial<EncyclopediaStatus> = {}): EncyclopediaStatus {
+  return {
+    enabled: true,
+    built: true,
+    report: report(),
+    publishing: 'not-configured',
+    settings: ITEMS_ONLY,
+    changes: { added: [], changed: [], removed: [] },
+    ...overrides,
+  };
+}
+
+/** A fake of the API: `current` is what GET returns; `buildResult` is what POST does; `saveResult` what PUT does. */
 class FakeEncyclopediaApi {
-  current: EncyclopediaStatus = { enabled: true, built: false, report: null, publishing: 'not-configured' };
+  current: EncyclopediaStatus = { enabled: true, built: false, report: null, publishing: 'not-configured', settings: ITEMS_ONLY, changes: null };
   buildResult: () => Promise<EncyclopediaReport> = async () => report();
+  saveResult: (settings: EncyclopediaSettings) => Promise<EncyclopediaStatus> = async (settings) => ({ ...this.current, settings });
   buildCalls = 0;
+  saveCalls: EncyclopediaSettings[] = [];
 
   status(): Promise<EncyclopediaStatus> {
     return Promise.resolve(this.current);
@@ -33,6 +50,11 @@ class FakeEncyclopediaApi {
   build(): Promise<EncyclopediaReport> {
     this.buildCalls++;
     return this.buildResult();
+  }
+
+  saveSettings(settings: EncyclopediaSettings): Promise<EncyclopediaStatus> {
+    this.saveCalls.push(settings);
+    return this.saveResult(settings);
   }
 }
 
@@ -56,98 +78,113 @@ function root(fixture: ComponentFixture<EncyclopediaPage>): HTMLElement {
   return fixture.nativeElement as HTMLElement;
 }
 
-function buildButton(fixture: ComponentFixture<EncyclopediaPage>): HTMLButtonElement {
-  return root(fixture).querySelector('button.primary') as HTMLButtonElement;
+function text(fixture: ComponentFixture<EncyclopediaPage>): string {
+  return root(fixture).textContent ?? '';
+}
+
+function buttonByText(fixture: ComponentFixture<EncyclopediaPage>, label: string): HTMLButtonElement | undefined {
+  return [...root(fixture).querySelectorAll('button')].find((button) => button.textContent?.trim() === label);
+}
+
+function buttonContaining(fixture: ComponentFixture<EncyclopediaPage>, label: string): HTMLButtonElement | undefined {
+  return [...root(fixture).querySelectorAll('button')].find((button) => button.textContent?.includes(label));
+}
+
+function badge(fixture: ComponentFixture<EncyclopediaPage>): string {
+  return root(fixture).querySelector('.badge')?.textContent?.trim() ?? '';
+}
+
+function kpiValues(fixture: ComponentFixture<EncyclopediaPage>): string[] {
+  return [...root(fixture).querySelectorAll('.kpi-value')].map((value) => value.textContent?.trim() ?? '');
+}
+
+function kindBox(fixture: ComponentFixture<EncyclopediaPage>, label: string): HTMLInputElement {
+  const label_ = [...root(fixture).querySelectorAll('.check-row')].find((row) => row.textContent?.trim() === label);
+  return label_?.querySelector('input') as HTMLInputElement;
+}
+
+function saveButton(fixture: ComponentFixture<EncyclopediaPage>): HTMLButtonElement {
+  return root(fixture).querySelector('button.save') as HTMLButtonElement;
+}
+
+function previewTab(fixture: ComponentFixture<EncyclopediaPage>): HTMLButtonElement {
+  return root(fixture).querySelector('#codex-tab-preview') as HTMLButtonElement;
+}
+
+function clearRemembered(): void {
+  try {
+    localStorage.removeItem('codex.tab');
+  } catch {
+    // Storage may be unavailable; nothing to clear.
+  }
 }
 
 describe('EncyclopediaPage', () => {
+  beforeEach(() => clearRemembered());
+
   afterEach(() => {
+    clearRemembered();
     TestBed.resetTestingModule();
   });
 
-  it('shows the empty state and no preview when it was never built', async () => {
-    const fixture = await setup(new FakeEncyclopediaApi());
-    expect(root(fixture).textContent).toContain('has not been built yet');
+  it('shows the module as off, with no dashboard, no tabs and no build button', async () => {
+    const fake = new FakeEncyclopediaApi();
+    fake.current = { enabled: false, built: false, report: null, publishing: 'not-configured', settings: null, changes: null };
+    const fixture = await setup(fake);
+    expect(text(fixture)).toContain('not turned on for this campaign');
+    expect(buttonByText(fixture, 'Generate the Codex')).toBeUndefined();
+    expect(root(fixture).querySelector('[role="tablist"]')).toBeNull();
     expect(root(fixture).querySelector('iframe')).toBeNull();
-    expect(root(fixture).querySelector('a[href="/enc/"]')).toBeNull();
-    expect(root(fixture).querySelectorAll('button')).toHaveLength(1);
-    expect(root(fixture).textContent).toContain('only available on this computer');
   });
 
-  it('shows the base address read-only with the hint about the assistant once a build exists', async () => {
+  it('never built: says so, the KPIs show dashes, no changes block, preview disabled, only Items ticked', async () => {
+    const fixture = await setup(new FakeEncyclopediaApi());
+    expect(badge(fixture)).toBe('Not generated');
+    expect(text(fixture)).toContain('has not been generated yet');
+    expect(buttonByText(fixture, 'Generate the Codex')).toBeDefined();
+    expect(kpiValues(fixture)).toEqual(['—', '—', '—', '—']);
+    expect(root(fixture).querySelector('#codex-changes-title')).toBeNull();
+    expect(previewTab(fixture).disabled).toBe(true);
+    expect(root(fixture).querySelector('iframe')).toBeNull();
+    expect(kindBox(fixture, 'Items').checked).toBe(true);
+    expect(kindBox(fixture, 'Places').checked).toBe(false);
+  });
+
+  it('up to date: the badge, the sentence and the no-changes sentence', async () => {
     const fake = new FakeEncyclopediaApi();
-    fake.current = { enabled: true, built: true, report: report(), publishing: 'not-configured' };
+    fake.current = built();
     const fixture = await setup(fake);
-    expect(root(fixture).querySelector('code')?.textContent).toBe('http://localhost/');
-    expect(root(fixture).textContent).toContain('ask the assistant in the chat');
-    expect(root(fixture).querySelector('input')).toBeNull();
+    expect(badge(fixture)).toBe('Up to date');
+    expect(text(fixture)).toContain('matches the campaign and its settings');
+    expect(text(fixture)).toContain('No changes since the last update.');
+    expect(root(fixture).querySelector('[data-state="upToDate"]')).not.toBeNull();
   });
 
-  it('shows the module as off when it is not turned on', async () => {
+  it('out of date by changes: the badge, and the changed titles under their group', async () => {
     const fake = new FakeEncyclopediaApi();
-    fake.current = { enabled: false, built: false, report: null, publishing: 'not-configured' };
+    fake.current = built({ changes: { added: [{ id: 'places/tavern', title: 'The Tavern' }], changed: [], removed: [] } });
     const fixture = await setup(fake);
-    expect(root(fixture).textContent).toContain('not turned on for this campaign');
-    expect(buildButton(fixture)).toBeNull();
+    expect(badge(fixture)).toBe('Out of date');
+    expect(text(fixture)).toContain('The Tavern');
   });
 
-  it('while building, the button is busy and no result is shown before the server answers', async () => {
+  it('out of date by settings: the saved settings differ from the ones the last update used', async () => {
     const fake = new FakeEncyclopediaApi();
-    fake.buildResult = () => new Promise<EncyclopediaReport>(() => undefined);
+    fake.current = built({ settings: { kinds: ['item', 'place'], flavourText: true, list: 'full' } });
     const fixture = await setup(fake);
-    buildButton(fixture).click();
-    await settle(fixture);
-    expect(buildButton(fixture).disabled).toBe(true);
-    expect(buildButton(fixture).getAttribute('aria-busy')).toBe('true');
-    expect(root(fixture).textContent).toContain('Building…');
-    expect(root(fixture).querySelector('#enc-report-title')).toBeNull();
-    expect(root(fixture).querySelector('[data-status]')).toBeNull();
+    expect(badge(fixture)).toBe('Out of date');
+    expect(text(fixture)).toContain('the settings changed since the last update');
   });
 
-  it('after a successful build shows the entries, the checks with icon and text, the preview and the link', async () => {
+  it('failed when the saved report says so', async () => {
     const fake = new FakeEncyclopediaApi();
-    fake.buildResult = async () => {
-      fake.current = { enabled: true, built: true, report: null, publishing: 'not-configured' };
-      return report({
-        entries: 3,
-        checks: [
-          { id: 'links', status: 'pass', message: 'All links lead somewhere.' },
-          { id: 'ids', status: 'fail', message: 'Two pages share an id.' },
-          { id: 'images', status: 'skipped', message: 'No images to check.' },
-        ],
-      });
-    };
+    fake.current = built({ report: report({ ok: false }) });
     const fixture = await setup(fake);
-    buildButton(fixture).click();
-    await settle(fixture);
-
-    expect(fake.buildCalls).toBe(1);
-    expect(root(fixture).textContent).toContain('The Codex has 3 entries.');
-
-    const rows = [...root(fixture).querySelectorAll<HTMLElement>('li.check')];
-    expect(rows.map((row) => row.dataset['status'])).toEqual(['pass', 'fail', 'skipped']);
-    for (const row of rows) {
-      expect(row.querySelector('svg')).not.toBeNull();
-      expect(row.querySelector('.check-status')?.textContent?.trim()).not.toBe('');
-    }
-    expect(rows[0].textContent).toContain('Passed');
-    expect(rows[0].textContent).toContain('All links lead somewhere.');
-    expect(rows[1].textContent).toContain('Failed');
-    expect(rows[1].textContent).toContain('Two pages share an id.');
-    expect(rows[2].textContent).toContain('Skipped');
-
-    const iframe = root(fixture).querySelector('iframe');
-    expect(iframe?.getAttribute('src')).toBe('/enc/');
-    expect(iframe?.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin');
-    expect(iframe?.getAttribute('title')).toBeTruthy();
-    expect(iframe?.getAttribute('loading')).toBe('lazy');
-
-    const link = root(fixture).querySelector('a[href="/enc/"]');
-    expect(link?.getAttribute('target')).toBe('_blank');
-    expect(link?.getAttribute('rel')).toBe('noopener');
+    expect(badge(fixture)).toBe('Failed');
+    expect(text(fixture)).toContain('The last update failed. Nothing was changed.');
   });
 
-  it('a failed build shows the server message, says nothing was changed and keeps the report rows', async () => {
+  it('failed when the last update in this session failed: the plain message, the nothing-changed line, the report kept', async () => {
     const fake = new FakeEncyclopediaApi();
     fake.buildResult = async () => {
       throw new CallFailure(409, 'A page has a broken link.', {
@@ -156,57 +193,214 @@ describe('EncyclopediaPage', () => {
       });
     };
     const fixture = await setup(fake);
-    buildButton(fixture).click();
+    buttonByText(fixture, 'Generate the Codex')?.click();
     await settle(fixture);
 
+    expect(badge(fixture)).toBe('Failed');
     const alert = root(fixture).querySelector('.alert[role="alert"]');
     expect(alert?.textContent).toContain('A page has a broken link.');
     expect(alert?.textContent).toContain('Nothing was changed');
-
-    const row = root(fixture).querySelector('li.check[data-status="fail"]');
-    expect(row?.textContent).toContain('Failed');
-    expect(row?.textContent).toContain('One link leads nowhere.');
     expect(root(fixture).querySelector('iframe')).toBeNull();
+    expect(kpiValues(fixture)[2]).toBe('1');
   });
 
-  it('a failed build without a report still shows the plain message', async () => {
+  it('a failed update without a report still shows the plain message', async () => {
     const fake = new FakeEncyclopediaApi();
+    fake.current = built();
     fake.buildResult = async () => {
       throw new CallFailure(409, 'A build is already running.', { error: 'A build is already running.' });
     };
     const fixture = await setup(fake);
-    buildButton(fixture).click();
+    buttonByText(fixture, 'Update the Codex')?.click();
     await settle(fixture);
     expect(root(fixture).querySelector('.alert')?.textContent).toContain('A build is already running.');
-    expect(root(fixture).querySelector('li.check')).toBeNull();
   });
 
-  it('lists what was left out, with the reasons, and the warnings', async () => {
+  it('KPI counts; each list opens on its own, and only one is open at a time', async () => {
     const fake = new FakeEncyclopediaApi();
-    fake.current = {
-      enabled: true,
-      built: true,
+    fake.current = built({
       report: report({
-        excluded: [{ path: 'places/secret.md', reason: 'Fully master-only.' }],
+        entries: 7,
+        excluded: [{ path: 'places/secret.md', reason: 'Fully master-only.' }, { path: 'items/key.md', reason: 'Not public.' }],
         warnings: [{ code: 'spacing', path: 'places/tavern.md', message: 'Two spaces in a row.' }],
+        checks: [
+          { id: 'links', status: 'pass', message: 'All links lead somewhere.' },
+          { id: 'ids', status: 'fail', message: 'Two pages share an id.' },
+          { id: 'images', status: 'skipped', message: 'No images to check.' },
+        ],
       }),
-      publishing: 'not-configured',
+    });
+    const fixture = await setup(fake);
+    expect(kpiValues(fixture)).toEqual(['7', '2', '1', '1']);
+
+    buttonContaining(fixture, 'Left out')?.click();
+    await settle(fixture);
+    expect(root(fixture).querySelector('#codex-list')?.textContent).toContain('Left out and why');
+    expect(text(fixture)).toContain('secret');
+    expect(text(fixture)).toContain('Fully master-only.');
+    expect(text(fixture)).not.toContain('places/secret.md');
+
+    buttonContaining(fixture, 'Failing checks')?.click();
+    await settle(fixture);
+    const rows = [...root(fixture).querySelectorAll<HTMLElement>('#codex-list .row.check')];
+    expect(rows.map((row) => row.dataset['status'])).toEqual(['fail', 'skipped']);
+    expect(rows[0].textContent).toContain('Failed');
+    expect(rows[0].textContent).toContain('Two pages share an id.');
+    expect(rows[1].textContent).toContain('Skipped');
+    expect(text(fixture)).not.toContain('Fully master-only.');
+    expect(buttonContaining(fixture, 'Left out')?.getAttribute('aria-expanded')).toBe('false');
+    expect(buttonContaining(fixture, 'Failing checks')?.getAttribute('aria-expanded')).toBe('true');
+
+    buttonContaining(fixture, 'Warnings')?.click();
+    await settle(fixture);
+    expect(text(fixture)).toContain('tavern');
+    expect(text(fixture)).toContain('Two spaces in a row.');
+  });
+
+  it('changes: three groups with their counts and titles', async () => {
+    const fake = new FakeEncyclopediaApi();
+    fake.current = built({
+      changes: {
+        added: [{ id: 'a', title: 'New Inn' }],
+        changed: [
+          { id: 'b', title: 'Old Keep' },
+          { id: 'c', title: 'Duke Varn' },
+        ],
+        removed: [],
+      },
+    });
+    const fixture = await setup(fake);
+    const groups = [...root(fixture).querySelectorAll('.group-block')].map((block) => block.textContent ?? '');
+    expect(groups).toHaveLength(3);
+    expect(groups[0]).toContain('Added');
+    expect(groups[0]).toContain('New Inn');
+    expect(groups[1]).toContain('Changed');
+    expect(groups[1]).toContain('2');
+    expect(groups[1]).toContain('Duke Varn');
+    expect(groups[2]).toContain('Removed');
+    expect(groups[2]).toContain('0');
+    expect(text(fixture)).not.toContain('No changes since the last update.');
+  });
+
+  it('changes that cannot be computed say so, and are not reported as no changes', async () => {
+    const fake = new FakeEncyclopediaApi();
+    fake.current = built({ changes: null });
+    const fixture = await setup(fake);
+    expect(text(fixture)).toContain('cannot be compared right now');
+    expect(text(fixture)).not.toContain('No changes since the last update.');
+  });
+
+  it('settings: Save is disabled until a change, and disabled again with zero kinds', async () => {
+    const fake = new FakeEncyclopediaApi();
+    fake.current = built();
+    const fixture = await setup(fake);
+    expect(saveButton(fixture).disabled).toBe(true);
+
+    kindBox(fixture, 'Items').click();
+    await settle(fixture);
+    expect(saveButton(fixture).disabled).toBe(true);
+    expect(text(fixture)).toContain('Choose at least one kind of entry.');
+  });
+
+  it('settings: Save sends the edited object in the fixed order, then shows the answer and the out-of-date state', async () => {
+    const fake = new FakeEncyclopediaApi();
+    fake.current = built();
+    fake.saveResult = async (settings) => built({ settings, report: report({ settings: ITEMS_ONLY }), changes: null });
+    const fixture = await setup(fake);
+
+    kindBox(fixture, 'Places').click();
+    await settle(fixture);
+    expect(saveButton(fixture).disabled).toBe(false);
+
+    root(fixture).querySelector<HTMLButtonElement>('.switch')?.click();
+    await settle(fixture);
+
+    saveButton(fixture).click();
+    await settle(fixture);
+
+    expect(fake.saveCalls).toEqual([{ kinds: ['place', 'item'], flavourText: false, list: 'full' }]);
+    expect(badge(fixture)).toBe('Out of date');
+    expect(text(fixture)).toContain('Saved. Update the Codex to publish the changes.');
+    expect(text(fixture)).toContain('Entry text is off: the Codex shows only titles and pictures.');
+    expect(saveButton(fixture).disabled).toBe(true);
+  });
+
+  it('settings: a failed save shows the plain message and keeps the edits', async () => {
+    const fake = new FakeEncyclopediaApi();
+    fake.current = built();
+    fake.saveResult = async () => {
+      throw new CallFailure(409, 'The Codex is not turned on.', null);
     };
     const fixture = await setup(fake);
-    const text = root(fixture).textContent ?? '';
-    expect(text).toContain('1 document was left out.');
-    expect(text).toContain('places/secret.md: Fully master-only.');
-    expect(root(fixture).querySelector('details')?.textContent).toContain('Left out and why');
-    expect(text).toContain('places/tavern.md: Two spaces in a row.');
+    kindBox(fixture, 'Places').click();
+    await settle(fixture);
+    saveButton(fixture).click();
+    await settle(fixture);
+    expect(root(fixture).querySelector('#codex-settings-title')?.parentElement?.textContent).toContain('The Codex is not turned on.');
+    expect(kindBox(fixture, 'Places').checked).toBe(true);
+  });
+
+  it('flavour text off: the dashboard warns that the Codex shows only titles and pictures', async () => {
+    const fake = new FakeEncyclopediaApi();
+    fake.current = built({ settings: { kinds: ['item'], flavourText: false, list: 'full' } });
+    const fixture = await setup(fake);
+    expect(text(fixture)).toContain('only titles and pictures');
+    expect(root(fixture).querySelector('.notice.warn')).not.toBeNull();
+  });
+
+  it('preview: disabled when never built; the frame of /enc/ when built and selected', async () => {
+    const never = await setup(new FakeEncyclopediaApi());
+    expect(previewTab(never).disabled).toBe(true);
+    expect(root(never).querySelector('iframe')).toBeNull();
+    TestBed.resetTestingModule();
+
+    const fake = new FakeEncyclopediaApi();
+    fake.current = built();
+    const fixture = await setup(fake);
+    expect(previewTab(fixture).disabled).toBe(false);
+    previewTab(fixture).click();
+    await settle(fixture);
+    const iframe = root(fixture).querySelector('iframe');
+    expect(iframe?.getAttribute('src')).toBe('/enc/');
+    expect(iframe?.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin');
+    expect(iframe?.getAttribute('title')).toBeTruthy();
+    expect(previewTab(fixture).getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('a remembered Preview tab falls back to Status when the Codex was never built', async () => {
+    localStorage.setItem('codex.tab', 'preview');
+    const fixture = await setup(new FakeEncyclopediaApi());
+    expect(root(fixture).querySelector('iframe')).toBeNull();
+    expect(root(fixture).querySelector('#codex-tab-status')?.getAttribute('aria-selected')).toBe('true');
+  });
+
+  it('no element shows the public address or the publishing note', async () => {
+    const fake = new FakeEncyclopediaApi();
+    fake.current = built();
+    const fixture = await setup(fake);
+    expect(text(fixture)).not.toContain('localhost');
+    expect(text(fixture)).not.toContain('Address of the Codex');
+    expect(text(fixture)).not.toContain('Publishing is not set up');
+    expect(root(fixture).querySelector('code')).toBeNull();
   });
 });
 
-describe('reportFromBody', () => {
-  it('reads the report from a failed build body', () => {
+describe('helpers', () => {
+  it('entryName strips the folders and .md', () => {
+    expect(entryName('places/taverns/the-tavern.md')).toBe('the-tavern');
+    expect(entryName('loose.md')).toBe('loose');
+  });
+
+  it('sameSettings compares kinds as a set', () => {
+    expect(sameSettings({ kinds: ['item', 'place'], flavourText: true, list: 'full' }, { kinds: ['place', 'item'], flavourText: true, list: 'full' })).toBe(true);
+    expect(sameSettings(ITEMS_ONLY, { ...ITEMS_ONLY, list: 'discovered' })).toBe(false);
+  });
+
+  it('reportFromBody reads the report from a failed build body', () => {
     expect(reportFromBody({ error: 'x', report: report({ ok: false }) })?.ok).toBe(false);
   });
 
-  it('accepts a bare report and rejects anything else', () => {
+  it('reportFromBody accepts a bare report and rejects anything else', () => {
     expect(reportFromBody(report())?.entries).toBe(3);
     expect(reportFromBody({ error: 'x' })).toBeNull();
     expect(reportFromBody(null)).toBeNull();

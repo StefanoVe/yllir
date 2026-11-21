@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseYamlLite } from './yaml-lite.mjs';
 import { listAdapters, pluginRootFromHere } from './adapter.mjs';
+import { KINDS } from './world-graph.mjs';
 
 const FILE = 'campaign.yaml';
 // allow_model_imagination is no longer read: it is accepted with any value and ignored
@@ -14,7 +15,8 @@ const FILE = 'campaign.yaml';
 // print and the cards flag of a structure entry belonged to a removed feature: older campaigns may still
 // carry them, so they are accepted with any value and ignored.
 const TOP_KEYS = ['schema', 'campaign', 'language', 'prose', 'system', 'structure', 'modules', 'audit', 'encyclopedia', 'print', 'workflow', 'allow_model_imagination'];
-const ENCYCLOPEDIA_KEYS = ['title', 'base_url'];
+const ENCYCLOPEDIA_KEYS = ['title', 'base_url', 'kinds', 'flavour_text', 'list'];
+const ENCYCLOPEDIA_LIST_MODES = ['full', 'discovered'];
 const WORKFLOW_KEYS = ['auto_accept', 'auto_item_images'];
 const ENCYCLOPEDIA_TITLE_MAX = 120;
 const ENCYCLOPEDIA_URL_MAX = 200;
@@ -330,6 +332,22 @@ function validateEncyclopedia(r, encyclopedia) {
       encyclopedia.base_url = `${value.replace(/\/+$/, '')}/`;
     }
   }
+  if (Object.hasOwn(encyclopedia, 'kinds')) {
+    const kinds = encyclopedia.kinds;
+    if (!Array.isArray(kinds) || kinds.length === 0) {
+      r.error('bad-value', 'encyclopedia.kinds', `encyclopedia.kinds must be a non-empty list of: ${KINDS.join(', ')}`);
+    } else {
+      const bad = kinds.some((kind) => typeof kind !== 'string' || !KINDS.includes(kind));
+      const duplicated = new Set(kinds).size !== kinds.length;
+      if (bad || duplicated) {
+        r.error('bad-value', 'encyclopedia.kinds', `encyclopedia.kinds must be a list of different values, each one of: ${KINDS.join(', ')}`);
+      }
+    }
+  }
+  if (Object.hasOwn(encyclopedia, 'flavour_text') && typeof encyclopedia.flavour_text !== 'boolean') {
+    r.error('bad-value', 'encyclopedia.flavour_text', 'encyclopedia.flavour_text must be true or false');
+  }
+  checkEnum(r, encyclopedia, 'encyclopedia', 'list', ENCYCLOPEDIA_LIST_MODES);
 }
 
 /** Why a base address is not usable, or null when it is valid. */

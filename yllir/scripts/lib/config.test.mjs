@@ -601,6 +601,29 @@ test('encyclopedia must be a mapping', () => {
   assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia: yes\n`)), ['bad-type encyclopedia']);
 });
 
+test('encyclopedia kinds, flavour_text and list: valid values pass', () => {
+  const yaml = `${MINIMAL}encyclopedia:\n  kinds: [item, character, place]\n  flavour_text: false\n  list: discovered\n`;
+  const result = validateConfig(makeCampaign(yaml));
+  assert.deepEqual(result.errors, []);
+  assert.deepEqual(result.config.encyclopedia.kinds, ['item', 'character', 'place']);
+  assert.equal(result.config.encyclopedia.flavour_text, false);
+  assert.equal(result.config.encyclopedia.list, 'discovered');
+});
+
+test('encyclopedia kinds must be a non-empty list of distinct known kinds', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  kinds: [sword]\n`)), ['bad-value encyclopedia.kinds']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  kinds: []\n`)), ['bad-value encyclopedia.kinds']);
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  kinds: [item, item]\n`)), ['bad-value encyclopedia.kinds']);
+});
+
+test('encyclopedia flavour_text must be true or false', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  flavour_text: maybe\n`)), ['bad-value encyclopedia.flavour_text']);
+});
+
+test('encyclopedia list must be full or discovered', () => {
+  assert.deepEqual(pairsOf(errorsOf(`${MINIMAL}encyclopedia:\n  list: some\n`)), ['bad-value encyclopedia.list']);
+});
+
 test('workflow with auto_accept true or false validates with no errors', () => {
   assert.deepEqual(errorsOf(`${MINIMAL}workflow:\n  auto_accept: true\n`), []);
   assert.deepEqual(errorsOf(`${MINIMAL}workflow:\n  auto_accept: false\n`), []);

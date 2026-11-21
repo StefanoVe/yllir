@@ -13,6 +13,7 @@ import { helpersIt } from './parts/helpers.it';
 import { updateIt } from './parts/update.it';
 import { atlasIt } from './parts/atlas.it';
 import { restyleIt } from './parts/restyle.it';
+import { codexIt } from './parts/codex.it';
 
 export const it: Record<TranslationKey, string> = {
   ...liveAgentIt,
@@ -29,6 +30,7 @@ export const it: Record<TranslationKey, string> = {
   ...updateIt,
   ...atlasIt,
   ...restyleIt,
+  ...codexIt,
   'combat.copy.duplicate': 'Duplica',
   'combat.copy.duplicateOf': 'Duplica {name}',
   'combat.copy.remove': 'Rimuovi',
@@ -446,32 +448,4 @@ export const it: Record<TranslationKey, string> = {
   'documents.masterBlock': 'Ha una parte riservata al master',
   'documents.shortcutHint': 'Premi / per filtrare',
   'enc.title': 'Codex',
-  'enc.off': 'Il Codex non è attivo per questa campagna.',
-  'enc.intro': 'Il Codex è un insieme di pagine che i giocatori possono leggere dal telefono. Mostra solo le parti pubbliche delle schede.',
-  'enc.build': 'Crea il Codex',
-  'enc.building': 'Creazione in corso…',
-  'enc.buildingNote': 'Può richiedere un minuto. Intanto puoi continuare a lavorare in chat.',
-  'enc.empty': 'Il Codex non è ancora stato creato. Premi «Crea il Codex» per crearlo.',
-  'enc.failed': 'Il Codex non è stato creato.',
-  'enc.nothingChanged': 'Non è stato cambiato nulla. Resta in uso l’ultima versione creata, se esiste.',
-  'enc.reportTitle': 'Ultima creazione',
-  'enc.entriesCount.one': 'Il Codex ha 1 voce.',
-  'enc.entriesCount.other': 'Il Codex ha {count} voci.',
-  'enc.excludedCount.one': '1 documento è stato lasciato fuori.',
-  'enc.excludedCount.other': '{count} documenti sono stati lasciati fuori.',
-  'enc.excludedList': 'Lasciati fuori e perché',
-  'enc.checks': 'Controlli',
-  'enc.check.pass': 'Superato',
-  'enc.check.fail': 'Non superato',
-  'enc.check.skipped': 'Saltato',
-  'enc.warnings': 'Avvisi',
-  'enc.pathLine': '{path}: {message}',
-  'enc.previewHeading': 'Anteprima',
-  'enc.preview': 'Apri l’anteprima',
-  'enc.previewTitle': 'Anteprima del Codex',
-  'enc.baseUrl': 'Indirizzo del Codex',
-  'enc.baseUrlHint': 'Le pagine del Codex sono costruite su questo indirizzo. Per cambiarlo, chiedi all’assistente in chat.',
-  'enc.noBaseUrl': 'L’indirizzo compare dopo la prima creazione.',
-  'enc.publishing': 'La pubblicazione non è ancora attiva. Il Codex è disponibile solo su questo computer.',
-  'enc.loading': 'Caricamento…',
 };

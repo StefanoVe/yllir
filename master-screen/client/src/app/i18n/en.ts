@@ -12,6 +12,7 @@ import { helpersEn } from './parts/helpers.en';
 import { updateEn } from './parts/update.en';
 import { atlasEn } from './parts/atlas.en';
 import { restyleEn } from './parts/restyle.en';
+import { codexEn } from './parts/codex.en';
 
 export const en = {
   ...liveAgentEn,
@@ -28,6 +29,7 @@ export const en = {
   ...updateEn,
   ...atlasEn,
   ...restyleEn,
+  ...codexEn,
   'combat.copy.duplicate': 'Duplicate',
   'combat.copy.duplicateOf': 'Duplicate {name}',
   'combat.copy.remove': 'Remove',
@@ -445,32 +447,4 @@ export const en = {
   'documents.masterBlock': 'Has a part for the master only',
   'documents.shortcutHint': 'Press / to filter',
   'enc.title': 'Codex',
-  'enc.off': 'The Codex is not turned on for this campaign.',
-  'enc.intro': 'The Codex is a set of pages that players can read on their phones. It shows only the public parts of the sheets.',
-  'enc.build': 'Build the Codex',
-  'enc.building': 'Building…',
-  'enc.buildingNote': 'This can take a minute. You can keep working in the chat meanwhile.',
-  'enc.empty': 'The Codex has not been built yet. Press "Build the Codex" to make it.',
-  'enc.failed': 'The Codex was not built.',
-  'enc.nothingChanged': 'Nothing was changed. The last built version, if there is one, is still in place.',
-  'enc.reportTitle': 'Last build',
-  'enc.entriesCount.one': 'The Codex has 1 entry.',
-  'enc.entriesCount.other': 'The Codex has {count} entries.',
-  'enc.excludedCount.one': '1 document was left out.',
-  'enc.excludedCount.other': '{count} documents were left out.',
-  'enc.excludedList': 'Left out and why',
-  'enc.checks': 'Checks',
-  'enc.check.pass': 'Passed',
-  'enc.check.fail': 'Failed',
-  'enc.check.skipped': 'Skipped',
-  'enc.warnings': 'Warnings',
-  'enc.pathLine': '{path}: {message}',
-  'enc.previewHeading': 'Preview',
-  'enc.preview': 'Open preview',
-  'enc.previewTitle': 'Preview of the Codex',
-  'enc.baseUrl': 'Address of the Codex',
-  'enc.baseUrlHint': 'The Codex pages are built on this address. To change it, ask the assistant in the chat.',
-  'enc.noBaseUrl': 'The address appears after the first build.',
-  'enc.publishing': 'Publishing is not set up yet. The Codex is only available on this computer.',
-  'enc.loading': 'Loading…',
 } as const;

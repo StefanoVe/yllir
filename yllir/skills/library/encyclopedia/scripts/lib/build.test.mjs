@@ -5,8 +5,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildEncyclopedia, buildDir } from './build.mjs';
+import { buildEncyclopedia, buildDir, computeChanges } from './build.mjs';
 import { decryptLocked } from './locked.mjs';
+import { nameKey } from './site.mjs';
 import { makeJpeg, makePng, sheet, campaignYaml, cleanupCampaigns } from './test-support.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -20,16 +21,17 @@ after(() => {
 
 const PIER = sheet({
   id: 'porto-di-selce',
+  meta: ['kind: place'],
   body: '# Porto di Selce\n\n![Lanterna sul molo](img/molo.png)\n\nA grey harbour. The [ledger keeper](../Personaggi/Ilde%20Varno.md) waits. A [hidden place](../Oggetti/Nascosto.md) is plain text. [that man](../Giocatori/Traditore.md) too.',
   master: 'The pier hides a smuggler route nobody mentions.',
 });
 const ILDE = sheet({
   id: 'ilde-varno',
+  meta: ['kind: character', 'merged_ids: [ilde-vecchia]'],
   body: '# Ilde Varno\n\nKeeps the harbour ledger.\n\n<!-- locked: diario -->\nIlde wrote that the lamp was lit on the night of the storm.\n<!-- /locked -->',
   master: '### Codici\n\n- diario: ascia-9',
-  meta: ['merged_ids: [ilde-vecchia]'],
 });
-const LANTERN = sheet({ id: 'lanterna-ottone', body: '# Lanterna di ottone\n\n![Brass lantern](lanterna.jpg)\n\nA brass lantern.' });
+const LANTERN = sheet({ id: 'lanterna-ottone', meta: ['kind: item'], body: '# Lanterna di ottone\n\n![Brass lantern](lanterna.jpg)\n\nA brass lantern.' });
 const TRAITOR = sheet({ id: 'traditore', body: '# Vettore Nero\n\nThe hidden traitor of the guild.' });
 const FILES = {
   'Mondo/porto.md': PIER,
@@ -45,7 +47,7 @@ function fixture(files = FILES, { yaml } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-enc-init-'));
   extra.push(root);
   execFileSync(process.execPath, [INIT, root, '--name', 'Test Campaign', '--language', 'en', '--register', 'plain', '--world', 'W', '--seed', 'World seed.md'], { stdio: 'pipe' });
-  fs.writeFileSync(path.join(root, 'campaign.yaml'), yaml ?? campaignYaml({ extra: 'encyclopedia:\n  title: "Atlas of Test"\n  base_url: "http://localhost:8080/c"' }));
+  fs.writeFileSync(path.join(root, 'campaign.yaml'), yaml ?? campaignYaml({ extra: 'encyclopedia:\n  title: "Atlas of Test"\n  base_url: "http://localhost:8080/c"\n  kinds: [place, character, item]' }));
   fs.writeFileSync(path.join(root, 'World seed.md'), '# World seed\n\nThe year 312 is a lie.\n');
   fs.writeFileSync(path.join(root, '.campaign', 'retired-ids.json'), '{ "ids": ["vecchio-porto"] }\n');
   for (const folder of ['Mondo', 'Personaggi', 'Oggetti', 'Varie', 'Giocatori', 'Fonti']) fs.mkdirSync(path.join(root, folder), { recursive: true });
@@ -175,7 +177,10 @@ test('the index lists entries by category with a filter box; the picture is copi
   const index = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
   assert.match(index, /<input id="filter"/);
   assert.match(index, /<h2 id="cat-0">Luoghi<\/h2>/);
-  assert.match(index, /<a href="e\/porto-di-selce\/">Porto di Selce<\/a>/);
+  assert.match(index, /<a class="card-link" href="e\/porto-di-selce\/">/);
+  assert.match(index, /<span class="card-title">Porto di Selce<\/span>/);
+  assert.equal(fs.existsSync(path.join(dir, 'c')), false, 'full mode writes no card files');
+  assert.equal(fs.existsSync(path.join(dir, 'discover.json')), false);
   const search = JSON.parse(fs.readFileSync(path.join(dir, 'search.json'), 'utf8'));
   assert.deepEqual(search.map((s) => s.id), ['porto-di-selce', 'ilde-varno', 'lanterna-ottone']);
   assert.equal(search.some((s) => s.text.includes('lamp was lit')), false);
@@ -188,7 +193,7 @@ test('the index lists entries by category with a filter box; the picture is copi
 });
 
 test('Italian campaigns get Italian pages and messages', async () => {
-  const root = fixture(FILES, { yaml: campaignYaml({ lang: 'it', extra: 'encyclopedia:\n  title: "Atlante"' }) });
+  const root = fixture(FILES, { yaml: campaignYaml({ lang: 'it', extra: 'encyclopedia:\n  title: "Atlante"\n  kinds: [place, character, item]' }) });
   const report = await buildEncyclopedia(root);
   assert.equal(report.ok, true);
   assert.match(fs.readFileSync(path.join(buildDir(root), 'index.html'), 'utf8'), /lang="it"/);
@@ -197,7 +202,7 @@ test('Italian campaigns get Italian pages and messages', async () => {
 
 test('the site calls itself Codex in every language, and no page shows the word Encyclopedia or Enciclopedia', async () => {
   for (const lang of ['en', 'it']) {
-    const root = fixture(FILES, { yaml: campaignYaml({ lang, extra: 'encyclopedia:\n  title: "Atlas of Test"' }) });
+    const root = fixture(FILES, { yaml: campaignYaml({ lang, extra: 'encyclopedia:\n  title: "Atlas of Test"\n  kinds: [place, character, item]' }) });
     assert.equal((await buildEncyclopedia(root)).ok, true, lang);
     const dir = buildDir(root);
     const index = fs.readFileSync(path.join(dir, 'index.html'), 'utf8');
@@ -220,6 +225,93 @@ test('a module that is off, or a broken configuration, refuses the build with a 
   assert.equal(offReport.checks[0].id, 'module');
   const broken = fixture(FILES, { yaml: 'schema: 2\n' });
   assert.equal((await buildEncyclopedia(broken)).ok, false);
+});
+
+const LIST_YAML = (list) => campaignYaml({ extra: `encyclopedia:\n  title: "Atlas"\n  kinds: [place, character, item]\n  list: ${list}` });
+
+test('list full writes the search index and no card files; both modes write the manifest and the placeholders', async () => {
+  const root = fixture(FILES, { yaml: LIST_YAML('full') });
+  assert.equal((await buildEncyclopedia(root)).ok, true);
+  const dir = buildDir(root);
+  assert.equal(fs.existsSync(path.join(dir, 'search.json')), true);
+  assert.equal(fs.existsSync(path.join(dir, 'c')), false);
+  assert.equal(Object.keys(listAll(dir)).some((f) => f.endsWith('card.json')), false);
+  assert.equal(fs.existsSync(path.join(dir, 'assets/placeholders/place.svg')), true);
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+  assert.deepEqual(Object.keys(manifest.entries), ['ilde-varno', 'lanterna-ottone', 'porto-di-selce']);
+  assert.equal(typeof manifest.generatedAt, 'string');
+  assert.match(manifest.entries['porto-di-selce'].hash, /^[0-9a-f]{16}$/);
+  assert.equal(manifest.entries['porto-di-selce'].title, 'Porto di Selce');
+});
+
+test('discovered mode writes discover.json with keys only, one card per key under c/, and no search index', async () => {
+  const root = fixture(FILES, { yaml: LIST_YAML('discovered') });
+  assert.equal((await buildEncyclopedia(root)).ok, true);
+  const dir = buildDir(root);
+  assert.equal(fs.existsSync(path.join(dir, 'search.json')), false);
+  assert.equal(Object.keys(listAll(dir)).some((f) => f.endsWith('card.json')), false, 'no e/*/card.json');
+  const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+  const discoverText = fs.readFileSync(path.join(dir, 'discover.json'), 'utf8');
+  const discover = JSON.parse(discoverText);
+  const expected = Object.values(manifest.entries).map((e) => nameKey(e.title)).sort();
+  assert.deepEqual(discover, expected);
+  assert.ok(discover.every((key) => typeof key === 'string' && /^[0-9a-f]{16}$/.test(key)));
+  for (const [id, entry] of Object.entries(manifest.entries)) {
+    assert.equal(discoverText.includes(id), false, `${id} in discover.json`);
+    assert.equal(discoverText.includes(entry.title), false, `${entry.title} in discover.json`);
+  }
+  assert.equal(fs.readdirSync(path.join(dir, 'c')).length, 3);
+  const card = JSON.parse(fs.readFileSync(path.join(dir, 'c', `${nameKey('Porto di Selce')}.json`), 'utf8'));
+  assert.deepEqual(Object.keys(card), ['id', 'title', 'summary', 'artwork', 'placeholder']);
+  assert.equal(card.id, 'porto-di-selce');
+  assert.equal(card.placeholder, 'place');
+  assert.match(card.artwork, /^assets\/img\/[0-9a-f]{16}\.png$/);
+  assert.equal(fs.existsSync(path.join(dir, card.artwork)), true);
+  assert.equal(fs.existsSync(path.join(dir, 'assets/placeholders/place.svg')), true);
+});
+
+test('two titles with the same name key: the second card gets a numbered key and a warning, and both are written', async () => {
+  const twin = sheet({ id: 'porto-gemello', meta: ['kind: item'], body: '# Porto  di selce\n\nA copy of the name.' });
+  const root = fixture({ ...FILES, 'Oggetti/gemello.md': twin }, { yaml: LIST_YAML('discovered') });
+  const report = await buildEncyclopedia(root);
+  assert.equal(report.ok, true, JSON.stringify(report.checks.filter((c) => c.status === 'fail')));
+  const clash = report.warnings.filter((w) => w.code === 'name-key-clash');
+  assert.equal(clash.length, 1);
+  const dir = buildDir(root);
+  const discover = JSON.parse(fs.readFileSync(path.join(dir, 'discover.json'), 'utf8'));
+  const key = nameKey('Porto di Selce');
+  assert.equal(discover.filter((k) => k === key).length, 1);
+  assert.equal(discover.filter((k) => k === `${key}-2`).length, 1);
+  assert.equal(fs.existsSync(path.join(dir, 'c', `${key}-2.json`)), true);
+});
+
+test('flavour_text false: the report warns that the entry text is off, and the settings are in the report', async () => {
+  const root = fixture(FILES, { yaml: campaignYaml({ extra: 'encyclopedia:\n  title: "Atlas"\n  kinds: [place, character, item]\n  flavour_text: false' }) });
+  const report = await buildEncyclopedia(root);
+  assert.equal(report.ok, true, JSON.stringify(report.checks.filter((c) => c.status === 'fail')));
+  assert.ok(report.warnings.some((w) => w.code === 'flavour-off'));
+  assert.deepEqual(report.settings, { kinds: ['place', 'character', 'item'], flavourText: false, list: 'full' });
+});
+
+test('computeChanges: nothing before a build, nothing right after one, then one added, one changed and one removed', async () => {
+  const root = fixture({
+    'Oggetti/chiave.md': sheet({ id: 'chiave', meta: ['kind: item'], body: '# Chiave\n\n## Descrizione\n\nIron.' }),
+    'Oggetti/corda.md': sheet({ id: 'corda', meta: ['kind: item'], body: '# Corda\n\nRope.' }),
+  }, { yaml: campaignYaml({ lang: 'it', extra: 'encyclopedia:\n  kinds: [item]' }) });
+  assert.deepEqual(computeChanges(root), { built: false });
+  assert.equal((await buildEncyclopedia(root)).ok, true);
+  const same = computeChanges(root);
+  assert.equal(same.built, true);
+  assert.deepEqual([same.added, same.changed, same.removed], [[], [], []]);
+
+  fs.writeFileSync(path.join(root, 'Oggetti/chiave.md'), sheet({ id: 'chiave', meta: ['kind: item'], body: '# Chiave\n\n## Descrizione\n\nIron and oak.' }));
+  fs.writeFileSync(path.join(root, 'Oggetti/nuova.md'), sheet({ id: 'nuova', meta: ['kind: item'], body: '# Nuova\n\nNew.' }));
+  fs.rmSync(path.join(root, 'Oggetti/corda.md'));
+  const now = computeChanges(root);
+  assert.deepEqual(now.added.map((x) => x.id), ['nuova']);
+  assert.deepEqual(now.changed.map((x) => x.id), ['chiave']);
+  assert.deepEqual(now.removed.map((x) => x.id), ['corda']);
+  assert.equal(now.removed[0].title, 'Corda');
 });
 
 test('CLI: build exits 0 and prints the report, a refused build exits 1, status reads the saved build, usage exits 2', () => {

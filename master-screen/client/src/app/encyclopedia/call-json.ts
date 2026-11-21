@@ -17,7 +17,7 @@ export class CallFailure extends Error {
 }
 
 /** JSON request to the master screen API. Rejects with a CallFailure, never with a raw fetch error. */
-export async function callJson<T>(i18n: I18n, method: 'GET' | 'POST', url: string, body?: unknown): Promise<T> {
+export async function callJson<T>(i18n: I18n, method: 'GET' | 'POST' | 'PUT', url: string, body?: unknown): Promise<T> {
   const hasBody = body !== undefined;
   let response: Response;
   try {

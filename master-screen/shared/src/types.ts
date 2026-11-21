@@ -431,8 +431,17 @@ export interface EncyclopediaReport {
   baseUrl: string;                 // link base, from campaign.yaml encyclopedia.base_url
   generatedAt: string;
   previewUrl: string | null;       // '/enc/' when a build exists
+  settings?: EncyclopediaSettings; // the settings the build used, when the framework reports them
 }
-export interface EncyclopediaStatus { enabled: boolean; built: boolean; report: EncyclopediaReport | null; publishing: 'not-configured' }
+export type EncyclopediaKind = 'place' | 'character' | 'creature' | 'item' | 'faction' | 'event';
+export interface EncyclopediaSettings { kinds: EncyclopediaKind[]; flavourText: boolean; list: 'full' | 'discovered' }
+export interface EncyclopediaChangeItem { id: string; title: string }
+/** What changed since the last build. Null when the module is off, never built, or not computable. */
+export interface EncyclopediaChanges { added: EncyclopediaChangeItem[]; changed: EncyclopediaChangeItem[]; removed: EncyclopediaChangeItem[] }
+export interface EncyclopediaStatus {
+  enabled: boolean; built: boolean; report: EncyclopediaReport | null; publishing: 'not-configured';
+  settings: EncyclopediaSettings | null; changes: EncyclopediaChanges | null;
+}
 
 
 // ---------------------------------------------------------------------------

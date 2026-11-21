@@ -349,9 +349,12 @@ Server endpoints (under `/api`; the module answers `{enabled:false,...}` with no
 
 | Method and path | Request | Response |
 |---|---|---|
-| GET `/encyclopedia` | | `EncyclopediaStatus` |
-| POST `/encyclopedia/build` | | `EncyclopediaReport` (409 plain message when a check fails; body still carries the report) |
+| GET `/encyclopedia` | | `EncyclopediaStatus`: `settings` (the saved `EncyclopediaSettings`, null when off) and `changes` (`EncyclopediaChanges` since the last build, null when the module is off, never built, or the framework could not compute it; never an error) |
+| POST `/encyclopedia/build` | | `EncyclopediaReport`, with its `settings` when the framework reports them (409 plain message when a check fails; body still carries the report) |
+| PUT `/encyclopedia/settings` | `EncyclopediaSettings` (`kinds`: one or more of place, character, creature, item, faction, event, no duplicates; `flavourText`: boolean; `list`: `full` or `discovered`) | `EncyclopediaStatus` after the save (200); 400 plain message for invalid settings, without running anything; 409 plain message when the module is off, when a job is running, or when the framework refuses the settings (exit 1); 500 plain message otherwise |
 | GET `/enc/*` | | the built static site, same origin, read-only, `Content-Security-Policy: sandbox allow-scripts allow-same-origin`-free: serve with the site's own strict CSP (`default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:`) |
+
+Settings: `node <fw>/skills/library/encyclopedia/scripts/encyclopedia.mjs settings <root>` prints `{ kinds, flavourText, list, errors }`; `settings <root> --set <json>` prints `{ ok, settings, saved }` (exit 0) or `{ ok: false, error, message }` (exit 1). `changes <root>` prints `{ built: false }` or `{ built: true, generatedAt, added, changed, removed }`, with `error` when it cannot be computed.
 
 The server only runs the CLIs through `execFile` (never a shell), one build at a time (409 plain message if busy), a 120 s timeout, and publishes SSE `files` when canon files change as it already does. Client: route `/encyclopedia` (build button, report with the checks as plain sentences, an Open-preview link and an embedded preview, base address shown with a hint that it can be changed in the campaign settings through the assistant, and a calm note that publishing is not configured); rail icon only when the module is on.
 

@@ -11,7 +11,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { validateConfig } from '../../../../../scripts/lib/config.mjs';
 import { ID_RE, collectEntries } from './entries.mjs';
-import { renderIndex, renderEntry, renderRedirect, renderGone, render404, searchIndex } from './site.mjs';
+import { compareStrings } from '../../../../../scripts/lib/subjects.mjs';
+import { renderIndex, renderEntry, renderRedirect, renderGone, render404, searchIndex, nameKey } from './site.mjs';
 import { runChecks } from './checks.mjs';
 import { decryptLocked } from './locked.mjs';
 import { langOf, reportText } from './strings.mjs';
@@ -96,33 +97,79 @@ export async function buildEncyclopedia(root) {
   }
 }
 
+/**
+ * The hash of one entry: its public text and the hashes of its pictures. The build writes it into
+ * the manifest, and computeChanges compares it, so both must use this one function.
+ */
+export function entryHash(entry, images) {
+  return crypto
+    .createHash('sha256')
+    .update(entry.markdown)
+    .update(entry.images.map((rel) => images.get(rel)?.hash ?? '').join(','))
+    .digest('hex')
+    .slice(0, 16);
+}
+
 async function writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp }) {
   const collected = collectEntries(root, config);
-  const { entries } = collected;
+  const { entries, settings } = collected;
   const text = reportText(lang);
   const warnings = [...collected.warnings];
+  const generatedAt = nowIso();
   const write = (rel, content) => {
     const full = path.join(tmp, rel);
     fs.mkdirSync(path.dirname(full), { recursive: true });
     fs.writeFileSync(full, content);
   };
+  if (!settings.flavourText) warnings.push({ code: 'flavour-off', message: text.flavourOff });
 
-  // Entries, index, 404, assets and the search index.
+  // Entries, index, 404, assets, card data and the search index.
+  // Discovered mode: each card is written under the name key of its title, and the keys go
+  // into discover.json. A key that two titles share gets a numbered suffix, with a warning.
+  const discovered = settings.list === 'discovered';
+  const keyTitles = new Map(); // key -> titles that use it, first one first
+  const discoverKeys = [];
+  const cardKeyOf = (title) => {
+    const base = nameKey(title);
+    const titles = keyTitles.get(base) ?? [];
+    titles.push(title);
+    keyTitles.set(base, titles);
+    if (titles.length === 1) return base;
+    warnings.push({ code: 'name-key-clash', message: `${titles[0]} / ${title}` });
+    return `${base}-${titles.length}`;
+  };
   const locks = [];
   for (const entry of entries) {
-    const rendered = renderEntry(entry, { lang, siteTitle });
+    const rendered = renderEntry(entry, { lang, siteTitle, listMode: settings.list });
     write(path.join('e', entry.id, 'index.html'), rendered.html);
     locks.push(...rendered.locks);
+    if (discovered) {
+      const key = cardKeyOf(entry.title);
+      discoverKeys.push(key);
+      write(path.join('c', `${key}.json`), `${JSON.stringify({
+        id: entry.id,
+        title: entry.title,
+        summary: entry.summary,
+        artwork: entry.artwork?.src ?? null,
+        placeholder: entry.placeholder,
+      }, null, 1)}\n`);
+    }
   }
+  if (discovered) write('discover.json', `${JSON.stringify([...discoverKeys].sort())}\n`);
   const categories = [];
   for (const entry of entries) {
     if (!categories.some((c) => c.id === entry.category)) categories.push({ id: entry.category, title: entry.categoryTitle });
   }
-  write('index.html', renderIndex({ lang, siteTitle, entries, categories }));
+  write('index.html', renderIndex({ lang, siteTitle, entries, categories, listMode: settings.list }));
   write('404.html', render404({ lang, siteTitle }));
   write(path.join('assets', 'site.css'), fs.readFileSync(path.join(SITE_DIR, 'site.css'), 'utf8'));
   write(path.join('assets', 'site.js'), fs.readFileSync(path.join(SITE_DIR, 'site.js'), 'utf8'));
-  write('search.json', `${JSON.stringify(searchIndex(entries), null, 1)}\n`);
+  if (fs.existsSync(path.join(SITE_DIR, 'placeholders'))) {
+    for (const name of fs.readdirSync(path.join(SITE_DIR, 'placeholders')).filter((n) => n.endsWith('.svg')).sort()) {
+      write(path.join('assets', 'placeholders', name), fs.readFileSync(path.join(SITE_DIR, 'placeholders', name)));
+    }
+  }
+  if (settings.list === 'full') write('search.json', `${JSON.stringify(searchIndex(entries), null, 1)}\n`);
 
   // Pictures, copied under their content hash.
   const copied = new Set();
@@ -167,14 +214,12 @@ async function writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp }) {
 
   // The manifest: one hash per entry, so the next build can say what changed.
   const manifest = {};
-  for (const entry of entries) {
-    manifest[entry.id] = crypto
-      .createHash('sha256')
-      .update(entry.markdown)
-      .update(entry.images.map((rel) => collected.images.get(rel)?.hash ?? '').join(','))
-      .digest('hex')
-      .slice(0, 16);
-  }
+  for (const entry of entries) manifest[entry.id] = entryHash(entry, collected.images);
+  const sortedIds = Object.keys(manifest).sort(compareStrings);
+  write('manifest.json', `${JSON.stringify({
+    generatedAt,
+    entries: Object.fromEntries(sortedIds.map((id) => [id, { hash: manifest[id], title: entries.find((e) => e.id === id).title }])),
+  }, null, 1)}\n`);
   const previous = readSavedReport(root);
   const change = compareManifest(previous?.manifest ?? null, manifest);
 
@@ -210,9 +255,54 @@ async function writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp }) {
     warnings: warnings.map((w) => ({ code: w.code, ...(w.path ? { path: w.path } : {}), message: w.message })),
     checks: result.checks,
     baseUrl,
-    generatedAt: nowIso(),
+    generatedAt,
     previewUrl: null,
     manifest,
+    settings,
+  };
+}
+
+/**
+ * The changes since the saved build, without writing anything: the entries added, changed and
+ * removed, each with its title, sorted by title.
+ * @returns {{ built: boolean, generatedAt?: string, added?: object[], changed?: object[], removed?: object[], error?: string }}
+ */
+export function computeChanges(root) {
+  const manifestFile = path.join(buildDir(root), 'manifest.json');
+  if (!fs.existsSync(manifestFile)) return { built: false };
+  const validated = validateConfig(root);
+  if (validated.config === null) return { built: true, error: reportText('en')['config-missing'] };
+  const config = validated.config;
+  const text = reportText(langOf(config.language?.main));
+  if (validated.errors.length > 0) return { built: true, error: text['config-invalid'] };
+  if (config.modules?.encyclopedia !== true) return { built: true, error: text['module-off'] };
+
+  let saved;
+  try {
+    saved = JSON.parse(fs.readFileSync(manifestFile, 'utf8'));
+  } catch {
+    return { built: true, error: text['build-error'] };
+  }
+  const previous = saved?.entries ?? {};
+  const collected = collectEntries(root, config);
+  const current = new Map(collected.entries.map((entry) => [entry.id, { title: entry.title, hash: entryHash(entry, collected.images) }]));
+  const byTitle = (a, b) => compareStrings(a.title.toLowerCase(), b.title.toLowerCase()) || compareStrings(a.id, b.id);
+  const added = [];
+  const changed = [];
+  const removed = [];
+  for (const [id, now] of current) {
+    if (!(id in previous)) added.push({ id, title: now.title });
+    else if (previous[id]?.hash !== now.hash) changed.push({ id, title: now.title });
+  }
+  for (const id of Object.keys(previous)) {
+    if (!current.has(id)) removed.push({ id, title: previous[id]?.title ?? id });
+  }
+  return {
+    built: true,
+    generatedAt: saved?.generatedAt,
+    added: added.sort(byTitle),
+    changed: changed.sort(byTitle),
+    removed: removed.sort(byTitle),
   };
 }
 

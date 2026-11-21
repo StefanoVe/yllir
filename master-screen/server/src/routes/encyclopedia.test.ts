@@ -17,7 +17,22 @@ const report = (ok: boolean, checks: Array<{ id: string; status: 'pass' | 'fail'
   previewUrl: null,
 });
 
-const OFF = { enabled: false, built: false, report: null, publishing: 'not-configured' };
+const OFF = { enabled: false, built: false, report: null, publishing: 'not-configured', settings: null, changes: null };
+
+const SETTINGS = {
+  kinds: ['place', 'character', 'creature', 'item', 'faction', 'event'],
+  flavourText: true,
+  list: 'full',
+};
+/**
+ * The fake answers by the first argument only, so the read and the save share one answer. It
+ * carries the settings (read shape) and the save flag (`ok`); the read ignores the extra keys.
+ */
+const settingsAnswer = (settings: unknown = SETTINGS) => ({
+  code: 0,
+  json: { ...(settings as object), ok: true, settings, saved: true, errors: [] },
+});
+const NO_CHANGES = { code: 0, json: { built: false } };
 
 describe('encyclopedia routes with the module off', () => {
   let f: Fixture;
@@ -42,6 +57,13 @@ describe('encyclopedia routes with the module off', () => {
     assert.deepEqual(await f.fake.calls(), []);
   });
 
+  it('refuses a settings save without running it', async () => {
+    const res = await f.call('PUT', '/api/encyclopedia/settings', SETTINGS);
+    assert.equal(res.status, 409);
+    assert.equal((res.json as { error: string }).error, 'The Codex is not turned on for this campaign.');
+    assert.deepEqual(await f.fake.calls(), []);
+  });
+
   it('serves no site, even when a build folder is there', async () => {
     const site = siteDirOf(f.root);
     await fs.mkdir(site, { recursive: true });
@@ -57,17 +79,74 @@ describe('encyclopedia status and build', () => {
   let f: Fixture;
   beforeEach(async () => {
     f = await openFixture(yamlWithModules({ encyclopedia: true }));
+    await f.fake.respond('settings', settingsAnswer());
+    await f.fake.respond('changes', NO_CHANGES);
   });
   afterEach(async () => {
     await f.close();
   });
 
-  it('runs the CLI status and answers with it', async () => {
+  it('runs the CLI status, settings and changes and answers with them', async () => {
     await f.fake.respond('status', { code: 0, json: { built: false, report: null } });
     const res = await f.call('GET', '/api/encyclopedia');
     assert.equal(res.status, 200);
-    assert.deepEqual(res.json, { enabled: true, built: false, report: null, publishing: 'not-configured' });
-    assert.deepEqual((await f.fake.calls()).map((c) => c.args), [['status', f.root]]);
+    assert.deepEqual(res.json, {
+      enabled: true,
+      built: false,
+      report: null,
+      publishing: 'not-configured',
+      settings: SETTINGS,
+      changes: null,
+    });
+    const args = (await f.fake.calls()).map((c) => c.args);
+    assert.equal(args.length, 3);
+    assert.deepEqual([...args].sort(), [['changes', f.root], ['settings', f.root], ['status', f.root]].sort());
+  });
+
+  it('answers the changes since the last build when the framework has them', async () => {
+    await f.fake.respond('status', { code: 0, json: { built: true, report: null } });
+    await f.fake.respond('changes', {
+      code: 0,
+      json: {
+        built: true,
+        generatedAt: '2026-11-20T10:00:00Z',
+        added: [{ id: 'mappa', title: 'Mappa' }],
+        changed: [],
+        removed: [{ id: 'vecchio', title: 'Vecchio' }],
+      },
+    });
+    const res = await f.call('GET', '/api/encyclopedia');
+    assert.equal(res.status, 200);
+    assert.deepEqual((res.json as { changes: unknown }).changes, {
+      added: [{ id: 'mappa', title: 'Mappa' }],
+      changed: [],
+      removed: [{ id: 'vecchio', title: 'Vecchio' }],
+    });
+  });
+
+  it('gives null changes when the changes command fails, and still answers the status', async () => {
+    await f.fake.respond('status', { code: 0, json: { built: true, report: null } });
+    await f.fake.respond('changes', { code: 2, json: { built: true, added: [], changed: [], removed: [] } });
+    const res = await f.call('GET', '/api/encyclopedia');
+    assert.equal(res.status, 200);
+    assert.equal((res.json as { changes: unknown }).changes, null);
+    assert.equal((res.json as { built: boolean }).built, true);
+  });
+
+  it('gives null changes when no build exists yet', async () => {
+    await f.fake.respond('status', { code: 0, json: { built: false, report: null } });
+    await f.fake.respond('changes', { code: 0, json: { built: false } });
+    const res = await f.call('GET', '/api/encyclopedia');
+    assert.equal(res.status, 200);
+    assert.equal((res.json as { changes: unknown }).changes, null);
+  });
+
+  it('answers 500 plainly when the settings cannot be read', async () => {
+    await f.fake.respond('status', { code: 0, json: { built: false, report: null } });
+    await f.fake.respond('settings', { code: 0, json: { kinds: ['dragon'], flavourText: true, list: 'full' } });
+    const res = await f.call('GET', '/api/encyclopedia');
+    assert.equal(res.status, 500);
+    assert.equal((res.json as { error: string }).error, 'The Codex status could not be read. Try again.');
   });
 
   it('answers 500 plainly when the status cannot be read', async () => {
@@ -119,12 +198,71 @@ describe('encyclopedia status and build', () => {
     assert.doesNotMatch(res.text, /Users/);
   });
 
+  it('drops the settings of a report that are not valid, and keeps the valid ones', async () => {
+    await f.fake.respond('build', {
+      code: 0,
+      json: { ...report(true, []), settings: { kinds: ['dragon'], flavourText: true, list: 'full' } },
+    });
+    const res = await f.call('POST', '/api/encyclopedia/build');
+    assert.equal(res.status, 200);
+    assert.equal('settings' in (res.json as object), false);
+    await f.fake.respond('build', { code: 0, json: { ...report(true, []), settings: SETTINGS } });
+    const kept = await f.call('POST', '/api/encyclopedia/build');
+    assert.deepEqual((kept.json as { settings: unknown }).settings, SETTINGS);
+  });
+
   it('answers 500 plainly when the build output cannot be read', async () => {
     await f.fake.respond('build', { code: 0, raw: 'not json /Users/x/secret' });
     const res = await f.call('POST', '/api/encyclopedia/build');
     assert.equal(res.status, 500);
     assert.equal((res.json as { error: string }).error, 'The Codex could not be built. Try again.');
     assert.doesNotMatch(res.text, /secret|Users/);
+  });
+
+  it('saves the settings through the CLI and answers with the new status', async () => {
+    const body = { kinds: ['place', 'item'], flavourText: false, list: 'discovered' };
+    await f.fake.respond('status', { code: 0, json: { built: false, report: null } });
+    const res = await f.call('PUT', '/api/encyclopedia/settings', body);
+    assert.equal(res.status, 200);
+    assert.equal((res.json as { enabled: boolean }).enabled, true);
+    const saves = (await f.fake.calls()).filter((c) => c.args[2] === '--set');
+    assert.equal(saves.length, 1);
+    assert.deepEqual(saves[0].args.slice(0, 2), ['settings', f.root]);
+    assert.deepEqual(JSON.parse(saves[0].args[3]), body);
+  });
+
+  it('refuses invalid settings without running anything', async () => {
+    for (const bad of [
+      { kinds: [], flavourText: true, list: 'full' },
+      { kinds: ['dragon'], flavourText: true, list: 'full' },
+      { kinds: ['place', 'place'], flavourText: true, list: 'full' },
+      { kinds: ['place'], flavourText: true, list: 'x' },
+      { kinds: ['place'], flavourText: 'yes', list: 'full' },
+      { kinds: ['place'], list: 'full' },
+    ]) {
+      const res = await f.call('PUT', '/api/encyclopedia/settings', bad);
+      assert.equal(res.status, 400, JSON.stringify(bad));
+      assert.equal((res.json as { error: string }).error, 'These Codex settings are not valid.');
+    }
+    assert.deepEqual(await f.fake.calls(), []);
+  });
+
+  it('answers 409 in plain words when the framework refuses the settings', async () => {
+    await f.fake.respond('settings', { code: 1, json: { ok: false, error: 'bad', message: 'Campaign problem /Users/x' } });
+    const res = await f.call('PUT', '/api/encyclopedia/settings', SETTINGS);
+    assert.equal(res.status, 409);
+    assert.equal(
+      (res.json as { error: string }).error,
+      'The Codex settings could not be saved: the campaign settings have a problem. Ask the assistant.',
+    );
+    assert.doesNotMatch(res.text, /Users/);
+  });
+
+  it('answers 500 plainly when the framework answer for a save is not readable', async () => {
+    await f.fake.respond('settings', { code: 0, raw: 'not json' });
+    const res = await f.call('PUT', '/api/encyclopedia/settings', SETTINGS);
+    assert.equal(res.status, 500);
+    assert.equal((res.json as { error: string }).error, 'The Codex settings could not be saved. Try again.');
   });
 
   it('refuses a second build while one runs, and a sheet job too (one job per campaign)', async () => {

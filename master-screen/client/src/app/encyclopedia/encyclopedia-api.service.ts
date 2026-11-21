@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import type { EncyclopediaReport, EncyclopediaStatus } from '@shared/types';
+import type { EncyclopediaReport, EncyclopediaSettings, EncyclopediaStatus } from '@shared/types';
 import { I18n } from '../i18n';
 import { callJson } from './call-json';
 
@@ -16,6 +16,12 @@ export class EncyclopediaApiService {
   /** POST /api/encyclopedia/build. Nothing is shown before the server answers. */
   build(): Promise<EncyclopediaReport> {
     return callJson<EncyclopediaReport>(this.i18n, 'POST', '/api/encyclopedia/build');
+  }
+
+  /** PUT /api/encyclopedia/settings. Saving does not rebuild; the answer is the full status. */
+  saveSettings(settings: EncyclopediaSettings): Promise<EncyclopediaStatus> {
+    // callJson only passes the method through to fetch; its type lists GET and POST only.
+    return callJson<EncyclopediaStatus>(this.i18n, 'PUT', '/api/encyclopedia/settings', settings);
   }
 }
 

@@ -188,6 +188,34 @@ export function saveVersion(root, { message, kind }) {
   return { saved: true, hash, message: subject };
 }
 
+/**
+ * Commits only the given campaign-relative files as one saved version. Other changes of the
+ * worktree stay uncommitted. Nothing changed in those files means nothing saved.
+ * @param {string[]} files campaign-relative paths
+ * @returns {{ saved: boolean, hash?: string, message?: string }}
+ */
+export function saveFilesVersion(root, files, { message, kind }) {
+  const dir = path.resolve(root);
+  requireRepo(dir);
+  checkKind(kind);
+  checkMessage(message);
+  if (!Array.isArray(files) || files.length === 0) {
+    throw fail('bad-files', 'a version needs at least one file');
+  }
+  const subject = message.trim();
+  const pre = ['--literal-pathspecs'];
+  runGit(dir, [...pre, 'add', '--', ...files]);
+  const staged = runGit(dir, [...pre, 'diff', '--cached', '--quiet', '--', ...files], { allow: [1] });
+  if (staged.status === 0) {
+    return { saved: false };
+  }
+  runGit(dir, [...pre, 'commit', '-q', '--cleanup=whitespace', '-F', '-', '--', ...files], {
+    input: `${subject}\n\n${TRAILER}: ${kind}\n`,
+  });
+  const hash = runGit(dir, ['rev-parse', '--short', 'HEAD']).stdout.trim();
+  return { saved: true, hash, message: subject };
+}
+
 /** Saves the master's own edits before the framework starts any work. */
 export function saveManualChanges(root, message) {
   return saveVersion(root, { message, kind: 'manual' });

@@ -20,6 +20,19 @@ You build the public encyclopedia of the campaign. It is a set of static pages w
 - Never open, edit or delete files under `.campaign/cache/encyclopedia/` by hand. It is rebuilt by the script only.
 - Never say to the master: script, command, check ids, JSON, exit codes, SHA, hashes, CSP, Web Crypto, PBKDF2, AES, the names of the internal folders, or the names of the checks.
 
+## Settings
+
+- The Codex has three settings, kept in the campaign settings:
+  - which kinds of sheets enter it: places, characters, creatures, items, factions, events. A new campaign has only items;
+  - whether the entries show their text, or only their title and picture;
+  - whether the players see every entry, or only the ones they discovered. A player discovers an entry by opening it, or by typing its exact name in the search of the Codex.
+- The master changes them in the master screen, in the Codex page. If the master asks in chat, read them with
+  `node "${CLAUDE_PLUGIN_ROOT}/skills/library/encyclopedia/scripts/encyclopedia.mjs" settings .`
+  and save them with
+  `node "${CLAUDE_PLUGIN_ROOT}/skills/library/encyclopedia/scripts/encyclopedia.mjs" settings . --set '{"kinds":["item","place"],"flavourText":true,"list":"full"}'`
+  with the master's values. The kinds are `place`, `character`, `creature`, `item`, `faction` and `event`, and `list` is `full` or `discovered`. Always send all three values, keeping the ones the master did not mention as they are. Then say in one sentence what changed, and that the Codex shows it after the next update (Step 2).
+- Only these sections of a sheet enter the Codex: for an item, its brief, description, effects and text; for a notice, its text and reward; for every other kind, its synopsis; for a place, also its battle map and its plan in the atlas.
+
 ## Steps
 
 **Step 1: check the module.** Read `campaign.yaml` with the Read tool. If `modules.encyclopedia` is not `true`, follow the rule above and stop.
@@ -37,6 +50,7 @@ Read the JSON and the final `exit:` line.
 - what was left out, one line per reason, from `excluded` (see the reasons below), without the names of the hidden subjects. Hidden entries are listed by their category, never by their title;
 - every warning as a plain sentence (for example «un'immagine non è stata copiata perché contiene dati nascosti»);
 - the change summary from the check `change-summary`, in plain words (new, removed and changed entries, compared with the previous build).
+- when the entry text is off, say that the Codex shows only titles and pictures, and that the master can turn the text on in the Codex page.
 
 **Step 4: report a refused build.** Nothing was replaced: the previous site, if any, is still there. Say which checks failed, one plain sentence each, and what the master can do. The failing checks mean:
 - a reserved sentence, a hidden subject's title or a secret code reached the public text: «Una frase della parte pubblica riprende un testo riservato. Tolgila dalla parte pubblica o spostala nella parte riservata»;
@@ -57,6 +71,7 @@ Ask one question at a time, and only if the master's answer decides the next ste
 - draft: a draft folder or a draft mark;
 - no public text: the sheet has only reserved text, so nothing goes out (title included);
 - no public title: the public part has no first heading.
+- kind not chosen: this kind of sheet is not in the Codex settings; the master can add it in the Codex page of the master screen.
 
 ## Locked texts (Proposta, for the master's text)
 

@@ -17,12 +17,165 @@ import { splitLocked, parseCodes, LABEL_RE, MIN_CODE_LENGTH } from './locked.mjs
 import { plainText } from './render.mjs';
 import { prepareImage, formatOf, ALLOWED_EXTENSIONS } from './images.mjs';
 import { reportText } from './strings.mjs';
+import { ITEM_TYPES } from '../../../../../scripts/lib/world-graph.mjs';
+import { readAtlas } from '../../../atlas/scripts/lib/model.mjs';
 
 export const ENTRY_TYPES = ['places', 'subjects', 'objects', 'free'];
 export const ID_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 const PRIVATE_NAMES = ['giocatori', 'players', 'fonti', 'sources', 'appunti', 'notes'];
 const PRIVATE_TYPES = ['sources', 'notes'];
 const MIN_RESERVED_LENGTH = 24;
+const SUMMARY_MAX = 280;
+const ATLAS_PLAN_SCOPES = ['settlement', 'district'];
+const MAP_HEADINGS = ['Mappa', 'Map'];
+const MAP_MARKER_RE = /^\s*<!--\s*\/?yllir:map\s*-->\s*$/;
+const HEADING_RE = /^\s{0,3}#\s/;
+
+/**
+ * Settings of the Codex with their defaults: which kinds of sheet enter it, whether the
+ * text of the entries is shown (flavour text), and whether the list is full or only discovered.
+ * @returns {{ kinds: string[], flavourText: boolean, list: 'full'|'discovered' }}
+ */
+export function codexSettings(config) {
+  const enc = config?.encyclopedia ?? {};
+  return {
+    kinds: enc.kinds ?? ['item'],
+    flavourText: !(enc.flavour_text === false || enc.flavour_text === 'false'),
+    list: enc.list === 'discovered' ? 'discovered' : 'full',
+  };
+}
+
+const SECTION_NAMES = {
+  it: { notice: ['Testo', 'Premio'], item: ['In breve', 'Descrizione', 'Effetti', 'Testo'], place: ['Sinossi', 'Mappa'], other: ['Sinossi'] },
+  en: { notice: ['Text', 'Reward'], item: ['In brief', 'Description', 'Effects', 'Text'], place: ['Synopsis', 'Map'], other: ['Synopsis'] },
+};
+
+/** The `##` headings a sheet may publish in the Codex, by kind (notices have their own). */
+export function allowedSections(data, lang) {
+  const names = lang === 'it' ? SECTION_NAMES.it : SECTION_NAMES.en;
+  if (data.kind === 'item') return data.template === 'notice' ? names.notice : names.item;
+  if (data.kind === 'place') return names.place;
+  return names.other;
+}
+
+/**
+ * Splits a Markdown text into the lines before its first `## ` heading (head) and its `## ` sections.
+ * A line inside a code fence is never a heading.
+ * @returns {{ head: string[], sections: Array<{ name: string, lines: string[] }> }}
+ */
+export function splitSections(body) {
+  const head = [];
+  const sections = [];
+  let target = head;
+  let fence = false;
+  for (const line of String(body).split('\n')) {
+    if (/^ {0,3}(```|~~~)/.test(line)) {
+      fence = !fence;
+      target.push(line);
+      continue;
+    }
+    if (!fence && line.startsWith('## ')) {
+      const section = { name: line.slice(3).trim(), lines: [line] };
+      sections.push(section);
+      target = section.lines;
+      continue;
+    }
+    target.push(line);
+  }
+  return { head, sections };
+}
+
+const isMapHeading = (name) => MAP_HEADINGS.includes(name);
+const IMAGE_LINE_RE = /!\[[^\]]*\]\([^)\s]+/;
+
+/** First image of a text as { alt, url }, or null. */
+function firstImage(text) {
+  for (const match of String(text).matchAll(IMAGE_RE)) return { alt: match[1], url: match[2] };
+  return null;
+}
+
+/** The map section kept whole in the Codex: its heading and its first picture only. */
+function mapLines(lines) {
+  const heading = lines[0];
+  const image = lines.find((line) => IMAGE_LINE_RE.test(line));
+  return image === undefined ? [heading] : [heading, '', image];
+}
+
+/**
+ * The public text of a sheet as the Codex shows it: the head (title and picture) and the allowed
+ * sections, in their order. A map section keeps only its heading and its first picture. With
+ * flavour text off, only the title and the pictures of the head and the map sections remain.
+ * @param {string} body public text, starting with its title
+ * @param {string[]} allowed allowed `##` heading names (see allowedSections)
+ * @param {{ flavourText?: boolean }} [options]
+ * @returns {string}
+ */
+export function filterPublicBody(body, allowed, { flavourText = true } = {}) {
+  const { head, sections } = splitSections(body);
+  const out = flavourText
+    ? [...head]
+    : head.filter((line) => HEADING_RE.test(line) || IMAGE_LINE_RE.test(line));
+  for (const section of sections) {
+    if (!allowed.includes(section.name)) continue;
+    if (isMapHeading(section.name)) {
+      out.push(...mapLines(section.lines));
+    } else if (flavourText) {
+      out.push(...section.lines);
+    }
+  }
+  return out.filter((line) => !MAP_MARKER_RE.test(line)).join('\n');
+}
+
+/** Cuts text to at most max characters, at a word boundary, adding an ellipsis when it is cut. */
+function cutAtWord(text, max) {
+  if (text.length <= max) return text;
+  const room = text.slice(0, max - 1);
+  const space = room.lastIndexOf(' ');
+  const cut = space > 0 ? room.slice(0, space) : room;
+  return `${cut.replace(/\s+$/, '')}…`;
+}
+
+/** Summary of an entry: the plain text of its first allowed section with text (never a locked text). */
+function summaryOf(filtered, allowed, flavourText) {
+  if (!flavourText) return '';
+  for (const section of splitSections(filtered).sections) {
+    if (!allowed.includes(section.name) || isMapHeading(section.name)) continue;
+    const { segments } = splitLocked(section.lines.slice(1).join('\n'));
+    const text = segments
+      .filter((s) => s.type === 'md')
+      .map((s) => plainText(s.text))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (text !== '') return cutAtWord(text, SUMMARY_MAX);
+  }
+  return '';
+}
+
+/** A picture path from the site root: `../../assets/img/x.png` becomes `assets/img/x.png`. */
+const siteSrc = (src) => src.replace(/^\.\.\/\.\.\//, '');
+
+/** Placeholder of the grid: the item type, `notice`, `other`, or the kind of the sheet. */
+function placeholderOf(kind, template, itemType) {
+  if (itemType !== null) return itemType;
+  if (template === 'notice') return 'notice';
+  if (kind === null || kind === 'item') return 'other';
+  return kind;
+}
+
+/** The atlas plan of a settlement or district atlas: the picture, its name and the places it shows. */
+function atlasPlanOf(root, atlas) {
+  const scope = atlas.manifest?.scope;
+  if (atlas.dir === null || !scope || !ATLAS_PLAN_SCOPES.includes(scope.kind) || !Array.isArray(scope.places)) return null;
+  const file = typeof atlas.manifest.base?.file === 'string' ? atlas.manifest.base.file : 'base.png';
+  const abs = path.join(atlas.dir, file);
+  if (!fs.existsSync(abs)) return null;
+  return {
+    rel: path.relative(root, abs).split(path.sep).join('/'),
+    ext: (file.split('.').pop() ?? '').toLowerCase(),
+    places: new Set(scope.places.filter((p) => typeof p === 'string')),
+  };
+}
 
 /**
  * Lower-cased, letters and digits only, words separated by single spaces and padded
@@ -107,6 +260,8 @@ function resolveRelative(fromDir, rawUrl) {
 export function collectEntries(root, config) {
   const lang = config.language?.main ?? 'en';
   const text = reportText(lang);
+  const settings = codexSettings(config);
+  const atlas = readAtlas(root);
   const structure = Array.isArray(config.structure) ? config.structure : [];
   const isPrivate = privateChecker(structure);
   const excluded = [];
@@ -234,12 +389,18 @@ export function collectEntries(root, config) {
       excludeFolder(folder, text.reasonNoPublicText);
       return;
     }
+    // The Codex shows only the allowed sections; the reserved-line test still reads the whole public text.
+    const filtered = filterPublicBody(publicText, allowedSections(data, lang), { flavourText: settings.flavourText });
     const title = firstHeading(publicText);
     if (title === null) {
       exclude(rel, text.reasonNoPublicTitle);
       return;
     }
-    candidates.push({ rel, id: data.id, title, category, body: publicText, fullBody: body, data });
+    if (!settings.kinds.includes(data.kind)) {
+      exclude(rel, text.reasonKindOff);
+      return;
+    }
+    candidates.push({ rel, id: data.id, title, category, body: filtered, publicText, fullBody: body, data });
   }
 
   // Duplicate ids: neither sheet is published.
@@ -269,9 +430,37 @@ export function collectEntries(root, config) {
   const retiredResult = readRetiredIds(root);
   const retired = retiredResult.ok ? retiredResult.ids : [];
 
+  const atlasPlan = atlasPlanOf(root, atlas);
+  let planCache = null; // the atlas plan picture, prepared once: { imageRel, ext, hash } or { problem }
+  const planPicture = () => {
+    if (planCache !== null) return planCache;
+    const { rel: imageRel, ext } = atlasPlan;
+    if (!ALLOWED_EXTENSIONS.includes(ext) || !formatOf(ext)) return (planCache = { problem: text.imageUnsupported(imageRel) });
+    if (isPrivate(imageRel)) return (planCache = { problem: text.imagePrivate(imageRel) });
+    let bytes;
+    try {
+      bytes = fs.readFileSync(path.join(root, imageRel));
+    } catch {
+      return (planCache = { problem: text.imageMissing(imageRel) });
+    }
+    const prepared = prepareImage(bytes, ext);
+    if (!prepared.ok) {
+      const why = prepared.reason === 'metadata-not-removable'
+        ? lang === 'it' ? 'contiene dati nascosti, esportala di nuovo senza' : 'hidden data inside, export it again without it'
+        : lang === 'it' ? 'file non leggibile' : 'file cannot be read';
+      return (planCache = { problem: text.imageSkipped(imageRel, why) });
+    }
+    const hash = crypto.createHash('sha256').update(prepared.bytes).digest('hex').slice(0, 16);
+    images.set(imageRel, { bytes: prepared.bytes, ext, hash });
+    return (planCache = { imageRel, ext, hash });
+  };
+
   const entries = kept.map((candidate) => {
-    const { rel, id, title, category, body, fullBody, data } = candidate;
+    const { rel, id, title, category, body, publicText, fullBody, data } = candidate;
     const dir = path.posix.dirname(rel);
+    const kind = typeof data.kind === 'string' ? data.kind : null;
+    const template = typeof data.template === 'string' ? data.template : null;
+    const itemType = typeof data.item_type === 'string' && ITEM_TYPES.includes(data.item_type) ? data.item_type : null;
     const { segments, problems } = splitLocked(body);
     const codes = parseCodes(masterPart(fullBody));
     for (const problem of problems) lockedProblems.push({ ...problem, title });
@@ -325,6 +514,26 @@ export function collectEntries(root, config) {
       imageUsed.push(imageRel);
     }
 
+    // Maps: the battle map of a place (its kept Mappa section) and the atlas plan of a settlement or district.
+    const maps = [];
+    const bodySections = splitSections(body).sections;
+    if (kind === 'place') {
+      const mapSection = bodySections.find((s) => isMapHeading(s.name));
+      const picture = mapSection ? firstImage(mapSection.lines.join('\n')) : null;
+      if (picture && imageSrc.has(picture.url)) {
+        maps.push({ src: siteSrc(imageSrc.get(picture.url)), alt: picture.alt, label: 'battleMap' });
+      }
+    }
+    if (kind === 'place' && atlasPlan !== null && atlasPlan.places.has(id)) {
+      const plan = planPicture();
+      if (plan.problem) {
+        warnings.push({ code: 'image-skipped', path: rel, message: plan.problem });
+      } else {
+        imageUsed.push(plan.imageRel);
+        maps.push({ src: `assets/img/${plan.hash}.${plan.ext}`, alt: title, label: 'plan' });
+      }
+    }
+
     const links = new Set();
     for (const match of body.matchAll(LINK_RE)) {
       const target = resolveRelative(dir, match[2]);
@@ -337,8 +546,15 @@ export function collectEntries(root, config) {
       .map((s) => plainText(s.text))
       .join('\n')
       .trim();
-    publicParts.push(body);
+    publicParts.push(publicText);
     sources.push(rel, ...imageUsed);
+
+    // Card data: the first picture above the first section, a short summary and the grid placeholder.
+    const artworkPicture = firstImage(splitSections(body).head.join('\n'));
+    const artwork = artworkPicture && imageSrc.has(artworkPicture.url)
+      ? { src: siteSrc(imageSrc.get(artworkPicture.url)), alt: artworkPicture.alt }
+      : null;
+    const summary = summaryOf(body, allowedSections(data, lang), settings.flavourText);
 
     return {
       id,
@@ -346,6 +562,13 @@ export function collectEntries(root, config) {
       category: category.id,
       categoryTitle: categoryTitle(category.id),
       sheet: rel,
+      kind,
+      template,
+      itemType,
+      placeholder: placeholderOf(kind, template, itemType),
+      artwork,
+      summary,
+      maps,
       segments,
       markdown: body,
       plain,
@@ -377,6 +600,7 @@ export function collectEntries(root, config) {
 
   return {
     entries,
+    settings,
     excluded: excluded.sort((a, b) => compareStrings(a.path, b.path) || compareStrings(a.reason, b.reason)),
     warnings,
     reserved: {

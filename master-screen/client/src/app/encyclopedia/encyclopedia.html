@@ -1,107 +1,244 @@
-<h1>{{ t('enc.title') }}</h1>
+<header class="head">
+  <div class="head-main">
+    <h1>{{ t('enc.title') }}</h1>
+    @if (enabled()) {
+      <p class="badge" [attr.data-state]="state()" role="status">
+        <lucide-angular [img]="stateIcon(state())" [size]="16" aria-hidden="true" [class.spin]="state() === 'loading'" />
+        <span>{{ stateBadge(state()) }}</span>
+      </p>
+    }
+  </div>
+
+  @if (enabled()) {
+    <div class="head-actions">
+      <p class="head-meta">
+        @if (lastUpdate(); as when) {
+          <span>{{ t('codex.lastUpdate', { time: when }) }}</span>
+        } @else {
+          <span>{{ t('codex.lastUpdate.never') }}</span>
+        }
+      </p>
+      <div class="buttons">
+        <button type="button" class="primary build" [disabled]="building()" [attr.aria-busy]="building()" (click)="build()">
+          <lucide-angular [img]="building() ? icons.LoaderCircle : icons.Hammer" [size]="18" aria-hidden="true"
+                          [class.spin]="building()" />
+          <span>{{ building() ? t('codex.build.busy') : built() ? t('codex.build.update') : t('codex.build.generate') }}</span>
+        </button>
+        @if (built()) {
+          <a class="btn" href="/enc/" target="_blank" rel="noopener">
+            <lucide-angular [img]="icons.ExternalLink" [size]="16" aria-hidden="true" />
+            <span>{{ t('codex.open') }}</span>
+          </a>
+        } @else {
+          <span class="btn" aria-disabled="true" [attr.title]="t('codex.openOff')">
+            <lucide-angular [img]="icons.ExternalLink" [size]="16" aria-hidden="true" />
+            <span>{{ t('codex.open') }}</span>
+          </span>
+        }
+      </div>
+    </div>
+    @if (building()) {
+      <p class="muted" role="status">{{ t('codex.build.note') }}</p>
+    }
+  }
+</header>
 
 @if (loadError(); as message) {
   <p class="alert" role="alert">{{ message }}</p>
 }
 
 @if (!status() && !loadError()) {
-  <p class="muted" role="status">{{ t('enc.loading') }}</p>
+  <p class="muted" role="status">{{ t('codex.state.loading') }}</p>
 }
 
-@if (status()) {
-  @if (!enabled()) {
-    <p class="notice" role="status">{{ t('enc.off') }}</p>
-  } @else {
-    <p class="muted">{{ t('enc.intro') }}</p>
+@if (status() && !enabled()) {
+  <p class="notice" role="status">{{ t('codex.state.off') }}</p>
+}
 
-    <section class="card" aria-label="{{ t('enc.build') }}">
-      <button type="button" class="primary" [disabled]="building()" [attr.aria-busy]="building()" (click)="build()">
-        <lucide-angular [img]="building() ? icons.LoaderCircle : icons.Hammer" [size]="18" aria-hidden="true"
-                        [class.spin]="building()" />
-        <span>{{ building() ? t('enc.building') : t('enc.build') }}</span>
-      </button>
-      @if (building()) {
-        <p class="muted" role="status">{{ t('enc.buildingNote') }}</p>
-      }
+@if (enabled()) {
+  <p class="sentence" [attr.data-state]="state()">{{ stateSentence(state()) }}</p>
+
+  <div class="tabs" role="tablist" [attr.aria-label]="t('codex.tabs.label')" (keydown)="onTabKeydown($event)">
+    <button type="button" role="tab" id="codex-tab-status" aria-controls="codex-panel-status"
+            [attr.aria-selected]="activeTab() === 'status'" [attr.tabindex]="activeTab() === 'status' ? 0 : -1"
+            [class.active]="activeTab() === 'status'" (click)="selectTab('status')">{{ t('codex.tab.status') }}</button>
+    <button type="button" role="tab" id="codex-tab-preview" aria-controls="codex-panel-preview"
+            [attr.aria-selected]="activeTab() === 'preview'" [attr.tabindex]="activeTab() === 'preview' ? 0 : -1"
+            [disabled]="!built()" [class.active]="activeTab() === 'preview'" (click)="selectTab('preview')">{{ t('codex.tab.preview') }}</button>
+  </div>
+  @if (!built()) {
+    <p class="hint">{{ t('codex.tab.previewOff') }}</p>
+  }
+
+  @if (activeTab() === 'status') {
+    <div id="codex-panel-status" role="tabpanel" aria-labelledby="codex-tab-status" class="panel-body">
       @if (buildError(); as message) {
         <div class="alert" role="alert">
           <p class="strong">{{ message }}</p>
-          <p>{{ t('enc.nothingChanged') }}</p>
+          <p>{{ t('codex.nothingChanged') }}</p>
         </div>
       }
-    </section>
 
-    @if (report(); as r) {
-      <section class="card" aria-labelledby="enc-report-title">
-        <h2 id="enc-report-title">{{ t('enc.reportTitle') }}</h2>
-        <p>{{ entriesText(r.entries) }}</p>
-
-        @if (r.excluded.length > 0) {
-          <p>{{ excludedText(r.excluded.length) }}</p>
-          <details>
-            <summary>{{ t('enc.excludedList') }}</summary>
-            <ul class="plain">
-              @for (item of r.excluded; track $index) {
-                <li>{{ lineText(item.path, item.reason) }}</li>
-              }
-            </ul>
-          </details>
-        }
-
-        <h3>{{ t('enc.checks') }}</h3>
-        <ul class="checks">
-          @for (check of r.checks; track $index) {
-            <li class="check" [attr.data-status]="check.status">
-              <lucide-angular [img]="checkIcon(check.status)" [size]="18" aria-hidden="true" />
-              <span class="check-status">{{ checkText(check.status) }}</span>
-              <span class="check-message">{{ check.message }}</span>
-            </li>
-          }
-        </ul>
-
-        @if (r.warnings.length > 0) {
-          <h3>{{ t('enc.warnings') }}</h3>
-          <ul class="plain">
-            @for (warning of r.warnings; track $index) {
-              <li class="warning">
-                <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
-                <span>{{ lineText(warning.path, warning.message) }}</span>
-              </li>
-            }
-          </ul>
-        }
-      </section>
-    }
-
-    <section class="card" aria-labelledby="enc-preview-title">
-      <h2 id="enc-preview-title">{{ t('enc.previewHeading') }}</h2>
-      @if (built()) {
-        <p>
-          <a class="link" href="/enc/" target="_blank" rel="noopener">
-            <lucide-angular [img]="icons.ExternalLink" [size]="16" aria-hidden="true" />
-            <span>{{ t('enc.preview') }}</span>
-          </a>
+      @if (flavourOff()) {
+        <p class="notice warn" role="status">
+          <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
+          <span>{{ t('codex.flavourOff') }}</span>
         </p>
-        <iframe class="preview" src="/enc/" sandbox="allow-scripts allow-same-origin" loading="lazy"
-                [title]="t('enc.previewTitle')"></iframe>
-      } @else {
-        <p class="muted">{{ t('enc.empty') }}</p>
       }
-    </section>
 
-    <section class="card" aria-labelledby="enc-address-title">
-      <h2 id="enc-address-title">{{ t('enc.baseUrl') }}</h2>
-      @if (baseUrl() !== '') {
-        <p class="address"><code>{{ baseUrl() }}</code></p>
-      } @else {
-        <p class="muted">{{ t('enc.noBaseUrl') }}</p>
+      <div class="kpis">
+        <div class="kpi">
+          <span class="kpi-label">{{ t('codex.kpi.entries') }}</span>
+          <span class="kpi-value">{{ report()?.entries ?? '—' }}</span>
+        </div>
+        <button type="button" class="kpi kpi-action" aria-controls="codex-list"
+                [attr.aria-expanded]="openList() === 'excluded'" (click)="toggleList('excluded')">
+          <span class="kpi-label">{{ t('codex.kpi.excluded') }}</span>
+          <span class="kpi-value">{{ report() ? report()?.excluded?.length : '—' }}</span>
+        </button>
+        <button type="button" class="kpi kpi-action" aria-controls="codex-list"
+                [attr.aria-expanded]="openList() === 'checks'" (click)="toggleList('checks')">
+          <span class="kpi-label">{{ t('codex.kpi.checks') }}</span>
+          <span class="kpi-value">{{ report() ? failingCount() : '—' }}</span>
+        </button>
+        <button type="button" class="kpi kpi-action" aria-controls="codex-list"
+                [attr.aria-expanded]="openList() === 'warnings'" (click)="toggleList('warnings')">
+          <span class="kpi-label">{{ t('codex.kpi.warnings') }}</span>
+          <span class="kpi-value">{{ report() ? report()?.warnings?.length : '—' }}</span>
+        </button>
+      </div>
+
+      @if (openList(); as list) {
+        <section id="codex-list" class="panel" [attr.aria-labelledby]="'codex-list-title'">
+          <div class="panel-head">
+            <h2 id="codex-list-title">{{ listTitle(list) }}</h2>
+            <button type="button" class="btn-text" (click)="toggleList(list)">{{ t('codex.list.close') }}</button>
+          </div>
+
+          @if (list === 'excluded') {
+            @for (item of report()?.excluded ?? []; track $index) {
+              <div class="row">
+                <span class="row-name">{{ rowName(item.path) }}</span>
+                <span class="row-note">{{ item.reason }}</span>
+              </div>
+            } @empty {
+              <p class="muted">{{ t('codex.list.none') }}</p>
+            }
+          }
+
+          @if (list === 'checks') {
+            @for (check of checksToFix(); track $index) {
+              <div class="row check" [attr.data-status]="check.status">
+                <lucide-angular [img]="checkIcon(check.status)" [size]="18" aria-hidden="true" />
+                <span class="row-name">{{ checkText(check.status) }}</span>
+                <span class="row-note">{{ check.message }}</span>
+              </div>
+            } @empty {
+              <p class="muted">{{ t('codex.list.none') }}</p>
+            }
+          }
+
+          @if (list === 'warnings') {
+            @for (warning of report()?.warnings ?? []; track $index) {
+              <div class="row">
+                <lucide-angular [img]="icons.TriangleAlert" [size]="16" aria-hidden="true" />
+                @if (warning.path) {
+                  <span class="row-name">{{ rowName(warning.path) }}</span>
+                }
+                <span class="row-note">{{ warning.message }}</span>
+              </div>
+            } @empty {
+              <p class="muted">{{ t('codex.list.none') }}</p>
+            }
+          }
+        </section>
       }
-      <p class="muted">{{ t('enc.baseUrlHint') }}</p>
-    </section>
 
-    <p class="muted note">
-      <lucide-angular [img]="icons.Info" [size]="16" aria-hidden="true" />
-      <span>{{ t('enc.publishing') }}</span>
-    </p>
+      @if (changes() || built()) {
+        <section class="panel" aria-labelledby="codex-changes-title">
+          <h2 id="codex-changes-title">{{ t('codex.changes.title') }}</h2>
+          @if (changes(); as c) {
+            @if (changeCount() === 0) {
+              <p class="muted">{{ t('codex.changes.none') }}</p>
+            } @else {
+              <div class="groups">
+                @for (group of changeGroups(c); track group.key) {
+                  <div class="group-block">
+                    <h3>{{ group.label }} <span class="count">{{ group.items.length }}</span></h3>
+                    @for (item of group.items; track item.id) {
+                      <p class="change-title">{{ item.title }}</p>
+                    } @empty {
+                      <p class="muted">—</p>
+                    }
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <p class="muted">{{ t('codex.changes.unknown') }}</p>
+          }
+        </section>
+      }
+
+      @if (draft(); as d) {
+        <section class="panel" aria-labelledby="codex-settings-title">
+          <h2 id="codex-settings-title">{{ t('codex.settings.title') }}</h2>
+
+          <fieldset class="group">
+            <legend>{{ t('codex.settings.kinds') }}</legend>
+            <div class="kinds">
+              @for (kind of kindOrder; track kind) {
+                <label class="check-row">
+                  <input type="checkbox" [checked]="d.kinds.includes(kind)"
+                         (change)="toggleKind(kind, $any($event.target).checked)" />
+                  <span>{{ kindLabel(kind) }}</span>
+                </label>
+              }
+            </div>
+            @if (d.kinds.length === 0) {
+              <p class="warn-text" role="status">{{ t('codex.settings.kindsNone') }}</p>
+            }
+          </fieldset>
+
+          <div class="switch-row">
+            <span id="codex-flavour-label">{{ t('codex.settings.flavour') }}</span>
+            <span class="switch-wrap">
+              <button type="button" class="switch" role="switch" aria-labelledby="codex-flavour-label"
+                      [attr.aria-checked]="d.flavourText" (click)="toggleFlavour()"><span class="thumb" aria-hidden="true"></span></button>
+              <span class="switch-state">{{ d.flavourText ? t('codex.switch.on') : t('codex.switch.off') }}</span>
+            </span>
+          </div>
+
+          <fieldset class="group">
+            <legend>{{ t('codex.settings.list') }}</legend>
+            <label class="radio-row">
+              <input type="radio" name="codex-list" value="full" [checked]="d.list === 'full'" (change)="setList('full')" />
+              <span>{{ t('codex.settings.listAll') }}</span>
+            </label>
+            <label class="radio-row">
+              <input type="radio" name="codex-list" value="discovered" [checked]="d.list === 'discovered'" (change)="setList('discovered')" />
+              <span>{{ t('codex.settings.listDiscovered') }}</span>
+            </label>
+            <p class="hint">{{ t('codex.settings.listHelp') }}</p>
+          </fieldset>
+
+          <div class="actions">
+            <button type="button" class="primary save" [disabled]="!canSave()" [attr.aria-busy]="saving()" (click)="save()">
+              {{ saving() ? t('codex.settings.saving') : t('codex.settings.save') }}
+            </button>
+            @if (saveError(); as message) {
+              <p class="alert" role="alert">{{ message }}</p>
+            } @else if (saved() && !dirty()) {
+              <p class="muted" role="status">{{ t('codex.settings.saved') }}</p>
+            }
+          </div>
+        </section>
+      }
+    </div>
+  } @else {
+    <div id="codex-panel-preview" role="tabpanel" aria-labelledby="codex-tab-preview" class="panel-body">
+      <iframe class="preview" src="/enc/" sandbox="allow-scripts allow-same-origin" loading="lazy"
+              [title]="t('codex.preview.title')"></iframe>
+    </div>
   }
 }

@@ -11,6 +11,9 @@ export interface EncyclopediaTexts {
   timedOut: string;
   noSite: string;
   notFound: string;
+  badSettings: string;
+  settingsRefused: string;
+  settingsFailed: string;
 }
 
 export const ENCYCLOPEDIA_TEXTS: Record<Lang, EncyclopediaTexts> = {
@@ -23,6 +26,9 @@ export const ENCYCLOPEDIA_TEXTS: Record<Lang, EncyclopediaTexts> = {
     timedOut: 'The build took too long. Try again.',
     noSite: 'The Codex has not been built yet. Build it first.',
     notFound: 'This page does not exist.',
+    badSettings: 'These Codex settings are not valid.',
+    settingsRefused: 'The Codex settings could not be saved: the campaign settings have a problem. Ask the assistant.',
+    settingsFailed: 'The Codex settings could not be saved. Try again.',
   },
   it: {
     notEnabled: 'Il Codex non è attivo per questa campagna.',
@@ -33,5 +39,8 @@ export const ENCYCLOPEDIA_TEXTS: Record<Lang, EncyclopediaTexts> = {
     timedOut: 'La generazione ha impiegato troppo tempo. Riprova.',
     noSite: 'Il Codex non è ancora stato generato. Generalo prima.',
     notFound: 'Questa pagina non esiste.',
+    badSettings: 'Queste impostazioni del Codex non sono valide.',
+    settingsRefused: 'Non ho potuto salvare le impostazioni del Codex: le impostazioni della campagna hanno un problema. Chiedi all\'assistente.',
+    settingsFailed: 'Non sono riuscito a salvare le impostazioni del Codex. Riprova.',
   },
 };
