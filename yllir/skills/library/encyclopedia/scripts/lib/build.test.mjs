@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildEncyclopedia, buildDir, computeChanges } from './build.mjs';
+import { buildEncyclopedia, buildDir, computeChanges, readSavedReport } from './build.mjs';
 import { decryptLocked } from './locked.mjs';
 import { nameKey } from './site.mjs';
 import { makeJpeg, makePng, sheet, campaignYaml, cleanupCampaigns } from './test-support.mjs';
@@ -58,6 +58,16 @@ function fixture(files = FILES, { yaml } = {}) {
   return root;
 }
 
+/** The report of the last good build, beside the build (never inside the site). */
+function reportPath(root) {
+  return path.join(root, '.campaign', 'cache', 'encyclopedia-report.json');
+}
+
+/** The titled manifest of the last good build, beside the build. */
+function titledManifestPath(root) {
+  return path.join(root, '.campaign', 'cache', 'encyclopedia-manifest.json');
+}
+
 function listAll(dir, base = dir) {
   const out = {};
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -80,11 +90,32 @@ test('a full build of a campaign made by init-campaign passes every check and wr
   assert.equal(report.baseUrl, 'http://localhost:8080/c/');
   assert.equal(report.previewUrl, '/enc/');
   const dir = buildDir(root);
-  for (const file of ['index.html', '404.html', 'search.json', 'report.json', 'assets/site.css', 'assets/site.js',
+  for (const file of ['index.html', '404.html', 'search.json', 'assets/site.css', 'assets/site.js',
     'e/porto-di-selce/index.html', 'e/ilde-varno/index.html', 'e/lanterna-ottone/index.html', 'e/ilde-vecchia/index.html', 'e/vecchio-porto/index.html']) {
     assert.ok(fs.existsSync(path.join(dir, file)), file);
   }
+  assert.equal(fs.existsSync(path.join(dir, 'report.json')), false, 'no report inside the site');
+  assert.equal(fs.existsSync(reportPath(root)), true, 'the report is beside the build');
+  assert.deepEqual(readSavedReport(root), JSON.parse(fs.readFileSync(reportPath(root), 'utf8')));
   assert.equal(fs.readdirSync(path.join(root, '.campaign', 'cache')).some((n) => n.includes('tmp-')), false);
+});
+
+test('a refused build keeps the saved report beside the build as it was', async () => {
+  const root = fixture();
+  assert.equal((await buildEncyclopedia(root)).ok, true);
+  const good = fs.readFileSync(reportPath(root), 'utf8');
+  fs.writeFileSync(path.join(root, 'Mondo/porto.md'), PIER.replace('A grey harbour.', 'A grey harbour where Vettore Nero hides.'));
+  assert.equal((await buildEncyclopedia(root)).ok, false);
+  assert.equal(fs.readFileSync(reportPath(root), 'utf8'), good);
+  assert.deepEqual(readSavedReport(root), JSON.parse(good));
+});
+
+test('a campaign built before the report moved out of the site still shows its last report', async () => {
+  const root = fixture();
+  assert.equal((await buildEncyclopedia(root)).ok, true);
+  fs.rmSync(reportPath(root));
+  fs.writeFileSync(path.join(buildDir(root), 'report.json'), JSON.stringify({ ok: true, legacy: true }));
+  assert.deepEqual(readSavedReport(root), { ok: true, legacy: true });
 });
 
 test('the reserved text, the hidden title, the codes and the locked plain text never appear in any file', async () => {
@@ -122,7 +153,7 @@ test('the same inputs give the same files: two builds at the same instant are id
     const third = listAll(buildDir(root));
     assert.deepEqual(second, third, 'a rebuild over an identical previous build is identical in every file');
     const differing = Object.keys(first).filter((k) => first[k] !== second[k]);
-    assert.deepEqual(differing, ['report.json'], 'only the change summary differs from the first build');
+    assert.deepEqual(differing, [], 'no file of the site differs between two builds at the same instant');
   } finally {
     delete process.env.YLLIR_NOW;
   }
@@ -238,10 +269,13 @@ test('list full writes the search index and no card files; both modes write the 
   assert.equal(Object.keys(listAll(dir)).some((f) => f.endsWith('card.json')), false);
   assert.equal(fs.existsSync(path.join(dir, 'assets/placeholders/place.svg')), true);
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
-  assert.deepEqual(Object.keys(manifest.entries), ['ilde-varno', 'lanterna-ottone', 'porto-di-selce']);
+  assert.deepEqual(Object.keys(manifest.entries).sort(), ['Ilde Varno', 'Lanterna di ottone', 'Porto di Selce'].map(nameKey).sort());
   assert.equal(typeof manifest.generatedAt, 'string');
-  assert.match(manifest.entries['porto-di-selce'].hash, /^[0-9a-f]{16}$/);
-  assert.equal(manifest.entries['porto-di-selce'].title, 'Porto di Selce');
+  assert.match(Object.values(manifest.entries).join(','), /^[0-9a-f]{16}(,[0-9a-f]{16})*$/);
+  const titled = JSON.parse(fs.readFileSync(titledManifestPath(root), 'utf8'));
+  assert.deepEqual(Object.keys(titled.entries), ['ilde-varno', 'lanterna-ottone', 'porto-di-selce']);
+  assert.match(titled.entries['porto-di-selce'].hash, /^[0-9a-f]{16}$/);
+  assert.equal(titled.entries['porto-di-selce'].title, 'Porto di Selce');
 });
 
 test('discovered mode writes discover.json with keys only, one card per key under c/, and no search index', async () => {
@@ -253,10 +287,11 @@ test('discovered mode writes discover.json with keys only, one card per key unde
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
   const discoverText = fs.readFileSync(path.join(dir, 'discover.json'), 'utf8');
   const discover = JSON.parse(discoverText);
-  const expected = Object.values(manifest.entries).map((e) => nameKey(e.title)).sort();
+  const expected = Object.keys(manifest.entries).sort();
   assert.deepEqual(discover, expected);
   assert.ok(discover.every((key) => typeof key === 'string' && /^[0-9a-f]{16}$/.test(key)));
-  for (const [id, entry] of Object.entries(manifest.entries)) {
+  const titled = JSON.parse(fs.readFileSync(titledManifestPath(root), 'utf8'));
+  for (const [id, entry] of Object.entries(titled.entries)) {
     assert.equal(discoverText.includes(id), false, `${id} in discover.json`);
     assert.equal(discoverText.includes(entry.title), false, `${entry.title} in discover.json`);
   }
@@ -270,9 +305,38 @@ test('discovered mode writes discover.json with keys only, one card per key unde
   assert.equal(fs.existsSync(path.join(dir, 'assets/placeholders/place.svg')), true);
 });
 
+test('discovered mode: outside the entry and card pages no file names an entry, its id or an excluded sheet', async () => {
+  const DRAGON = sheet({ id: 'drago-rosso', meta: ['kind: creature'], body: '# Drago Rosso\n\nA red dragon in the hills.' });
+  const root = fixture({ ...FILES, 'Varie/bozza-drago.md': DRAGON }, { yaml: LIST_YAML('discovered') });
+  const report = await buildEncyclopedia(root);
+  assert.equal(report.ok, true, JSON.stringify(report.checks.filter((c) => c.status === 'fail')));
+  assert.ok(report.excluded.some((x) => x.path === 'Varie/bozza-drago.md'), 'the creature is not chosen');
+  const dir = buildDir(root);
+  const titled = JSON.parse(fs.readFileSync(titledManifestPath(root), 'utf8'));
+  const forbidden = [
+    ...Object.entries(titled.entries).flatMap(([id, entry]) => [id, entry.title]),
+    'Vettore Nero', 'Drago Rosso', 'bozza-drago',
+  ].map((s) => s.toLowerCase());
+  const outside = Object.entries(listAll(dir)).filter(([rel]) => !rel.startsWith('e/') && !rel.startsWith('c/'));
+  assert.ok(outside.length > 0);
+  for (const [rel, b64] of outside) {
+    const body = Buffer.from(b64, 'base64').toString('utf8').toLowerCase();
+    for (const secret of forbidden) {
+      assert.equal(body.includes(secret), false, `${rel} names ${secret}`);
+    }
+  }
+  const publicManifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8'));
+  const keys = Object.keys(publicManifest.entries);
+  assert.equal(keys.length, 3);
+  assert.deepEqual(keys.sort(), Object.values(titled.entries).map((e) => nameKey(e.title)).sort());
+  for (const key of keys) {
+    assert.match(key, /^[0-9a-f]{16}$/);
+    assert.equal(typeof publicManifest.entries[key], 'string');
+  }
+});
+
 test('two titles with the same name key: the second card gets a numbered key and a warning, and both are written', async () => {
-  const twin = sheet({ id: 'porto-gemello', meta: ['kind: item'], body: '# Porto  di selce\n\nA copy of the name.' });
-  const root = fixture({ ...FILES, 'Oggetti/gemello.md': twin }, { yaml: LIST_YAML('discovered') });
+  const twin = sheet({ id: 'porto-gemello', meta: ['kind: item'], body: '# Porto  di selce\n\nA copy of the name.' });  const root = fixture({ ...FILES, 'Oggetti/gemello.md': twin }, { yaml: LIST_YAML('discovered') });
   const report = await buildEncyclopedia(root);
   assert.equal(report.ok, true, JSON.stringify(report.checks.filter((c) => c.status === 'fail')));
   const clash = report.warnings.filter((w) => w.code === 'name-key-clash');
@@ -312,6 +376,8 @@ test('computeChanges: nothing before a build, nothing right after one, then one 
   assert.deepEqual(now.changed.map((x) => x.id), ['chiave']);
   assert.deepEqual(now.removed.map((x) => x.id), ['corda']);
   assert.equal(now.removed[0].title, 'Corda');
+  assert.equal(now.added[0].title, 'Nuova');
+  assert.equal(now.changed[0].title, 'Chiave');
 });
 
 test('CLI: build exits 0 and prints the report, a refused build exits 1, status reads the saved build, usage exits 2', () => {

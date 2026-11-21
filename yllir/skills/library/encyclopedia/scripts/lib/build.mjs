@@ -2,8 +2,8 @@
 // temporary folder inside .campaign/cache/, every pre-publish check runs over the
 // written files, and only a passing build replaces the previous one (a rename).
 // A failing build leaves the previous build untouched and removes its temporary
-// folder. The report is written into the build, so the saved build always says
-// what it is.
+// folder. The report and the titled manifest are written beside the build, after
+// the swap, so the public site never holds a title, an id or a report.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -27,13 +27,29 @@ export function buildDir(root) {
   return path.join(root, CACHE_SUBDIR, BUILD_NAME);
 }
 
-/** The report saved with the last good build, or null. */
+/** The report of the last good build: a sibling of the build, never inside the site. */
+function reportFile(root) {
+  return path.join(root, CACHE_SUBDIR, `${BUILD_NAME}-report.json`);
+}
+
+/** The titled manifest of the last good build (title and hash per id): a sibling of the build. */
+function titledManifestFile(root) {
+  return path.join(root, CACHE_SUBDIR, `${BUILD_NAME}-manifest.json`);
+}
+
+/**
+ * The report saved with the last good build, or null. A campaign built before the report moved
+ * out of the site still has it in `<site>/report.json`, which is read when the new file is missing.
+ */
 export function readSavedReport(root) {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(buildDir(root), 'report.json'), 'utf8'));
-  } catch {
-    return null;
+  for (const file of [reportFile(root), path.join(buildDir(root), 'report.json')]) {
+    try {
+      return JSON.parse(fs.readFileSync(file, 'utf8'));
+    } catch {
+      // missing or unreadable: try the next place
+    }
   }
+  return null;
 }
 
 /** The current instant as ISO text. YLLIR_NOW (ISO text) overrides it, for tests. */
@@ -81,15 +97,17 @@ export async function buildEncyclopedia(root) {
 
   try {
     fs.mkdirSync(tmp, { recursive: true });
-    const report = await writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp, dest });
+    const { report, titles } = await writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp, dest });
     if (!report.ok) {
       fs.rmSync(tmp, { recursive: true, force: true });
       report.previewUrl = fs.existsSync(path.join(dest, 'index.html')) ? '/enc/' : null;
       return report;
     }
     report.previewUrl = '/enc/';
-    fs.writeFileSync(path.join(tmp, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
     swap(tmp, dest);
+    // Beside the build, and only after the swap: a refused build keeps the previous ones.
+    fs.writeFileSync(reportFile(root), `${JSON.stringify(report, null, 2)}\n`);
+    fs.writeFileSync(titledManifestFile(root), `${JSON.stringify(titles, null, 1)}\n`);
     return report;
   } catch {
     fs.rmSync(tmp, { recursive: true, force: true });
@@ -124,10 +142,12 @@ async function writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp }) {
   if (!settings.flavourText) warnings.push({ code: 'flavour-off', message: text.flavourOff });
 
   // Entries, index, 404, assets, card data and the search index.
-  // Discovered mode: each card is written under the name key of its title, and the keys go
-  // into discover.json. A key that two titles share gets a numbered suffix, with a warning.
+  // Every entry has a name key of its title, in both modes; the public manifest is keyed by it.
+  // Discovered mode: each card is written under that key, and the keys go into discover.json.
+  // A key that two titles share gets a numbered suffix, with a warning.
   const discovered = settings.list === 'discovered';
   const keyTitles = new Map(); // key -> titles that use it, first one first
+  const keyOf = new Map(); // entry id -> name key
   const discoverKeys = [];
   const cardKeyOf = (title) => {
     const base = nameKey(title);
@@ -140,11 +160,12 @@ async function writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp }) {
   };
   const locks = [];
   for (const entry of entries) {
+    const key = cardKeyOf(entry.title);
+    keyOf.set(entry.id, key);
     const rendered = renderEntry(entry, { lang, siteTitle, listMode: settings.list });
     write(path.join('e', entry.id, 'index.html'), rendered.html);
     locks.push(...rendered.locks);
     if (discovered) {
-      const key = cardKeyOf(entry.title);
       discoverKeys.push(key);
       write(path.join('c', `${key}.json`), `${JSON.stringify({
         id: entry.id,
@@ -212,14 +233,19 @@ async function writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp }) {
     write(path.join('e', id, 'index.html'), renderGone({ lang, siteTitle }));
   }
 
-  // The manifest: one hash per entry, so the next build can say what changed.
+  // One hash per entry, so the next build can say what changed. The site gets only name keys and
+  // hashes (no title, no id); the titles and ids stay beside the build, for computeChanges.
   const manifest = {};
   for (const entry of entries) manifest[entry.id] = entryHash(entry, collected.images);
   const sortedIds = Object.keys(manifest).sort(compareStrings);
-  write('manifest.json', `${JSON.stringify({
+  const publicEntries = entries
+    .map((entry) => [keyOf.get(entry.id), manifest[entry.id]])
+    .sort((a, b) => compareStrings(a[0], b[0]));
+  write('manifest.json', `${JSON.stringify({ generatedAt, entries: Object.fromEntries(publicEntries) }, null, 1)}\n`);
+  const titles = {
     generatedAt,
     entries: Object.fromEntries(sortedIds.map((id) => [id, { hash: manifest[id], title: entries.find((e) => e.id === id).title }])),
-  }, null, 1)}\n`);
+  };
   const previous = readSavedReport(root);
   const change = compareManifest(previous?.manifest ?? null, manifest);
 
@@ -235,9 +261,7 @@ async function writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp }) {
   );
 
   // The checks read what was written, not what was meant to be written.
-  const outputs = listFiles(tmp)
-    .filter((rel) => rel !== 'report.json')
-    .map((rel) => ({ rel, bytes: fs.readFileSync(path.join(tmp, rel)) }));
+  const outputs = listFiles(tmp).map((rel) => ({ rel, bytes: fs.readFileSync(path.join(tmp, rel)) }));
   const result = runChecks({
     lang,
     outputs,
@@ -248,7 +272,7 @@ async function writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp }) {
   });
   warnings.push(...result.warnings);
 
-  return {
+  const report = {
     ok: result.checks.every((c) => c.status !== 'fail'),
     entries: entries.length,
     excluded: collected.excluded,
@@ -260,6 +284,7 @@ async function writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp }) {
     manifest,
     settings,
   };
+  return { report, titles };
 }
 
 /**
@@ -268,8 +293,8 @@ async function writeAndCheck({ root, config, lang, siteTitle, baseUrl, tmp }) {
  * @returns {{ built: boolean, generatedAt?: string, added?: object[], changed?: object[], removed?: object[], error?: string }}
  */
 export function computeChanges(root) {
-  const manifestFile = path.join(buildDir(root), 'manifest.json');
-  if (!fs.existsSync(manifestFile)) return { built: false };
+  const manifestFile = titledManifestFile(root);
+  if (!fs.existsSync(manifestFile) || !fs.existsSync(path.join(buildDir(root), 'index.html'))) return { built: false };
   const validated = validateConfig(root);
   if (validated.config === null) return { built: true, error: reportText('en')['config-missing'] };
   const config = validated.config;

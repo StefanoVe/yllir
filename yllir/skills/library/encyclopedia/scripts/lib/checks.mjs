@@ -38,7 +38,7 @@ function extensionOf(rel) {
  * Runs every pre-publish check.
  * @param {object} input
  * @param {string} input.lang campaign language (it or en)
- * @param {Array<{rel: string, bytes: Buffer}>} input.outputs every generated file (report.json excluded)
+ * @param {Array<{rel: string, bytes: Buffer}>} input.outputs every generated file (the build report is written outside the site)
  * @param {object} input.collected result of collectEntries
  * @param {object} input.structure the structure list of campaign.yaml
  * @param {Array<{ok: boolean}>} input.roundtrip results of the unlock self-test, one per locked text
