@@ -44,7 +44,7 @@ A resume keeps everything the first run did: the originals, the transcriptions a
 2. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/today.mjs"`. Its first line is DATE (`YYYY-MM-DD`). If the exit code is not 0, say the same fixed sentence, and stop.
 3. PROVENANCE is what the master said about where the material comes from, in a few words, with every double quote and line break removed. If the master said nothing, PROVENANCE is `unknown`.
 
-**Step 5 — Document ingest.** Run the sub-steps 5.1 to 5.7 below, in order, in this turn. Their inputs come from the steps above: FILES (Step 3; empty on a resume), RESUME_IDS (Step 2; on a resume only), PROVENANCE (Step 4.3) and DATE (Step 4.2). Their result is the set of values that Step 6 reads: `status` (`DONE`, `WAITING` or `FAILED`), `sources` (the number of originals copied now), `integrated` (the number of statements written into documents), `duplicates`, `invented` (`yes` or `no`), `ids`, and either `question` (when WAITING) or `reason` (when FAILED: one line in English, starting with `campaign settings:` when the cause is a settings problem, that is no sources entry or an unreadable campaign.yaml, otherwise a plain cause). Keep these values for yourself; never show them to the master. Do not end your turn here: continue with Step 6 in the same turn.
+**Step 5 — Document ingest.** Run the sub-steps 5.1 to 5.7 below, in order, in this turn. Their inputs come from the steps above: FILES (Step 3; empty on a resume), RESUME_IDS (Step 2; on a resume only), PROVENANCE (Step 4.3) and DATE (Step 4.2). Their result is the set of values that Step 6 reads: `status` (`DONE`, `WAITING`, `PARTIAL` or `FAILED`), `sources` (the number of originals copied now), `integrated` (the number of statements written into documents), `duplicates`, `invented` (`yes` or `no`), `ids`, `missing`, and either `question` (when WAITING) or `reason` (when FAILED: one line in English, starting with `campaign settings:` when the cause is a settings problem, that is no sources entry or an unreadable campaign.yaml, otherwise a plain cause). Keep these values for yourself; never show them to the master. Do not end your turn here: continue with Step 6 in the same turn.
 
 Do not retry a failed sub-step yourself. A `FAILED` status goes to Step 6 with the failure message. A `WAITING` status gives the question that Step 6 asks, in your own words, in the campaign language. Ask only that one question: never a second one in the same message.
 
@@ -70,7 +70,7 @@ Remove every double quote from PROVENANCE before you use it. Read the line `ids:
 
 **Step 5.3 — Transcribe.** One id at a time. Never two at once.
 1. Read `<SOURCES>/<id>/card.md`. Its `original` field is the file name, in the same folder.
-2. Read the original with the Read tool. An image is one page, `p1`. A PDF is read with the `pages` parameter in ranges of up to 20 pages; each PDF page is one page, numbered as in the PDF. A text file is one page, `p1`. If it cannot be read, FAILED with the reason «unreadable original».
+2. Read the original with the Read tool. An image is one page, `p1`. A PDF is read with the `pages` parameter in ranges of up to 20 pages; each PDF page is one page, numbered as in the PDF. A text file is one page, `p1`. If it cannot be read (the file is damaged, cut, or empty), do not stop: add its original name (the `original_name` field of the card) to UNREADABLE, leave its card as it is (the original stays saved in the sources folder), skip Steps 5.3 to 5.5 for this id, and go on with the next id. Never write a transcription for it.
 3. Write `<SOURCES>/<id>/transcription.md` with the Write tool, in this form:
    - the first line is `# Transcription <id>`, then one blank line;
    - then one line per line of the original, in reading order: `[p<page>:l<line>] <text>`. The line number restarts at 1 on each page. Empty lines of the original are left out.
@@ -128,18 +128,20 @@ Sources (originals, transcriptions and cards) are kept in the campaign folder as
 
 Find the first open question across the cards, in the order of the ids, and then the order of the lines in the card.
 - If there is one: `status: WAITING`, and `question:` with it, in English, starting with its id and its locator.
-- If there is none and nothing failed: `status: DONE`.
-- If a step failed and stopped the run: `status: FAILED`, with the reason in one line in English.
+- If there is none, nothing failed and UNREADABLE is empty: `status: DONE`.
+- If there is none, nothing failed and UNREADABLE is not empty: `status: PARTIAL`, and `missing:` with the original names in UNREADABLE.
+- If a step failed and stopped the run: `status: FAILED`, with the reason in one line in English, and `missing:` with the original names of the files not brought in (UNREADABLE plus the ids not reached).
 
-Keep the values (`status`, `sources`, `integrated`, `duplicates`, `invented`, `ids`, and `question` or `reason`) for Step 6, and go to Step 6. Do not write any report file.
+Keep the values (`status`, `sources`, `integrated`, `duplicates`, `invented`, `ids`, `missing`, and `question` or `reason`) for Step 6, and go to Step 6. Do not write any report file.
 
-**Step 6 — Message to the master.** Read the values of Step 5: `status`, `sources`, `integrated`, `duplicates`, `invented`, and `question` when there is one. Write ONE message in the campaign language, in plain words:
+**Step 6 — Message to the master.** Read the values of Step 5: `status`, `sources`, `integrated`, `duplicates`, `invented`, `missing`, and `question` when there is one. Write ONE message in the campaign language, in plain words:
 - if `sources` is more than 0: one sentence: how many documents were brought in, saved with their originals;
 - if `sources` is 0 and `duplicates` is more than 0: one sentence: those documents were already in the campaign, so they were not added again; if there is nothing else, end there;
 - if `integrated` is more than 0: one sentence: how many statements went into the documents;
 - if `invented` is `yes`: one sentence saying what was invented to complete a sheet, labelled «Inventato dall'assistente» (English: «Invented by the assistant»), so the master can ask to change it;
 - if `status` is `WAITING`: name the document by its original name (not its id), name the place in plain words (for example «the second line of the first page»), and ask the question as the LAST sentence, ONE question, ending with a question mark. If more questions will follow, say so in one sentence before it;
-- if `status` is `FAILED`: say only the fixed sentence of the Failures paragraph below, and do not explain why.
+- if `status` is `PARTIAL`: name each file of `missing` by its original name and say, in one sentence, that it was kept but could not be read, so the import is not complete; then say, in one sentence, that a readable copy can be brought in later. Never call the import complete or finished;
+- if `status` is `FAILED`: if `sources` is more than 0, the sentence of the first bullet comes first, then one sentence naming the files of `missing` by their original names and saying the import is not complete; then the fixed sentence of the Failures paragraph below. Do not explain why.
 
 No ids, paths, locators, statuses or report lines. No backticks.
 
@@ -151,6 +153,10 @@ Correct, DONE: «Ho portato nella campagna 2 documenti e li ho salvati con gli o
 
 Correct, WAITING: «Ho portato nella campagna il documento «Note di Varn». Ci sono altre domande, e te le farò una alla volta. Alla seconda riga della prima pagina il nome si legge «Corvin»: è così?»
 
+Correct, PARTIAL: «Ho portato nella campagna il documento «Appunti della torre» e l'ho salvato con l'originale. Il file «pianta-del-castello.pdf» l'ho conservato, ma non si riesce a leggere, quindi l'importazione non è completa. Se me ne mandi una copia leggibile, la porto dentro.»
+
 Wrong: «Ho salvato src-1a2b3c4d e la domanda Q001 su p1:l2 è ancora aperta.» The master sees only plain words.
 
 Wrong: «Da dove arrivano queste foto?» The provenance is never asked.
+
+Wrong: «Ho importato tutto.» when a file could not be read. The import is never called complete while a file is missing.
