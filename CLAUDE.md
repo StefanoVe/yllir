@@ -6,6 +6,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Always answer in TLDR mode: lead with the outcome in a few short lines, no preamble or recap. Add detail only when asked, or when a decision, blocker or failure needs it.
 
+## Work by issues, not docs (author decision, 2026-11-21)
+
+The GitHub issues of `StefanoVe/yllir` are the single backlog and the home of scope, decisions and open questions. The `docs/` scope is legacy and is being retired: do not add or extend docs for new work.
+
+- Keep the issues up to date as you work: open a new issue for new work or a newly found problem, add a comment for progress, decisions and findings, and change the state (close, reopen, labels) when it changes. Do it without waiting to be asked; the standing authorization covers issues of this repo only. A fix not yet pushed is not closed: the `Fixes #N` line closes it on the author's push.
+- Every issue is in English, carries the `story` label (or `epic` for a macro topic), one `area:*`, one kind (`new-feature`, `enhancement` or `bug`) and one scope (`scope:yllir` for the product, `scope:repo` for the development repo), plus `testbench` when it only changes the testbench. Add the new issue to its area epic checklist.
+- An issue holds everything needed to develop it without the docs: story, context, decisions (decided vs proposal), requirements, open questions, acceptance, tests. Do not silently resolve an open question: ask, then record the answer in a comment.
+- Use the `issues` skill for the mechanics. Wherever this file points to `docs/`, read it as "the matching issue" once the docs are gone.
+
 ## What this is
 
 Yllir is a framework of agent skills, distributed as a Claude Code plugin (Codex at most as an optional image provider), for creating and maintaining tabletop RPG campaigns. It is system-agnostic: D&D 2024 is only the first adapter. The target user is a game master who has never used AI or a terminal: they talk in natural language, and everything else (git, sub-agents, reviews, linking) stays hidden.

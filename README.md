@@ -116,6 +116,7 @@ Yllir writes the chronicle page from what you said, applies the consequences you
 
 - *"Make a portrait of the innkeeper."* · *"Make a battle map of the warehouse."* · *"Find existing artwork for the duke."*
 - *"Find ambience music for the harbour."*
+- *"Make a map of the world."* · *"Make a plan of the capital."* Yllir paints the atlas, keeps it up to date as you add places, and never changes land you approved unless you ask.
 - *"Make the card for the Lantern of Morvalle."* · *"Print the cards I haven't printed yet."*
 - *"Build the encyclopedia for my players."*
 
@@ -123,7 +124,7 @@ Music, printing and the public encyclopedia are optional modules. Yllir tells yo
 
 ## The master screen
 
-The master screen is an optional local web app, opened in your browser, that runs only on your computer. You can chat with the assistant there, read the campaign, see and undo recent changes, and run a **live table**: the scene's cards, the session log, and a combat view with initiative, a battle map with tokens you can drag, and stats on hover.
+The master screen is an optional local web app, opened in your browser, that runs only on your computer. You can chat with the assistant there, read the campaign, see and undo recent changes, and run a **live table**: the scene's cards, the session log, and a combat view with initiative, a battle map with tokens you can drag, and stats on hover. A **projector window** shows your players any image from the campaign, or the live fight (initiative order, enemy health in words, the battle map with tokens), on a second screen. Master-only content is never shown on it.
 
 When you create a campaign, Yllir puts an **"Open master screen"** shortcut in its folder. Double-click it. The first time, it downloads the master screen (and Node.js, if needed) and checks the downloads before using them. After that it also works offline.
 
