@@ -369,6 +369,11 @@ describe('MusicPlayback', () => {
       await waitFor(() => r.playback.snapshot().phase === 'playing');
       r.playback.fadeout();
       await waitFor(() => r.playback.snapshot().phase === 'idle');
+      await waitFor(() => {
+        const s = sentCommands(r.logFile);
+        const at = s.findIndex((c) => c[0] === 'stop');
+        return at >= 0 && s.slice(at).some((c) => c[0] === 'set_property' && c[1] === 'volume' && c[2] === 80);
+      });
       const sent = sentCommands(r.logFile);
       const volumes = sent.filter((c) => c[0] === 'set_property' && c[1] === 'volume').map((c) => c[2]);
       assert.ok(volumes.includes(40), 'the ramp went below the start value');
