@@ -29,7 +29,7 @@ There are no commands to learn and no technical setup inside the campaign. Git, 
 - **It never loses your work.** Every change is a saved version. *"Go back to how it was"* always works.
 - **It keeps your secrets.** Every sheet has a master-only part. It is kept out of anything meant for players, and never sent to image services, web searches or publishing.
 - **It is yours.** Plain Markdown files with ordinary links, in a folder on your computer. Read them, edit them, open them in Obsidian or any editor. No account, no cloud, no lock-in.
-- **Any game.** Yllir works without a game system. With an adapter it also follows a game's rules: **D&D 2024** is the first, and it is never invented from memory.
+- **Any game.** Yllir works without a game system. With an adapter it also follows a game's rules: **D&D 2024** and **Fabula Ultima** are available, and the rules are never invented from memory.
 - **Any language.** The campaign and Yllir's messages use the language you choose.
 
 ## Requirements
@@ -40,7 +40,7 @@ There are no commands to learn and no technical setup inside the campaign. Git, 
 | **Git** | Saved versions and undo | Yllir won't write anything without it. [Download Git](https://git-scm.com/downloads). You never have to use it yourself. |
 | **Node.js 20+** | The automatic checks (links, consistency, indexes) | The master screen launcher installs it for you if it is missing. Otherwise, [download it here](https://nodejs.org). |
 
-Optional, only if you want images: Adobe Photoshop, a local [ComfyUI](https://www.comfy.org), OpenAI's Codex, or an image service of your choice with its key.
+Optional, only if you want images: Adobe Photoshop, a local [ComfyUI](https://www.comfy.org), OpenAI's Codex, ChatGPT images with an OpenAI key, or an image service of your choice with its key.
 
 Supported: **macOS** and **Windows**. Linux runs the plugin but is not tested as a target yet.
 
@@ -116,7 +116,7 @@ Yllir writes the chronicle page from what you said, applies the consequences you
 
 - *"Make a portrait of the innkeeper."* · *"Make a battle map of the warehouse."* · *"Find existing artwork for the duke."*
 - *"Find ambience music for the harbour."*
-- *"Make a map of the world."* · *"Make a plan of the capital."* Yllir paints the atlas, keeps it up to date as you add places, and never changes land you approved unless you ask.
+- *"Make the atlas."* · *"Make a plan of the capital."* From a picture of your map, or one painted by an image service after asking you, Yllir builds an atlas of the world, a region, or a single city, with names, borders and clickable places (each with a symbol for its kind and a summary written only from the public part of its sheet). It is browsable as a map site with an endless sea around it, kept up to date as you add places, and the land you approved never changes unless you ask.
 - *"Make the card for the Lantern of Morvalle."* · *"Print the cards I haven't printed yet."*
 - *"Build the encyclopedia for my players."*
 
@@ -124,7 +124,7 @@ Music, printing and the public encyclopedia are optional modules. Yllir tells yo
 
 ## The master screen
 
-The master screen is an optional local web app, opened in your browser, that runs only on your computer. You can chat with the assistant there, read the campaign, see and undo recent changes, and run a **live table**: the scene's cards, the session log, and a combat view with initiative, a battle map with tokens you can drag, and stats on hover. A **projector window** shows your players any image from the campaign, or the live fight (initiative order, enemy health in words, the battle map with tokens), on a second screen. Master-only content is never shown on it.
+The master screen is an optional local web app, opened in your browser, that runs only on your computer. You can chat with the assistant there, read the campaign, see and undo recent changes, and run a **live table**: the scene's cards, the session log, and a combat view with initiative, a battle map with tokens you can drag, and stats on hover. A **projector window** on a second screen shows your players an image from the campaign when you click Project, or the live fight (initiative order, enemy health in words instead of numbers, hidden enemies kept off, the battle map with tokens). Nothing reaches the projector unless you send it.
 
 When you create a campaign, Yllir puts an **"Open master screen"** shortcut in its folder. Double-click it. The first time, it downloads the master screen (and Node.js, if needed) and checks the downloads before using them. After that it also works offline.
 
@@ -142,7 +142,8 @@ Shattered Coast/
 ├── Creatures/
 ├── Items/
 ├── History/               past events
-├── Plot/                  one folder per session, one file per scene
+├── Plot/                  one folder per session, one file per scene,
+│   │                      plus a plot map (flowchart of sessions and scenes)
 │   └── Session 3/
 ├── Chronicle/             what actually happened, one page per evening
 ├── Players/               master-only notes on the players
@@ -170,7 +171,7 @@ Every sheet ends with a **Master** section. Anything there is for you only.
 No. You only open Claude Code in a folder and talk. Everything else stays hidden.
 
 **Does it work with my game?**
-Yes. Without an adapter, Yllir writes stats and checks as plain text and never makes up rules of a specific game. D&D 2024 has a full adapter. More are planned.
+Yes. Without an adapter, Yllir writes stats and checks as plain text and never makes up rules of a specific game. D&D 2024 and Fabula Ultima have adapters, including turn-by-turn fights and fight balancing. More are planned.
 
 **Will it invent things I didn't ask for?**
 Only to fill gaps in something you asked for, and never against what is already written. It tells you in one sentence what it made up. It never presents an invention as a quote from your sources. The chronicle and transcriptions of your notes are always faithful: nothing is invented there.
