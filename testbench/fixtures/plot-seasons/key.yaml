@@ -1,0 +1,57 @@
+# Answer key for plot-seasons. It sits beside campaign/, never inside it.
+#
+# The campaign uses the hierarchical shape Stagioni/Stagione N/Capitolo N/Capitolo N.md.
+# The engine reads only the flat shape (Stagioni/Capitolo N/Capitolo N.md), so:
+#   engine_hierarchical: what plotMap reports on the fixture as it is (the engine's today).
+#   intended_flat:       what the same content must report once it sits in the flat shape.
+#                        The test builds that flat copy in a temp folder (the fixture is never
+#                        changed), so the seeded traps are still checked against the engine.
+
+engine_hierarchical:
+  sessions: 0
+  arcs: 0
+  errors:
+    - code: legacy-session-layout
+      file: Stagioni/Stagione 1/Capitolo 1/Capitolo 1.md
+    - code: legacy-session-layout
+      file: Stagioni/Stagione 1/Capitolo 2/Capitolo 2.md
+    - code: legacy-session-layout
+      file: Stagioni/Stagione 2/Capitolo 3/Capitolo 3.md
+    - code: legacy-session-layout
+      file: Stagioni/Stagione 2/Capitolo 4/Capitolo 4.md
+    - code: legacy-session-layout
+      file: Stagioni/Stagione 2/Capitolo 4/Eventi/A Il disgelo.md
+    - code: legacy-session-layout
+      file: Stagioni/Stagione 2/Capitolo 4/Eventi/B La lettera.md
+    - code: unknown-played-id
+      file: Cronaca/2026-11-15.md
+      ids: [brenna-capitolo-1]
+    - code: unknown-played-id
+      file: Cronaca/2026-11-15.md
+      ids: [brenna-capitolo-3]
+
+intended_flat:
+  errors:
+    - code: event-cycle
+      file: Stagioni/Capitolo 4/Eventi/A Il disgelo.md
+      ids: [brenna-capitolo-4-scena-a, brenna-capitolo-4-scena-b]
+    # The message names only the unplayed prerequisite, not the chapter itself.
+    - code: played-before-prerequisite
+      file: Stagioni/Capitolo 3/Capitolo 3.md
+      ids: [brenna-capitolo-2]
+  statuses:
+    - id: brenna-capitolo-1
+      status: played
+    - id: brenna-capitolo-2
+      status: ready
+    - id: brenna-capitolo-3
+      status: played
+    - id: brenna-capitolo-4
+      status: ready
+  # Chapter 3 is the rejoin across the two seasons.
+  rejoin: [brenna-capitolo-1, brenna-capitolo-2]
+  arc_order: [brenna-capitolo-1, brenna-capitolo-2, brenna-capitolo-3, brenna-capitolo-4]
+  next_number: 5
+  # Chapter 4 has two scenes that depend on each other (a cycle), so it is not
+  # reported as unlinked by the current rule. The key records that as expected today.
+  unlinked: []

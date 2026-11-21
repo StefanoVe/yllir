@@ -8,6 +8,9 @@ The testbench holds synthetic campaigns, each with an answer key, and the runner
 - `fixtures/continuity/campaign/`: a small synthetic campaign for the library skill `continuity-keeper` (rename with a homonym, delete with a dependent document, merge with a conflicting fact, retcon of a played chronicle). Its traps are listed in `fixtures/continuity/README.md`. Each answer key is `cases/continuity/<name>/key.yaml`.
 - `fixtures/atlas-morvalle/campaign/`: the Morvalle campaign plus a second region (Valdaspra), two wells with the same title, a hidden refuge and no stated direction for one well. Only the atlas cases use it. Its traps are listed in `fixtures/atlas-morvalle/README.md`; each answer key is `cases/atlas/<name>/key.yaml`.
 - `fixtures/atlas-ostrava-town/campaign/`: a synthetic walled river town (Bornago) with two districts and a homonym. Only the atlas city case uses it; its traps are listed in `fixtures/atlas-ostrava-town/README.md`.
+- `fixtures/fabula-ultima/`: an English campaign with the fabula-ultima adapter. Its traps are in its README; its answer key is `fixtures/fabula-ultima/key.yaml`, checked offline by `runners/fabula-fixture.test.mjs`. Only the system cases use it.
+- `fixtures/plot-missions/` and `fixtures/plot-seasons/`: two plot structures, one with missions and one with seasons and chapters. Their traps and Findings are in their READMEs; their keys are `key.yaml`, checked offline by `runners/plot-structures.test.mjs`. Only the plot cases use them.
+- `fixtures/import-interrupted-input/`: the input of the import case (`import/interrupted`). The runner makes a truncated PDF from it in the copy; the traps are in `fixtures/import-interrupted-README.md`.
 - `fixtures/morvalle-legacy/campaign/`: a frozen copy of the same campaign before the world-graph migration (no `kind`, `provenance` or relations, and no seed). Only the update cases use it, because they need the old format.
 - `cases/<kind>/<name>/case.yaml`: one case: the master's message, the expected behaviour and its limits.
 - `runners/`: the scripts that run a case or grade a component against its key.
@@ -54,6 +57,9 @@ A run that exceeds a limit fails. The current values:
 | `atlas/update-keeps-land` | 8 | 160 | target: an added place on a locked land (agent update) |
 | `atlas/players-no-secrets` | 4 | 60 | target: the players' version of the atlas |
 | `atlas/city-from-picture` | 6 | 120 | target: a city atlas from a picture in the sources |
+| `import/interrupted` | 8 | 100 | target: an import cut off halfway, with its sources kept |
+| `plot/*` | 6 | 140 | target: one new plot activity on an existing plot structure |
+| `system/fu-*` | 3 | 60 | target: one system-rule question or fight state, the same budget as the entry cases |
 
 The minute targets come from the redesign document («Tempi misurati»). Note that the medians recorded there for prepare-session (6.5 min) and after-session (3.4 min) are above the 3-minute targets, so those cases will fail on time until the framework is faster. The tool-call limits come from `results/*.jsonl` (haiku runs).
 
@@ -63,12 +69,15 @@ The minute targets come from the redesign document («Tempi misurati»). Note th
 |---|---|---|
 | `run-new-campaign-case.mjs` | `new-campaign/all-answers`, `new-campaign/resume-after-stop` | B1 to B8 (settings, world document, instructions, saved version, links, plain words, no extra files, saved as a framework version) |
 | `run-entry-case.mjs` | `entry/go-back`, `entry/where-and-question`, `entry/not-available`, `entry/question-hypothesis`, `entry/prepare-proceed`, `entry/prepare-two-turns`, `entry/after-proceed`, `entry/after-too-thin` | E, W, N, Q, P, A and T checks, see the runner's header |
-| `run-update-case.mjs` | `update/stale-campaign`, `update/legacy-sessions`, `update/newer-published`, `update/declined` | S, L, N and D checks |
+| `run-update-case.mjs` | `update/stale-campaign`, `update/legacy-sessions`, `update/newer-published`, `update/declined` | S, L, N and D checks. S8: the master's paragraphs are kept, links compared by target file name. S9: every file before the update is restorable from the saved version |
 | `run-audit-case.mjs` | `audit/full` | A1 to A8: recall of the contradictions, no problem for perspectives, hypotheses or recorded exclusions, no change to the documents |
 | `run-continuity-case.mjs` | `continuity/rename-with-homonym`, `continuity/delete-still-referenced` (two turns), `continuity/merge-conflicting-fact`, `continuity/retcon-contradicts-chronicle` | R1 to R6 (rename), D1 to D4 after the question and D5 to D9 after the answer (delete), M1 to M4 (merge), T1 to T3 (retcon). Each run starts from a copy of the fixture with one baseline version; a question turn must save nothing and change nothing. Three runs per agent (`runs: 3` in each `case.yaml`) |
 | `run-world-case.mjs` | `world/region`, `world/creature` | W1 to W10 (region: new subjects with provenance, kinds, sketches and full documents, no new world-graph error, the lake subtree, a faction with members, the family-name rule, the seed changed, one saved version, a final message that names a created subject and says it is invented). C1 to C5 (creature: one enemy sheet that the adapter validates, ability modifiers, location, one saved version). Optional `Q-grid` with `--judge` |
 | `run-atlas-case.mjs` | `atlas/create-asks`, `atlas/update-keeps-land`, `atlas/players-no-secrets`, `atlas/city-from-picture` | A1 to A3 (create: a question in Italian or no invented label, no locked layer, no forbidden word), U1 to U5 (update: the Riva Storta sheet exists, land.png is byte-identical and still locked, the place is on a land pixel, it is not pending, a version is saved), P1 to P3 (players: the players' version exists, no text of the hidden place or its reserved block, the master site is byte-identical), C1 to C4 (city: the scope kind is settlement or district, the canvas is the picture's size, land.png exists, validate exits 0). The setups are built through the atlas CLI only, from a procedural picture (`runners/lib/make-atlas-picture.mjs`). Three runs per agent. The agent's provider is a fake Codex script (first on the PATH and set as `YLLIR_CODEX_BIN`) that returns that picture, so no real image service is called. They are paid agent runs and run only with `--with-atlas` |
-| `run-convert-case.mjs` | `convert/basic` (two turns; run by hand, `run-suite.mjs` does not map the kind yet) | O1 to O4 (the outline turn), W1 and D1 (saved, nothing deleted), E1 to E6 (subjects), H1 to H3 (homonyms stay two), A1 and A2 (alias), C1 and C2 (contradiction reported, not decided), Y1 (no accusation), S1 to S3 (master-only secret), U1 to U3 (dated and undated evening), I1 (input unchanged). Deterministic, no model grades |
+| `run-import-case.mjs` | `import/interrupted` | I1 sources kept (a sources folder with a byte-identical copy of the original and a card.md), I2 the missing file named, I3 never declared complete, I4 nothing invented in transcriptions, I5 input unchanged, I6 nothing from the cut part, I7 saved and clean |
+| `run-plot-case.mjs` | `plot/fork-rejoin`, `plot/missions-next`, `plot/seasons-next` | K1 one new activity with depends_on, K2 one version saved and clean, K3 nodes matched, K4 expected edges, K5 no forbidden edge, K6 first nodes, K7 no new plot error, K8 seeded files unchanged. Metrics edges_missing, edges_false and characters_drift. `seasons-next` is expected to show where the mechanism breaks |
+| `run-system-case.mjs` | `system/fu-rules-v11`, `system/fu-homonym-veil`, `system/fu-tracker-statuses`, `system/fu-check-flags` | X1 to X3 text, X4 documents unchanged, X5 fight state, X6 no technical words. `fu-rules-v11` measures the model's knowledge of the v1.1 rule values, because the adapter holds no rule tables |
+| `run-convert-case.mjs` | `convert/basic` (two turns; mapped by `run-suite.mjs` and run only with `--with-world`) | O1 to O4 (the outline turn), W1 and D1 (saved, nothing deleted), E1 to E6 (subjects), H1 to H3 (homonyms stay two), A1 and A2 (alias), C1 and C2 (contradiction reported, not decided), Y1 (no accusation), S1 to S3 (master-only secret), U1 to U3 (dated and undated evening), I1 (input unchanged). Deterministic, no model grades |
 
 Every case also has `L-time` and `L-calls` when it declares limits.
 
@@ -131,22 +140,37 @@ The scanner is graded against `fixtures/morvalle/key.yaml`. A mention may set `o
 
 ## Running the suite
 
-`runners/run-suite.mjs` runs every case under `cases/` through its runner, one child process per (case, run), at most `--parallel` at a time (default 8). The child uses the runner's default model (`sonnet`) unless `--model` is given. Each child appends its own record to `results/`. The suite prints a table of `p/n` per case, a TOTAL line and the reasons of the failed jobs, and exits 0 only when every job passes.
+`runners/run-suite.mjs` runs every case under `cases/` through its runner, one child process per (case, run), at most `--parallel` at a time (default 8). The child uses the runner's default model (`sonnet`) unless `--model` is given. Each child appends its own record to `results/`. Before the jobs, the suite runs the core purity check (see below) and prints its summary line; the check is one extra row, `core-purity`, and is not counted in the TOTAL line. The suite prints a table of `p/n` per case, a TOTAL line and the reasons of the failed jobs, and exits 0 only when every job and the purity check pass.
 
 ```sh
-node testbench/runners/run-suite.mjs                                  # quick: one run per case, audit and world skipped
-node testbench/runners/run-suite.mjs --runs 3 --with-audit           # release measurement
-node testbench/runners/run-suite.mjs --only entry/                   # a subset
-node testbench/runners/run-suite.mjs --with-world --only world/      # the world cases (only when the world path changed)
-node testbench/runners/run-suite.mjs --with-atlas --only atlas/      # the atlas cases (paid; only when the atlas path changed)
+node testbench/runners/run-suite.mjs --no-purity                     # quick: one run per case, audit, world and convert skipped
+node testbench/runners/run-suite.mjs --runs 3 --with-audit --no-purity  # release measurement
+node testbench/runners/run-suite.mjs --only entry/ --no-purity       # a subset
+node testbench/runners/run-suite.mjs --with-world --only world/ --no-purity  # the world cases (only when the world path changed)
+node testbench/runners/run-suite.mjs --with-world --only convert/ --no-purity # the convert case (long and costly)
+node testbench/runners/run-suite.mjs --with-atlas --only atlas/ --no-purity  # the atlas cases (paid; only when the atlas path changed)
 ```
 
-`--only world/` without `--with-world` runs nothing for the world cases and says so on stderr. The same holds for `--only atlas/` without `--with-atlas`.
+The import, plot and system kinds run by default, like entry. `--only world/` without `--with-world` runs nothing for the world cases and says so on stderr. The same holds for `--only convert/` without `--with-world`, and for `--only atlas/` without `--with-atlas`.
+
+## Metrics, regression gate and core purity
+
+```sh
+node testbench/runners/metrics-report.mjs [--case <substring>] [--json]
+node testbench/runners/regression-gate.mjs [--tolerance 0.34]
+node testbench/runners/check-core-purity.mjs
+```
+
+- `metrics-report.mjs` prints one row per case, per model and instruction hash: pass rate, stability, failing checks, time and call overruns, median minutes and cost.
+- `regression-gate.mjs` compares the latest record set of each case and model with the previous one. A drop of more than one run in three (`--tolerance 0.34`) blocks a release (author decision, 2026-11-21). It exits 1 when blocked.
+- `check-core-purity.mjs` checks that the core of the framework (`yllir/scripts`, `yllir/skills`, `yllir/agents`, `yllir/templates`) names no game system and no fixture world. The terms are in `runners/core-purity.yaml`; justified exceptions are in its `allow` list. The suite runs it first unless `--no-purity` is given.
 
 ## Unit tests
 
 ```sh
-cd testbench && node --test runners/*.test.mjs runners/lib/*.test.mjs
+cd testbench && find runners -name '*.test.mjs' | xargs node --test
 ```
+
+A bare directory fails on Node 24, so the files are listed with `find`.
 
 These cover the grading helpers, the limits, the suite, the update runner's grading, the world grading (on temporary copies of the fixtures, with synthetic documents written in place of the agent), the judge's reply parser and prompt, and the delegation rewrite (on temporary copies of the plugin). They run offline.

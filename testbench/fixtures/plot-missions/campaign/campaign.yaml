@@ -1,0 +1,31 @@
+schema: 1
+
+campaign:
+  name: "La compagnia del Corvo"
+  slug: compagnia-del-corvo
+  seed: Seme del mondo.md
+  created: 2026-11-21
+
+language:
+  main: it
+  other: []
+
+prose:
+  register: plain
+
+system:
+  adapter: none
+
+structure:
+  - id: trama
+    folder: Missioni
+    type: plot
+  - id: cronaca
+    folder: Cronaca
+    type: chronicle
+  - id: luoghi
+    folder: Mondo
+    type: places
+  - id: personaggi
+    folder: Personaggi
+    type: subjects

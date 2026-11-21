@@ -1,0 +1,11 @@
+case: plot-missions-next
+fixture: plot-missions
+# Runs per agent: 3 (the suite passes --runs 1 per job).
+runs: 3
+# One turn, no reply. Known risk (see the report of the case): the fixture's ready and unplayed
+# mission is missione-2, which prepare-session takes as the target when the master names none.
+prompt: |
+  Prepariamo la missione 6 della compagnia, una missione nuova (non toccare le altre): devono scortare una carovana di sale fino al passo. Procedi senza chiedermi altro.
+limits:
+  max_minutes: 6
+  max_tool_calls: 140

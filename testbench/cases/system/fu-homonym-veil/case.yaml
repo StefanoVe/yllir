@@ -1,0 +1,7 @@
+case: system-fu-homonym-veil
+fixture: fabula-ultima
+runs: 3
+prompt: "What does Kael's Veil do in a fight?"
+limits:
+  max_minutes: 3
+  max_tool_calls: 60

@@ -1,0 +1,13 @@
+case: plot-fork-rejoin
+fixture: morvalle
+# Runs per agent: 3 (the suite passes --runs 1 per job).
+runs: 3
+# One turn, no reply: the agent prepares the next session and saves it.
+# Known risk (not changed here, see the report of the case): the fixture's ready and unplayed
+# session is la-cenere-che-canta-02, which prepare-session takes as the target when the master
+# names no session. The agent may then edit that session instead of creating a new one.
+prompt: |
+  Prepariamo la sessione 4 della Cenere che canta, una sessione nuova: anche se le sessioni prima non sono state giocate, procedi senza chiedermi altro. Il gruppo arriva al guado del Lago Grigio. Lì deve scegliere: o paga il traghettatore, o attraversa a nuoto di notte. In entrambi i casi arriva al mulino abbandonato, dove trova Lino Valdes. Poi, al mulino, scoppia l'incendio. In qualunque momento della sessione può presentarsi un araldo del borgo con un messaggio.
+limits:
+  max_minutes: 6
+  max_tool_calls: 140

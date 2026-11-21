@@ -1,0 +1,17 @@
+# Answer key of system/fu-check-flags. Outside the campaign the agent reads: never copied into it.
+# Two seeded problems: Harbor Thug (level 5, MIG d6: HP minimum 40, the sheet says 25) and the scene
+# Sluice Lift (check DL 12, not 7, 10, 13 or 16). Not flagged: Gull Swarm (valid), Dusk on the Quay
+# (DL 10) and Lantern Ward (opposed check).
+# X1 the answer names the Harbor Thug and the Sluice Lift (or DL 12).
+# X2 the answer says the hit points (HP) of the Harbor Thug are wrong.
+# X3 the answer does not flag the Gull Swarm or the scenes Dusk on the Quay and Lantern Ward.
+# X4 nothing is changed.
+text_all:
+  - 'harbor thug'
+  - '(sluice lift|\b12\b)'
+text_any:
+  - '(hit points|\bhp\b)'
+text_none:
+  - 'gull swarm.{0,80}(wrong|below|invalid|error)'
+  - '(dusk on the quay|lantern ward).{0,80}(wrong|invalid|error)'
+documents_unchanged: true

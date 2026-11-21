@@ -1,0 +1,18 @@
+# Answer key of system/fu-rules-v11. Outside the campaign the agent reads: never copied into it.
+# The tutorial (Press Start) says Study DL 10, 13 and 16 and a Tonic cures one status. The reference,
+# the v1.1 of the core rulebook, says DL 7, 10 and 13 and a Tonic cures all statuses.
+# X1 the answer names 7, 10 and 13.
+# X2 the answer says a Tonic cures all (or every, or each) status or condition.
+# X3 the answer names no 16 and does not say one status only.
+# X4 the campaign is byte for byte the baseline: nothing was changed.
+text_all:
+  - '\b7\b'
+  - '\b10\b'
+  - '\b13\b'
+text_any:
+  - '(all|every|each) (status|condition)'
+text_none:
+  - '\b16\b'
+  - '(only|just) one (status|condition)'
+  - 'a single (status|condition)'
+documents_unchanged: true

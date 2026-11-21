@@ -29,7 +29,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import {
   REPO_ROOT,
   appendResult,
@@ -269,7 +269,170 @@ function metadataReasons(dir) {
   return reasons;
 }
 
-/** Stale campaign checks S1 to S7: the update ran silently and was saved, the master's text is intact, and the metadata is in the comment form. */
+const NO_BASELINE = 'setup has no baseline (rerun the setup)';
+
+/** Every file of the folder, campaign-relative with posix slashes, sorted. The .git folder is left out. */
+function walkCampaign(dir) {
+  const files = [];
+  const visit = (abs, rel) => {
+    for (const entry of fs.readdirSync(abs, { withFileTypes: true })) {
+      if (entry.name === '.git') continue;
+      const childRel = rel === '' ? entry.name : `${rel}/${entry.name}`;
+      if (entry.isDirectory()) visit(path.join(abs, entry.name), childRel);
+      else if (entry.isFile()) files.push(childRel);
+    }
+  };
+  visit(dir, '');
+  return files.sort();
+}
+
+/** The text without its metadata block (the whole text when there is no closed block), with LF line endings. */
+function bodyOf(text) {
+  const lf = text.replace(/\r\n/g, '\n');
+  const lines = lf.split('\n');
+  const block = findMetadataBlock(lines);
+  return block !== null && block.close !== -1 ? lines.slice(block.close + 1).join('\n') : lf;
+}
+
+const LINK_TARGET = /\[([^\]\n]*)\]\(([^)\s]+)\)/g;
+
+/**
+ * Every Markdown link [label](target) becomes [label](basename): the last segment of the decoded target
+ * without its #anchor. The label and the file name are still compared; the relative depth is not.
+ */
+function linkBasenames(line) {
+  return line.replace(LINK_TARGET, (whole, label, target) => {
+    const plain = target.split('#')[0];
+    let decoded = plain;
+    try {
+      decoded = decodeURIComponent(plain);
+    } catch {
+      // a malformed escape is compared as written
+    }
+    const base = decoded.split('/').pop();
+    return base === '' ? whole : `[${label}](${base})`;
+  });
+}
+
+/**
+ * One block of prose as one line: links are reduced to their file names (see linkBasenames), each line
+ * loses its leading Markdown heading markers (# ...), so a heading that a migration re-levels still
+ * matches; every run of whitespace becomes one space and the ends are trimmed.
+ */
+function flatten(text) {
+  return text
+    .split('\n')
+    .map((line) => linkBasenames(line).replace(/^\s*#+\s*/, ''))
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** The whole prose of a Markdown text, as one line (metadata block removed, headings flattened). */
+export function normalizeBody(text) {
+  return flatten(bodyOf(text));
+}
+
+/** The prose paragraphs of a Markdown text: blocks separated by one or more blank lines, each flattened, empty ones dropped. */
+export function proseParagraphsOf(text) {
+  return bodyOf(text)
+    .split(/\n\s*\n/)
+    .map((block) => flatten(block))
+    .filter((paragraph) => paragraph !== '');
+}
+
+/**
+ * Baseline of the master's prose, taken at setup: the paragraphs of every .md file of the campaign
+ * that is not under .campaign/ and not generated (metadata generated: true), keyed by its path.
+ */
+export function recordBodies(dir) {
+  const bodies = {};
+  for (const rel of walkCampaign(dir)) {
+    if (!rel.endsWith('.md') || rel.startsWith('.campaign/')) continue;
+    const text = readText(dir, rel);
+    if (text === null || String(parseFrontmatter(text).data?.generated) === 'true') continue;
+    bodies[rel] = proseParagraphsOf(text);
+  }
+  return bodies;
+}
+
+/** Baseline of the files at setup: git hash-object of every file of the folder (ignored ones included), keyed by path. */
+export function recordHashes(dir) {
+  const files = walkCampaign(dir);
+  const hashes = {};
+  if (files.length === 0) return hashes;
+  const out = execFileSync('git', ['-C', dir, 'hash-object', '--stdin-paths'], { input: `${files.join('\n')}\n`, encoding: 'utf8' });
+  const lines = out.trim().split('\n');
+  files.forEach((rel, i) => {
+    hashes[rel] = lines[i];
+  });
+  return hashes;
+}
+
+/** The paths of the given files that git ignores now (tracked files are never reported as ignored). */
+function ignoredPaths(dir, files) {
+  if (files.length === 0) return [];
+  const res = spawnSync('git', ['-C', dir, 'check-ignore', '--stdin'], { input: `${files.join('\n')}\n`, encoding: 'utf8' });
+  if (res.status === 1) return [];
+  if (res.status !== 0) throw new Error(`git check-ignore failed: ${res.stderr.trim()}`);
+  return res.stdout.split('\n').filter((line) => line !== '');
+}
+
+/** The whole baseline taken at setup, after the baseline commit: the HEAD, the prose, the hashes and the ignored paths. */
+export function recordBaseline(dir) {
+  const baseHead = tryGit(dir, ['rev-parse', 'HEAD'])?.trim();
+  if (!baseHead) throw new Error('recordBaseline: git rev-parse HEAD failed');
+  const hashes = recordHashes(dir);
+  return { baseHead, bodies: recordBodies(dir), hashes, ignored: ignoredPaths(dir, Object.keys(hashes)) };
+}
+
+const PARAGRAPH_REASONS_PER_FILE = 5;
+const PARAGRAPH_PREVIEW = 60;
+
+/**
+ * Check S8, at paragraph level: each recorded paragraph must be a substring of the flattened text of
+ * some .md file of the campaign after the run (not under .git/ or .campaign/), so a file a migration
+ * splits or moves still passes, and a lost or changed sentence fails. At most 5 reasons per file.
+ */
+export function proseReasons(dir, bodies) {
+  if (bodies === null || typeof bodies !== 'object') return [NO_BASELINE];
+  const texts = [];
+  for (const rel of walkCampaign(dir)) {
+    if (!rel.endsWith('.md') || rel.startsWith('.campaign/')) continue;
+    const text = readText(dir, rel);
+    if (text !== null) texts.push(normalizeBody(text));
+  }
+  const reasons = [];
+  for (const [rel, paragraphs] of Object.entries(bodies)) {
+    const lost = paragraphs.filter((paragraph) => !texts.some((text) => text.includes(paragraph)));
+    for (const paragraph of lost.slice(0, PARAGRAPH_REASONS_PER_FILE)) {
+      reasons.push(`${rel}: paragraph lost or changed: "${paragraph.slice(0, PARAGRAPH_PREVIEW)}"`);
+    }
+  }
+  return reasons;
+}
+
+/**
+ * Check S9: the state before the update is in the history. The HEAD recorded at setup exists, and every
+ * recorded file that git does not ignore has the same blob in that commit. Returns the reasons.
+ */
+export function restorableReasons(dir, setup) {
+  if (setup === null || typeof setup !== 'object' || setup.hashes === null || typeof setup.hashes !== 'object') return [NO_BASELINE];
+  if (typeof setup.baseHead !== 'string') return [NO_BASELINE];
+  if (tryGit(dir, ['cat-file', '-e', setup.baseHead]) === null) {
+    return [`${setup.baseHead}: the version before the update is missing`];
+  }
+  const ignored = new Set(setup.ignored ?? []);
+  const reasons = [];
+  for (const [rel, hash] of Object.entries(setup.hashes)) {
+    if (ignored.has(rel)) continue;
+    const now = tryGit(dir, ['rev-parse', '--verify', '-q', `${setup.baseHead}:${rel}`]);
+    if (now === null || now.trim() !== hash) reasons.push(`${rel}: not restorable from the version before the update`);
+  }
+  return reasons;
+}
+
+/** Stale campaign checks S1 to S9: the update ran silently and was saved, the master's text is intact, the metadata is in the comment form, and the state before the update is in the history. */
 export function gradeStale({ dir, setup, report }) {
   const s1 = [];
   const version = frameworkVersionOf(readText(dir, VERSION_PATH));
@@ -318,8 +481,20 @@ export function gradeStale({ dir, setup, report }) {
     s6.push(`checkLinks: ${err.message}`);
   }
   const s7 = metadataReasons(dir);
+  const s8 = proseReasons(dir, setup.bodies);
+  const s9 = restorableReasons(dir, setup);
 
-  return [result('S1', s1), result('S2', s2), result('S3', s3), result('S4', s4), result('S5', s5), result('S6', s6), result('S7', s7)];
+  return [
+    result('S1', s1),
+    result('S2', s2),
+    result('S3', s3),
+    result('S4', s4),
+    result('S5', s5),
+    result('S6', s6),
+    result('S7', s7),
+    result('S8', s8),
+    result('S9', s9),
+  ];
 }
 
 /** Newer-published checks N1 to N6: the question is answered, the notice is recorded, nothing is updated. */
@@ -406,7 +581,7 @@ function withoutLinks(text) {
   return text.replace(MARKDOWN_LINK, (whole, label) => label).trim();
 }
 
-/** Legacy layout checks L1 to L4 on top of the stale-campaign checks S1 to S7. */
+/** Legacy layout checks L1 to L4 on top of the stale-campaign checks S1 to S9. */
 export function gradeLegacy({ dir, setup, report }) {
   const stale = gradeStale({ dir, setup, report });
   const sessions = Object.entries(setup.scenes);
@@ -691,6 +866,8 @@ export function setupScenario(scenario) {
     });
     const commits = Number(tryGit(dir, ['rev-list', '--count', 'HEAD'])?.trim());
     if (Number.isNaN(commits)) throw new Error('setup: git log failed');
+    // The baseline is taken after the baseline commit: the HEAD, the master's prose and the file hashes (S8, S9).
+    const baseline = withIsolatedGit(() => recordBaseline(dir));
     if (!REWOUND.includes(scenario)) {
       const published = makePublishedSource(installed);
       publishedDir = published.dir;
@@ -702,6 +879,7 @@ export function setupScenario(scenario) {
       customizationsText: fs.readFileSync(path.join(dir, CUSTOMIZATIONS_PATH), 'utf8'),
       marker: HAND_MARKER,
       published: publishedDir === null ? null : nextMinorVersion(installed),
+      ...baseline,
     };
     if (layout !== null) {
       setup.scenes = layout.scenes;

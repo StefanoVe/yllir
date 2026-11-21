@@ -1,0 +1,34 @@
+schema: 1
+
+campaign:
+  name: "The Drowned Lantern"
+  slug: drowned-lantern
+  seed: World seed.md
+  created: 2026-11-21
+
+language:
+  main: en
+  other: []
+
+prose:
+  register: plain
+
+system:
+  adapter: fabula-ultima
+
+structure:
+  - id: plot
+    folder: Plot
+    type: plot
+  - id: chronicle
+    folder: Chronicle
+    type: chronicle
+  - id: world
+    folder: World
+    type: places
+  - id: characters
+    folder: Characters
+    type: subjects
+  - id: creature
+    folder: Creature
+    type: subjects

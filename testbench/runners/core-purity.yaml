@@ -1,0 +1,160 @@
+# Terms that must not appear in the core of the framework (author decision 2026-11-21).
+# Read by testbench/runners/check-core-purity.mjs.
+scan:            # folders scanned, relative to the repo root
+  - yllir/scripts
+  - yllir/skills
+  - yllir/agents
+  - yllir/templates
+exclude:         # path prefixes skipped
+  - yllir/modules
+terms:           # case-insensitive, matched on word boundaries
+  - D&D
+  - DnD
+  - dnd-2024
+  - dnd
+  - 5e
+  - Dungeons & Dragons
+  - Fabula Ultima
+  - fabula-ultima
+  - Pathfinder
+  - Morvalle
+  - Valdaspra
+  - Bornago
+  - Ostrava
+  - Le ceneri della valle
+  - Il faro di Tessa
+# justified exceptions: file (repo-relative), term, reason.
+# A file ending in "/" is a prefix; term "*" allows every term. Only test code
+# that exercises an adapter by id is allowed here. Fixture world names used as
+# sample data and prose in SKILL.md, templates and comments are NOT allowed:
+# they stay as hits for the author to decide.
+allow:
+  - file: yllir/scripts/lib/adapter.test.mjs
+    term: D&D
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/scripts/lib/adapter.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/scripts/lib/adapter.test.mjs
+    term: Fabula Ultima
+    reason: test exercises the fabula-ultima adapter
+  - file: yllir/scripts/lib/adapter.test.mjs
+    term: fabula-ultima
+    reason: test exercises the fabula-ultima adapter
+  - file: yllir/scripts/lib/adapter-ops.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/scripts/lib/config.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/scripts/lib/engine/commit.test.mjs
+    term: D&D
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/scripts/lib/engine/commit.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/scripts/lib/engine/encounters.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/scripts/lib/engine/query.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/skills/library/atlas/scripts/lib/styles.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/skills/library/combat-tracker/scripts/combat.test.mjs
+    term: D&D
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/skills/library/combat-tracker/scripts/combat.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/skills/library/combat-tracker/scripts/lib/combat-store.test.mjs
+    term: D&D
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/skills/library/combat-tracker/scripts/lib/combat-store.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/skills/library/new-campaign/scripts/lib/init-campaign.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/skills/library/new-campaign/scripts/lib/set-system.test.mjs
+    term: D&D
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/skills/library/new-campaign/scripts/lib/set-system.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/skills/library/update/scripts/lib/combat-statistics.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/skills/library/update/scripts/lib/scene-checks.test.mjs
+    term: dnd-2024
+    reason: test exercises the dnd-2024 adapter
+  - file: yllir/scripts/engine.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/config-write.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/config-write.test.mjs
+    term: Le ceneri della valle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/config.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/config.test.mjs
+    term: Le ceneri della valle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/engine/commit.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/instructions.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/instructions.test.mjs
+    term: Le ceneri della valle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/mentions.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/plot/plot-map.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/session-check.test.mjs
+    term: Le ceneri della valle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/turn-check.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/world-graph.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/scripts/lib/yaml-lite.test.mjs
+    term: Le ceneri della valle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/skills/library/continuity-audit/scripts/lib/audit-cache.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/skills/library/continuity-audit/scripts/lib/audit-facts.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/skills/library/continuity-audit/scripts/lib/audit-scope.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/skills/library/continuity-audit/scripts/lib/audit-vocabulary.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/skills/library/encyclopedia/scripts/lib/site.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/skills/library/new-campaign/scripts/lib/set-system.test.mjs
+    term: Le ceneri della valle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/skills/library/update/scripts/lib/item-descriptions.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/skills/library/update/scripts/lib/migrate-world.test.mjs
+    term: Morvalle
+    reason: test uses a testbench fixture world as sample data
+  - file: yllir/skills/library/update/scripts/lib/migrate-world.test.mjs
+    term: Le ceneri della valle
+    reason: test uses a testbench fixture world as sample data

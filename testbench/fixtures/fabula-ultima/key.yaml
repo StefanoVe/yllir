@@ -1,0 +1,27 @@
+# Answer key of the fabula-ultima fixture. Outside campaign/: the agent under test never reads it.
+# file: path relative to campaign/. code: the code the adapter check returns (bad-hp, bad-check).
+flagged:
+  - file: Creature/Harbor Thug.md
+    code: bad-hp
+    message: "is below 40"
+  - file: Plot/Session 1/Events/Sluice Lift.md
+    code: bad-check
+    message: "the DL must be 7, 10, 13 or 16"
+not_flagged:
+  - Creature/The Brine Warden.md
+  - Creature/Gull Swarm.md
+  - Characters/Ysolde Varn.md
+  - Characters/Kael Morrow.md
+  - World/Salt Harbor.md
+  - World seed.md
+  - Plot/Session 1/Session 1.md
+  - Plot/Session 1/Events/Dusk on the Quay.md
+  - Plot/Session 1/Events/Lantern Ward.md
+homonym_spell: Veil
+pc_spell_effect_words: [ranged attack]
+npc_spell_effect_words: [cannot see]
+tracker:
+  enemy: The Brine Warden
+  dex_base: d8
+  statuses: [slow, enraged]
+  dex_effective: d6     # each status lowers the die one step, never below d6

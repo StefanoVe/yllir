@@ -5,16 +5,20 @@
 // the JSON line the child prints and summarises it.
 //
 // Usage: node testbench/runners/run-suite.mjs [--agent claude] [--runs N]
-//          [--parallel N] [--with-audit] [--with-world] [--with-atlas] [--only <substring>] [--model <m>]
+//          [--parallel N] [--with-audit] [--with-world] [--with-atlas] [--no-purity] [--only <substring>] [--model <m>]
 // Defaults: --agent claude, --runs 1 (quick), --parallel 8. The audit kind is skipped
-// unless --with-audit is given (each audit run takes 10+ minutes). The world kind is
-// skipped unless --with-world is given (it runs only when the world-generation path changes).
-// The atlas kind is skipped unless --with-atlas is given (its cases are paid agent runs).
-// Exit codes: 0 every job passes; 1 some job fails or errors; 2 usage error or no cases.
+// unless --with-audit is given (each audit run takes 10+ minutes). The world and convert
+// kinds are skipped unless --with-world is given (they run only when the world-generation
+// path changes; convert is long and costly). The atlas kind is skipped unless --with-atlas
+// is given (its cases are paid agent runs). The import, plot and system kinds run by default,
+// like entry. Before the jobs, the core purity check (check-core-purity.mjs) runs and counts as
+// one row, core-purity; --no-purity skips it.
+// Exit codes: 0 every job and the purity check pass; 1 some job fails or errors, or the purity
+// check fails; 2 usage error or no cases.
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const RUNNERS_DIR = import.meta.dirname;
@@ -26,12 +30,19 @@ const KIND_RUNNERS = new Map([
   ['world', 'run-world-case.mjs'],
   ['continuity', 'run-continuity-case.mjs'],
   ['atlas', 'run-atlas-case.mjs'],
+  ['import', 'run-import-case.mjs'],
+  ['plot', 'run-plot-case.mjs'],
+  ['system', 'run-system-case.mjs'],
+  ['convert', 'run-convert-case.mjs'],
 ]);
 const AGENT_SETS = new Map([['claude', ['claude']]]);
 const AGENT_ORDER = ['claude'];
 const REASON_WIDTH = 160;
+const PURITY_RUNNER = path.join(RUNNERS_DIR, 'check-core-purity.mjs');
+const PURITY_CASE = 'core-purity';
+const PURITY_HIT_LINES = 20;
 const USAGE =
-  'usage: node testbench/runners/run-suite.mjs [--agent claude] [--runs N] [--parallel N] [--with-audit] [--with-world] [--with-atlas] [--only <substring>] [--model <m>]';
+  'usage: node testbench/runners/run-suite.mjs [--agent claude] [--runs N] [--parallel N] [--with-audit] [--with-world] [--with-atlas] [--no-purity] [--only <substring>] [--model <m>]';
 
 class UsageError extends Error {}
 
@@ -48,8 +59,9 @@ function sortedDirs(dir) {
  * The jobs for every case under casesRoot: one per (case, agent, run index), in case
  * order, then agent order, then run order. A case is a folder casesRoot/<kind>/<name>
  * holding case.yaml; kinds without a runner are ignored. The audit kind is skipped
- * unless withAudit is true, the world kind unless withWorld is true, and the atlas kind unless
- * withAtlas is true. only, when
+ * unless withAudit is true, the world and convert kinds unless withWorld is true (convert
+ * is long and costly, so it shares the world rule), and the atlas kind unless
+ * withAtlas is true. The import, plot and system kinds always run. only, when
  * given, keeps the cases whose "<kind>/<name>" contains that substring.
  */
 export function planJobs({
@@ -67,6 +79,7 @@ export function planJobs({
     if (runner === undefined) continue;
     if (kind === 'audit' && !withAudit) continue;
     if (kind === 'world' && !withWorld) continue;
+    if (kind === 'convert' && !withWorld) continue;
     if (kind === 'atlas' && !withAtlas) continue;
     for (const name of sortedDirs(path.join(casesRoot, kind))) {
       const caseDir = path.join(casesRoot, kind, name);
@@ -85,23 +98,22 @@ export function planJobs({
 }
 
 /**
- * The world cases that an --only filter names but that are not run because withWorld is
- * false, as "world/<name>" strings. Empty when only is null or withWorld is true.
+ * The world and convert cases that an --only filter names but that are not run because
+ * withWorld is false, as "<kind>/<name>" strings. Empty when only is null or withWorld is true.
  */
 export function skippedWorldCases({ casesRoot = CASES_ROOT, only = null, withWorld = false } = {}) {
-  return skippedGated({ casesRoot, only, flag: withWorld, kind: 'world' });
+  return skippedGated({ casesRoot, only, flag: withWorld, kinds: ['world', 'convert'], option: 'withWorld' });
 }
 
 /** The atlas cases that an --only filter names but that are not run because withAtlas is false. */
 export function skippedAtlasCases({ casesRoot = CASES_ROOT, only = null, withAtlas = false } = {}) {
-  return skippedGated({ casesRoot, only, flag: withAtlas, kind: 'atlas' });
+  return skippedGated({ casesRoot, only, flag: withAtlas, kinds: ['atlas'], option: 'withAtlas' });
 }
 
-function skippedGated({ casesRoot, only, flag, kind }) {
+function skippedGated({ casesRoot, only, flag, kinds, option }) {
   if (flag || only === null || only === undefined) return [];
-  const option = kind === 'world' ? 'withWorld' : 'withAtlas';
   return planJobs({ casesRoot, [option]: true, only })
-    .filter((job) => job.kind === kind)
+    .filter((job) => kinds.includes(job.kind))
     .map((job) => `${job.kind}/${job.name}`)
     .filter((name, index, names) => names.indexOf(name) === index);
 }
@@ -253,10 +265,51 @@ export function formatReport(summary) {
     lines.push('');
     lines.push('failures:');
     for (const failure of summary.failures) {
-      lines.push(`  ${failure.case} ${failure.agent} run ${failure.run}: ${failure.reason.slice(0, REASON_WIDTH)}`);
+      const runPart = failure.run === null ? '' : ` run ${failure.run}`;
+      lines.push(`  ${failure.case} ${failure.agent}${runPart}: ${failure.reason.slice(0, REASON_WIDTH)}`);
     }
   }
   return lines.join('\n');
+}
+
+function firstNonEmptyLine(text) {
+  return text.split('\n').map((line) => line.trim()).find((line) => line !== '') ?? '';
+}
+
+/**
+ * Runs the core purity check synchronously. Resolves to { pass, summary, hits }: pass is true
+ * when the check exits 0; summary is its "purity: ..." line (or the reason it did not finish);
+ * hits holds at most PURITY_HIT_LINES of its hit lines.
+ */
+export function runPurity({ runner = PURITY_RUNNER } = {}) {
+  const child = spawnSync(process.execPath, [runner], { encoding: 'utf8' });
+  const stdout = child.stdout ?? '';
+  const lines = stdout.split('\n').map((line) => line.trimEnd()).filter((line) => line.trim() !== '');
+  const summaryLine = lines.find((line) => line.startsWith('purity:'));
+  const hitLines = lines.filter((line) => !line.startsWith('purity:'));
+  const pass = child.status === 0;
+  let summary = summaryLine;
+  if (summary === undefined) {
+    const reason = child.error ? child.error.message : firstNonEmptyLine(child.stderr ?? '');
+    summary = `purity: did not finish (${reason === '' ? `exit ${child.status}` : reason})`;
+  }
+  return { pass, summary, hits: pass ? [] : hitLines.slice(0, PURITY_HIT_LINES) };
+}
+
+/**
+ * The summary with the core-purity row added first. A failed check adds its hit lines to the
+ * failures (or its summary when it has none). The purity row is not counted in the TOTAL line.
+ */
+export function addPurityRow(summary, purity) {
+  const row = { case: PURITY_CASE, agent: '-', pass: purity.pass ? 1 : 0, fail: purity.pass ? 0 : 1, error: 0, n: 1 };
+  const reasons = purity.pass ? [] : purity.hits.length > 0 ? purity.hits : [purity.summary];
+  const failures = reasons.map((reason) => ({ case: PURITY_CASE, agent: '-', run: null, reason }));
+  return {
+    rows: [row, ...summary.rows],
+    totals: summary.totals,
+    failures: [...failures, ...summary.failures],
+    allPassed: summary.allPassed && purity.pass,
+  };
 }
 
 function positiveInt(name, value) {
@@ -266,7 +319,17 @@ function positiveInt(name, value) {
 
 /** Parses the command line. Throws UsageError on anything it does not accept. */
 export function parseArgs(argv) {
-  const opts = { agent: 'claude', runs: 1, parallel: 8, withAudit: false, withWorld: false, withAtlas: false, only: null, model: null };
+  const opts = {
+    agent: 'claude',
+    runs: 1,
+    parallel: 8,
+    withAudit: false,
+    withWorld: false,
+    withAtlas: false,
+    noPurity: false,
+    only: null,
+    model: null,
+  };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     const value = () => {
@@ -288,6 +351,8 @@ export function parseArgs(argv) {
       opts.withWorld = true;
     } else if (arg === '--with-atlas') {
       opts.withAtlas = true;
+    } else if (arg === '--no-purity') {
+      opts.noPurity = true;
     } else if (arg === '--only') {
       opts.only = value();
     } else if (arg === '--model') {
@@ -308,6 +373,11 @@ async function main(argv) {
   } catch (err) {
     console.error(`run-suite: ${err.message}\n${USAGE}`);
     return 2;
+  }
+  let purity = null;
+  if (!opts.noPurity) {
+    purity = runPurity();
+    console.log(purity.summary);
   }
   const agents = AGENT_SETS.get(opts.agent);
   const skippedWorld = skippedWorldCases({ casesRoot: CASES_ROOT, only: opts.only, withWorld: opts.withWorld });
@@ -333,7 +403,8 @@ async function main(argv) {
   }
   console.error(`run-suite: ${jobs.length} job(s), up to ${opts.parallel} at a time`);
   const results = await runPool(jobs, opts.parallel, (job) => runJob(job, { model: opts.model }));
-  const summary = summarize(results);
+  let summary = summarize(results);
+  if (purity !== null) summary = addPurityRow(summary, purity);
   console.log(formatReport(summary));
   return summary.allPassed ? 0 : 1;
 }

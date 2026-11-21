@@ -1,0 +1,53 @@
+# Answer key for plot-missions. It sits beside campaign/, never inside it, so the
+# agent under test cannot read it. Every value is what the engine (plotMap) must
+# report on this structure, which it handles today.
+
+# Engine errors: code and file. Each message must name the ids listed here.
+errors:
+  - code: cycle
+    file: Missioni/Missione 4/Missione 4.md
+    ids: [missione-4, missione-5]
+  # FINDING: the message of missing-depends-on does not name the activity ("depends_on is missing"),
+  # so no ids are checked for it; the file is the only locator.
+  - code: missing-depends-on
+    file: Missioni/Missione 2/Missione 2.md
+  # The message names the unknown prerequisite; the activity itself is named by the file.
+  - code: unknown-dependency
+    file: Missioni/Missione 3/Missione 3.md
+    ids: [missione-9]
+
+# Status of each mission after the chronicle page (played: [missione-1]).
+statuses:
+  - id: missione-1
+    status: played
+  - id: missione-2
+    status: ready
+  - id: missione-3
+    status: waiting
+  - id: missione-4
+    status: waiting
+  - id: missione-5
+    status: waiting
+
+# Missions with two or more scenes and no scene depending on another scene.
+unlinked: [missione-2]
+
+# The activity with no depends_on field at all.
+no_depends_on_field: [missione-2]
+
+# The activity with an explicit empty list.
+explicit_empty_depends_on: [missione-1]
+
+# Fork and rejoin of Missione 1: scene -> the scenes it depends on.
+fork_rejoin:
+  - event: missione-1-scena-a
+    depends_on: []
+  - event: missione-1-scena-b
+    depends_on: [missione-1-scena-a]
+  - event: missione-1-scena-c
+    depends_on: [missione-1-scena-a]
+  - event: missione-1-scena-d
+    depends_on: [missione-1-scena-b, missione-1-scena-c]
+
+# Scenes of Missione 1 in topological order (fork before rejoin).
+event_order_missione_1: [missione-1-scena-a, missione-1-scena-b, missione-1-scena-c, missione-1-scena-d]

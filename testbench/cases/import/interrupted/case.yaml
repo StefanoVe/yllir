@@ -1,0 +1,16 @@
+case: import-interrupted
+kind: import
+fixture: import-interrupted-input
+# The input is a folder with ONE source (note-locanda.md). The runner adds a second file to the copy at
+# setup: mappa-del-porto.pdf, a valid one-page PDF cut after 45% of its bytes, so it cannot be opened.
+# {{INPUT_DIR}} in the prompt is replaced by the absolute path of that copy.
+# One turn: the master asks for both files, and the import must keep the first, say what is missing
+# from the second and never declare the import complete. The case has no second turn.
+# Long-ish and costly (agent run): run it by hand with runners/run-import-case.mjs, not from run-suite.mjs.
+runs: 3
+prompt: |
+  Porta nella campagna questi due file: {{INPUT_DIR}}/note-locanda.md e {{INPUT_DIR}}/mappa-del-porto.pdf
+# Not measured yet: one turn over two files, one of them broken.
+limits:
+  max_minutes: 8
+  max_tool_calls: 100

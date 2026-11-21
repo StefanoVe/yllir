@@ -1,0 +1,13 @@
+case: plot-seasons-next
+fixture: plot-seasons
+# Runs per agent: 3 (the suite passes --runs 1 per job).
+runs: 3
+# Expected to show where the mechanism breaks. The engine does not read the hierarchical
+# season/chapter shape today (Stagioni/Stagione N/Capitolo N/), see the fixture README, Findings:
+# the chapters are reported as legacy-session-layout and no activity is seen. A failing record
+# here is a finding about the engine, not a runner bug.
+prompt: |
+  Prepariamo il capitolo 5, nuovo, nella seconda stagione (non toccare gli altri capitoli): il disgelo apre la strada del nord. Procedi senza chiedermi altro.
+limits:
+  max_minutes: 6
+  max_tool_calls: 140

@@ -1,0 +1,28 @@
+schema: 1
+
+campaign:
+  name: "Le stagioni di Brenna"
+  slug: stagioni-di-brenna
+  seed: Seme del mondo.md
+  created: 2026-11-21
+
+language:
+  main: it
+  other: []
+
+prose:
+  register: plain
+
+system:
+  adapter: none
+
+structure:
+  - id: trama
+    folder: Stagioni
+    type: plot
+  - id: cronaca
+    folder: Cronaca
+    type: chronicle
+  - id: luoghi
+    folder: Mondo
+    type: places

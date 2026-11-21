@@ -1,0 +1,8 @@
+case: system-fu-rules-v11
+fixture: fabula-ultima
+# Runs per agent: 3 (the suite passes --runs 1 per job).
+runs: 3
+prompt: "Two quick rules questions for tonight. When the heroes Study an enemy, which Difficulty Levels give them more information? And does a Tonic cure every status effect or only one?"
+limits:
+  max_minutes: 3
+  max_tool_calls: 60

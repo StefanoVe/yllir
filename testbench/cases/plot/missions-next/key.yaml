@@ -1,0 +1,12 @@
+# Answer key for plot/missions-next. It sits beside case.yaml, outside the copy the agent reads.
+#
+# The new mission must be a new activity under Missioni/. The seeded traps (missione-2 with no
+# depends_on field, missione-3 with an unknown prerequisite, missione-4 and missione-5 in a cycle)
+# must not be silently "fixed": their main files must stay byte-identical.
+activity_folder: Missioni
+
+unchanged_files:
+  - Missioni/Missione 2/Missione 2.md
+  - Missioni/Missione 3/Missione 3.md
+  - Missioni/Missione 4/Missione 4.md
+  - Missioni/Missione 5/Missione 5.md

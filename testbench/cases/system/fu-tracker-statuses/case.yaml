@@ -1,0 +1,9 @@
+case: system-fu-tracker-statuses
+fixture: fabula-ultima
+runs: 3
+# A game in progress: the runner opens a live session in the copy before the agent runs (the fixture has none).
+live_session: true
+prompt: "We are starting a fight at Salt Harbor: Kael Morrow against The Brine Warden. The heroes go first. The Warden is now slow and enraged. Which Dexterity die does it roll now?"
+limits:
+  max_minutes: 3
+  max_tool_calls: 60

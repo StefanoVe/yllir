@@ -19,8 +19,12 @@ import {
   gradeStale,
   neverSayWords,
   nextMinorVersion,
+  normalizeBody,
   paragraphsOf,
   parseCaseData,
+  proseReasons,
+  recordBaseline,
+  restorableReasons,
   setFrameworkVersion,
   setupScenario,
   technicalFindings,
@@ -100,9 +104,13 @@ const STALE_FILES = () => ({
   '.campaign/customizations.md': CUSTOMIZATIONS,
 });
 
+// The baseline (S8, S9) of each stale folder, taken right after its first commit, before the update.
+const BASELINES = new Map();
+
 /** A stale-campaign folder: framework 0.1.0 after the update, one commit more than the setup. */
 function staleFolder({ files = STALE_FILES(), addSecond = true } = {}) {
   const dir = makeRepo(files);
+  BASELINES.set(dir, withIsolatedGit(() => recordBaseline(dir)));
   if (addSecond) addCommit(dir, { subject: 'Updated Yllir to 0.1.0', kind: 'framework' });
   return dir;
 }
@@ -115,6 +123,9 @@ const STALE_SETUP = {
   versionYamlText: VERSION_YAML,
   published: null,
 };
+
+/** The setup of a stale folder: STALE_SETUP plus the baseline recorded when the folder was made. */
+const staleSetup = (dir) => ({ ...STALE_SETUP, ...BASELINES.get(dir) });
 
 const NEWER_SETUP = { ...STALE_SETUP, published: '0.2.0' };
 
@@ -426,7 +437,7 @@ test('gradeLegacy fails S7 when a migrated scene is turned back to the --- form'
 test('gradeStale passes when the update ran, saved one version and kept the master text', () => {
   const dir = staleFolder();
   try {
-    const results = gradeStale({ dir, setup: STALE_SETUP, report: 'Ciao! La campagna è pronta a ripartire.' });
+    const results = gradeStale({ dir, setup: staleSetup(dir), report: 'Ciao! La campagna è pronta a ripartire.' });
     assert.deepEqual(failing(results), [], JSON.stringify(results));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -442,7 +453,7 @@ test('gradeStale fails each check that the update broke', () => {
   ];
   for (const [id, dir] of cases) {
     try {
-      const results = gradeStale({ dir, setup: STALE_SETUP, report: 'Ciao!' });
+      const results = gradeStale({ dir, setup: staleSetup(dir), report: 'Ciao!' });
       assert.ok(failing(results).includes(id), `${id} should fail: ${JSON.stringify(results)}`);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
@@ -455,7 +466,7 @@ test('gradeStale accepts the format version and the update version, both framewo
   addCommit(dir, { subject: 'Campaign format update', kind: 'framework' });
   addCommit(dir, { subject: 'Updated Yllir to 0.1.0', kind: 'framework' });
   try {
-    const results = gradeStale({ dir, setup: STALE_SETUP, report: 'Ciao!' });
+    const results = gradeStale({ dir, setup: staleSetup(dir), report: 'Ciao!' });
     assert.deepEqual(failing(results), [], JSON.stringify(results));
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -469,10 +480,10 @@ test('gradeStale fails S4 when a manual version follows the setup, or no version
   const noUpdate = staleFolder({ addSecond: false });
   addCommit(noUpdate, { subject: 'Campaign format update', kind: 'framework' });
   try {
-    const first = gradeStale({ dir: manual, setup: STALE_SETUP, report: 'Ciao!' });
+    const first = gradeStale({ dir: manual, setup: staleSetup(manual), report: 'Ciao!' });
     assert.ok(failing(first).includes('S4'), JSON.stringify(first));
     assert.ok(first.find(([id]) => id === 'S4')[2].some((reason) => reason.includes('is manual')));
-    const second = gradeStale({ dir: noUpdate, setup: STALE_SETUP, report: 'Ciao!' });
+    const second = gradeStale({ dir: noUpdate, setup: staleSetup(noUpdate), report: 'Ciao!' });
     assert.ok(failing(second).includes('S4'), JSON.stringify(second));
     assert.ok(second.find(([id]) => id === 'S4')[2].some((reason) => reason.includes('Updated Yllir')));
   } finally {
@@ -484,7 +495,7 @@ test('gradeStale fails S4 when a manual version follows the setup, or no version
 test('gradeStale fails the technical words in the final message (S5)', () => {
   const dir = staleFolder();
   try {
-    const results = gradeStale({ dir, setup: STALE_SETUP, report: 'Il framework è aggiornato alla 0.1.0.' });
+    const results = gradeStale({ dir, setup: staleSetup(dir), report: 'Il framework è aggiornato alla 0.1.0.' });
     assert.deepEqual(failing(results), ['S5']);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
@@ -589,6 +600,161 @@ test('gradeScenario turns the results into checks, failures and the notice', () 
     const noReport = gradeScenario({ scenario: 'declined', dir, setup: NEWER_SETUP, report: null, todays: [TODAY] });
     assert.equal(noReport.pass, false);
     assert.equal(noReport.technical_found, null);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------- baseline: S8 and S9
+
+const OORIA = '<!-- yllir\nkind: character\n-->\n\nOria è la guida.\nHa un coltello.\n';
+const POZZO = '<!-- yllir\nkind: place\n-->\n\nIl pozzo è profondo.\n';
+
+/** A committed campaign with two prose files, and the baseline taken at the commit. Remove dir when done. */
+function baselineFolder() {
+  const dir = makeRepo({ 'Personaggi/Oria.md': OORIA, 'Luoghi/Pozzo.md': POZZO });
+  const setup = withIsolatedGit(() => recordBaseline(dir));
+  return { dir, setup };
+}
+
+/** S8 and S9 reasons of the folder against its baseline. */
+function baselineReasons(dir, setup) {
+  return withIsolatedGit(() => ({
+    prose: proseReasons(dir, setup.bodies),
+    restorable: restorableReasons(dir, setup),
+  }));
+}
+
+test('normalizeBody drops the metadata block and collapses the whitespace', () => {
+  assert.equal(normalizeBody('<!-- yllir\nkind: place\n-->\n\nUno  due\r\n\ttre.\n'), 'Uno due tre.');
+  assert.equal(normalizeBody('---\nkind: place\n---\nSolo testo.'), 'Solo testo.');
+  assert.equal(normalizeBody('<!-- yllir\nkind: place\n'), '<!-- yllir kind: place');
+});
+
+test('S8 and S9 pass for an unchanged campaign', () => {
+  const { dir, setup } = baselineFolder();
+  try {
+    assert.deepEqual(baselineReasons(dir, setup), { prose: [], restorable: [] });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('S8 passes when only the metadata block changes', () => {
+  const { dir, setup } = baselineFolder();
+  try {
+    fs.writeFileSync(path.join(dir, 'Personaggi', 'Oria.md'), OORIA.replace('kind: character', 'kind: npc\nfaction: guardia'));
+    assert.deepEqual(baselineReasons(dir, setup).prose, []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('S8 passes when a file moves to another folder with the same prose', () => {
+  const { dir, setup } = baselineFolder();
+  try {
+    fs.mkdirSync(path.join(dir, 'Storia'));
+    fs.renameSync(path.join(dir, 'Luoghi', 'Pozzo.md'), path.join(dir, 'Storia', 'Pozzo.md'));
+    const reasons = baselineReasons(dir, setup);
+    assert.deepEqual(reasons.prose, []);
+    assert.deepEqual(reasons.restorable, [], 'the moved file is still in the version before the update');
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('S8 fails and names the path when a sentence is removed from a paragraph', () => {
+  const { dir, setup } = baselineFolder();
+  try {
+    fs.writeFileSync(path.join(dir, 'Personaggi', 'Oria.md'), OORIA.replace('Ha un coltello.\n', ''));
+    assert.deepEqual(baselineReasons(dir, setup).prose, [
+      'Personaggi/Oria.md: paragraph lost or changed: "Oria è la guida. Ha un coltello."',
+    ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('S8 passes when a file moves one folder deeper with its links rebased, and fails when a link target name changes', () => {
+  const dir = makeRepo({
+    'Personaggi/Oria.md': OORIA,
+    'Storia/Pozzo.md': '<!-- yllir\nkind: place\n-->\n\nVedi [Oria Valdes](../Personaggi/Oria%20Valdes.md) al pozzo.\n',
+  });
+  try {
+    const setup = withIsolatedGit(() => recordBaseline(dir));
+    fs.mkdirSync(path.join(dir, 'Storia', 'Luoghi'));
+    fs.renameSync(path.join(dir, 'Storia', 'Pozzo.md'), path.join(dir, 'Storia', 'Luoghi', 'Pozzo.md'));
+    fs.writeFileSync(
+      path.join(dir, 'Storia', 'Luoghi', 'Pozzo.md'),
+      '<!-- yllir\nkind: place\n-->\n\nVedi [Oria Valdes](../../Personaggi/Oria%20Valdes.md) al pozzo.\n',
+    );
+    assert.deepEqual(baselineReasons(dir, setup).prose, []);
+    fs.writeFileSync(
+      path.join(dir, 'Storia', 'Luoghi', 'Pozzo.md'),
+      '<!-- yllir\nkind: place\n-->\n\nVedi [Oria Valdes](../../Personaggi/Oria%20Brunel.md) al pozzo.\n',
+    );
+    assert.deepEqual(baselineReasons(dir, setup).prose, [
+      'Storia/Pozzo.md: paragraph lost or changed: "Vedi [Oria Valdes](Oria Valdes.md) al pozzo."',
+    ]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('S8 passes when a file is split in two files with the same paragraphs', () => {
+  const dir = makeRepo({ 'Storia/Lunga.md': '<!-- yllir\nkind: event\n-->\n\n# Primo\n\nPrimo paragrafo del racconto.\n\nSecondo paragrafo, più lungo.\n' });
+  try {
+    const setup = withIsolatedGit(() => recordBaseline(dir));
+    fs.writeFileSync(path.join(dir, 'Storia', 'Lunga.md'), '<!-- yllir\nkind: event\n-->\n\n## Primo\n\nPrimo paragrafo del racconto.\n');
+    fs.mkdirSync(path.join(dir, 'Storia', 'Eventi'));
+    fs.writeFileSync(path.join(dir, 'Storia', 'Eventi', 'Secondo.md'), 'Secondo paragrafo, più lungo.\n');
+    assert.deepEqual(baselineReasons(dir, setup).prose, []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('S9 passes for a file deleted from the working tree but present in the version before the update', () => {
+  const { dir, setup } = baselineFolder();
+  try {
+    fs.rmSync(path.join(dir, 'Luoghi', 'Pozzo.md'));
+    assert.deepEqual(baselineReasons(dir, setup).restorable, []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('S9 fails and names a file that was untracked at setup', () => {
+  const dir = makeRepo({ 'Personaggi/Oria.md': OORIA });
+  try {
+    fs.writeFileSync(path.join(dir, 'Bozza.txt'), 'bozza mai salvata\n');
+    const setup = withIsolatedGit(() => recordBaseline(dir));
+    fs.rmSync(path.join(dir, 'Bozza.txt'));
+    assert.deepEqual(baselineReasons(dir, setup).restorable, ['Bozza.txt: not restorable from the version before the update']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('S9 does not fail for an ignored file at setup', () => {
+  const dir = makeRepo({ '.gitignore': 'cache/\n', 'Personaggi/Oria.md': OORIA });
+  try {
+    fs.mkdirSync(path.join(dir, 'cache'));
+    fs.writeFileSync(path.join(dir, 'cache', 'tmp.md'), 'appunto temporaneo\n');
+    const setup = withIsolatedGit(() => recordBaseline(dir));
+    assert.deepEqual(setup.ignored, ['cache/tmp.md']);
+    assert.deepEqual(baselineReasons(dir, setup).restorable, []);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('gradeStale fails S8 and S9 when the setup has no baseline', () => {
+  const dir = staleFolder();
+  try {
+    const results = gradeStale({ dir, setup: STALE_SETUP, report: 'Ciao!' });
+    assert.deepEqual(results.find(([id]) => id === 'S8')[2], ['setup has no baseline (rerun the setup)']);
+    assert.deepEqual(results.find(([id]) => id === 'S9')[2], ['setup has no baseline (rerun the setup)']);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }

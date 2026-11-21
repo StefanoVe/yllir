@@ -16,6 +16,7 @@ import { parseYamlLite } from '../../yllir/scripts/lib/yaml-lite.mjs';
 import { findMetadataBlock } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { listMetadataFiles } from '../../yllir/skills/library/update/scripts/lib/migrate-metadata.mjs';
 import { updateCampaign } from '../../yllir/skills/library/update/scripts/lib/update-campaign.mjs';
+import { loadRegistry } from '../../yllir/skills/library/update/scripts/lib/registry.mjs';
 
 // Identity logic is exercised only when no global or system git config exists.
 process.env.GIT_CONFIG_GLOBAL = '/dev/null';
@@ -34,11 +35,13 @@ const PENDING = [
   'scene-checks-v1', 'combat-statistics-v1', 'economy-v1', 'links-review-v1', 'plot-flowchart-v1', 'prose-style-v1',
   'public-knowledge-v1',
 ];
-const ORDER = [
-  'session-layout-v1', 'category-first-geography-v1', 'item-descriptions-v1', 'item-knowledge-v1', 'statistics-tables-v1',
-  'world-graph-v1', 'metadata-comment-v1', 'scene-checks-v1', 'combat-statistics-v1', 'shortcut-v1', 'economy-v1', 'encounters-v1',
-  'links-review-v1', 'plot-flowchart-v1', 'prose-style-v1', 'atlas-site-v1', 'place-kinds-v1', 'atlas-site-v2', 'public-knowledge-v1',
-];
+// The migration ids in the order of the registry.
+const ORDER = loadRegistry().migrations.map((migration) => migration.id);
+
+test('every pending migration exists in the registry', () => {
+  assert.deepEqual(loadRegistry().errors, []);
+  for (const id of PENDING) assert.ok(ORDER.includes(id), `${id} is not in the registry`);
+});
 
 const tempDirs = [];
 after(() => {

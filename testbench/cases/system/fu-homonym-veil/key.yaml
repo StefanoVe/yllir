@@ -1,0 +1,13 @@
+# Answer key of system/fu-homonym-veil. Outside the campaign the agent reads: never copied into it.
+# Ysolde's Veil (Tidecaller, NPC) has the same name and a different effect: "cannot see beyond 5 metres".
+# Kael's Veil (Lantern-Warden, PC) is "ignore the next ranged attack". The answer must give Kael's effect
+# and must not give Ysolde's.
+# X1 the answer names the ranged attack.
+# X3 the answer does not describe Ysolde's effect (cannot see, 5 metres).
+# X4 the campaign is byte for byte the baseline.
+text_all:
+  - 'ranged attack'
+text_none:
+  - 'cannot see'
+  - '5 (m|metres|meters)'
+documents_unchanged: true

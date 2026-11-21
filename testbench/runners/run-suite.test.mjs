@@ -19,6 +19,8 @@ import {
   childArgs,
   skippedWorldCases,
   skippedAtlasCases,
+  runPurity,
+  addPurityRow,
 } from './run-suite.mjs';
 
 function makeCases(layout) {
@@ -92,8 +94,9 @@ test('childArgs passes the case, agent, one run and the model when given', () =>
 });
 
 test('parseArgs reads the options and rejects bad values', () => {
-  const opts = parseArgs(['--agent', 'claude', '--runs', '3', '--parallel', '4', '--with-audit', '--with-world', '--with-atlas', '--only', 'entry', '--model', 'haiku']);
-  assert.deepEqual(opts, { agent: 'claude', runs: 3, parallel: 4, withAudit: true, withWorld: true, withAtlas: true, only: 'entry', model: 'haiku' });
+  const opts = parseArgs(['--agent', 'claude', '--runs', '3', '--parallel', '4', '--with-audit', '--with-world', '--with-atlas', '--no-purity', '--only', 'entry', '--model', 'haiku']);
+  assert.deepEqual(opts, { agent: 'claude', runs: 3, parallel: 4, withAudit: true, withWorld: true, withAtlas: true, noPurity: true, only: 'entry', model: 'haiku' });
+  assert.equal(parseArgs([]).noPurity, false);
   assert.equal(parseArgs([]).withWorld, false);
   assert.equal(parseArgs([]).withAtlas, false);
   assert.equal(parseArgs([]).agent, 'claude');
@@ -273,6 +276,73 @@ test('planJobs excludes atlas cases by default, as paid agent runs', () => {
   const root = makeCases({ 'atlas/create-asks': 'case: atlas-create\n', 'entry/a': 'case: x\n' });
   assert.deepEqual(planJobs({ casesRoot: root }).map((job) => `${job.kind}/${job.name}`), ['entry/a']);
   assert.deepEqual(planJobs({ casesRoot: root, withWorld: true }).map((job) => `${job.kind}/${job.name}`), ['entry/a']);
+});
+
+test('planJobs maps the import, plot and system kinds and runs them by default', () => {
+  const root = makeCases({ 'import/x': 'case: x\n', 'plot/x': 'case: x\n', 'system/x': 'case: x\n', 'convert/x': 'case: x\n' });
+  const jobs = planJobs({ casesRoot: root });
+  assert.deepEqual(jobs.map((job) => `${job.kind}/${job.name}`), ['import/x', 'plot/x', 'system/x']);
+  assert.equal(path.basename(jobs[0].runner), 'run-import-case.mjs');
+  assert.equal(path.basename(jobs[1].runner), 'run-plot-case.mjs');
+  assert.equal(path.basename(jobs[2].runner), 'run-system-case.mjs');
+});
+
+test('planJobs skips the convert kind without withWorld and includes it with withWorld', () => {
+  const root = makeCases({ 'convert/x': 'case: x\n', 'entry/a': 'case: x\n' });
+  assert.deepEqual(planJobs({ casesRoot: root }).map((job) => `${job.kind}/${job.name}`), ['entry/a']);
+  const withWorld = planJobs({ casesRoot: root, withWorld: true });
+  assert.deepEqual(withWorld.map((job) => `${job.kind}/${job.name}`), ['convert/x', 'entry/a']);
+  assert.ok(withWorld[0].runner.endsWith('run-convert-case.mjs'));
+});
+
+test('skippedWorldCases names the convert cases that --only asks for without --with-world', () => {
+  const root = makeCases({ 'convert/x': 'case: x\n', 'entry/a': 'case: x\n' });
+  assert.deepEqual(skippedWorldCases({ casesRoot: root, only: 'convert/' }), ['convert/x']);
+  assert.deepEqual(skippedWorldCases({ casesRoot: root, only: 'convert/', withWorld: true }), []);
+});
+
+function fakeRunner(dir, name, body) {
+  const file = path.join(dir, name);
+  fs.writeFileSync(file, body);
+  return file;
+}
+
+test('runPurity passes when the check exits 0 and reports its summary line', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'run-suite-purity-'));
+  const runner = fakeRunner(dir, 'ok.mjs', "console.log('purity: 0 hits, 0 allowed, 0 unused allow entries');\nprocess.exit(0);\n");
+  const result = runPurity({ runner });
+  assert.equal(result.pass, true);
+  assert.equal(result.summary, 'purity: 0 hits, 0 allowed, 0 unused allow entries');
+  assert.deepEqual(result.hits, []);
+});
+
+test('runPurity fails on a hit and keeps its hit lines', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'run-suite-purity-'));
+  const runner = fakeRunner(dir, 'hit.mjs', "console.log('yllir/scripts/x.mjs:3  D&D  text');\nconsole.log('purity: 1 hits, 0 allowed, 0 unused allow entries');\nprocess.exit(1);\n");
+  const result = runPurity({ runner });
+  assert.equal(result.pass, false);
+  assert.match(result.summary, /^purity: 1 hits/);
+  assert.deepEqual(result.hits, ['yllir/scripts/x.mjs:3  D&D  text']);
+});
+
+test('runPurity keeps at most twenty hit lines', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'run-suite-purity-'));
+  const body = "for (let i = 0; i < 25; i++) console.log('hit ' + i);\nconsole.log('purity: 25 hits, 0 allowed, 0 unused allow entries');\nprocess.exit(1);\n";
+  const result = runPurity({ runner: fakeRunner(dir, 'many.mjs', body) });
+  assert.equal(result.pass, false);
+  assert.equal(result.hits.length, 20);
+});
+
+test('addPurityRow adds a core-purity row and fails the suite on a failed check', () => {
+  const base = summarize([jobResult('entry', 'a', 'claude', 1, { pass: true })]);
+  const passed = addPurityRow(base, { pass: true, summary: 'purity: 0 hits', hits: [] });
+  assert.equal(passed.allPassed, true);
+  assert.match(formatReport(passed), /core-purity\s+-\s+1\/1/);
+  assert.match(formatReport(passed), /TOTAL claude 1\/1/);
+  const failed = addPurityRow(base, { pass: false, summary: 'purity: 1 hits', hits: ['a.md:1  D&D  x'] });
+  assert.equal(failed.allPassed, false);
+  assert.match(formatReport(failed), /core-purity\s+-\s+0\/1/);
+  assert.match(formatReport(failed), /core-purity -: a\.md:1  D&D  x/);
 });
 
 test('skippedAtlasCases names the atlas cases that --only asks for without --with-atlas', () => {

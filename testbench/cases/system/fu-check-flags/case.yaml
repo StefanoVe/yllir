@@ -1,0 +1,7 @@
+case: system-fu-check-flags
+fixture: fabula-ultima
+runs: 3
+prompt: "Can you check the Harbor Thug and the scenes of session 1 against the rules, and tell me what is wrong? Do not change anything yet."
+limits:
+  max_minutes: 3
+  max_tool_calls: 60

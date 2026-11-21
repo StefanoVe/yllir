@@ -1,0 +1,40 @@
+# Answer key for plot/fork-rejoin. It sits beside case.yaml, outside the copy the agent reads.
+#
+# What the scene graph must show, in one new session under Trama/:
+#   guado          first scene: the group reaches the Lago Grigio ford.
+#   traghettatore  fork A: pay the ferryman (depends on guado).
+#   nuoto          fork B: swim across at night (depends on guado). Both forks start at guado.
+#   mulino         rejoin: the abandoned mill, reached from both forks (depends on BOTH forks).
+#                  Adjacency decoy: the mill is listed after the swim in the story, so a sequential
+#                  writer makes nuoto -> traghettatore or mulino depend on one fork only.
+#   incendio       after the mill (depends on mulino). The title holds no "mulino", so the mill
+#                  regex excludes it with a negative lookahead.
+#   araldo         an event with no stated order: "at any moment". It has no prerequisite, so it
+#                  is a first node, and it must not hang off any scene.
+# The plot folder of the morvalle campaign (campaign.yaml, type plot).
+activity_folder: Trama
+
+nodes:
+  guado: "guado"
+  traghettatore: "traghett"
+  nuoto: "nuot"
+  mulino: "^(?!.*incend).*mulino"
+  incendio: "incend"
+  araldo: "araldo"
+
+expected_edges:
+  - [traghettatore, guado]
+  - [nuoto, guado]
+  - [mulino, traghettatore]
+  - [mulino, nuoto]
+  - [incendio, mulino]
+
+# Forbidden: the fork branches must not depend on each other (adjacency decoy), and the araldo
+# must not hang off the story (no prerequisite of the mill or of the fire).
+forbidden_edges:
+  - [nuoto, traghettatore]
+  - [traghettatore, nuoto]
+  - [araldo, incendio]
+  - [araldo, mulino]
+
+first_nodes: [guado, araldo]
