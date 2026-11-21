@@ -47,7 +47,7 @@ You make the fights of the campaign fit the party the master has, without changi
 **Step 4 — Plan each fight.**
 1. For each fight in scope, compute the target band:
    - the target is the band the master named: `trivial` and `low` are «facile», `moderate` is «impegnativo», `high` and `beyond` are «molto duro»; for games rated by level, `easy` is «facile», `normal` is «impegnativo», `hard` is «molto duro»;
-   - when the master said «più duro» or «più facile», the target is one band up or down from the `band` of the entry, in the order of the game: `trivial, low, moderate, high, beyond` for D&D, `easy, normal, hard` for games rated by level.
+   - when the master said «più duro» or «più facile», the target is one band up or down from the `band` of the entry, in the order of the game: `trivial, low, moderate, high, beyond` for games rated by challenge rating, `easy, normal, hard` for games rated by level.
 2. Choose the change that reaches the target without changing what the fight is about. The options, in order of preference:
    - change the `count` of an enemy in the `enemies` list of the scene (keep it a positive whole number);
    - add a minion that is already in the campaign: an `enemies` entry with the `id` of an existing creature sheet whose template is `enemy`;

@@ -158,3 +158,30 @@ allow:
   - file: yllir/skills/library/update/scripts/lib/migrate-world.test.mjs
     term: Le ceneri della valle
     reason: test uses a testbench fixture world as sample data
+  - file: yllir/skills/core/prepare-session/SKILL.md
+    term: D&D
+    reason: scene-check format example; to move into the adapter manifest, issue #131
+  - file: yllir/skills/core/prepare-session/SKILL.md
+    term: Fabula Ultima
+    reason: scene-check format example; to move into the adapter manifest, issue #131
+  - file: yllir/templates/content-format.md
+    term: D&D
+    reason: scene-check format example; to move into the adapter manifest, issue #131
+  - file: yllir/templates/content-format.md
+    term: Fabula Ultima
+    reason: scene-check format example; to move into the adapter manifest, issue #131
+  - file: yllir/skills/library/update/migrations/scene-checks-v1/guided.md
+    term: D&D
+    reason: scene-check format example; to move into the adapter manifest, issue #131
+  - file: yllir/skills/library/new-campaign/SKILL.md
+    term: D&D
+    reason: example of how the master names a game edition to match an adapter id
+  - file: yllir/skills/library/new-campaign/SKILL.md
+    term: DnD
+    reason: example of how the master names a game edition to match an adapter id
+  - file: yllir/skills/library/new-campaign/SKILL.md
+    term: dnd-2024
+    reason: example of how the master names a game edition to match an adapter id
+  - file: yllir/skills/library/new-campaign/SKILL.md
+    term: 5e
+    reason: example of how the master names a game edition to match an adapter id

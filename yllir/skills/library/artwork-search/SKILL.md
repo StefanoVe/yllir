@@ -108,7 +108,7 @@ Use these sentences as they are, from the table «Fixed sentences for artwork se
 
 ## Examples
 
-(a) Wrong: the sheet says «Oria Brunel, the miller of Morvalle», and you send WebSearch «Oria Brunel Morvalle miller portrait».
+(a) Wrong: the sheet says «Oria Brunel, the miller of Valcupa», and you send WebSearch «Oria Brunel Valcupa miller portrait».
 Correct: the terms are generic words only, such as «old woman, miller, flour, white apron, kind face, village», and the search is the `search` string printed by `artwork-query.mjs`, unchanged.
 
 (b) Wrong: the screen says `"ok":false` for candidate 2, but the picture looks fine, so you propose it as number 2.

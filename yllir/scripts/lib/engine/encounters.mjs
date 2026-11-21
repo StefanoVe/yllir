@@ -3,7 +3,7 @@
 // each enemy's challenge rating, level and rank from its sheet (the adapter's
 // statSummary) and, when the adapter has difficulty rules, rates the fight
 // against the levels of the player characters. Games rated by challenge rating
-// (D&D) report `cr`, xp and budgets; games rated by level (`level-offset`)
+// (rated by challenge rating, `band-and-cr`) report `cr`, xp and budgets; games rated by level (`level-offset`)
 // report `level` and `rank`, and a band with working `detail`. Asynchronous only
 // because the adapter's modules are loaded with import(). Read-only; never writes.
 
