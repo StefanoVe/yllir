@@ -4,6 +4,7 @@
 import { CockpitBus } from "./bus.js";
 import { CockpitStore } from "./store.js";
 import { createResolver, type TrackCache } from "./resolvers.js";
+import { createAssetIndex } from "./asset-index.js";
 import { createCockpitTools } from "./tools.js";
 import { TurnTokens, mcpHandler } from "./mcp.js";
 import { TurnManager } from "./turns.js";
@@ -89,37 +90,16 @@ export function createCockpit(options: CreateCockpitOptions) {
       })
       .catch((error) => console.error("[cockpit] libreria musicale:", error));
   });
-  let mapVersion = "";
-  let mapValues: MapAsset[] = [];
-  // The image index is built from the same maps, in the same refresh.
-  let imageValues: ImageAsset[] = [];
-  let mapRefresh: Promise<void> | undefined;
-  const refreshMaps = () => {
-    const version = ports.archive.version();
-    if (mapVersion === version || mapRefresh) return;
-    mapRefresh = ports
-      .listMaps(ports.archive.docs.values())
-      .then(async (maps) => {
-        mapValues = maps;
-        mapVersion = version;
-        imageValues = await ports
-          .listImages(ports.archive.docs.values(), maps)
-          .catch(() => imageValues);
-      })
-      .catch(() => {})
-      .finally(() => {
-        mapRefresh = undefined;
-      });
-  };
-  void refreshMaps();
-  const maps = () => {
-    refreshMaps();
-    return mapValues;
-  };
-  const images = () => {
-    refreshMaps();
-    return imageValues;
-  };
+  const assets = createAssetIndex({
+    version: () => ports.archive.version(),
+    docs: () => ports.archive.docs.values(),
+    listMaps: (docs) => ports.listMaps(docs),
+    listImages: (docs, maps) => ports.listImages(docs, maps),
+    // An image card resolved before the index was ready shows as missing: republish it.
+    onChange: () => republishAll(),
+  });
+  const maps = assets.maps;
+  const images = assets.images;
   let plotVersion = "";
   let plotGraph: PlotGraph = ports.buildPlotGraph(ports.archive.docs.values());
   const getPlotGraph = () => {
