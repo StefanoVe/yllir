@@ -20,8 +20,10 @@ import {
   gradeItem,
   gradeRegion,
   lakeClosure,
+  combineTurns,
   lastWordOf,
   loadWorldCase,
+  needsReplyTurn,
   newErrorsOf,
   newSubjectsOf,
   sectionOf,
@@ -570,4 +572,71 @@ test('newSubjectsOf, newErrorsOf and addCheck compare against the baseline', () 
   assert.deepEqual(graded.checks, { W1: true, 'Q-grid': false });
   assert.deepEqual(graded.failures, ['Q-grid mean 2.00']);
   assert.equal(graded.pass, false);
+});
+
+// ---------------------------------------------------------------- reply turn
+
+test('loadWorldCase accepts an optional reply and rejects an empty one', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'world-reply-test-'));
+  try {
+    const write = (name, replyLine) => {
+      fs.mkdirSync(path.join(root, name), { recursive: true });
+      fs.writeFileSync(path.join(root, name, 'case.yaml'), `case: world-item\nfixture: morvalle\nprompt: x\n${replyLine}`);
+      fs.writeFileSync(path.join(root, name, 'key.yaml'), 'kind: item\ntemplate: item\nitem_type: key\nforbidden_public: [boss]\nsecret_words: [boss]\n');
+      return path.join(root, name);
+    };
+    assert.equal(loadWorldCase(write('a', 'reply: "Sì, procedi."\n')).reply, 'Sì, procedi.');
+    assert.equal(loadWorldCase(write('b', '')).reply, undefined);
+    assert.throws(() => loadWorldCase(write('c', 'reply: ""\n')), /reply must be a non-empty string/);
+    assert.throws(() => loadWorldCase(write('d', 'reply: 3\n')), /reply must be a non-empty string/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the shipped creature and item cases carry the reply', () => {
+  assert.equal(creatureCase().reply, 'Sì, procedi.');
+  assert.equal(itemCase().reply, 'Sì, procedi.');
+  assert.equal(regionCase().reply, undefined);
+});
+
+test('needsReplyTurn: true with a reply and no new version, false with a new version or without a reply', () => {
+  const withReply = { reply: 'Sì, procedi.' };
+  const withoutReply = {};
+  assert.equal(needsReplyTurn(withReply, 1, 1), true);
+  assert.equal(needsReplyTurn(withReply, 1, 2), false);
+  assert.equal(needsReplyTurn(withoutReply, 1, 1), false);
+  assert.equal(needsReplyTurn(withoutReply, 1, 2), false);
+});
+
+test('combineTurns sums cost, duration, turns and tool calls, joins denied and keeps both reports', () => {
+  const first = {
+    ok: true, report: 'primo', cost_usd: 0.25, duration_ms: 1000, num_turns: 4,
+    denied: ['Bash(rm)'], tool_calls: 10, error: null, permission_mode: 'manual',
+  };
+  const second = {
+    ok: true, report: 'secondo', cost_usd: 0.5, duration_ms: 500, num_turns: 2,
+    denied: [], tool_calls: 3, error: null, permission_mode: 'manual',
+  };
+  const combined = combineTurns(first, second);
+  assert.equal(combined.ok, true);
+  assert.equal(combined.report, 'secondo');
+  assert.equal(combined.turn1_report, 'primo');
+  assert.equal(combined.cost_usd, 0.75);
+  assert.equal(combined.duration_ms, 1500);
+  assert.equal(combined.num_turns, 6);
+  assert.equal(combined.tool_calls, 13);
+  assert.deepEqual(combined.denied, ['Bash(rm)']);
+  assert.equal(combined.error, null);
+});
+
+test('combineTurns keeps a failed second turn as the error and leaves a null sum when a count is missing', () => {
+  const first = { ok: true, report: 'primo', cost_usd: 0.1, duration_ms: 100, num_turns: 1, denied: [], tool_calls: null, error: null, permission_mode: 'manual' };
+  const second = { ok: false, report: null, cost_usd: null, duration_ms: null, num_turns: null, denied: [], tool_calls: null, error: 'timeout', permission_mode: 'manual' };
+  const combined = combineTurns(first, second);
+  assert.equal(combined.ok, false);
+  assert.equal(combined.error, 'timeout');
+  assert.equal(combined.cost_usd, null);
+  assert.equal(combined.tool_calls, null);
+  assert.equal(combined.turn1_report, 'primo');
 });

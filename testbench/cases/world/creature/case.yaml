@@ -3,6 +3,7 @@ fixture: morvalle
 system_adapter: dnd-2024
 prompt: |
   Mi serve un capo bandito tosto per un gruppo di terzo livello, al Borgo Cenere.
+reply: "Sì, procedi."
 limits:
   max_minutes: 3
   max_tool_calls: 60

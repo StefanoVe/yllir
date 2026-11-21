@@ -95,6 +95,9 @@ export function loadWorldCase(caseDir) {
   for (const field of ['prompt', 'fixture']) {
     if (typeof data[field] !== 'string' || data[field].trim() === '') throw new Error(`case.yaml: ${field} missing`);
   }
+  if (data.reply !== undefined && (typeof data.reply !== 'string' || data.reply.trim() === '')) {
+    throw new Error('case.yaml: reply must be a non-empty string');
+  }
   if (kind === 'creature' && (typeof data.system_adapter !== 'string' || data.system_adapter === '')) {
     throw new Error('case.yaml: world-creature needs system_adapter');
   }
@@ -639,6 +642,7 @@ function makeRecord({ caseName, run, date, header, hash, delegation, agent, agen
     failures: [...(agentFailure ? [`agent error: ${agentFailure}`] : []), ...graded.failures],
     new_subjects: graded.newSubjects,
     report: agent?.report ?? null,
+    turn1_report: agent?.turn1_report ?? null,
     cost_usd: agent?.cost_usd ?? null,
     duration_ms: agent?.duration_ms ?? null,
     num_turns: agent?.num_turns ?? null,
@@ -674,6 +678,51 @@ function instructionFiles() {
   const files = ['skills', 'agents', 'templates', 'hooks'].flatMap((dir) => listFiles(path.join(yllir, dir)));
   files.push(...listFiles(path.join(yllir, 'scripts'), { scriptsOnly: true }));
   return [...new Set(files)].filter((file) => !path.basename(file).startsWith('.'));
+}
+
+// ---------------------------------------------------------------- turns
+
+/**
+ * True when the case has a reply and the copy has no new saved version after the first turn. The
+ * versions are counted the same way the C5 and I6 checks count them (saved versions, not the setup).
+ */
+export function needsReplyTurn(caseData, versionsBefore, versionsAfter) {
+  return caseData.reply !== undefined && versionsAfter <= versionsBefore;
+}
+
+/**
+ * Combines the result of two turns of one run, as runAgentTurns in the entry runner does: cost, duration,
+ * turns and tool calls are summed (null when either side is null), denied is concatenated, report is the
+ * second report and turn1_report the first one.
+ */
+export function combineTurns(first, second) {
+  const sum = (a, b) => (a === null || b === null ? null : a + b);
+  return {
+    ok: second.ok,
+    report: second.report,
+    cost_usd: sum(first.cost_usd, second.cost_usd),
+    duration_ms: sum(first.duration_ms, second.duration_ms),
+    num_turns: sum(first.num_turns, second.num_turns),
+    denied: [...first.denied, ...second.denied],
+    tool_calls: sum(first.tool_calls, second.tool_calls),
+    error: second.ok ? null : second.error,
+    permission_mode: first.permission_mode,
+    turn1_report: first.report,
+  };
+}
+
+/**
+ * Runs the first agent turn in dir. When needsReplyTurn says so, runs the reply in the same folder
+ * (--continue) and returns the combined result; otherwise the first result with turn1_report null.
+ */
+function runAgentTurns({ caseData, dir, model, agentName, pluginDir, versionsBefore }) {
+  const common = { agent: agentName, cwd: dir, model, timeoutMs: AGENT_TIMEOUT_MS, pluginDir };
+  const first = runAgent({ ...common, prompt: caseData.prompt });
+  if (!first.ok || !needsReplyTurn(caseData, versionsBefore, listVersions(dir).length)) {
+    return { ...first, turn1_report: null };
+  }
+  const second = runAgent({ ...common, prompt: caseData.reply, continueConversation: true });
+  return combineTurns(first, second);
 }
 
 // ---------------------------------------------------------------- main
@@ -746,13 +795,13 @@ async function main() {
     const variant = buildPluginVariant({ mode: delegation, sourceDir: PLUGIN_DIR });
     let record;
     try {
-      const agent = runAgent({
-        agent: opts.agent,
-        cwd: setup.dir,
-        prompt: caseData.prompt,
+      const agent = runAgentTurns({
+        caseData,
+        dir: setup.dir,
         model: opts.model,
-        timeoutMs: AGENT_TIMEOUT_MS,
+        agentName: opts.agent,
         pluginDir: variant.pluginDir,
+        versionsBefore: setup.versions,
       });
       const { graded, quality } = await evaluate({ caseData, dir: setup.dir, setup, agent, judge, judgeModel });
       record = makeRecord({
