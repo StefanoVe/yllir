@@ -80,53 +80,34 @@ From here, build the world as you need it. Nothing is generated unless you ask, 
 
 Talk normally. These are only examples.
 
-### Building the world
+| Goal | Say | What Yllir does |
+| --- | --- | --- |
+| **Build the world** | *"A fishing village on the north coast, with an innkeeper who hides something."* · *"Expand the old lighthouse sketch into a full sheet."* · *"A fire elemental with full stats for level 5."* | Writes places, characters, items, creatures, factions and history, checks them against the canon, and links every mention. Works from one sentence up to a whole kingdom. |
+| **Prepare a session** | *"Prepare next session: the party reaches the village at night."* | Writes the session file, one file per scene, and the characters, places and items the scenes need. |
+| **Play** | *"We're starting."* · *"Mira lied to the guard."* · *"Fight: three bandits and the captain."* · *"The captain takes 12 damage."* · *"Next turn."* | Keeps the session log and tracks initiative, hit points and conditions. It never rolls dice or plays the monsters. |
+| **After the game** | *"Tonight they burned the warehouse and the innkeeper fled."* | Writes the chronicle page from your words only, applies the consequences you stated, and proposes the rest for you to confirm. |
+| **Fix the canon** | *"Rename Varn to Varnak everywhere."* · *"Merge the two smugglers."* · *"Actually, the duke died ten years ago."* | Finds every reference, asks you, then updates them all. |
+| **Check the campaign** | *"Check the whole campaign."* | Reports contradictions plus structural and story problems (unused characters, dangling threads, unreachable plot), each with a proposed fix. Changes nothing. |
+| **Balance fights** | *"Make session 4 easier for four players."* | Measures each fight with the game's rules, shows a plan, changes nothing until you say yes. |
+| **Go back** | *"Where were we?"* · *"Undo the last change."* · *"Back to how it was yesterday."* | Summarises, or restores a saved version. |
+| **Import** | *"Here are my notes."* · hand over a whole written campaign | Transcribes, keeps originals untouched, asks when a reading is unclear. For a whole campaign, shows an outline and writes only after your yes. |
+| **Images** | *"A portrait of the innkeeper."* · *"A battle map of the warehouse."* · *"Find existing artwork for the duke."* | Makes or finds the picture and places it on the sheet. Objects come with a transparent background. |
+| **Atlas** | *"Make the atlas."* · *"A plan of the capital."* | Builds a map of the world, a region or a city, from your picture or one painted after you agree, with clickable places (symbol per kind, public summary only) and a browsable map site. Approved land never changes unless you ask. |
+| **Cards and print** | *"Make the card for the Lantern of Morvalle."* · *"Print the cards I haven't printed yet."* | Makes card images and printable PDF sheets with QR codes. |
+| **Music** | *"Ambience music for the harbour."* | Finds and verifies links, saved in the master-only part of the sheet. |
+| **Encyclopedia** | *"Build the encyclopedia for my players."* | Builds a public site from public content only, and tells you what was left out and why. |
 
-- *"Create a fishing village on the north coast, with an innkeeper who hides something."*
-- *"Add a thieves' guild to the capital and decide who they're at war with."*
-- *"Expand the sketch of the old lighthouse into a full sheet."*
-- *"Write a fire elemental with full stats for level 5 players."*
-
-### Before the game
-
-- *"Prepare next session: the party reaches the village at night."*
-
-Yllir writes a session file, one file per scene, and any characters, places or items those scenes need.
-
-### At the table
-
-- *"We're starting."* · *"Note that Mira lied to the guard."* · *"Fight: three bandits and the captain."* · *"The captain takes 12 damage."* · *"Next turn."*
-
-Yllir keeps the session log and tracks initiative, hit points and conditions. It never rolls dice and never plays the monsters for you.
-
-### After the game
-
-- *"Tonight they burned the warehouse and the innkeeper escaped to the hills."*
-
-Yllir writes the chronicle page from what you said, applies the consequences you stated (statuses, locations, timeline), and proposes the others for you to confirm.
-
-### Looking after the canon
-
-- *"Rename Varn to Varnak everywhere."* · *"Merge the two smugglers, they're the same person."* · *"Actually, the duke died ten years ago, not five."*
-- *"Check the whole campaign for contradictions."* The report also lists structural and story problems (unused characters, threads nobody picks up, unreachable plot nodes), each with a proposed fix.
-- *"Make the fights of session 4 easier for four players."* Yllir measures each fight with the game's rules, shows a plan and changes nothing until you say yes.
-- *"Where were we?"* · *"Undo the last change."* · *"Go back to how it was yesterday."*
-
-### Extras
-
-- *"Make a portrait of the innkeeper."* · *"Make a battle map of the warehouse."* · *"Find existing artwork for the duke."*
-- *"Find ambience music for the harbour."*
-- *"Make the atlas."* · *"Make a plan of the capital."* From a picture of your map, or one painted by an image service after asking you, Yllir builds an atlas of the world, a region, or a single city, with names, borders and clickable places (each with a symbol for its kind and a summary written only from the public part of its sheet). It is browsable as a map site with an endless sea around it, kept up to date as you add places, and the land you approved never changes unless you ask.
-- *"Make the card for the Lantern of Morvalle."* · *"Print the cards I haven't printed yet."*
-- *"Build the encyclopedia for my players."*
-
-Music, printing and the public encyclopedia are optional modules. Yllir tells you when one is off and how to turn it on.
+Music, printing and the encyclopedia are optional modules. Yllir tells you when one is off and how to turn it on.
 
 ## The master screen
 
-The master screen is an optional local web app, opened in your browser, that runs only on your computer. You can chat with the assistant there, read the campaign, see and undo recent changes, and run a **live table**: the scene's cards, the session log, and a combat view with initiative, a battle map with tokens you can drag, and stats on hover. A **projector window** on a second screen shows your players an image from the campaign when you click Project, or the live fight (initiative order, enemy health in words instead of numbers, hidden enemies kept off, the battle map with tokens). Nothing reaches the projector unless you send it.
+An optional web app that runs only on your computer, in your browser.
 
-When you create a campaign, Yllir puts an **"Open master screen"** shortcut in its folder. Double-click it. The first time, it downloads the master screen (and Node.js, if needed) and checks the downloads before using them. After that it also works offline.
+- **Chat and read**: talk to the assistant, read the campaign, see and undo recent changes.
+- **Live table**: the scene's cards, the session log, and a combat view with initiative, a battle map with draggable tokens, and stats on hover.
+- **Projector**: a second window for the screen your players see. It shows an image when you click *Project*, or the live fight (initiative order, enemy health in words instead of numbers, hidden enemies kept off, battle map with tokens). Nothing reaches it unless you send it.
+
+When you create a campaign, Yllir puts an **"Open master screen"** shortcut in its folder. Double-click it. The first time, it downloads the master screen (and Node.js, if needed) and checks the downloads; after that it also works offline.
 
 ## Your campaign folder
 
