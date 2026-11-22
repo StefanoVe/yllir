@@ -220,7 +220,8 @@ describe('generateInstructions', () => {
     const instructions = fs.readFileSync(path.join(root, '.campaign/instructions/agent.md'), 'utf8');
     assert.match(instructions, /When the adapter is not `none`, the engine checks creature and item sheets against it at each commit\./);
     assert.match(instructions, /Read its definition in `[^`]*\/modules\/systems\/example\/` before writing such a sheet\./);
-    assert.match(instructions, /Never write a game rule from memory\./);
+    assert.match(instructions, /Never refuse only because the adapter does not contain the rule\./);
+    assert.doesNotMatch(instructions, /Never write a game rule from memory/);
   });
 
   test('creates the five files with the exact wrapper text and no AGENTS.md', () => {
