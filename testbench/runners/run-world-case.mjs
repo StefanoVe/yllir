@@ -7,7 +7,8 @@
 // Cases (cases/world/<name>/case.yaml, with key.yaml beside it):
 //   world-region    fixture morvalle-seeded: the seed holds constraints; new villages and their
 //                   chiefs around the lake, and a fishermen's faction (checks W1 to W10)
-//   world-creature  fixture morvalle with system.adapter dnd-2024: one enemy sheet (C1 to C5)
+//   world-creature  fixture morvalle with system.adapter dnd-2024: one sheet, an enemy or a character
+//                   (npc or vendor), complete and playable (C1 to C6)
 //   world-item      fixture morvalle: a key whose real purpose the players do not know; its public part
 //                   stays clean and its master block holds the secret (I1 to I6)
 // All cases: L-time and L-calls from case.yaml limits. With --judge, a distinct model grades
@@ -53,6 +54,7 @@ import { ensureRepo, listVersions, saveVersion } from '../../yllir/scripts/lib/v
 import { buildWorldIndex } from '../../yllir/scripts/lib/world-graph.mjs';
 import { loadAdapter } from '../../yllir/scripts/lib/adapter.mjs';
 import { validateSheet } from '../../yllir/scripts/lib/adapter-ops.mjs';
+import { actionRowCount } from '../../yllir/scripts/lib/statistics-tables.mjs';
 import { parseFrontmatter } from '../../yllir/scripts/lib/frontmatter.mjs';
 import { foldForm } from '../../yllir/scripts/lib/fold.mjs';
 import { MASTER_MARKER, publicBody } from '../../yllir/scripts/lib/public-text.mjs';
@@ -79,11 +81,19 @@ const REQUIRED_KEYS = {
     'surname_suffix',
     'min_checkable_characters',
   ],
-  creature: ['template', 'kind', 'location', 'abilities'],
+  creature: ['accepted', 'location', 'abilities'],
   item: ['kind', 'template', 'item_type', 'forbidden_public', 'secret_words'],
 };
 // The labels of the characteristics table, by language (the heading of the table under Statistics).
 const CHARACTERISTICS = { it: 'Caratteristiche', en: 'Characteristics' };
+// The label of the actions table under Statistics (C6), by language.
+const ACTIONS = { it: 'Attacchi e capacità', en: 'Attacks and abilities' };
+// The kind and template pairs a creature sheet may take (C1). A creature (kind) is never a fighter: enemy only.
+const ACCEPTED_PAIRS = [
+  { kind: 'creature', template: 'enemy' },
+  { kind: 'character', template: 'npc' },
+  { kind: 'character', template: 'vendor' },
+];
 const LANGUAGES = ['it', 'en'];
 
 // ---------------------------------------------------------------- case files
@@ -110,6 +120,14 @@ export function loadWorldCase(caseDir) {
   }
   for (const name of REQUIRED_KEYS[kind].filter((n) => n.startsWith('min_'))) {
     if (!Number.isInteger(key[name]) || key[name] < 0) throw new Error(`key.yaml: ${name} must be a whole number`);
+  }
+  if (kind === 'creature') {
+    const accepted = key.accepted;
+    if (!Array.isArray(accepted) || accepted.length === 0) throw new Error('key.yaml: accepted must be a list of kind and template pairs');
+    for (const pair of accepted) {
+      const ok = pair !== null && typeof pair === 'object' && ACCEPTED_PAIRS.some((item) => item.kind === pair.kind && item.template === pair.template);
+      if (!ok) throw new Error(`key.yaml: accepted pair ${JSON.stringify(pair)} is not a creature (enemy) or a character (npc, vendor)`);
+    }
   }
   if (kind === 'item') {
     for (const name of ['forbidden_public', 'secret_words']) {
@@ -339,6 +357,20 @@ export function abilityProblems(markdown, adapter, lang, abilityIds) {
   return problems;
 }
 
+/**
+ * C6 helper: the Attacks and abilities table under Statistics has at least one row. Returns the list of
+ * problems (empty when it holds). The count is the adapter-independent one of statistics-tables.mjs.
+ */
+export function actionProblems(markdown, adapter, lang) {
+  const { body } = parseFrontmatter(markdown);
+  const statisticsTitle = adapter.headings?.statistics?.[lang];
+  if (typeof statisticsTitle !== 'string') return [`adapter has no statistics heading for ${lang}`];
+  const statistics = sectionOf(body, statisticsTitle);
+  if (statistics === null) return [`no ${statisticsTitle} section`];
+  if (actionRowCount(statistics, lang) === 0) return [`no row in the ### ${ACTIONS[lang]} table`];
+  return [];
+}
+
 // ---------------------------------------------------------------- link-only saves
 
 const LINK_SYNTAX = /\[([^\]]*)\]\([^)]*\)/g;
@@ -511,8 +543,10 @@ export function gradeRegion({ key, baseline, after, seedBefore, seedAfter, dir, 
 }
 
 /**
- * The creature checks C1 to C5. The adapter is loaded from the framework (adapterId) and the sheet is
- * checked with its validateSheet (the same checks as the engine's). Returns the same shape as gradeRegion.
+ * The creature checks C1 to C6. The sheet is an enemy (creature) or a character (npc, vendor): the statistics
+ * tables are the same for all of them, so C2, C3 and C6 run on the sheet whatever the accepted pair is.
+ * The adapter is loaded from the framework (adapterId) and the sheet is checked with its validateSheet
+ * (the same checks as the engine's). Returns the same shape as gradeRegion.
  */
 export async function gradeCreature({ key, adapterId, lang, baseline, after, dir, versions, setupVersions, report }) {
   const { record, finish } = checkBook();
@@ -527,17 +561,21 @@ export async function gradeCreature({ key, adapterId, lang, baseline, after, dir
     }
   }
 
-  // C1: one new document, a creature with the enemy template.
+  // C1: one new document, whose kind and template form an accepted pair.
   const c1 = [];
   if (fresh.length !== 1) c1.push(`${fresh.length} new documents (want 1)`);
   if (subject !== null) {
-    if (subject.kind !== key.kind) c1.push(`kind is ${subject.kind} (want ${key.kind})`);
     const template = text === null ? null : parseFrontmatter(text).data?.template;
-    if (template !== key.template) c1.push(`template is ${JSON.stringify(template ?? null)} (want ${key.template})`);
+    const pair = key.accepted.some((item) => item.kind === subject.kind && item.template === template);
+    if (!pair) {
+      const wanted = key.accepted.map((item) => `${item.kind} with ${item.template}`).join(' or ');
+      c1.push(`kind ${subject.kind} with template ${JSON.stringify(template ?? null)} (want ${wanted})`);
+    }
   }
   record('C1', c1);
 
   // C2: the sheet passes the adapter's validation (shape and arithmetic), and the adapter loads.
+  // validateSheet takes the statistics branch for every sheet except template creature (no statistics).
   const c2 = [];
   let adapter = null;
   const loaded = loadAdapter(PLUGIN_DIR, adapterId);
@@ -558,11 +596,15 @@ export async function gradeCreature({ key, adapterId, lang, baseline, after, dir
   const c3 = adapter !== null && text !== null ? abilityProblems(text, adapter, lang, key.abilities) : ['no sheet to check'];
   record('C3', c3);
 
-  // C4: the creature lives where the request said.
+  // C4: the sheet lives where the request said.
   record('C4', subject !== null && subject.location.includes(key.location) ? [] : [`location is ${JSON.stringify(subject?.location ?? null)} (want ${key.location})`]);
 
   // C5: one saved version more than the setup.
   record('C5', versionReasons({ dir, versions, setupVersions }));
+
+  // C6: the actions table under Statistics has at least one row.
+  const c6 = adapter !== null && text !== null ? actionProblems(text, adapter, lang) : ['no sheet to check'];
+  record('C6', c6);
 
   return finish({ newSubjects: fresh.map((item) => item.id), newFiles: subject === null ? [] : [subject.file] });
 }

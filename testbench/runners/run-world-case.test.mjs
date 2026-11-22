@@ -106,6 +106,11 @@ test('loadWorldCase reads both world cases with their keys and limits', () => {
   assert.equal(creature.system_adapter, 'dnd-2024');
   assert.deepEqual(creature.limits, { max_minutes: 3, max_tool_calls: 60 });
   assert.deepEqual(creature.key.abilities, ['str', 'dex', 'con', 'int', 'wis', 'cha']);
+  assert.deepEqual(creature.key.accepted, [
+    { kind: 'creature', template: 'enemy' },
+    { kind: 'character', template: 'npc' },
+    { kind: 'character', template: 'vendor' },
+  ]);
 });
 
 test('loadWorldCase rejects an unknown case, a creature without an adapter and a key missing a field', () => {
@@ -117,15 +122,20 @@ test('loadWorldCase rejects an unknown case, a creature without an adapter and a
       fs.writeFileSync(path.join(root, name, 'key.yaml'), keyYaml);
       return path.join(root, name);
     };
-    const creatureKey = 'kind: creature\ntemplate: enemy\nlocation: borgo-cenere\nabilities: [str]\n';
+    const creatureKey = 'accepted:\n  - kind: creature\n    template: enemy\nlocation: borgo-cenere\nabilities: [str]\n';
     assert.throws(() => loadWorldCase(write('a', 'case: world-nope\nfixture: morvalle\nprompt: x\n', creatureKey)), /unknown case/);
     assert.throws(
       () => loadWorldCase(write('b', 'case: world-creature\nfixture: morvalle\nprompt: x\n', creatureKey)),
       /needs system_adapter/,
     );
     assert.throws(
-      () => loadWorldCase(write('c', 'case: world-creature\nfixture: morvalle\nsystem_adapter: dnd-2024\nprompt: x\n', 'kind: creature\n')),
-      /template missing/,
+      () => loadWorldCase(write('c', 'case: world-creature\nfixture: morvalle\nsystem_adapter: dnd-2024\nprompt: x\n', 'location: x\nabilities: [str]\n')),
+      /accepted missing/,
+    );
+    assert.throws(
+      () => loadWorldCase(write('e', 'case: world-creature\nfixture: morvalle\nsystem_adapter: dnd-2024\nprompt: x\n',
+        'accepted:\n  - kind: creature\n    template: npc\nlocation: x\nabilities: [str]\n')),
+      /accepted pair/,
     );
     assert.throws(
       () => loadWorldCase(write('d', 'case: world-creature\nfixture: morvalle\nsystem_adapter: dnd-2024\nprompt: x\nquality_min: 9\n', creatureKey)),
@@ -296,6 +306,12 @@ Guida una banda di tagliagole sulle strade alte sopra il borgo.
 | SAG | 10 (+0) |
 | CAR | 9 (-1) |
 
+### Attacchi e capacità
+
+| Attacco o capacità | Dettagli |
+| --- | --- |
+| Spada corta | Attacco in mischia: +5. Colpisce: 1d6 + 3 danni taglienti. |
+
 <!-- master -->
 ## Master
 
@@ -327,10 +343,77 @@ test('gradeCreature passes a valid enemy sheet on the dnd-2024 copy, with a save
     saveVersion(setup.dir, { message: 'Creature: capo bandito', kind: 'framework' });
     const graded = await gradeCreatureIn(setup, creatureCase(), 'Ho creato il Capo Bandito, inventato da me.');
     assert.deepEqual(graded.failures, []);
-    for (const id of ['C1', 'C2', 'C3', 'C4', 'C5']) assert.equal(graded.checks[id], true, id);
+    for (const id of ['C1', 'C2', 'C3', 'C4', 'C5', 'C6']) assert.equal(graded.checks[id], true, id);
   } finally {
     fs.rmSync(setup.tmp, { recursive: true, force: true });
   }
+});
+
+/** Grades one sheet written at rel in the copy, with version 2 saved, as the creature case. */
+async function gradeSheetIn(text, rel) {
+  const setup = setupWorldCase(creatureCase());
+  try {
+    const file = path.join(setup.dir, rel);
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, text);
+    saveVersion(setup.dir, { message: 'Personaggi: prova', kind: 'framework' });
+    return await gradeCreatureIn(setup, creatureCase(), 'x');
+  } finally {
+    fs.rmSync(setup.tmp, { recursive: true, force: true });
+  }
+}
+
+test('gradeCreature passes a complete character (npc) sheet on the dnd-2024 copy: C1 to C6', async () => {
+  const npc = SHEET.replace('kind: creature\ntemplate: enemy', 'kind: character\ntemplate: npc');
+  const graded = await gradeSheetIn(npc, 'Personaggi/Capo Bandito.md');
+  assert.deepEqual(graded.failures, []);
+  for (const id of ['C1', 'C2', 'C3', 'C4', 'C5', 'C6']) assert.equal(graded.checks[id], true, id);
+});
+
+test('gradeCreature accepts a vendor sheet for C1, and rejects an enemy sheet filed as a character', async () => {
+  const vendor = SHEET.replace('kind: creature\ntemplate: enemy', 'kind: character\ntemplate: vendor');
+  const ok = await gradeSheetIn(vendor, 'Personaggi/Capo Bandito.md');
+  assert.equal(ok.checks.C1, true);
+  const wrong = SHEET.replace('kind: creature\ntemplate: enemy', 'kind: creature\ntemplate: npc');
+  const bad = await gradeSheetIn(wrong, 'Creature/Capo Bandito.md');
+  assert.equal(bad.checks.C1, false);
+  assert.ok(bad.failures.some((f) => f.startsWith('C1') && f.includes('creature with template "npc"')));
+});
+
+test('gradeCreature fails C1 for an item, and for a creature with the npc template', async () => {
+  const item = `---
+id: capo-bandito
+kind: item
+template: item
+provenance: generated
+location: [borgo-cenere]
+---
+# Capo Bandito
+
+## In breve
+
+Un oggetto.
+
+## Descrizione
+
+Una frase.
+
+## Effetti
+
+Nessun effetto di gioco
+`;
+  const graded = await gradeSheetIn(item, 'Oggetti/Capo Bandito.md');
+  assert.equal(graded.checks.C1, false);
+  assert.ok(graded.failures.some((f) => f.startsWith('C1') && f.includes('kind item')));
+});
+
+test('gradeCreature fails C6 on a sheet with an empty attacks table', async () => {
+  const empty = SHEET.replace('| Spada corta | Attacco in mischia: +5. Colpisce: 1d6 + 3 danni taglienti. |\n', '');
+  const graded = await gradeSheetIn(empty, 'Creature/Capo Bandito.md');
+  assert.equal(graded.checks.C6, false);
+  assert.ok(graded.failures.some((f) => f.startsWith('C6') && f.includes('no row in the ### Attacchi e capacità table')));
+  assert.equal(graded.checks.C2, true);
+  assert.equal(graded.checks.C3, true);
 });
 
 test('gradeCreature fails C2 and C3 for a wrong modifier, and C4 for another location', async () => {
@@ -361,6 +444,7 @@ test('gradeCreature fails C1 when no creature was created and C5 when no version
     assert.equal(graded.checks.C2, false);
     assert.equal(graded.checks.C3, false);
     assert.equal(graded.checks.C4, false);
+    assert.equal(graded.checks.C6, false);
   } finally {
     fs.rmSync(setup.tmp, { recursive: true, force: true });
   }
