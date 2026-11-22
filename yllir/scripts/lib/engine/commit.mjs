@@ -485,7 +485,16 @@ async function transform(dir, copy, { files, deletes, retired }) {
   if ([...out.finalFiles, ...deletes].some((rel) => plotFolders.some((folder) => isInside(rel, folder)))) {
     const map = plotMap(copy);
     if (!map.errors.some((error) => error.code === 'campaign-config')) {
-      writeSessionMaps(copy, map.sessions);
+      // Only the sessions of this batch (their folder holds a touched path) are rebuilt; a main file with hand-written text is blocked.
+      const touched = [...out.finalFiles, ...deletes];
+      const batchSessions = map.sessions.filter((session) =>
+        touched.some((rel) => isInside(rel, path.posix.dirname(session.file))));
+      const maps = writeSessionMaps(copy, map.sessions, {
+        only: batchSessions.map((session) => session.file),
+        keepHandText: true,
+        rewritable: out.finalFiles,
+      });
+      out.errors.push(...maps.blocked);
     }
   }
 

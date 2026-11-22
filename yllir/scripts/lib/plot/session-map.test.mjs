@@ -125,12 +125,12 @@ test('writeSessionMaps writes once, then reports unchanged on the second run', (
     const sessions = [THREE_EVENTS];
 
     const first = writeSessionMaps(root, sessions);
-    assert.deepEqual(first, { written: ['Trama/Il faro/Il faro.md'], unchanged: [] });
+    assert.deepEqual(first, { written: ['Trama/Il faro/Il faro.md'], unchanged: [], blocked: [] });
     const target = path.join(folder, 'Il faro.md');
     assert.equal(fs.readFileSync(target, 'utf8'), renderSessionMap(THREE_EVENTS));
 
     const second = writeSessionMaps(root, sessions);
-    assert.deepEqual(second, { written: [], unchanged: ['Trama/Il faro/Il faro.md'] });
+    assert.deepEqual(second, { written: [], unchanged: ['Trama/Il faro/Il faro.md'], blocked: [] });
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -145,7 +145,7 @@ test('a hand-edited main file is overwritten with the generated text', () => {
     fs.writeFileSync(target, 'Manually written text\n');
 
     const result = writeSessionMaps(root, [THREE_EVENTS]);
-    assert.deepEqual(result, { written: ['Trama/Il faro/Il faro.md'], unchanged: [] });
+    assert.deepEqual(result, { written: ['Trama/Il faro/Il faro.md'], unchanged: [], blocked: [] });
     assert.equal(fs.readFileSync(target, 'utf8'), renderSessionMap(THREE_EVENTS));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -184,7 +184,115 @@ test('writeSessionMaps keeps master provenance of the existing main file on rege
     assert.match(fs.readFileSync(target, 'utf8'), /^<!-- yllir\nid: faro\ndepends_on: \[\]\nprovenance: master\n/);
 
     const again = writeSessionMaps(root, sessions);
-    assert.deepEqual(again, { written: [], unchanged: ['Trama/Il faro/Il faro.md'] });
+    assert.deepEqual(again, { written: [], unchanged: ['Trama/Il faro/Il faro.md'], blocked: [] });
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('depends_on is not written when depends_on_declared is false, and is written when it is missing or true', () => {
+  const absent = renderSessionMap(session({ depends_on_declared: false }));
+  assert.doesNotMatch(absent, /^depends_on:/m);
+  assert.match(absent, /^<!-- yllir\nid: faro\nprovenance: generated\n/);
+
+  for (const overrides of [{}, { depends_on_declared: true }]) {
+    const text = renderSessionMap(session(overrides));
+    assert.match(text, /^depends_on: \[\]$/m);
+  }
+});
+
+test('writeSessionMaps with only leaves the sessions not listed untouched, byte for byte', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-map-'));
+  try {
+    const listed = path.join(root, 'Trama', 'Alfa', 'Alfa.md');
+    const other = path.join(root, 'Trama', 'Beta', 'Beta.md');
+    fs.mkdirSync(path.dirname(listed), { recursive: true });
+    fs.mkdirSync(path.dirname(other), { recursive: true });
+    const otherBefore = 'Testo a mano di Beta\n';
+    fs.writeFileSync(other, otherBefore);
+    const alfa = session({ id: 'alfa', file: 'Trama/Alfa/Alfa.md' });
+    const beta = session({ id: 'beta', file: 'Trama/Beta/Beta.md' });
+
+    const result = writeSessionMaps(root, [alfa, beta], { only: ['Trama/Alfa/Alfa.md'] });
+    assert.deepEqual(result, { written: ['Trama/Alfa/Alfa.md'], unchanged: [], blocked: [] });
+    assert.equal(fs.readFileSync(other, 'utf8'), otherBefore);
+    assert.equal(fs.readFileSync(listed, 'utf8'), renderSessionMap(alfa));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('keepHandText leaves a main file with prose and no generated: true byte-identical and reports it as blocked', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-map-'));
+  try {
+    const folder = path.join(root, 'Trama', 'Il faro');
+    fs.mkdirSync(folder, { recursive: true });
+    const target = path.join(folder, 'Il faro.md');
+    const prose = '<!-- yllir\nid: faro\ndepends_on: []\nprovenance: master\n-->\n\nIl faro ha una lanterna rotta.\n';
+    fs.writeFileSync(target, prose);
+
+    const result = writeSessionMaps(root, [THREE_EVENTS], { keepHandText: true });
+    assert.deepEqual(result.written, []);
+    assert.deepEqual(result.unchanged, []);
+    assert.deepEqual(result.blocked, [
+      {
+        file: 'Trama/Il faro/Il faro.md',
+        code: 'main-file-has-text',
+        message: 'Trama/Il faro/Il faro.md has text written by hand; ask the master which scene of the session receives it, then make the main file a stub',
+      },
+    ]);
+    assert.equal(fs.readFileSync(target, 'utf8'), prose);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('keepHandText still writes a stub main file with a metadata block and an empty body', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-map-'));
+  try {
+    const folder = path.join(root, 'Trama', 'Il faro');
+    fs.mkdirSync(folder, { recursive: true });
+    const target = path.join(folder, 'Il faro.md');
+    fs.writeFileSync(target, '<!-- yllir\nid: faro\nprovenance: generated\n-->\n');
+
+    const result = writeSessionMaps(root, [THREE_EVENTS], { keepHandText: true });
+    assert.deepEqual(result, { written: ['Trama/Il faro/Il faro.md'], unchanged: [], blocked: [] });
+    assert.equal(fs.readFileSync(target, 'utf8'), renderSessionMap(THREE_EVENTS));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('keepHandText does not protect a main file listed in rewritable: the batch wrote it on purpose', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-map-'));
+  try {
+    const folder = path.join(root, 'Trama', 'Il faro');
+    fs.mkdirSync(folder, { recursive: true });
+    const target = path.join(folder, 'Il faro.md');
+    fs.writeFileSync(target, '<!-- yllir\nid: faro\nprovenance: master\n-->\n\nTesto a mano.\n');
+
+    const result = writeSessionMaps(root, [THREE_EVENTS], {
+      keepHandText: true,
+      rewritable: ['Trama/Il faro/Il faro.md'],
+    });
+    assert.deepEqual(result, { written: ['Trama/Il faro/Il faro.md'], unchanged: [], blocked: [] });
+    assert.equal(fs.readFileSync(target, 'utf8'), renderSessionMap(THREE_EVENTS));
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('keepHandText rewrites a generated main file with a different body', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-map-'));
+  try {
+    const folder = path.join(root, 'Trama', 'Il faro');
+    fs.mkdirSync(folder, { recursive: true });
+    const target = path.join(folder, 'Il faro.md');
+    fs.writeFileSync(target, '<!-- yllir\nid: faro\ndepends_on: []\nprovenance: generated\ngenerated: true\n-->\n\nVecchia mappa.\n');
+
+    const result = writeSessionMaps(root, [THREE_EVENTS], { keepHandText: true });
+    assert.deepEqual(result, { written: ['Trama/Il faro/Il faro.md'], unchanged: [], blocked: [] });
+    assert.equal(fs.readFileSync(target, 'utf8'), renderSessionMap(THREE_EVENTS));
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }

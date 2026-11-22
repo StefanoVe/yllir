@@ -490,3 +490,16 @@ test('the session object carries the provenance of its main file, or null when m
     [['s-01', 'master'], ['s-02', null], ['s-03', null]],
   );
 });
+
+test('depends_on_declared is true when the main file has a depends_on key, false when the key is absent', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/Sessione 1/Sessione 1.md': '---\nid: s-01\ndepends_on: []\n---\n\n# S1\n',
+    'Trama/Sessione 2/Sessione 2.md': '---\nid: s-02\n---\n\n# S2\n',
+  });
+  const result = plotMap(root);
+  const byId = Object.fromEntries(result.sessions.map((s) => [s.id, s]));
+  assert.equal(byId['s-01'].depends_on_declared, true);
+  assert.deepEqual(byId['s-01'].depends_on, []);
+  assert.equal(byId['s-02'].depends_on_declared, false);
+  assert.deepEqual(byId['s-02'].depends_on, []);
+});

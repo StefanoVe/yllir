@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { compareStrings } from '../subjects.mjs';
 import { PROVENANCES } from '../world-graph.mjs';
-import { METADATA_CLOSE, METADATA_OPEN } from '../frontmatter.mjs';
+import { METADATA_CLOSE, METADATA_OPEN, parseFrontmatter } from '../frontmatter.mjs';
 
 const LIST_SEPARATOR = ', ';
 
@@ -37,7 +37,10 @@ export function renderSessionMap(session) {
   events.forEach((event, index) => indexById.set(event.id, index));
 
   const lines = [METADATA_OPEN, `id: ${session.id}`];
-  lines.push(`depends_on: [${(session.depends_on ?? []).join(LIST_SEPARATOR)}]`);
+  // A main file that declared no depends_on keeps it undeclared; only an explicit false omits the line.
+  if (session.depends_on_declared !== false) {
+    lines.push(`depends_on: [${(session.depends_on ?? []).join(LIST_SEPARATOR)}]`);
+  }
   lines.push(`provenance: ${provenanceOf(session)}`);
   lines.push(`location: [${(session.location ?? []).join(LIST_SEPARATOR)}]`);
   if (session.arc) lines.push(`arc: "${session.arc}"`);
@@ -93,18 +96,42 @@ export function renderSessionMap(session) {
 }
 
 /**
+ * True when the existing main file holds text that a rebuild would destroy: it has
+ * no `generated: true` in its metadata, and its body (after the metadata block, trimmed)
+ * is non-empty and differs from the body of the rendered text (trimmed).
+ * @param {string} current existing file content
+ * @param {string} rendered the generated text that would replace it
+ */
+function hasHandText(current, rendered) {
+  const existing = parseFrontmatter(current);
+  if (existing.data?.generated === 'true') return false;
+  const body = existing.body.trim();
+  if (body === '') return false;
+  return body !== parseFrontmatter(rendered).body.trim();
+}
+
+/**
  * Writes the main file of every session, but only where it is missing or differs
  * from the rendered text. No folders are created.
  * @param {string} root absolute path of the campaign
  * @param {object[]} sessions the sessions of plotMap(root)
- * @returns {{ written: string[], unchanged: string[] }} campaign-relative paths
+ * @param {{ only?: string[]|Set<string>, keepHandText?: boolean, rewritable?: string[]|Set<string> }} [options]
+ *   only: campaign-relative main files to consider; every other session is skipped entirely.
+ *   keepHandText: a main file with hand-written text (see hasHandText) is not written; it is reported in blocked.
+ *   rewritable: main files the batch itself writes; they skip the hand-text check and are rebuilt.
+ * @returns {{ written: string[], unchanged: string[], blocked: Array<{file: string, code: string, message: string}> }}
+ *   campaign-relative paths
  */
-export function writeSessionMaps(root, sessions) {
+export function writeSessionMaps(root, sessions, options = {}) {
   const written = [];
   const unchanged = [];
+  const blocked = [];
+  const only = options.only ? new Set(options.only) : null;
+  const rewritable = new Set(options.rewritable ?? []);
   const ordered = [...sessions].sort((a, b) => compareStrings(a.file, b.file));
 
   for (const session of ordered) {
+    if (only !== null && !only.has(session.file)) continue;
     const text = renderSessionMap(session);
     const target = path.join(root, session.file);
 
@@ -117,11 +144,22 @@ export function writeSessionMaps(root, sessions) {
 
     if (current === text) {
       unchanged.push(session.file);
+    } else if (
+      options.keepHandText === true
+      && !rewritable.has(session.file)
+      && current !== null
+      && hasHandText(current, text)
+    ) {
+      blocked.push({
+        file: session.file,
+        code: 'main-file-has-text',
+        message: `${session.file} has text written by hand; ask the master which scene of the session receives it, then make the main file a stub`,
+      });
     } else {
       fs.writeFileSync(target, text);
       written.push(session.file);
     }
   }
 
-  return { written, unchanged };
+  return { written, unchanged, blocked };
 }

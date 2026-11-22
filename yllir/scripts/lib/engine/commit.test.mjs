@@ -911,6 +911,89 @@ test('a new generated session main file passes check: the engine map step does n
   assert.match(readAt(dir, SESSION2_PATH), /generated: true/);
 });
 
+const MISSIONE2_PATH = 'Trama/Missione 2/Missione 2.md';
+const MISSIONE2_SCENE = 'Trama/Missione 2/Eventi/Il committente.md';
+const MISSIONE2_TEXT = '---\nid: missione-due\ndepends_on: []\nprovenance: master\n---\n\nIl committente del forte chiede una seconda scorta.\n';
+const MISSIONE2_SCENE_TEXT = '---\nid: scena-committente\nsession: missione-due\ndepends_on: []\nprovenance: master\n---\n\n## Il committente\n\nUn uomo chiede la scorta.\n';
+
+test('a new session does not overwrite the hand-written main file of another session', async (t) => {
+  const dir = makeCampaign(t);
+  // Missione 2 is saved with prose in its main file and one scene.
+  fs.mkdirSync(path.join(dir, 'Trama/Missione 2/Eventi'), { recursive: true });
+  fs.writeFileSync(path.join(dir, MISSIONE2_PATH), MISSIONE2_TEXT);
+  fs.writeFileSync(path.join(dir, MISSIONE2_SCENE), MISSIONE2_SCENE_TEXT);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'missione due']);
+  const missione2Before = readAt(dir, MISSIONE2_PATH);
+
+  const SESSION6_PATH = 'Trama/Missione 6/Missione 6.md';
+  const SCENE6_PATH = 'Trama/Missione 6/Eventi/Il ponte.md';
+  writeDraft(dir, SESSION6_PATH, '---\nid: missione-sei\ndepends_on: []\nprovenance: generated\n---\n');
+  writeDraft(
+    dir,
+    SCENE6_PATH,
+    '---\nid: scena-ponte\nsession: missione-sei\ndepends_on: []\nprovenance: master\n---\n\n## Il ponte\n\nIl gruppo attraversa il ponte.\n',
+  );
+
+  const check = await checkBatch(dir, { files: [SESSION6_PATH, SCENE6_PATH] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  writeReview(dir);
+  const result = await commitBatch(dir, { files: [SESSION6_PATH, SCENE6_PATH], message: 'Add session six' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.equal(readAt(dir, MISSIONE2_PATH), missione2Before);
+  assert.match(readAt(dir, SESSION6_PATH), /generated: true/);
+});
+
+test('a batch that changes a scene and writes a stub of the same main file rebuilds the main file', async (t) => {
+  const dir = makeCampaign(t);
+  fs.mkdirSync(path.join(dir, 'Trama/Missione 2/Eventi'), { recursive: true });
+  fs.writeFileSync(path.join(dir, MISSIONE2_PATH), MISSIONE2_TEXT);
+  fs.writeFileSync(path.join(dir, MISSIONE2_SCENE), MISSIONE2_SCENE_TEXT);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'missione due']);
+
+  writeDraft(
+    dir,
+    MISSIONE2_SCENE,
+    MISSIONE2_SCENE_TEXT.replace('Un uomo chiede la scorta.', 'Una donna chiede la scorta.'),
+  );
+  writeDraft(dir, MISSIONE2_PATH, '---\nid: missione-due\ndepends_on: []\nprovenance: master\n---\n');
+  const files = [MISSIONE2_PATH, MISSIONE2_SCENE];
+  const check = await checkBatch(dir, { files });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+
+  writeReview(dir);
+  const result = await commitBatch(dir, { files, message: 'Change the client scene' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.match(readAt(dir, MISSIONE2_PATH), /generated: true/);
+});
+
+test('a batch that changes a scene of a session with hand-written prose is refused with main-file-has-text', async (t) => {
+  const dir = makeCampaign(t);
+  fs.mkdirSync(path.join(dir, 'Trama/Missione 2/Eventi'), { recursive: true });
+  fs.writeFileSync(path.join(dir, MISSIONE2_PATH), MISSIONE2_TEXT);
+  fs.writeFileSync(path.join(dir, MISSIONE2_SCENE), MISSIONE2_SCENE_TEXT);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'missione due']);
+  const commitBefore = head(dir);
+  const missione2Before = readAt(dir, MISSIONE2_PATH);
+
+  writeDraft(
+    dir,
+    MISSIONE2_SCENE,
+    MISSIONE2_SCENE_TEXT.replace('Un uomo chiede la scorta.', 'Una donna chiede la scorta.'),
+  );
+  const check = await checkBatch(dir, { files: [MISSIONE2_SCENE] });
+  assert.equal(check.ok, false);
+  const errors = check.errors.filter((e) => e.code === 'main-file-has-text');
+  assert.equal(errors.length, 1, JSON.stringify(check.errors));
+  assert.equal(errors[0].file, MISSIONE2_PATH);
+
+  assert.equal(readAt(dir, MISSIONE2_PATH), missione2Before);
+  assert.equal(head(dir), commitBefore);
+});
+
 test('with the dnd-2024 adapter, a check value that is not a D&D 2024 check is rejected', async (t) => {
   const dir = makeCampaign(t);
   const config = fs.readFileSync(path.join(dir, 'campaign.yaml'), 'utf8').replace('adapter: none', 'adapter: dnd-2024');

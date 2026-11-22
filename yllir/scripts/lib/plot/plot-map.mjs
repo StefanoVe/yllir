@@ -95,6 +95,7 @@ export function plotMap(root) {
       arc,
       name: path.posix.basename(file, '.md'),
       depends_on: dependsOn,
+      depends_on_declared: Object.hasOwn(data, 'depends_on'),
       location: readLocation(data),
       provenance: readProvenance(data),
     };
@@ -271,6 +272,7 @@ export function plotMap(root) {
       arc: doc.arc,
       name: doc.name,
       depends_on: doc.depends_on.slice(),
+      depends_on_declared: doc.depends_on_declared,
       location: doc.location.slice(),
       provenance: doc.provenance,
       played,
