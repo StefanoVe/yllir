@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { REPO_ROOT } from './lib/case-common.mjs';
 import { saveVersion, listVersions } from '../../yllir/scripts/lib/versions.mjs';
 import { buildWorldIndex } from '../../yllir/scripts/lib/world-graph.mjs';
@@ -19,6 +20,8 @@ import {
   gradeCreature,
   gradeItem,
   gradeRegion,
+  isLinkOnlyCommit,
+  versionReasons,
   lakeClosure,
   combineTurns,
   lastWordOf,
@@ -639,4 +642,139 @@ test('combineTurns keeps a failed second turn as the error and leaves a null sum
   assert.equal(combined.cost_usd, null);
   assert.equal(combined.tool_calls, null);
   assert.equal(combined.turn1_report, 'primo');
+});
+
+// ---------------------------------------------------------------- link-only saves
+
+/** Runs git in a temporary repository with a fixed author (the tests never touch the real repository). */
+function git(dir, args) {
+  return execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', ...args], {
+    cwd: dir,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+}
+
+/** Makes a temporary repository with one base commit holding the given files, and runs fn in it. */
+function withRepo(files, fn) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-link-'));
+  try {
+    git(dir, ['init', '-q']);
+    for (const [rel, text] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(dir, rel)), { recursive: true });
+      fs.writeFileSync(path.join(dir, rel), text);
+    }
+    git(dir, ['add', '-A']);
+    git(dir, ['commit', '-q', '-m', 'base']);
+    return fn(dir);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** Applies change to the repository and commits everything as HEAD. */
+function commitChange(dir, change) {
+  change(dir);
+  git(dir, ['add', '-A']);
+  git(dir, ['commit', '-q', '-m', 'change']);
+}
+
+const CANNETO_BASE = '# Canneto\n\nIl borgo di Canneto sorge sulla riva.\nLe case sono di canne.\n';
+
+test('isLinkOnlyCommit: a commit that only turns a name into a link is link-only', () => {
+  withRepo({ 'Mondo/Canneto.md': CANNETO_BASE }, (dir) => {
+    commitChange(dir, (root) => {
+      fs.writeFileSync(path.join(root, 'Mondo/Canneto.md'), CANNETO_BASE.replace('Il borgo di Canneto', 'Il borgo di [Canneto](Mondo/Canneto.md)'));
+    });
+    assert.equal(isLinkOnlyCommit(dir, 'HEAD'), true);
+  });
+});
+
+test('isLinkOnlyCommit: links added in two files, with no other change, are link-only', () => {
+  withRepo({ 'Mondo/Canneto.md': CANNETO_BASE, 'Personaggi/Tarsa.md': 'Capo di Canneto.\n' }, (dir) => {
+    commitChange(dir, (root) => {
+      fs.writeFileSync(path.join(root, 'Mondo/Canneto.md'), CANNETO_BASE.replace('Il borgo di Canneto', 'Il borgo di [Canneto](Mondo/Canneto.md)'));
+      fs.writeFileSync(path.join(root, 'Personaggi/Tarsa.md'), 'Capo di [Canneto](../Mondo/Canneto.md).\n');
+    });
+    assert.equal(isLinkOnlyCommit(dir, 'HEAD'), true);
+  });
+});
+
+test('isLinkOnlyCommit: a commit that changes other words as well is not link-only', () => {
+  withRepo({ 'Mondo/Canneto.md': CANNETO_BASE }, (dir) => {
+    commitChange(dir, (root) => {
+      fs.writeFileSync(path.join(root, 'Mondo/Canneto.md'), CANNETO_BASE.replace('sorge sulla riva', 'sta sulla riva').replace('Il borgo di Canneto', 'Il borgo di [Canneto](Mondo/Canneto.md)'));
+    });
+    assert.equal(isLinkOnlyCommit(dir, 'HEAD'), false);
+  });
+});
+
+test('isLinkOnlyCommit: a commit that only rewords a line, with no link, is not link-only', () => {
+  withRepo({ 'Mondo/Canneto.md': CANNETO_BASE }, (dir) => {
+    commitChange(dir, (root) => {
+      fs.writeFileSync(path.join(root, 'Mondo/Canneto.md'), CANNETO_BASE.replace('sorge sulla riva', 'sta sulla riva'));
+    });
+    assert.equal(isLinkOnlyCommit(dir, 'HEAD'), false);
+  });
+});
+
+test('isLinkOnlyCommit: a commit that adds a file is not link-only', () => {
+  withRepo({ 'Mondo/Canneto.md': CANNETO_BASE }, (dir) => {
+    commitChange(dir, (root) => {
+      fs.writeFileSync(path.join(root, 'Mondo/Canneto.md'), CANNETO_BASE.replace('Il borgo di Canneto', 'Il borgo di [Canneto](Mondo/Canneto.md)'));
+      fs.writeFileSync(path.join(root, 'Mondo/Nuovo.md'), '# Nuovo\n');
+    });
+    assert.equal(isLinkOnlyCommit(dir, 'HEAD'), false);
+  });
+});
+
+test('isLinkOnlyCommit: a commit that deletes a line is not link-only', () => {
+  withRepo({ 'Mondo/Canneto.md': CANNETO_BASE }, (dir) => {
+    commitChange(dir, (root) => {
+      fs.writeFileSync(path.join(root, 'Mondo/Canneto.md'), CANNETO_BASE.replace('Le case sono di canne.\n', '').replace('Il borgo di Canneto', 'Il borgo di [Canneto](Mondo/Canneto.md)'));
+    });
+    assert.equal(isLinkOnlyCommit(dir, 'HEAD'), false);
+  });
+});
+
+test('isLinkOnlyCommit: a commit that deletes a file or renames one is not link-only', () => {
+  withRepo({ 'Mondo/Canneto.md': CANNETO_BASE, 'Mondo/Vecchio.md': 'Un testo.\n' }, (dir) => {
+    commitChange(dir, (root) => {
+      fs.rmSync(path.join(root, 'Mondo/Vecchio.md'));
+    });
+    assert.equal(isLinkOnlyCommit(dir, 'HEAD'), false);
+  });
+  withRepo({ 'Mondo/Canneto.md': CANNETO_BASE }, (dir) => {
+    commitChange(dir, (root) => {
+      git(root, ['mv', 'Mondo/Canneto.md', 'Mondo/Borgo.md']);
+    });
+    assert.equal(isLinkOnlyCommit(dir, 'HEAD'), false);
+  });
+});
+
+test('isLinkOnlyCommit: a change to a file that is not Markdown is not link-only', () => {
+  withRepo({ 'Mondo/mappa.txt': 'Il borgo di Canneto\n' }, (dir) => {
+    commitChange(dir, (root) => {
+      fs.writeFileSync(path.join(root, 'Mondo/mappa.txt'), 'Il borgo di [Canneto](Mondo/Canneto.md)\n');
+    });
+    assert.equal(isLinkOnlyCommit(dir, 'HEAD'), false);
+  });
+});
+
+test('versionReasons: setup + 1 passes, setup + 2 passes only with a link-only last version', () => {
+  withRepo({ 'Mondo/Canneto.md': CANNETO_BASE }, (dir) => {
+    commitChange(dir, (root) => {
+      fs.writeFileSync(path.join(root, 'Mondo/Canneto.md'), CANNETO_BASE.replace('Il borgo di Canneto', 'Il borgo di [Canneto](Mondo/Canneto.md)'));
+    });
+    assert.deepEqual(versionReasons({ dir, versions: 2, setupVersions: 1 }), []);
+  });
+  withRepo({ 'Mondo/Canneto.md': CANNETO_BASE }, (dir) => {
+    commitChange(dir, (root) => {
+      fs.writeFileSync(path.join(root, 'Mondo/Canneto.md'), CANNETO_BASE.replace('sorge sulla riva', 'sta sulla riva'));
+    });
+    assert.deepEqual(versionReasons({ dir, versions: 2, setupVersions: 1 }), []);
+    assert.deepEqual(versionReasons({ dir, versions: 3, setupVersions: 1 }), ['3 saved versions (want 2) (the extra version is not a link-only save)']);
+    assert.deepEqual(versionReasons({ dir, versions: 4, setupVersions: 1 }), ['4 saved versions (want 2)']);
+    assert.deepEqual(versionReasons({ dir: undefined, versions: 3, setupVersions: 1 }), ['3 saved versions (want 2) (the extra version is not a link-only save)']);
+  });
 });

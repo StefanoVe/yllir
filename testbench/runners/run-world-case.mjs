@@ -25,6 +25,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   REPO_ROOT,
@@ -338,6 +339,81 @@ export function abilityProblems(markdown, adapter, lang, abilityIds) {
   return problems;
 }
 
+// ---------------------------------------------------------------- link-only saves
+
+const LINK_SYNTAX = /\[([^\]]*)\]\([^)]*\)/g;
+const withoutLinks = (line) => line.replace(LINK_SYNTAX, '$1');
+const DIFF_NOT_IN_PLACE = /^(new file mode|deleted file mode|rename from|rename to|copy from|copy to|similarity index|dissimilarity index|Binary files)/;
+
+/** Runs git in dir and returns its stdout. The outer GIT_DIR, GIT_WORK_TREE and GIT_INDEX_FILE are dropped, as in versions.mjs. */
+function gitOutput(dir, args) {
+  const env = { ...process.env };
+  for (const name of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE']) delete env[name];
+  // core.quotePath=false keeps non-ASCII paths unquoted, so the .md check reads the real name.
+  return execFileSync('git', ['-c', 'core.quotePath=false', ...args], {
+    cwd: dir,
+    encoding: 'utf8',
+    env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: 512 * 1024 * 1024,
+  });
+}
+
+/**
+ * True when the commit ref only adds link syntax to existing Markdown files: every changed path is a .md file
+ * modified in place (no add, delete or rename), and inside each hunk (-U0) the removed lines and the added
+ * lines pair up in order, equal in number, and each pair is equal once [text](target) is reduced to text on
+ * both sides. False for an empty commit.
+ */
+export function isLinkOnlyCommit(dir, ref) {
+  const changed = gitOutput(dir, ['show', '--numstat', '--format=', '-M', ref]).split('\n').filter((line) => line !== '');
+  if (changed.length === 0) return false;
+  for (const line of changed) {
+    const [added, removed, ...rest] = line.split('\t');
+    const file = rest.join('\t');
+    if (added === '-' || removed === '-') return false; // binary
+    if (!file.endsWith('.md') || file.includes(' => ')) return false; // a rename shows as "old => new"
+  }
+
+  let removedLines = [];
+  let addedLines = [];
+  let inHunk = false;
+  const hunkPairsOk = () => {
+    const ok = removedLines.length === addedLines.length && removedLines.every((text, i) => withoutLinks(text) === withoutLinks(addedLines[i]));
+    removedLines = [];
+    addedLines = [];
+    return ok;
+  };
+  for (const line of gitOutput(dir, ['show', '--format=', '-U0', '-M', ref]).split('\n')) {
+    if (line.startsWith('diff --git ')) {
+      if (!hunkPairsOk()) return false;
+      inHunk = false;
+    } else if (line.startsWith('@@')) {
+      if (!hunkPairsOk()) return false;
+      inHunk = true;
+    } else if (!inHunk) {
+      if (DIFF_NOT_IN_PLACE.test(line) || line === '--- /dev/null' || line === '+++ /dev/null') return false;
+    } else if (line.startsWith('-')) {
+      removedLines.push(line.slice(1));
+    } else if (line.startsWith('+')) {
+      addedLines.push(line.slice(1));
+    } // "\ No newline at end of file" and other lines carry no content
+  }
+  return hunkPairsOk();
+}
+
+/**
+ * The reasons why the saved-version count is wrong for W9, C5 and I6 (an empty list when it is right).
+ * The count is right when it is setupVersions + 1, or setupVersions + 2 with a link-only last version
+ * (the link review saves its approved links as one more version).
+ */
+export function versionReasons({ dir, versions, setupVersions }) {
+  if (versions === setupVersions + 1) return [];
+  if (versions === setupVersions + 2 && dir !== undefined && isLinkOnlyCommit(dir, 'HEAD')) return [];
+  const extra = versions === setupVersions + 2 ? ' (the extra version is not a link-only save)' : '';
+  return [`${versions} saved versions (want ${setupVersions + 1})${extra}`];
+}
+
 // ---------------------------------------------------------------- grading
 
 /** Returns { checks, failures, pass } with the record helper used by both grading functions. */
@@ -358,7 +434,7 @@ function checkBook() {
  * saved versions after the run and setupVersions the number before it (1). report is the final message
  * or null. Returns { checks, failures, pass, newSubjects, newFiles }.
  */
-export function gradeRegion({ key, baseline, after, seedBefore, seedAfter, versions, setupVersions, report }) {
+export function gradeRegion({ key, baseline, after, seedBefore, seedAfter, dir, versions, setupVersions, report }) {
   const { record, finish } = checkBook();
   const fresh = newSubjectsOf(after, baseline);
 
@@ -417,7 +493,7 @@ export function gradeRegion({ key, baseline, after, seedBefore, seedAfter, versi
   if (!/<!-- master -->/.test(seedAfter) || !/<!-- \/master -->/.test(seedAfter)) w8.push('the seed has no master block');
   record('W8', w8);
 
-  record('W9', versions === setupVersions + 1 ? [] : [`${versions} saved versions (want ${setupVersions + 1})`]);
+  record('W9', versionReasons({ dir, versions, setupVersions }));
 
   // W10: the final message names a created subject and says it is invented.
   const w10 = [];
@@ -486,7 +562,7 @@ export async function gradeCreature({ key, adapterId, lang, baseline, after, dir
   record('C4', subject !== null && subject.location.includes(key.location) ? [] : [`location is ${JSON.stringify(subject?.location ?? null)} (want ${key.location})`]);
 
   // C5: one saved version more than the setup.
-  record('C5', versions === setupVersions + 1 ? [] : [`${versions} saved versions (want ${setupVersions + 1})`]);
+  record('C5', versionReasons({ dir, versions, setupVersions }));
 
   return finish({ newSubjects: fresh.map((item) => item.id), newFiles: subject === null ? [] : [subject.file] });
 }
@@ -562,7 +638,7 @@ export function gradeItem({ key, baseline, after, dir, versions, setupVersions }
   );
 
   // I6: one saved version more than the setup.
-  record('I6', versions === setupVersions + 1 ? [] : [`${versions} saved versions (want ${setupVersions + 1})`]);
+  record('I6', versionReasons({ dir, versions, setupVersions }));
 
   return finish({ newSubjects: fresh.map((item) => item.id), newFiles: subject === null ? [] : [subject.file] });
 }
@@ -581,6 +657,7 @@ async function gradeWorld({ caseData, dir, setup, report }) {
       after,
       seedBefore: setup.seedBefore,
       seedAfter: readSeed(dir),
+      dir,
       versions,
       setupVersions: setup.versions,
       report,
