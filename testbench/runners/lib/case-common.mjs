@@ -232,6 +232,8 @@ function resultText(content) {
  * Parses the stream-json output of `claude -p --output-format stream-json --verbose`.
  * Lines that are not JSON are skipped. Returns:
  *   result: the object of the last line with type "result", or null;
+ *   results_count: how many lines have type "result" (a run with sub-agents can have more than one);
+ *   cost_usd_sum: the sum of total_cost_usd over all result lines (null when none has a number);
  *   denied: one { name, input, sub } per tool result refused by a permission rule
  *           (input is the first 300 characters of the call's input summary);
  *           name and input are null when the refused tool_use was not seen;
@@ -243,6 +245,7 @@ export function parseStream(text) {
   const denied = [];
   let toolCalls = 0;
   let result = null;
+  const results = [];
   for (const raw of text.split('\n')) {
     const line = raw.trim();
     if (line === '') continue;
@@ -253,7 +256,10 @@ export function parseStream(text) {
       continue;
     }
     if (obj === null || typeof obj !== 'object') continue;
-    if (obj.type === 'result') result = obj;
+    if (obj.type === 'result') {
+      result = obj;
+      results.push(obj);
+    }
     const content = obj.message?.content;
     if (!Array.isArray(content)) continue;
     const sub = obj.parent_tool_use_id !== undefined && obj.parent_tool_use_id !== null;
@@ -272,16 +278,26 @@ export function parseStream(text) {
       }
     }
   }
-  return { result, denied, tool_calls: toolCalls };
+  const costs = results.map((r) => r.total_cost_usd).filter((c) => typeof c === 'number');
+  const costSum = costs.length > 0 ? costs.reduce((a, b) => a + b, 0) : null;
+  return { result, results_count: results.length, cost_usd_sum: costSum, denied, tool_calls: toolCalls };
 }
 
 /**
  * Runs the agent under test with `claude -p` in cwd, in strict permission mode
  * (no prompts, only the rules in strict-settings.json). Never throws: the result
- * is { ok, report, cost_usd, duration_ms, num_turns, denied, tool_calls, error,
- * permission_mode }, where error is the first line of the failure message when
- * ok is false, denied is the list parseStream returns and tool_calls is the number
- * of tool calls (null when the run failed).
+ * is { ok, report, cost_usd, cost_usd_sum, results_count, duration_ms, result_duration_ms,
+ * num_turns, denied, tool_calls, error, permission_mode }, where:
+ *   duration_ms is the wall-clock time of the whole claude process (sub-agents included);
+ *   result_duration_ms is the duration_ms of the last result line, as the CLI reports it;
+ *   cost_usd is the total_cost_usd of the last result line; cost_usd_sum sums it over all result lines;
+ *   results_count is the number of result lines;
+ *   error is the first line of the failure message when ok is false, denied is the list
+ *   parseStream returns and tool_calls is the number of tool calls (null when the run failed).
+ * When ok is false the result also has exit_status (number or null), exit_signal (string or null),
+ * stderr_tail (last 1500 characters of stderr), and, when the process wrote stdout before failing,
+ * the report, tool_calls, denied, results_count and costs parsed from that stdout. error then reads
+ * "<first line> (exit <status|signal>): <last stderr line>", cut to 300 characters.
  */
 export function runClaude({
   cwd,
@@ -309,6 +325,7 @@ export function runClaude({
     '--settings',
     STRICT_SETTINGS,
   ];
+  const started = Date.now();
   try {
     const stdout = execFileSync('claude', args, {
       cwd,
@@ -319,14 +336,18 @@ export function runClaude({
       // Feedback is off by default; test runs record it for the case reports.
       env: { ...process.env, YLLIR_FEEDBACK: '1' },
     });
-    const { result: data, denied, tool_calls: toolCalls } = parseStream(stdout);
+    const { result: data, results_count: resultsCount, cost_usd_sum: costSum, denied, tool_calls: toolCalls } = parseStream(stdout);
+    const duration = Date.now() - started;
     if (data === null || typeof data.result !== 'string') throw new Error('no result text in JSON output');
     const num = (value) => (typeof value === 'number' ? value : null);
     return {
       ok: true,
       report: data.result,
       cost_usd: num(data.total_cost_usd),
-      duration_ms: num(data.duration_ms),
+      cost_usd_sum: costSum,
+      results_count: resultsCount,
+      duration_ms: duration,
+      result_duration_ms: num(data.duration_ms),
       num_turns: num(data.num_turns),
       denied,
       tool_calls: toolCalls,
@@ -334,15 +355,35 @@ export function runClaude({
       permission_mode: PERMISSION_MODE,
     };
   } catch (err) {
+    // A failed run keeps what it did before failing: its stdout is parsed like a good one.
+    const partial = err.stdout ? parseStream(String(err.stdout)) : null;
+    const data = partial ? partial.result : null;
+    const num = (value) => (typeof value === 'number' ? value : null);
+    const status = typeof err.status === 'number' ? err.status : null;
+    const signal = typeof err.signal === 'string' ? err.signal : null;
+    const stderrTail = String(err.stderr ?? '').slice(-1500);
+    const stderrLines = stderrTail.split('\n').map((line) => line.trim()).filter((line) => line !== '');
+    const headline = err.message.split('\n')[0];
+    const exit = status !== null ? String(status) : (signal ?? 'unknown');
+    const lastStderr = stderrLines.length > 0 ? `: ${stderrLines[stderrLines.length - 1]}` : '';
+    // The headline is the long command line: cut it first so the exit and the stderr cause survive the 300 limit.
+    const suffix = ` (exit ${exit})${lastStderr}`;
+    const error = (headline.slice(0, Math.max(0, 300 - suffix.length)) + suffix).slice(0, 300);
     return {
       ok: false,
-      report: null,
-      cost_usd: null,
-      duration_ms: null,
-      num_turns: null,
-      denied: [],
-      tool_calls: null,
-      error: err.message.split('\n')[0],
+      report: data !== null && typeof data.result === 'string' ? data.result : null,
+      cost_usd: data !== null ? num(data.total_cost_usd) : null,
+      cost_usd_sum: partial ? partial.cost_usd_sum : null,
+      results_count: partial ? partial.results_count : null,
+      duration_ms: Date.now() - started,
+      result_duration_ms: data !== null ? num(data.duration_ms) : null,
+      num_turns: data !== null ? num(data.num_turns) : null,
+      denied: partial ? partial.denied : [],
+      tool_calls: partial ? partial.tool_calls : null,
+      exit_status: status,
+      exit_signal: signal,
+      stderr_tail: stderrTail,
+      error,
       permission_mode: PERMISSION_MODE,
     };
   }

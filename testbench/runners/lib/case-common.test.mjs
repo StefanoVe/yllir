@@ -210,3 +210,40 @@ test('printSummary names the agent only when it is given', () => {
   assert.equal(withAgent, 'pass rate: 1/1  agent: claude  model: haiku  instructions: abc');
   assert.equal(withoutAgent, 'pass rate: 1/1  model: haiku  instructions: abc');
 });
+
+test('counts every result line and sums their cost, while the last result stays the last one', () => {
+  const text = lines(
+    { type: 'system', subtype: 'init' },
+    { type: 'result', subtype: 'success', result: 'first', total_cost_usd: 0.5, duration_ms: 9000, num_turns: 40 },
+    { type: 'assistant', message: { content: [{ type: 'tool_use', id: 'q', name: 'Bash', input: { command: 'ls' } }] } },
+    { type: 'result', subtype: 'success', result: 'final', total_cost_usd: 0.25, duration_ms: 3826, num_turns: 1 },
+  );
+  const parsed = parseStream(text);
+  assert.equal(parsed.results_count, 2);
+  assert.equal(parsed.cost_usd_sum, 0.75);
+  assert.equal(parsed.result.result, 'final');
+  assert.equal(parsed.result.total_cost_usd, 0.25);
+  assert.equal(parsed.tool_calls, 1);
+});
+
+test('a single result line gives results_count 1 and its own cost as the sum', () => {
+  const parsed = parseStream(sample);
+  assert.equal(parsed.results_count, 1);
+  assert.equal(parsed.cost_usd_sum, 0.12);
+});
+
+test('no result line gives results_count 0 and a null cost sum', () => {
+  const parsed = parseStream('not json\n');
+  assert.equal(parsed.results_count, 0);
+  assert.equal(parsed.cost_usd_sum, null);
+});
+
+test('result lines without a numeric cost are left out of the sum', () => {
+  const text = lines(
+    { type: 'result', subtype: 'error', result: 'a' },
+    { type: 'result', subtype: 'success', result: 'b', total_cost_usd: 0.3 },
+  );
+  const parsed = parseStream(text);
+  assert.equal(parsed.results_count, 2);
+  assert.equal(parsed.cost_usd_sum, 0.3);
+});
