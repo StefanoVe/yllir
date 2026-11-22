@@ -1,13 +1,13 @@
----
+<!-- yllir
 id: la-strada-verso-il-faro
 provenance: master
 depends_on: []
----
+-->
 # La strada verso il faro
 
-Il gruppo attraversa il porto e chiede di [Corrado Varno](../Personaggi/Corrado%20Varno.md), che custodisce il magazzino.
+Il gruppo attraversa il porto e chiede di [Corrado Varno](../Personaggi/Faro%20di%20Tessa/Corrado%20Varno.md), che custodisce il magazzino.
 
-Poco dopo incontra [Ilde Varno](../Personaggi/Ilde%20Varno.md) davanti alla sartoria.
+Poco dopo incontra [Ilde Varno](../Personaggi/Faro%20di%20Tessa/Ilde%20Varno.md) davanti alla sartoria.
 
 <!-- master -->
 ## Master

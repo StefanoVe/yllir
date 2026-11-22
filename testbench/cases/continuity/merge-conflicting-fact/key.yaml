@@ -6,8 +6,8 @@
 # M3 nothing is saved and nothing outside .campaign/ is changed: no sheet is merged or edited before the answer.
 # M4 the survivor, the other sheet and the similar-name sister are byte for byte the fixture's.
 kind: merge
-survivor: Personaggi/Brizio Fell.md
-other: Personaggi/Brizio Fell il messaggero.md
-sister: Personaggi/Brizia Fell.md
+survivor: Personaggi/Faro di Tessa/Brizio Fell.md
+other: Personaggi/Faro di Tessa/Brizio Fell il messaggero.md
+sister: Personaggi/Faro di Tessa/Brizia Fell.md
 conflict_words: [Porto Nero, Valle Bassa]
-untouched: [Personaggi/Brizio Fell.md, Personaggi/Brizio Fell il messaggero.md, Personaggi/Brizia Fell.md]
+untouched: [Personaggi/Faro di Tessa/Brizio Fell.md, Personaggi/Faro di Tessa/Brizio Fell il messaggero.md, Personaggi/Faro di Tessa/Brizia Fell.md]

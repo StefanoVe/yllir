@@ -1,8 +1,9 @@
----
+<!-- yllir
 id: faro-di-tessa
 kind: place
 provenance: master
----
+location: []
+-->
 # Faro di Tessa
 
 ## Descrizione

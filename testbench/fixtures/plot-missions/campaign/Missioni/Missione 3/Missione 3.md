@@ -1,10 +1,22 @@
 <!-- yllir
 id: missione-3
-provenance: master
 depends_on: [missione-9]
+provenance: master
 location: [forte-brenno]
 arc: "La compagnia del Corvo"
+generated: true
 -->
-# Missione 3
 
-Il committente del forte chiede una seconda scorta. Dipende da una missione che non esiste.
+> Generated file. Do not edit by hand: it is rebuilt from the files in Eventi/.
+
+## Events
+
+- none
+
+## Entry points
+
+- none
+
+## Exits
+
+- none

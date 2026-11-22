@@ -9,4 +9,5 @@ Synthetic test campaign for the library skill `continuity-keeper` (rename, delet
   - delete: a plot document that names the merchant in a frontmatter field (`merchant`) and also links to him.
   - merge: a second sheet of the same person with a different birthplace (the one fact that must be asked), and a sister with a similar name (`Brizia Fell`) who must not be merged.
   - retcon: a chronicle page already played (`played: [sessione-2]`) that states the old date, and a recorded exclusion in `campaign.yaml` (the lighthouse height) that must not be touched.
+- Layout: the sheets of the characters sit in `campaign/Personaggi/Faro di Tessa/`, the folder that the engine layout derives from their location (`faro-di-tessa`). `campaign/.campaign/geographic-layout.json` is the empty manifest the engine writes at the first save, so the first save moves nothing. Every sheet is already in the engine form (`<!-- yllir` metadata, the sections of its template, the statistics table of `system.adapter: none`).
 - This README stays outside `campaign/`.

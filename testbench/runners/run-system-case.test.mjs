@@ -134,7 +134,7 @@ test('fu-homonym-veil: Kael effect passes and Ysolde effect fails', () => {
   withCopy('fu-homonym-veil', (setup, caseData) => {
     const good = "Kael's Veil: the caster and one ally ignore the next ranged attack this round.";
     assert.equal(gradeSystemRun({ key: caseData.key, snap: snapshotSystem(setup.copy, setup, good), baseline: setup.tree }).pass, true);
-    const mixed = "Veil makes one enemy cannot see beyond 5 metres, which is Ysolde's spell.";
+    const mixed = "Kael's Veil makes one enemy unable to see beyond 5 metres.";
     const failed = gradeSystemRun({ key: caseData.key, snap: snapshotSystem(setup.copy, setup, mixed), baseline: setup.tree });
     assert.equal(failed.checks.X3, false);
     assert.equal(failed.checks.X1, false);

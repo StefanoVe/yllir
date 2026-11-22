@@ -32,3 +32,13 @@ The engine handles this structure. Its output on the fixture, as the test assert
 - The arc order places `missione-3` as free, because the graph keeps only known dependencies. Its status is still waiting: the `unknown-dependency` error is the only sign of the gap.
 - Terms: the engine does not require the word «Sessione». The `Missioni`/`Missione N` names work, because the rules are the folder shape (`<X>/<X>.md`) and the events folder name (`Eventi` or `Events`). The folder name `Eventi` is hard-coded in the engine (`EVENT_FOLDERS`), so the Italian name works and any other name does not.
 - Metadata block: the fixtures use the comment form the framework writes (`<!-- yllir` ... `-->`, read by `frontmatter.mjs`). The Morvalle fixture still uses the older `---` form, which the engine also reads; the fixtures here do not use it.
+
+## Main files
+
+The session main files (`Missioni/Missione N/Missione N.md`) are in the derived form the engine writes at every save (`renderSessionMap` in `yllir/scripts/lib/plot/session-map.mjs`): metadata, `generated: true`, the generated note, the event map and the Events, Entry points and Exits lists. The prose they had is gone, except the lines that matter for a trap:
+
+- Missione 2: «Il forte chiede di recuperare un registro rubato. Non ha un contratto collegato alla prima missione.» The mission is meant to be unlinked: it has no contract with Missione 1.
+- Missione 3: «Il committente del forte chiede una seconda scorta. Dipende da una missione che non esiste.» The prerequisite `missione-9` is the missing one.
+- Missione 4 and 5: each says it depends on the other (cycle trap).
+
+Missione 2 keeps its metadata without a `depends_on` line. The engine's renderer would add `depends_on: []`, so the line is removed by hand in the derived file: that absence is the trap.

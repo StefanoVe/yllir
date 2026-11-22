@@ -33,3 +33,9 @@ The same content, flattened to `Stagioni/Capitolo N/` (the test does this in a t
 - Arc order: chapters 1, 2, 3, 4; next number 5.
 - FINDING: a cycle between two scenes counts as a link for the `unlinked` rule (the rule only asks that some scene depends on another scene of the same session). So chapter 4 is not reported as unlinked, and the `event-cycle` is the only report.
 - FINDING: the `played-before-prerequisite` message names only the unplayed prerequisite, not the chapter that was played too early.
+
+## Main files
+
+The chapter main files are in the derived form the engine writes at every save (`renderSessionMap` in `yllir/scripts/lib/plot/session-map.mjs`). The engine cannot read the hierarchical shape, so the derived text was produced on a flattened copy (`Stagioni/Capitolo N/`) and copied back unchanged: the relative event links are the same in both shapes. The prose they had is gone, except the line that matters for the rejoin trap:
+
+- Chapter 3: «Il consiglio di Brenna decide chi deve partire per il passo, con le prove dei due autunni.» The chapter rejoins the two autumns of season 1.

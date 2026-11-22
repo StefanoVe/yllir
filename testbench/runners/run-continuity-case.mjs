@@ -10,8 +10,10 @@
 //        node testbench/runners/run-continuity-case.mjs <caseDir> --grade-only <dir> --run-json <file>
 // --keep keeps the copy and saves the snapshots of each turn as <tmp>/run.json. --grade-only grades
 // a saved run.json again without running the agent and does not append to the results file.
-// Checks by kind: rename R1 to R6; delete D1 to D4 after turn 1 (the question) and D5 to D9 after
-// turn 2 (the answer); merge M1 to M4; retcon T1 to T3. L-time and L-calls come from the limits.
+// Checks by kind: rename R0a and R0b after turn 1 (the question, only when the case has a reply) and
+// R1 to R6 after the last turn (R3 the chronicle words are the fixture's (links may change, as the
+// skill says)); delete D1 to D4 after turn 1 (the question) and D5 to D9 after turn 2
+// (the answer); merge M1 to M4; retcon T1 to T3. L-time and L-calls come from the limits.
 // Exit codes: 0 every run passes; 1 some run fails; 2 the case or key cannot be used.
 
 import fs from 'node:fs';
@@ -80,7 +82,9 @@ export function loadCase(caseDir) {
   if (!fs.existsSync(fixture)) throw new Error(`case.yaml: fixture ${data.fixture} not found`);
   const key = validateKey(loadYamlMapping(path.join(caseDir, 'key.yaml')));
   if (key.kind === 'delete' && data.reply === undefined) throw new Error('case.yaml: a delete case needs a reply (the answer)');
-  if (key.kind !== 'delete' && data.reply !== undefined) throw new Error('case.yaml: only a delete case has a reply');
+  if (!['delete', 'rename'].includes(key.kind) && data.reply !== undefined) {
+    throw new Error('case.yaml: only a rename or a delete case has a reply');
+  }
   return { ...data, limits: parseLimits(data), key, fixtureDir: fixture };
 }
 
@@ -192,15 +196,80 @@ export function linkTargets(file, text) {
   return targets;
 }
 
-/** The saved changes all fall inside the allowed list, and nothing is left uncommitted. */
-function onlyAllowed(snap, allowed) {
+/**
+ * The saved and uncommitted changes all fall inside the allowed list (or in wordsOk, the files whose
+ * words are unchanged), and nothing is left uncommitted.
+ * Returns { ok, reason }; the reason lists at most 10 paths outside the allowed set, or the uncommitted ones.
+ */
+function allowedChanges(snap, allowed, wordsOk = []) {
   const set = new Set(allowed);
-  return snap.dirty.length === 0 && snap.committed.every((change) => set.has(change.path));
+  const saved = snap.committed.map((change) => change.path);
+  const outside = [...new Set([...saved, ...snap.dirty])].filter((file) => !set.has(file) && !wordsOk.includes(file));
+  if (outside.length > 0) {
+    return { ok: false, reason: `changes outside the allowed set: ${outside.slice(0, 10).join(', ')}` };
+  }
+  if (snap.dirty.length > 0) {
+    return { ok: false, reason: `left uncommitted: ${snap.dirty.slice(0, 10).join(', ')}` };
+  }
+  return { ok: true, reason: '' };
+}
+
+/** A check of allowedChanges under the given id (R6 or D9). */
+function allowedCheck(id, snap, allowed, wordsOk) {
+  const result = allowedChanges(snap, allowed, wordsOk);
+  return check(id, result.ok, result.reason);
+}
+
+/** A Markdown link [label](target) reduced to its label. Line breaks are kept, so line numbers do not move. */
+function stripLinks(text) {
+  return text.replace(/\[([^\]\n]*)\]\([^)\s]+\)/g, '$1');
+}
+
+/** Splits a document into its metadata block (front matter or the leading <!-- yllir --> comment) and its body. */
+function splitMetadata(text) {
+  const match = /^(?:---\r?\n[\s\S]*?\r?\n---\r?\n?|<!-- yllir[\s\S]*?-->\r?\n?)/.exec(text);
+  return match === null ? { meta: '', body: text } : { meta: match[0], body: text.slice(match[0].length) };
+}
+
+function firstDifferentIndex(left, right) {
+  for (let i = 0; i < Math.max(left.length, right.length); i++) {
+    if (left[i] !== right[i]) return i;
+  }
+  return -1;
+}
+
+/**
+ * The words of a document are the same: its metadata block is byte for byte the same and its body is
+ * the same once every Markdown link is reduced to its label (links may change, as the skill says).
+ * Returns { ok, line } where line is the first differing line of the after text (at most 120 characters).
+ */
+export function wordsUnchanged(before, after) {
+  if (typeof before !== 'string' || typeof after !== 'string') return { ok: false, line: '(missing)' };
+  const left = splitMetadata(before);
+  const right = splitMetadata(after);
+  const shown = (line) => (line === undefined ? '(removed)' : line.replace(/\r$/, '').slice(0, 120));
+  if (left.meta !== right.meta) {
+    const i = firstDifferentIndex(left.meta.split('\n'), right.meta.split('\n'));
+    return { ok: false, line: shown(right.meta.split('\n')[i]) };
+  }
+  const leftLines = stripLinks(left.body).split('\n');
+  const rightLines = right.body.split('\n');
+  const i = firstDifferentIndex(leftLines, rightLines.map(stripLinks));
+  if (i < 0) return { ok: true, line: '' };
+  return { ok: false, line: shown(rightLines[i]) };
 }
 
 // ---------------------------------------------------------------- graders by kind
 
-/** Rename: R1 to R6, after the single turn. */
+/** Rename, turn 1 (the question) when the case has a reply: R0a and R0b. */
+export function renameQuestionChecks(snap) {
+  return [
+    check('R0a', endsWithQuestion(snap.report), 'the run does not end on a question'),
+    check('R0b', quiet(snap), 'something was saved or changed before the answer'),
+  ];
+}
+
+/** Rename: R1 to R6, after the single turn or after the answer turn. */
 export function renameChecks(key, snap, fixture) {
   const files = snap.files;
   const data = fm(files[key.new_file]);
@@ -216,6 +285,8 @@ export function renameChecks(key, snap, fixture) {
     }
   }
   const missingNew = key.link_documents.filter((doc) => !newLinkers.has(doc));
+  // R3 the chronicle words are the fixture's (links may change, as the skill says).
+  const words = wordsUnchanged(fixture[key.chronicle], files[key.chronicle]);
   return [
     check(
       'R1',
@@ -227,10 +298,11 @@ export function renameChecks(key, snap, fixture) {
       'the sheet is not renamed with its id kept, its heading and the old title as an alias',
     ),
     check('R2', oldLinks.length === 0 && missingNew.length === 0, `links to the old file in ${oldLinks.join(', ') || '-'}; no link to the new file in ${missingNew.join(', ') || '-'}`),
-    check('R3', same(snap, fixture, key.chronicle), 'the chronicle text changed'),
+    check('R3', words.ok, `the chronicle words changed: ${words.line}`),
     check('R4', same(snap, fixture, key.homonym), 'the homonym sheet changed'),
     check('R5', snap.versions_added === key.versions_added, `${snap.versions_added} saved versions instead of ${key.versions_added}`),
-    check('R6', onlyAllowed(snap, key.allowed_changes), 'a change outside the allowed set, or something left uncommitted'),
+    // R6: the chronicle counts as allowed only for a link-only change (the same R3 comparison).
+    allowedCheck('R6', snap, key.allowed_changes, words.ok ? [key.chronicle] : []),
   ];
 }
 
@@ -254,7 +326,7 @@ export function deleteDoneChecks(key, snap) {
     check('D6', data !== null && !holds, `the dependent document still holds the field ${key.dependent_field}`),
     check('D7', !linkTargets(key.dependent, snap.files[key.dependent]).includes(key.sheet), 'the dependent document still links to the deleted sheet'),
     check('D8', snap.versions_added === key.versions_added, `${snap.versions_added} saved versions instead of ${key.versions_added}`),
-    check('D9', onlyAllowed(snap, key.allowed_changes), 'a change outside the allowed set, or something left uncommitted'),
+    allowedCheck('D9', snap, key.allowed_changes),
   ];
 }
 
@@ -279,14 +351,24 @@ export function retconChecks(key, snap, fixture) {
 
 /**
  * Grades the snapshots of one run (one per turn that ran). agentError is the first error of a turn
- * that did not finish; such a run fails without checks. For delete, turn 2 is graded only when it ran.
+ * that did not finish; such a run fails without checks. turns is how many turns the case has (2 when
+ * it has a reply). For rename, turn 1 gets R0a and R0b and the last turn gets R1 to R6; for delete,
+ * turn 2 is graded only when it ran.
  */
-export function gradeRun({ key, snaps, fixture, agentError = null }) {
+export function gradeRun({ key, snaps, fixture, agentError = null, turns = 1 }) {
   if (agentError !== null) return { checks: {}, failures: [`agent: ${agentError}`], pass: false };
   if (snaps.length === 0) return { checks: {}, failures: ['agent: no turn ran'], pass: false };
   switch (key.kind) {
-    case 'rename':
-      return finish(renameChecks(key, snaps[0], fixture));
+    case 'rename': {
+      if (turns === 1) return finish(renameChecks(key, snaps[0], fixture));
+      const list = renameQuestionChecks(snaps[0]);
+      if (snaps.length > 1) {
+        list.push(...renameChecks(key, snaps[1], fixture));
+      } else {
+        for (const id of ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']) list.push(check(id, false, 'the answer turn did not run'));
+      }
+      return finish(list);
+    }
     case 'merge':
       return finish(mergeChecks(key, snaps[0], fixture));
     case 'retcon':
@@ -374,7 +456,13 @@ function runOnce(caseData, opts) {
     }
     snaps.push(snapshotCopy(setup.copy, { baseline: setup.baseline, versionsBefore: setup.versionsBefore, report: result.report }));
   }
-  const graded = gradeRun({ key: caseData.key, snaps, fixture: readTree(caseData.fixtureDir), agentError });
+  const graded = gradeRun({
+    key: caseData.key,
+    snaps,
+    fixture: readTree(caseData.fixtureDir),
+    agentError,
+    turns: prompts.length,
+  });
   const totals = {
     duration_ms: sumOf(agents.map((a) => a.duration_ms)),
     tool_calls: sumOf(agents.map((a) => a.tool_calls)),
@@ -427,7 +515,13 @@ function main() {
     if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new Error(`--grade-only: ${dir} is not a folder`);
     const saved = JSON.parse(fs.readFileSync(path.resolve(runJson), 'utf8'));
     const graded = applyLimits(
-      gradeRun({ key: caseData.key, snaps: saved.snaps, fixture: readTree(caseData.fixtureDir), agentError: saved.agent_error ?? null }),
+      gradeRun({
+        key: caseData.key,
+        snaps: saved.snaps,
+        fixture: readTree(caseData.fixtureDir),
+        agentError: saved.agent_error ?? null,
+        turns: caseData.reply === undefined ? 1 : 2,
+      }),
       caseData.limits,
       saved.totals,
     );

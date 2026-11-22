@@ -2,13 +2,15 @@
 # The Brine Warden has DEX d8 at rest. Each status lowers DEX one die step (d8 to d6 to d4), but never
 # below d6 (the adapter's floor). So slow and enraged together give d6, and d4 is wrong.
 # X1 the answer names d6.
-# X3 the answer does not name d4.
+# X3 the answer does not give the Warden a d4: no «rolls a d4» and no «Dexterity is (now) a d4».
+#    Naming d4 as the die it would be, and saying it is not allowed, is fine.
 # X4 the campaign is byte for byte the baseline (the fight state is under .campaign/, outside the check).
 # X5 the fight state holds the Warden with both conditions.
 text_all:
   - '\bd6\b'
 text_none:
-  - '\bd4\b'
+  - 'rolls? an? \*{0,2}d4'
+  - '(dexterity|dex)[^.]{0,30}(is|becomes) (now )?(an? )?\*{0,2}d4'
 fight:
   combatant: "Brine Warden"
   conditions: [slow, enraged]

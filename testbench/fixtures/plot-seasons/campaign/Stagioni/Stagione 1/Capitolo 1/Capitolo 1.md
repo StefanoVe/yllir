@@ -1,10 +1,22 @@
 <!-- yllir
 id: brenna-capitolo-1
-provenance: master
 depends_on: []
+provenance: master
 location: [brenna]
 arc: "Le stagioni di Brenna"
+generated: true
 -->
-# Capitolo 1: l'autunno
 
-Il villaggio di Brenna raccoglie l'ultimo grano prima del gelo.
+> Generated file. Do not edit by hand: it is rebuilt from the files in Eventi/.
+
+## Events
+
+- none
+
+## Entry points
+
+- none
+
+## Exits
+
+- none

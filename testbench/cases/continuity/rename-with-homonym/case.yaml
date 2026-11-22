@@ -2,10 +2,12 @@ case: continuity-rename-homonym
 fixture: continuity
 # Runs per agent: 3 (the suite passes --runs 1 per job).
 runs: 3
-# One master message, no reply: the rename runs to its saved version in one turn.
+# Two turns in the same folder. Turn 1 is the master's request: the agent tells the plan and asks «Va bene?», saving nothing. Turn 2 is the master's yes.
 prompt: |
   Cambia il nome di Corrado Varno: da adesso si chiama Corrado Lesca. Il resto resta com'è.
+reply: |
+  Sì, va bene.
 # Not measured yet: the budget is the default of the continuity cases.
 limits:
-  max_minutes: 4
-  max_tool_calls: 60
+  max_minutes: 5
+  max_tool_calls: 90

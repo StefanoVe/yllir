@@ -16,6 +16,7 @@ import {
   setupCopy,
   snapshotCopy,
   validateKey,
+  wordsUnchanged,
 } from './run-continuity-case.mjs';
 import { validateConfig } from '../../yllir/scripts/lib/config.mjs';
 import { saveVersion } from '../../yllir/scripts/lib/versions.mjs';
@@ -138,6 +139,50 @@ test('rename: the correct result passes every check, the traps fail', () => {
   }
 });
 
+test('rename: the chronicle may gain links with the same words (R3 and R6 pass); a changed word or metadata fails R3 and R6', () => {
+  const key = caseOf('rename-with-homonym').key;
+  const chronicle = key.chronicle;
+  const original = fixtureText(chronicle);
+  const linkedText = original.replace(
+    'Corrado Varno aprì',
+    '[Corrado Varno](../Personaggi/Faro%20di%20Tessa/Corrado%20Lesca.md) aprì',
+  );
+  assert.notEqual(linkedText, original, 'the fixture has the phrase to link');
+  assert.equal(wordsUnchanged(original, linkedText).ok, true);
+
+  const linked = openCopy();
+  try {
+    applyRenameAnswer(linked, key);
+    linked.write(chronicle, linkedText);
+    linked.save('Collegata la cronaca alla nuova scheda');
+    const result = gradeRun({ key, snaps: [linked.snap('Fatto.')], fixture: readTree(FIXTURE) });
+    assert.equal(result.checks.R3, true, 'a link-only change keeps the words');
+    assert.equal(result.checks.R6, true, 'a link-only change of the chronicle is allowed');
+  } finally {
+    linked.close();
+  }
+
+  const reworded = openCopy();
+  try {
+    applyRenameAnswer(reworded, key);
+    reworded.write(chronicle, original.replace('chiese del sale', 'chiese del grano'));
+    reworded.save('Riscritta la cronaca');
+    const result = gradeRun({ key, snaps: [reworded.snap('Fatto.')], fixture: readTree(FIXTURE) });
+    assert.equal(result.checks.R3, false, 'a changed word is found');
+    assert.equal(result.checks.R6, false, 'a changed chronicle is outside the allowed set');
+    const line = result.failures.find((failure) => failure.startsWith('R3 '));
+    assert.ok(line.startsWith('R3 the chronicle words changed: Il gruppo arrivò'), line);
+    assert.ok(line.length <= 'R3 the chronicle words changed: '.length + 120, 'the line is at most 120 characters');
+  } finally {
+    reworded.close();
+  }
+
+  const metadata = wordsUnchanged(original, original.replace('played: [sessione-1]', 'played: []'));
+  assert.equal(metadata.ok, false, 'the metadata block is kept as is');
+  assert.equal(metadata.line, 'played: []');
+  assert.equal(wordsUnchanged(original, original.replace('Il carico restò', '[Il carico](x.md) restò')).ok, true);
+});
+
 test('delete: the question turn passes only when nothing is saved and the answer turn passes after the answer', () => {
   const key = caseOf('delete-still-referenced').key;
   const copy = openCopy();
@@ -153,7 +198,7 @@ test('delete: the question turn passes only when nothing is saved and the answer
 
     // The answer: the document is settled and saved first, then the sheet is deleted.
     const plot = key.dependent;
-    copy.write(plot, copy.read(plot).replace('merchant: ottone-sela\n', '').replace('[Ottone Sela](../Personaggi/Ottone%20Sela.md)', 'Ottone Sela'));
+    copy.write(plot, copy.read(plot).replace('merchant: ottone-sela\n', '').replace('[Ottone Sela](../Personaggi/Faro%20di%20Tessa/Ottone%20Sela.md)', 'Ottone Sela'));
     copy.save('Tolto il mercante dalla scena del mercato');
     copy.remove(key.sheet);
     copy.save('Eliminata la scheda di Ottone Sela');
@@ -161,6 +206,92 @@ test('delete: the question turn passes only when nothing is saved and the answer
     const both = gradeRun({ key, snaps: [first, second], fixture: readTree(FIXTURE) });
     assert.equal(both.pass, true, both.failures.join('; '));
     assert.equal(both.checks.D8, true);
+  } finally {
+    copy.close();
+  }
+});
+
+/** The answer to the rename question: the sheet is renamed, the link is retargeted and one version is saved. */
+function applyRenameAnswer(copy, key) {
+  copy.write(key.new_file, copy.read(key.old_file).replace('# Corrado Varno', '# Corrado Lesca').replace('aliases: [Corrado]', 'aliases: [Corrado, Corrado Varno]'));
+  copy.remove(key.old_file);
+  const plot = 'Trama/La strada verso il faro.md';
+  copy.write(plot, copy.read(plot).replace('Corrado%20Varno.md', 'Corrado%20Lesca.md').replace('[Corrado Varno]', '[Corrado Lesca]'));
+  copy.save('Rinominata la scheda di Corrado Varno in Corrado Lesca');
+}
+
+test('rename with a reply: a quiet question turn passes R0a and R0b, then the yes passes R1 to R6', () => {
+  const caseData = caseOf('rename-with-homonym');
+  assert.equal(caseData.reply !== undefined, true, 'the rename case has a reply');
+  const key = caseData.key;
+  const copy = openCopy();
+  try {
+    const question = copy.snap('Cambierò il nome della scheda e i collegamenti in un documento. Va bene?');
+    const turnOne = gradeRun({ key, snaps: [question], fixture: readTree(FIXTURE), turns: 2 });
+    assert.equal(turnOne.checks.R0a, true);
+    assert.equal(turnOne.checks.R0b, true);
+    assert.equal(turnOne.checks.R1, false, 'the answer turn has not run yet');
+
+    applyRenameAnswer(copy, key);
+    const answer = copy.snap('Fatto: la scheda è stata rinominata.');
+    const both = gradeRun({ key, snaps: [question, answer], fixture: readTree(FIXTURE), turns: 2 });
+    assert.equal(both.pass, true, both.failures.join('; '));
+    assert.equal(both.checks.R5, true, 'the one version is counted after both turns');
+  } finally {
+    copy.close();
+  }
+});
+
+test('rename with a reply: R0a fails without a question, R0b fails when turn 1 saved a version', () => {
+  const key = caseOf('rename-with-homonym').key;
+  const copy = openCopy();
+  try {
+    const noQuestion = gradeRun({ key, snaps: [copy.snap('Fatto.')], fixture: readTree(FIXTURE), turns: 2 });
+    assert.equal(noQuestion.checks.R0a, false);
+    assert.equal(noQuestion.checks.R0b, true);
+  } finally {
+    copy.close();
+  }
+
+  const saved = openCopy();
+  try {
+    saved.write('Trama/Mappa della trama.md', '# Mappa della trama\n');
+    saved.save('Salvato prima della risposta');
+    const early = gradeRun({ key, snaps: [saved.snap('Va bene?')], fixture: readTree(FIXTURE), turns: 2 });
+    assert.equal(early.checks.R0a, true);
+    assert.equal(early.checks.R0b, false, 'a version saved before the yes is found');
+  } finally {
+    saved.close();
+  }
+});
+
+test('rename with a reply: when the yes never ran, R1 to R6 fail and R0a and R0b are still graded', () => {
+  const key = caseOf('rename-with-homonym').key;
+  const copy = openCopy();
+  try {
+    const result = gradeRun({ key, snaps: [copy.snap('Va bene?')], fixture: readTree(FIXTURE), turns: 2 });
+    assert.equal(result.checks.R0a, true);
+    for (const id of ['R1', 'R2', 'R3', 'R4', 'R5', 'R6']) assert.equal(result.checks[id], false, id);
+  } finally {
+    copy.close();
+  }
+});
+
+test('D9 names the files outside the allowed set, at most ten', () => {
+  const key = caseOf('delete-still-referenced').key;
+  const copy = openCopy();
+  try {
+    const first = copy.snap('Il mercato di Tessa ancora nomina Ottone Sela. Lo tolgo o lo cambio?');
+    copy.write('Cronaca/2026-10-03.md', `${copy.read('Cronaca/2026-10-03.md')}\nNota.\n`);
+    for (let i = 0; i < 12; i++) copy.write(`Extra/nota ${i}.md`, `# Nota ${i}\n`);
+    copy.save('Modifiche fuori dall elenco');
+    const second = copy.snap('Fatto.');
+    const result = gradeRun({ key, snaps: [first, second], fixture: readTree(FIXTURE) });
+    assert.equal(result.checks.D9, false);
+    const reason = result.failures.find((line) => line.startsWith('D9 ')) ?? '';
+    assert.match(reason, /^D9 changes outside the allowed set: Cronaca\/2026-10-03\.md/);
+    const listed = reason.replace(/^D9 changes outside the allowed set: /, '').split(', ');
+    assert.equal(listed.length, 10, 'the reason lists at most ten files');
   } finally {
     copy.close();
   }
@@ -222,7 +353,7 @@ test('the setup is the only place where the framework runs git on the copy', () 
   try {
     const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: setup.copy, encoding: 'utf8' }).trim();
     assert.equal(head, setup.baseline);
-    assert.ok(fs.existsSync(path.join(setup.copy, 'Personaggi', 'Corrado Varno.md')));
+    assert.ok(fs.existsSync(path.join(setup.copy, 'Personaggi', 'Faro di Tessa', 'Corrado Varno.md')));
   } finally {
     fs.rmSync(setup.tmp, { recursive: true, force: true });
   }

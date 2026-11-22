@@ -1,10 +1,22 @@
 <!-- yllir
 id: missione-4
-provenance: master
 depends_on: [missione-5]
+provenance: master
 location: [porto-salso]
 arc: "La compagnia del Corvo"
+generated: true
 -->
-# Missione 4
 
-Il porto chiede il pagamento di un debito. Dipende dalla missione 5.
+> Generated file. Do not edit by hand: it is rebuilt from the files in Eventi/.
+
+## Events
+
+- none
+
+## Entry points
+
+- none
+
+## Exits
+
+- none

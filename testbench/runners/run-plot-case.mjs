@@ -11,8 +11,8 @@
 // keeps the copy. It calls no model. --keep keeps the copy and saves the state of the run as
 // <tmp>/run.json. --grade-only grades a saved run.json again without running the agent and does not
 // append to the results file.
-// Checks: K1 one new activity under activity_folder with a depends_on field; K2 one saved version more
-// and a clean git status; K3 every key node matches exactly one scene of the new activity; K4 expected
+// Checks: K1 one new activity under activity_folder with a depends_on field; K2 at least one version saved
+// after the setup, every one of them of kind framework, and a clean git status; K3 every key node matches exactly one scene of the new activity; K4 expected
 // edges present; K5 forbidden edges absent; K6 first nodes have depends_on []; K7 no plot error that is
 // not in the baseline; K8 unchanged files are byte-identical; L-time and L-calls from the limits.
 // Metrics (recorded, not pass/fail): edges_missing, edges_false, characters_drift.
@@ -180,7 +180,7 @@ function git(cwd, args) {
 }
 
 /** Runs a function with git's global and system configuration switched off, then restores the environment. */
-function withIsolatedGit(fn) {
+export function withIsolatedGit(fn) {
   const names = ['GIT_CONFIG_GLOBAL', 'GIT_CONFIG_NOSYSTEM'];
   const saved = names.map((name) => [name, process.env[name]]);
   process.env.GIT_CONFIG_GLOBAL = '/dev/null';
@@ -221,11 +221,17 @@ export function setupPlotCopy(fixtureDir) {
   }
 }
 
-/** What the copy holds after one turn: versions added, git status, and the captured state. */
+/**
+ * What the copy holds after one turn: the versions saved after the setup (newest first, as message and
+ * kind), git status, and the captured state.
+ */
 export function snapshotPlot(setup, report) {
+  const added = listVersions(setup.copy, { limit: 500 }).length - setup.versionsBefore;
+  const versions = added > 0 ? listVersions(setup.copy, { limit: added }).map(({ message, kind }) => ({ message, kind })) : [];
   return {
     report: report ?? null,
-    versions_added: listVersions(setup.copy, { limit: 500 }).length - setup.versionsBefore,
+    versions_added: added,
+    versions,
     status: git(setup.copy, ['status', '--porcelain']).trim(),
     ...captureState(setup.copy),
   };
@@ -279,13 +285,16 @@ export function gradePlot({ key, baseline, snap, agentError = null }) {
     );
   }
 
-  // K2: exactly one saved version more, and nothing left uncommitted.
-  const clean = snap.status === '';
-  put(
-    'K2',
-    snap.versions_added === 1 && clean,
-    `saved versions added ${snap.versions_added} (expected 1), git status ${clean ? 'clean' : `not clean: ${snap.status.split('\n').join('; ')}`}`,
-  );
+  // K2: at least one version saved after the setup, every one of them a framework version (the batch and
+  // the plot map are both framework versions), and nothing left uncommitted.
+  const saved = snap.versions ?? [];
+  const k2 = [];
+  if (saved.length === 0) k2.push('no version saved after the setup');
+  for (const version of saved) {
+    if (version.kind !== 'framework') k2.push(`version "${version.message}" is ${version.kind}, want framework`);
+  }
+  if (snap.status !== '') k2.push(`git status not clean: ${snap.status.split('\n').join('; ')}`);
+  put('K2', k2.length === 0, k2.length === 0 ? `${saved.length} framework version(s) saved, git status clean` : k2.join('; '));
 
   // K3: every node matches exactly one scene of the new activity (by its H1, else its file name).
   const events = activity === null ? [] : activity.events;
@@ -452,7 +461,7 @@ function runOnce(caseData, opts) {
   return { setup, snap, agents: [result], totals, agentError, graded };
 }
 
-function makeRecord({ caseData, run, hash, opts, graded, agents, totals, agentError, copy }) {
+function makeRecord({ caseData, run, hash, opts, graded, agents, totals, agentError, copy, snap }) {
   return {
     case: caseData.case,
     run,
@@ -468,6 +477,8 @@ function makeRecord({ caseData, run, hash, opts, graded, agents, totals, agentEr
     limits: caseData.limits,
     metrics: graded.metrics,
     new_activity: graded.new_activity,
+    versions_added: snap?.versions_added ?? null,
+    version_messages: snap?.versions ? snap.versions.map((version) => version.message) : null,
     cost_usd: totals.cost_usd,
     duration_ms: totals.duration_ms,
     tool_calls: totals.tool_calls,
@@ -532,6 +543,7 @@ function main() {
       totals: saved.totals,
       agentError,
       copy: dir,
+      snap: saved.snaps[0],
     });
     console.log(JSON.stringify(consoleView(record)));
     process.exitCode = printSummary([record], opts.modelLabel, hash, opts.agent) === 1 ? 0 : 1;
@@ -551,6 +563,7 @@ function main() {
       totals: one.totals,
       agentError: one.agentError,
       copy: opts.keep ? one.setup.copy : null,
+      snap: one.snap,
     });
     if (opts.keep) {
       fs.writeFileSync(

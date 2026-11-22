@@ -11,12 +11,13 @@
 # D6 the dependent document no longer holds the id in the field named dependent_field.
 # D7 the dependent document has no link to the deleted sheet.
 # D8 exactly versions_added saved versions after both turns: the answer is saved first, then the delete.
-# D9 the saved changes touch only the sheet and the dependent document.
+# D9 the saved changes touch only allowed_changes (the sheet, the dependent document and the plot map);
+#    the reason lists the files outside the set, at most 10.
 kind: delete
 subject: ottone-sela
-sheet: Personaggi/Ottone Sela.md
+sheet: Personaggi/Faro di Tessa/Ottone Sela.md
 dependent: Trama/Il mercato di Tessa.md
 dependent_title_word: mercato
 dependent_field: merchant
-allowed_changes: [Personaggi/Ottone Sela.md, Trama/Il mercato di Tessa.md]
+allowed_changes: [Personaggi/Faro di Tessa/Ottone Sela.md, Trama/Il mercato di Tessa.md, Trama/Mappa della trama.md, .campaign/retired-ids.json]
 versions_added: 2

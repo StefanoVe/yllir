@@ -7,8 +7,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { REPO_ROOT } from './lib/case-common.mjs';
-import { gradePlot, loadPlotCase, setupPlotCopy, snapshotPlot, validatePlotKey } from './run-plot-case.mjs';
-import { listVersions } from '../../yllir/scripts/lib/versions.mjs';
+import { gradePlot, loadPlotCase, setupPlotCopy, snapshotPlot, validatePlotKey, withIsolatedGit } from './run-plot-case.mjs';
+import { listVersions, saveVersion } from '../../yllir/scripts/lib/versions.mjs';
 
 const CASES = path.join(REPO_ROOT, 'testbench', 'cases', 'plot');
 const RUNNER = path.join(REPO_ROOT, 'testbench', 'runners', 'run-plot-case.mjs');
@@ -176,6 +176,68 @@ test('missions-next: the untouched copy has no new activity, no new error and no
     assert.equal(result.metrics, null);
   } finally {
     copy.close();
+  }
+});
+
+/** Saves the copy's current files as one version of the given kind (isolated git, as the runner does). */
+function saveCopy(copy, message, kind) {
+  return withIsolatedGit(() => saveVersion(copy.setup.copy, { message, kind }));
+}
+
+test('K2: two framework versions after the setup pass (the batch and the plot map)', () => {
+  const copy = openCopy('fork-rejoin');
+  try {
+    writeForkSession(copy);
+    assert.equal(saveCopy(copy, 'Sessione 4 scritta', 'framework').saved, true);
+    copy.write(`${SESSION_DIR}/Mappa della trama.md`, '# Mappa della trama\n');
+    assert.equal(saveCopy(copy, 'Mappa della trama', 'framework').saved, true);
+    const snap = copy.snap();
+    const result = gradePlot({ key: copy.key, baseline: copy.setup.state, snap });
+    assert.equal(snap.versions_added, 2);
+    assert.deepEqual(snap.versions.map((v) => v.message), ['Mappa della trama', 'Sessione 4 scritta']);
+    assert.equal(result.checks.K2, true, result.details.K2);
+    assert.match(result.details.K2, /2 framework version\(s\) saved, git status clean/);
+  } finally {
+    copy.close();
+  }
+});
+
+test('K2: a manual version saved after the setup fails, and names the version', () => {
+  const copy = openCopy('fork-rejoin');
+  try {
+    writeForkSession(copy);
+    assert.equal(saveCopy(copy, 'Sessione 4 scritta', 'framework').saved, true);
+    copy.write(`${SESSION_DIR}/Note a mano.md`, '# Note\n');
+    assert.equal(saveCopy(copy, 'Modifica a mano', 'manual').saved, true);
+    const snap = copy.snap();
+    const result = gradePlot({ key: copy.key, baseline: copy.setup.state, snap });
+    assert.equal(result.checks.K2, false);
+    assert.match(result.details.K2, /version "Modifica a mano" is manual, want framework/);
+    assert.equal(result.pass, false);
+  } finally {
+    copy.close();
+  }
+});
+
+test('K2: no version after the setup fails; an uncommitted file fails with the git status line', () => {
+  const copy = openCopy('fork-rejoin');
+  try {
+    const empty = gradePlot({ key: copy.key, baseline: copy.setup.state, snap: copy.snap() });
+    assert.equal(empty.checks.K2, false);
+    assert.match(empty.details.K2, /no version saved after the setup/);
+  } finally {
+    copy.close();
+  }
+  const dirty = openCopy('fork-rejoin');
+  try {
+    writeForkSession(dirty);
+    assert.equal(saveCopy(dirty, 'Sessione 4 scritta', 'framework').saved, true);
+    dirty.write(`${SESSION_DIR}/Appunto.md`, '# Appunto\n');
+    const result = gradePlot({ key: dirty.key, baseline: dirty.setup.state, snap: dirty.snap() });
+    assert.equal(result.checks.K2, false);
+    assert.match(result.details.K2, /git status not clean: \?\? /);
+  } finally {
+    dirty.close();
   }
 });
 

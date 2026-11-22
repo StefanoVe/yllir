@@ -3,11 +3,11 @@
 # Kael's Veil (Lantern-Warden, PC) is "ignore the next ranged attack". The answer must give Kael's effect
 # and must not give Ysolde's.
 # X1 the answer names the ranged attack.
-# X3 the answer does not describe Ysolde's effect (cannot see, 5 metres).
+# X3 the answer does not give Kael Ysolde's effect: no sentence with Kael and «cannot see» or 5 metres.
+#    Naming Ysolde's different Veil to tell them apart is allowed.
 # X4 the campaign is byte for byte the baseline.
 text_all:
   - 'ranged attack'
 text_none:
-  - 'cannot see'
-  - '5 (m|metres|meters)'
+  - 'kael[^.]{0,80}(cannot see|see beyond|5 ?(m|metres|meters))'
 documents_unchanged: true
