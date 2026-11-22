@@ -221,6 +221,7 @@ describe('generateInstructions', () => {
     assert.match(instructions, /When the adapter is not `none`, the engine checks creature and item sheets against it at each commit\./);
     assert.match(instructions, /Read its definition in `[^`]*\/modules\/systems\/example\/` before writing such a sheet\./);
     assert.match(instructions, /Never refuse only because the adapter does not contain the rule\./);
+    assert.match(instructions, /check it with one web search that names only the game and the rule/);
     assert.doesNotMatch(instructions, /Never write a game rule from memory/);
   });
 
