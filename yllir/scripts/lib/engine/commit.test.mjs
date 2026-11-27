@@ -824,8 +824,8 @@ const SCENE_PATH = 'Trama/Sessione Prova/Eventi/Il benvenuto.md';
 const SESSION = `---\nid: sessione-uno\ndepends_on: []\nprovenance: master\n---\n\n# Sessione 1\n\nTesto.\n`;
 
 /** An event file of the session above, with the given public body. */
-function scene(body) {
-  return `---\nid: scena-benvenuto\nsession: sessione-uno\ndepends_on: []\nprovenance: master\n---\n\n${body}`;
+function scene(body, provenance = 'master') {
+  return `---\nid: scena-benvenuto\nsession: sessione-uno\ndepends_on: []\nprovenance: ${provenance}\n---\n\n${body}`;
 }
 
 const SCENE_OK = scene(`## Il benvenuto
@@ -853,7 +853,7 @@ Chi parla con Sibilla tira.
 
 - **Successo:** Il gruppo ottiene un consiglio.
 - **Fallimento:** Il gruppo riceve un invito.
-`);
+`, 'generated');
 
 test('an event file with outcome lists is rejected with scene-checks and nothing is written', async (t) => {
   const dir = makeCampaign(t);
@@ -871,6 +871,54 @@ test('an event file with outcome lists is rejected with scene-checks and nothing
 
   assert.equal(head(dir), commitBefore);
   assert.equal(fs.existsSync(path.join(dir, SCENE_PATH)), false);
+});
+
+// A check written in running prose (no check heading): a finding of the scene checks.
+const SCENE_PROSE_CD = scene(`## Il benvenuto
+
+Sibilla chiede una prova CD 12 di Persuasione.
+`);
+
+test('a scene-check finding in a master event file is a warning: the check passes and the commit saves', async (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, SESSION_PATH, SESSION);
+  writeDraft(dir, SCENE_PATH, SCENE_PROSE_CD);
+
+  const check = await checkBatch(dir, { files: [SESSION_PATH, SCENE_PATH] });
+  assert.equal(check.ok, true, JSON.stringify(check.errors));
+  assert.deepEqual(check.errors.filter((e) => e.code === 'scene-checks'), [], JSON.stringify(check.errors));
+  assert.equal(check.warnings.length, 1, JSON.stringify(check.warnings));
+  assert.equal(check.warnings[0].code, 'scene-checks');
+  assert.equal(check.warnings[0].file, SCENE_PATH);
+  assert.ok(check.warnings[0].message.startsWith('line '), check.warnings[0].message);
+
+  writeReview(dir);
+  const before = commitCount(dir);
+  const result = await commitBatch(dir, { files: [SESSION_PATH, SCENE_PATH], message: 'Add the first session' });
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.ok(result.saved && /^[0-9a-f]+$/.test(result.saved.hash));
+  assert.equal(commitCount(dir), before + 1);
+  assert.equal(result.warnings.length, 1, JSON.stringify(result.warnings));
+});
+
+test('a scene-check finding in a generated event file stays an error and blocks the commit', async (t) => {
+  const dir = makeCampaign(t);
+  const commitBefore = head(dir);
+  writeDraft(dir, SESSION_PATH, SESSION);
+  writeDraft(dir, SCENE_PATH, SCENE_PROSE_CD.replace('provenance: master', 'provenance: generated'));
+
+  const check = await checkBatch(dir, { files: [SESSION_PATH, SCENE_PATH] });
+  assert.equal(check.ok, false);
+  const errors = check.errors.filter((e) => e.code === 'scene-checks');
+  assert.equal(errors.length, 1, JSON.stringify(check.errors));
+  assert.equal(errors[0].file, SCENE_PATH);
+  assert.deepEqual(check.warnings, []);
+
+  writeReview(dir);
+  const result = await commitBatch(dir, { files: [SESSION_PATH, SCENE_PATH], message: 'Add the first session' });
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.warnings, []);
+  assert.equal(head(dir), commitBefore);
 });
 
 test('a correct event file passes the scene checks', async (t) => {
@@ -1002,7 +1050,7 @@ test('with the dnd-2024 adapter, a check value that is not a D&D 2024 check is r
   git(dir, ['commit', '-q', '-m', 'use dnd-2024']);
 
   writeDraft(dir, SESSION_PATH, SESSION);
-  writeDraft(dir, SCENE_PATH, SCENE_OK.replace('Carisma (Persuasione) CD 13', 'Persuasione CD 13'));
+  writeDraft(dir, SCENE_PATH, SCENE_OK.replace('provenance: master', 'provenance: generated').replace('Carisma (Persuasione) CD 13', 'Persuasione CD 13'));
   const check = await checkBatch(dir, { files: [SESSION_PATH, SCENE_PATH] });
   const errors = check.errors.filter((e) => e.code === 'scene-checks');
   assert.equal(check.ok, false);

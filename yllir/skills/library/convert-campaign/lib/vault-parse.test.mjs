@@ -154,6 +154,77 @@ test('findConventions: fence with a master info string, inner lines between the 
   ]);
 });
 
+test('findConventions: heading with a master keyword in its text, section to the next heading', () => {
+  const lines = ['## Here is to you — per il master', 'Prima riga.', 'Seconda riga.', '## Origine'];
+  assert.deepEqual(findConventions(lines, 1), [
+    { id: 'heading:master', start: 1, end: 3, inner: [2, 3], heading: 'Here is to you — per il master' },
+  ]);
+});
+
+test('findConventions: a ### master heading inside a ## section covers only its own section', () => {
+  const lines = ['## Luogo', 'Testo.', '### Le soglie — per il master', 'Soglia uno.', '## Altro'];
+  assert.deepEqual(findConventions(lines, 1), [
+    { id: 'heading:master', start: 3, end: 4, inner: [4, 4], heading: 'Le soglie — per il master' },
+  ]);
+});
+
+test('findConventions: master keyword at the end of a heading', () => {
+  assert.deepEqual(findConventions(['## Esplorazione della torre — Preparazione per il master', 'Testo.'], 1), [
+    {
+      id: 'heading:master',
+      start: 1,
+      end: 2,
+      inner: [2, 2],
+      heading: 'Esplorazione della torre — Preparazione per il master',
+    },
+  ]);
+});
+
+test('findConventions: GM note heading is master, secret headings are segreti', () => {
+  assert.deepEqual(findConventions(['## Note del GM', 'a'], 1), [
+    { id: 'heading:master', start: 1, end: 2, inner: [2, 2], heading: 'Note del GM' },
+  ]);
+  assert.deepEqual(findConventions(['## Segreti', 'a'], 1), [
+    { id: 'heading:segreti', start: 1, end: 2, inner: [2, 2], heading: 'Segreti' },
+  ]);
+  assert.deepEqual(findConventions(['### Il segreto della torre', 'a'], 1), [
+    { id: 'heading:segreti', start: 1, end: 2, inner: [2, 2], heading: 'Il segreto della torre' },
+  ]);
+});
+
+test('findConventions: keywords are whole words, Mastro and Dmitri are not conventions', () => {
+  assert.deepEqual(findConventions(['## Mastro Eldo', 'a'], 1), []);
+  assert.deepEqual(findConventions(['## Il dmitri', 'a'], 1), []);
+  assert.deepEqual(findConventions(['## Segretario', 'a'], 1), [
+    { id: 'heading:segreti', start: 1, end: 2, inner: [2, 2], heading: 'Segretario' },
+  ]);
+});
+
+test('findConventions: a convention heading nested in another one is not reported again', () => {
+  const lines = ['## Indicazioni per il master', 'a', '### Segreti', 'b', '## Altro'];
+  assert.deepEqual(findConventions(lines, 1), [
+    { id: 'heading:master', start: 1, end: 4, inner: [2, 4], heading: 'Indicazioni per il master' },
+  ]);
+});
+
+test('findConventions: fence with no info string whose first line is a master note', () => {
+  const lines = ['```', "Per il master — conduzione dell'incarico", 'testo', '```'];
+  assert.deepEqual(findConventions(lines, 1), [
+    { id: 'fence:master-note', start: 1, end: 4, inner: [2, 3], heading: null },
+  ]);
+});
+
+test('findConventions: a fence with a master info string keeps its id, reported once', () => {
+  const lines = ['```segreto', 'Per il master — nota', 'b', '```'];
+  assert.deepEqual(findConventions(lines, 1), [
+    { id: 'fence:segreto', start: 1, end: 4, inner: [2, 3], heading: null },
+  ]);
+});
+
+test('findConventions: a plain js fence whose first line is not a note is not reported', () => {
+  assert.deepEqual(findConventions(['```js', 'const master = 1', '```'], 1), []);
+});
+
 test('findConventions: html comment across lines, metadata comment not reported', () => {
   assert.deepEqual(findConventions(['<!--', 'a', '-->'], 1), [
     { id: 'html-comment', start: 1, end: 3, inner: [1, 3], heading: null },

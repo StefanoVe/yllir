@@ -47,6 +47,7 @@ const CASES = [
       ['personaggi', 'Personaggi', 'subjects'],
       ['oggetti', 'Oggetti', 'objects'],
       ['storia', 'Storia', 'free'],
+      ['trama', 'Trama', 'plot'],
     ],
   },
 ];
@@ -116,8 +117,10 @@ function draftBody(draft, doc) {
   const lines = draft.split('\n');
   let i = lines.indexOf('-->') + 1;
   while (lines[i] === '') i++;
-  assert.match(lines[i], /^# /, `${doc.target}: title line`);
-  i++;
+  if (doc.title !== null) {
+    assert.match(lines[i], /^# /, `${doc.target}: title line`);
+    i++;
+  }
   if (doc.image) {
     while (lines[i] === '') i++;
     assert.match(lines[i], /^!\[/, `${doc.target}: image line`);
@@ -149,6 +152,15 @@ function expectedBody(doc, plan, inputDir) {
     for (let n = part.from; n <= part.to; n++) if (!drop.has(n)) body.push(lines[n - 1]);
     body = trimBlank(body);
     if (index === 0 && body.length > 0 && /^# /.test(body[0])) body = trimBlank(body.slice(1));
+    const shift = part.shift ?? 0;
+    if (shift !== 0) {
+      body = body.map((line) => {
+        const m = /^(#{1,6}) /.exec(line);
+        if (!m) return line;
+        const level = Math.min(6, Math.max(2, m[1].length + shift));
+        return '#'.repeat(level) + line.slice(m[1].length);
+      });
+    }
     if (body.length === 0) return;
     if (part.heading) body = [part.heading, '', ...body];
     pieces.push(body);
@@ -250,6 +262,14 @@ function runCase(def) {
     ]);
     const checked = parseOutput(check.stdout);
     assert.equal(checked.ok, true, `engine check errors: ${JSON.stringify(checked.errors)}`);
+    if (key.routes?.plot) {
+      // A prepared session: the scene checks of its master's text are warnings, never errors.
+      assert.ok(Array.isArray(checked.warnings), 'the check output has no warnings array');
+      assert.ok(
+        checked.warnings.some((w) => w.code === 'scene-checks' && String(w.file).startsWith('Trama/')),
+        `no scene-checks warning on a Trama file: ${JSON.stringify(checked.warnings)}`,
+      );
+    }
 
     // 6. The drafts go to their final places; the link check must find nothing.
     for (const target of result.files) {
@@ -308,6 +328,10 @@ function runCase(def) {
 
     // 8. Invariant: the public text of every draft is the public text of its parts.
     for (const doc of plan.documents) {
+      if (doc.parts.length === 0) {
+        // A main stub of a session: metadata only, followed by one line feed.
+        assert.ok(drafts.get(doc.target).endsWith('-->\n'), `${doc.target} has a body`);
+      }
       assert.deepEqual(draftBody(drafts.get(doc.target), doc), expectedBody(doc, plan, inputDir), `invariant of ${doc.target}`);
     }
   } finally {

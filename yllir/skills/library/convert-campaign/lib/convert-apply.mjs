@@ -11,11 +11,13 @@ import {
   parseFrontmatter, findLinks, findConventions, findFeatures, headings, resolveLink,
 } from './vault-parse.mjs';
 
+// Spec 7.2: the allowed meta keys, in write order.
 const META_ORDER = [
-  'id', 'kind', 'template', 'item_type', 'provenance', 'location', 'status', 'ended',
-  'when', 'participants', 'aliases', 'relations', 'sketch',
+  'id', 'kind', 'template', 'item_type', 'session', 'provenance', 'location', 'status', 'ended',
+  'when', 'depends_on', 'participants', 'characters', 'items', 'played', 'aliases', 'appearances',
+  'enemies', 'relations', 'sketch',
 ];
-const LIST_KEYS = new Set(['location', 'participants', 'aliases']);
+const LIST_KEYS = new Set(['location', 'participants', 'depends_on', 'characters', 'items', 'played', 'aliases']);
 const SLUG = /^[a-z0-9][a-z0-9-]*$/;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
 
@@ -118,6 +120,34 @@ function metadataLines(meta, errors) {
       lines.push('relations:');
       for (const r of value) {
         const pair = [`  - to: ${r.to}`, `    type: ${r.type}`];
+        pair.forEach(check);
+        lines.push(...pair);
+      }
+    } else if (key === 'appearances') {
+      if (!Array.isArray(value) || value.some((a) => !isObject(a) || typeof a.subject !== 'string'
+        || !Array.isArray(a.location) || a.location.some((item) => typeof item !== 'string' || /[,[\]]/.test(item)))) {
+        bad('meta.appearances must be a list of { subject, location }');
+        ok = false;
+        continue;
+      }
+      if (value.length === 0) continue;
+      lines.push('appearances:');
+      for (const a of value) {
+        const pair = [`  - subject: ${a.subject}`, `    location: [${a.location.join(', ')}]`];
+        pair.forEach(check);
+        lines.push(...pair);
+      }
+    } else if (key === 'enemies') {
+      if (!Array.isArray(value) || value.some((e) => !isObject(e) || typeof e.id !== 'string'
+        || !Number.isInteger(e.count) || e.count < 1)) {
+        bad('meta.enemies must be a list of { id, count } with a positive integer count');
+        ok = false;
+        continue;
+      }
+      if (value.length === 0) continue;
+      lines.push('enemies:');
+      for (const e of value) {
+        const pair = [`  - id: ${e.id}`, `    count: ${e.count}`];
         pair.forEach(check);
         lines.push(...pair);
       }
@@ -337,7 +367,9 @@ function analyse(root, plan) {
     if (problem) fail('bad-target', problem);
     if (targets.has(doc.target)) fail('duplicate-target', `duplicate target ${doc.target}`);
     targets.add(doc.target);
-    if (typeof doc.title !== 'string' || blank(doc.title) || doc.title.includes('\n')) bad(`${doc.target}: title must be one line`);
+    if (doc.title !== null && (typeof doc.title !== 'string' || blank(doc.title) || doc.title.includes('\n'))) {
+      bad(`${doc.target}: title must be one line or null`);
+    }
     const meta = metadataLines(doc.meta, errors);
     if (meta && ids.has(doc.meta.id)) fail('duplicate-id', `duplicate id ${doc.meta.id}`);
     if (meta) ids.add(doc.meta.id);
@@ -589,11 +621,16 @@ export function applyPlan(campaignRoot, plan) {
     moved += chunkCount;
 
     const meta = metadataLines(doc.meta, []) ?? [];
-    lines.push(renderMetadata(meta), '', `# ${doc.title}`, '');
-    if (doc.image) lines.push(`![${doc.image.alt}](${hrefTo(doc.target, doc.image.target)})`, '');
+    // A null title writes no H1 (plot event files and session stubs); the body then follows the metadata block.
+    lines.push(renderMetadata(meta));
+    if (doc.title !== null) lines.push('', `# ${doc.title}`, '');
+    if (doc.image) {
+      if (lines.at(-1) !== '') lines.push('');
+      lines.push(`![${doc.image.alt}](${hrefTo(doc.target, doc.image.target)})`, '');
+    }
     for (const bp of bodyParts) {
       if (bp.heading === null && bp.pieces.length === 0) continue;
-      if (started) lines.push('');
+      if (started || lines.at(-1) !== '') lines.push('');
       if (bp.heading !== null) lines.push(bp.heading, '');
       lines.push(...bp.pieces);
       started = true;

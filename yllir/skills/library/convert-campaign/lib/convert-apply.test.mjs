@@ -498,3 +498,131 @@ test('CLI: valid plan exits 0 with ok true, bad plan exits 1, missing --plan exi
     cleanup(root, input, planDir);
   }
 });
+
+test('spec 7.2: session main stub has no title and no body, meta in 7.2 order', () => {
+  const { root, input } = setup({});
+  try {
+    const result = applyPlan(root, planFor(input, {
+      documents: [{
+        target: 'Trama/sessione-1/sessione-1.md',
+        title: null,
+        meta: { id: 'sessione-1', depends_on: [], provenance: 'master' },
+        parts: [],
+      }],
+    }));
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.equal(
+      draftOf(root, 'Trama/sessione-1/sessione-1.md'),
+      '<!-- yllir\nid: sessione-1\nprovenance: master\ndepends_on: []\n-->\n',
+    );
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('spec 7.2: event file with null title drops the first H1 and renders the block lists', () => {
+  const { root, input } = setup({
+    'Trama/sessione-1/Eventi/Avvicinarsi.md': '# Avvicinarsi alla cappella\nTesto dell evento.\n',
+  });
+  try {
+    const result = applyPlan(root, planFor(input, {
+      documents: [{
+        target: 'Trama/sessione-1/Eventi/Avvicinarsi.md',
+        title: null,
+        meta: {
+          id: 'avvicinarsi-alla-cappella',
+          session: 'sessione-1',
+          depends_on: ['a'],
+          location: ['x'],
+          characters: ['c'],
+          items: [],
+          provenance: 'master',
+          appearances: [{ subject: 'c', location: ['x'] }],
+          enemies: [{ id: 'e', count: 3 }],
+        },
+        parts: [{ file: 'Trama/sessione-1/Eventi/Avvicinarsi.md', from: 1, to: 2, heading: null, shift: 0 }],
+      }],
+    }));
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.equal(
+      draftOf(root, 'Trama/sessione-1/Eventi/Avvicinarsi.md'),
+      '<!-- yllir\nid: avvicinarsi-alla-cappella\nsession: sessione-1\nprovenance: master\n'
+      + 'location: [x]\ndepends_on: [a]\ncharacters: [c]\nitems: []\n'
+      + 'appearances:\n  - subject: c\n    location: [x]\n'
+      + 'enemies:\n  - id: e\n    count: 3\n'
+      + '-->\n\nTesto dell evento.\n',
+    );
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('spec 7.2: played renders as a flow list, an unlisted key is an unknown-key error', () => {
+  const { root, input } = setup({});
+  try {
+    const result = applyPlan(root, planFor(input, {
+      documents: [{
+        target: 'Trama/sessione-1/sessione-1.md',
+        title: null,
+        meta: { id: 'sessione-1', provenance: 'master', played: [] },
+        parts: [],
+      }],
+    }));
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.equal(
+      draftOf(root, 'Trama/sessione-1/sessione-1.md'),
+      '<!-- yllir\nid: sessione-1\nprovenance: master\nplayed: []\n-->\n',
+    );
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('spec 7.2: a meta key outside the allowed list is unknown-key, with null title', () => {
+  assertPlanError({}, (input) => planFor(input, {
+    documents: [{
+      target: 'Trama/sessione-1/sessione-1.md',
+      title: null,
+      meta: { id: 'sessione-1', foo: 'x' },
+      parts: [],
+    }],
+  }), 'unknown-key');
+});
+
+test('spec 5.1: the dropped first H1 of the first part is not a level error and is not shifted', () => {
+  const file = 'Trama/sessione-1/Eventi/Taverna.md';
+  const { root, input } = setup({
+    [file]: "# La taverna\nApri la porta.\n## Parlare con l'oste\nL'oste tace.\n### Se chiedono del ponte\nRisponde in fretta.\n",
+  });
+  try {
+    const result = applyPlan(root, planFor(input, {
+      documents: [{
+        target: file,
+        title: null,
+        meta: { id: 'la-taverna', session: 'sessione-1', depends_on: [], provenance: 'master' },
+        parts: [{ file, from: 1, to: 6, heading: null, shift: 0 }],
+      }],
+    }));
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.equal(
+      draftOf(root, file),
+      "<!-- yllir\nid: la-taverna\nsession: sessione-1\nprovenance: master\ndepends_on: []\n-->\n\n"
+      + "Apri la porta.\n## Parlare con l'oste\nL'oste tace.\n### Se chiedono del ponte\nRisponde in fretta.\n",
+    );
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('spec 5.1: a level-1 heading inside a part with shift 0 is still bad-heading-level', () => {
+  assertPlanError({
+    'Trama/sessione-1/Eventi/Taverna.md': '# La taverna\nTesto.\n# Altro\nTesto due.\n',
+  }, (input) => planFor(input, {
+    documents: [{
+      target: 'Trama/sessione-1/Eventi/Taverna.md',
+      title: null,
+      meta: { id: 'la-taverna', session: 'sessione-1', depends_on: [], provenance: 'master' },
+      parts: [{ file: 'Trama/sessione-1/Eventi/Taverna.md', from: 1, to: 4, heading: null, shift: 0 }],
+    }],
+  }), 'bad-heading-level');
+});

@@ -15,11 +15,20 @@ const BLOCK_REF = /(?:^|\s)\^[A-Za-z0-9-]+\s*$/;
 const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
 const MASTER_OPEN = '<!-- master -->';
 const MASTER_CLOSE = '<!-- /master -->';
-const HEADING_CONVENTIONS = new Set([
-  'master', 'segreti', 'segreto', 'secrets', 'secret', 'note del master', 'per il master',
-  'solo master', 'master only', 'gm', 'dm', 'note del gm', 'note del dm',
-]);
 const FENCE_CONVENTIONS = new Set(['secret', 'segreto', 'segreti', 'master', 'private', 'privato', 'gm', 'dm']);
+// Heading keywords match as whole words (a letter on either side breaks the match).
+const HEADING_MASTER_WORD = /(?<!\p{L})(?:master|gm|dm)(?!\p{L})/u;
+const HEADING_SECRET_WORD = /(?<!\p{L})(?:segret|secret)/u;
+// First inner line of a fence that marks it as master-only (the keyword ends at end, space or punctuation).
+const FENCE_MASTER_NOTE_LINE = /^(?:solo per il master|per il master|note del master|master|gm|dm|segreto|segreti|secret)(?:$|[\s\p{P}])/u;
+
+/** Convention id of a heading text (lowercased and matched as whole words), or null. */
+function headingConvention(text) {
+  const lower = text.toLowerCase();
+  if (HEADING_MASTER_WORD.test(lower)) return 'heading:master';
+  if (HEADING_SECRET_WORD.test(lower)) return 'heading:segreti';
+  return null;
+}
 
 /** Removes one pair of matching quotes around a value. */
 function unquote(text) {
@@ -304,9 +313,11 @@ export function findConventions(lines, firstLine) {
   const inMaster = (idx) => masterRanges.some(([a, b]) => idx >= a && idx <= b);
 
   const all = headingIndexes(lines, fenced);
+  let coveredUntil = -1; // last line of the reported heading section; nested headings are covered by it
   all.forEach((h, k) => {
-    const key = h.text.toLowerCase();
-    if (!HEADING_CONVENTIONS.has(key) || inMaster(h.idx)) return;
+    if (h.idx <= coveredUntil || inMaster(h.idx)) return;
+    const id = headingConvention(h.text);
+    if (id === null) return;
     let end = n - 1;
     for (const next of all.slice(k + 1)) {
       if (next.level <= h.level) {
@@ -314,8 +325,9 @@ export function findConventions(lines, firstLine) {
         break;
       }
     }
+    coveredUntil = end;
     found.push({
-      id: `heading:${key}`,
+      id,
       s: h.idx,
       e: end,
       inner: end > h.idx ? [h.idx + 1, end] : null,
@@ -360,14 +372,17 @@ export function findConventions(lines, firstLine) {
   }
 
   for (const fence of scanFences(lines)) {
-    if (!fence.closed || !FENCE_CONVENTIONS.has(fence.info)) continue;
-    found.push({
-      id: `fence:${fence.info}`,
-      s: fence.open,
-      e: fence.close,
-      inner: fence.close - 1 >= fence.open + 1 ? [fence.open + 1, fence.close - 1] : null,
-      heading: null,
-    });
+    if (!fence.closed) continue;
+    const inner = fence.close - 1 >= fence.open + 1 ? [fence.open + 1, fence.close - 1] : null;
+    let id = null;
+    if (FENCE_CONVENTIONS.has(fence.info)) {
+      id = `fence:${fence.info}`;
+    } else if (inner !== null) {
+      const first = lines.slice(inner[0], inner[1] + 1).find((l) => l.trim() !== '');
+      if (first !== undefined && FENCE_MASTER_NOTE_LINE.test(first.trim().toLowerCase())) id = 'fence:master-note';
+    }
+    if (id === null) continue;
+    found.push({ id, s: fence.open, e: fence.close, inner, heading: null });
   }
 
   return found

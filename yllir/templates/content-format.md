@@ -204,7 +204,7 @@ Il gruppo ottiene un consiglio sulla strada per il bosco.
 Il gruppo riceve soltanto un invito a tornare il giorno dopo.
 ```
 
-**Validated:** the engine checks, at commit, that every `###` heading of an event file is a check; that each check has both `#### Successo` (`#### Success`) and `#### Fallimento` (`#### Failure`), each with a non-empty paragraph; that no event uses the old list form `- **Successo:**`; and that no check is asked in prose outside a check heading (for example "ask the players for a Wisdom check", or "CD 15" in running text).
+**Validated:** the engine checks, at commit, that every `###` heading of an event file is a check; that each check has both `#### Successo` (`#### Success`) and `#### Fallimento` (`#### Failure`), each with a non-empty paragraph; that no event uses the old list form `- **Successo:**`; and that no check is asked in prose outside a check heading (for example "ask the players for a Wisdom check", or "CD 15" in running text). An event file with `provenance: master` (a scene brought over from the master's own notes) is checked the same way, but its findings are warnings that never block the save.
 
 ## 3. Chronicle page
 

@@ -2,7 +2,9 @@
   "input": "{{INPUT}}",
   "masterHeading": "Indicazioni per il master",
   "masterConventions": {
+    "fence:master-note": "master",
     "fence:segreto": "master",
+    "heading:master": "master",
     "heading:segreti": "master",
     "html-master": "master"
   },
@@ -444,6 +446,99 @@
           "from": 15,
           "to": 15,
           "heading": "## Origine",
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Trama/Sessione 1/Sessione 1.md",
+      "title": null,
+      "meta": {
+        "id": "sessione-1",
+        "depends_on": [],
+        "provenance": "master"
+      },
+      "parts": []
+    },
+    {
+      "target": "Trama/Sessione 1/Eventi/Arrivo a Brina.md",
+      "title": null,
+      "meta": {
+        "id": "arrivo-a-brina",
+        "session": "sessione-1",
+        "depends_on": [],
+        "location": [
+          "citta-di-brina"
+        ],
+        "characters": [
+          "ilde"
+        ],
+        "provenance": "master"
+      },
+      "parts": [
+        {
+          "file": "Trama/Sessione 1.md",
+          "from": 1,
+          "to": 4,
+          "heading": null,
+          "shift": 0
+        },
+        {
+          "file": "Trama/Sessione 1.md",
+          "from": 6,
+          "to": 13,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Trama/Sessione 1/Eventi/La taverna.md",
+      "title": null,
+      "meta": {
+        "id": "la-taverna",
+        "session": "sessione-1",
+        "depends_on": [
+          "arrivo-a-brina"
+        ],
+        "location": [
+          "fonte-nera-taverna"
+        ],
+        "provenance": "master"
+      },
+      "parts": [
+        {
+          "file": "Trama/Sessione 1.md",
+          "from": 15,
+          "to": 29,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Trama/Sessione 1/Eventi/Il ponte.md",
+      "title": null,
+      "meta": {
+        "id": "il-ponte",
+        "session": "sessione-1",
+        "depends_on": [
+          "la-taverna"
+        ],
+        "location": [
+          "ponte-lungo"
+        ],
+        "characters": [
+          "capitano-brenno"
+        ],
+        "provenance": "master"
+      },
+      "parts": [
+        {
+          "file": "Trama/Sessione 1.md",
+          "from": 31,
+          "to": 42,
+          "heading": null,
           "shift": 0
         }
       ]

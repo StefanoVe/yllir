@@ -88,6 +88,7 @@ export async function checkBatch(root, options = {}) {
       finalFiles: [...files],
       ambiguousMentions: [],
       shortNames: [],
+      warnings: [],
     };
   }
 
@@ -95,7 +96,7 @@ export async function checkBatch(root, options = {}) {
   const batch = new Set([...files, ...deletes]);
   const conflicts = dirty.filter((rel) => batch.has(rel));
   const evaluation = conflicts.length > 0
-    ? { errors: conflicts.map(conflictError), finalFiles: [...files], ambiguousMentions: [], shortNames: [], copy: null }
+    ? { errors: conflicts.map(conflictError), finalFiles: [...files], ambiguousMentions: [], shortNames: [], copy: null, warnings: [] }
     : await evaluate(dir, { files, deletes, sources, tmpRoot });
   try {
     const ok = evaluation.errors.length === 0;
@@ -115,6 +116,7 @@ export async function checkBatch(root, options = {}) {
       finalFiles: evaluation.finalFiles,
       ambiguousMentions: evaluation.ambiguousMentions,
       shortNames: evaluation.shortNames,
+      warnings: evaluation.warnings,
     };
   } finally {
     removeCopy(evaluation.copy);
@@ -129,9 +131,10 @@ export async function checkBatch(root, options = {}) {
  * @param {{ files?: string[], deletes?: string[], sources?: string[], message: string, note?: string }} options
  * @returns {Promise<{ ok: boolean, errors: object[], saved: { hash: string } | null, finalFiles: string[],
  *   manualChanges: string[], ambiguousMentions: object[], reviewRequired: boolean, layoutOnly: boolean,
- *   shortNames: object[] }>}
+ *   shortNames: object[], warnings: object[] }>}
  *   shortNames: abbreviated names of the batch's Markdown drafts (see checkBatch). Informational only: it never
- *   sets ok or adds to errors. file is the campaign-relative final path; empty when evaluation did not run.
+ *   sets ok or adds to errors. warnings: findings on master-written event files (see sceneErrors); they never
+ *   set ok or block the save. file is the campaign-relative final path; empty when evaluation did not run.
  */
 export async function commitBatch(root, options = {}) {
   const { files, deletes, sources, message, note, tmpRoot } = readArgs(root, options, true);
@@ -146,6 +149,7 @@ export async function commitBatch(root, options = {}) {
     manualChanges: [],
     ambiguousMentions: [],
     shortNames: [],
+    warnings: [],
     reviewRequired,
     layoutOnly,
     ...extra,
@@ -194,6 +198,7 @@ export async function commitBatch(root, options = {}) {
         manualChanges: dirty,
         ambiguousMentions: evaluation.ambiguousMentions,
         shortNames: evaluation.shortNames,
+        warnings: evaluation.warnings,
         reviewRequired,
         layoutOnly,
       };
@@ -217,6 +222,7 @@ export async function commitBatch(root, options = {}) {
         manualChanges: dirty,
         ambiguousMentions: evaluation.ambiguousMentions,
         shortNames: evaluation.shortNames,
+        warnings: evaluation.warnings,
         reviewRequired,
         layoutOnly,
       };
@@ -230,6 +236,7 @@ export async function commitBatch(root, options = {}) {
       manualChanges: dirty,
       ambiguousMentions: evaluation.ambiguousMentions,
       shortNames: evaluation.shortNames,
+      warnings: evaluation.warnings,
       reviewRequired,
       layoutOnly,
     };
@@ -283,22 +290,23 @@ async function evaluate(dir, { files, deletes, sources, tmpRoot }) {
   const draftsHash = hashDrafts(dir, files, deletes, sources);
   const preflightErrors = preflight(dir, files, deletes, sources);
   if (preflightErrors.length > 0) {
-    return { errors: preflightErrors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map(), shortNames: [] };
+    return { errors: preflightErrors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map(), shortNames: [], warnings: [] };
   }
   const config = configChange(dir, files);
   if (config.errors.length > 0) {
-    return { errors: config.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map(), shortNames: [] };
+    return { errors: config.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map(), shortNames: [], warnings: [] };
   }
   const retired = planRetiredIds(dir, { files, deletes, draftRoot: path.join(dir, DRAFT_DIR) });
   if (retired.errors.length > 0) {
-    return { errors: retired.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map(), shortNames: [] };
+    return { errors: retired.errors, finalFiles: [...files], ambiguousMentions: [], draftsHash, copy: null, externalLinks: new Map(), shortNames: [], warnings: [] };
   }
 
   const copy = fs.mkdtempSync(path.join(tmpRoot, 'yllir-engine-'));
-  const result = { errors: [], finalFiles: [...files], ambiguousMentions: [], draftsHash, copy, externalLinks: new Map(), shortNames: [] };
+  const result = { errors: [], finalFiles: [...files], ambiguousMentions: [], draftsHash, copy, externalLinks: new Map(), shortNames: [], warnings: [] };
   try {
     const existing = files.filter((rel) => lstatOrNull(path.join(dir, rel)) !== null);
     const baseline = await validate(dir, scopesFor(dir, existing, deletes));
+    // validate returns { errors, warnings }: both are diffed against the baseline below.
 
     const transformed = await transform(dir, copy, { files, deletes, retired: retired.ids });
     result.externalLinks = transformed.externalLinks;
@@ -311,7 +319,8 @@ async function evaluate(dir, { files, deletes, sources, tmpRoot }) {
     }
 
     const after = await validate(copy, scopesFor(copy, transformed.finalFiles, deletes), { pendingPaths: config.pendingPaths });
-    result.errors = newErrors(baseline, after, transformed.pathMap);
+    result.errors = newErrors(baseline.errors, after.errors, transformed.pathMap);
+    result.warnings = newErrors(baseline.warnings, after.warnings, transformed.pathMap);
     if (result.errors.length === 0 && config.structureAdded > 0) {
       // What add-category does after a structure change: the instruction files are regenerated. They are
       // generated in the copy, so they are synced and saved with the batch, in the same version.
@@ -512,6 +521,7 @@ async function transform(dir, copy, { files, deletes, retired }) {
  * as an error with the validator name as code, so one broken validator never hides the rest.
  * @param {string} dir campaign folder (the real one, or the copy)
  * @param {{ files: string[], checkFiles: string[]|null, planFiles: string[]|null }} scope
+ * @returns {Promise<{ errors: object[], warnings: object[] }>} warnings: scene findings of master-written event files.
  */
 async function validate(dir, { files, checkFiles, planFiles }, { pendingPaths = new Set() } = {}) {
   const out = [];
@@ -544,35 +554,44 @@ async function validate(dir, { files, checkFiles, planFiles }, { pendingPaths = 
   run('plot', () => plotMap(dir).errors);
   run('geographic-layout', () => planGeographicLayout(dir).errors);
   out.push(...(await adapterErrors(dir, files)));
+  let warnings = [];
   if (files.length > 0) {
     try {
-      out.push(...(await sceneErrors(dir, files)));
+      const scenes = await sceneErrors(dir, files);
+      out.push(...scenes.errors);
+      warnings = scenes.warnings;
     } catch (error) {
       out.push(normalize('scene-checks', { message: error.message }));
     }
   }
-  return out;
+  return { errors: out, warnings };
 }
 
-/** Errors of the plot event files in the batch (see plot/scene-checks.mjs). */
+/**
+ * Scene-check findings of the plot event files in the batch (see plot/scene-checks.mjs). A file whose metadata
+ * says provenance: master is the master's own text: its findings are warnings, which never block a check or a
+ * commit. Every other event file's findings are errors.
+ */
 async function sceneErrors(dir, files) {
   const structure = readStructure(dir).structure ?? [];
   const plotFolders = folderPaths(structure, (type) => type === 'plot');
   const eventFiles = files.filter((rel) => isSceneEventFile(rel, plotFolders));
-  if (eventFiles.length === 0) return [];
+  const errors = [];
+  const warnings = [];
+  if (eventFiles.length === 0) return { errors, warnings };
 
   const config = readConfig(dir);
   const lang = typeof config?.language?.main === 'string' ? config.language.main : 'en';
   const checkValue = await sceneValueCheck(config);
-  const out = [];
   for (const file of eventFiles) {
     const text = readText(path.join(dir, file));
     if (text === null) continue;
+    const target = parseFrontmatter(text).data?.provenance === 'master' ? warnings : errors;
     for (const entry of checkScene(text, lang, { checkValue })) {
-      out.push(normalize('scene-checks', { file, message: `line ${entry.line}: ${entry.message}` }, file));
+      target.push(normalize('scene-checks', { file, message: `line ${entry.line}: ${entry.message}` }, file));
     }
   }
-  return out;
+  return { errors, warnings };
 }
 
 /** An event file: inside a plot folder, in an Eventi or Events folder, and not a session main file. */
