@@ -88,8 +88,21 @@ test('findLinks: markdown links, percent-decoded, angle brackets, anchors and im
   ]);
 });
 
-test('findLinks: external links and same-file anchors are not returned', () => {
-  assert.deepEqual(findLinks(['[w](https://x.y)', '[s](#sez)'], 1), []);
+test('findLinks: external links are not returned, a same-file anchor is returned with an empty target', () => {
+  assert.deepEqual(findLinks(['[w](https://x.y)'], 1), []);
+  assert.deepEqual(findLinks(['testo [s](#rientro%20e-consegna)'], 1), [
+    {
+      line: 1,
+      col: 6,
+      end: 32,
+      raw: '[s](#rientro%20e-consegna)',
+      form: 'markdown',
+      target: '',
+      anchor: 'rientro e-consegna',
+      label: 's',
+      embed: false,
+    },
+  ]);
 });
 
 test('findLinks: a link inside inline code is not returned, the one after it is', () => {
@@ -102,6 +115,68 @@ test('findLinks: a link inside a fence is not returned, the one after it is', ()
   assert.deepEqual(findLinks(['```', '[[A]]', '```', '[[B]]'], 1), [
     { line: 4, col: 0, end: 5, raw: '[[B]]', form: 'wiki', target: 'B', anchor: null, label: null, embed: false },
   ]);
+});
+
+test('findLinks: linked image gives the outer link first, then the inner image', () => {
+  assert.deepEqual(findLinks(['[![Carta](img/a.png)](../Items/A.md)'], 1), [
+    {
+      line: 1,
+      col: 0,
+      end: 36,
+      raw: '[![Carta](img/a.png)](../Items/A.md)',
+      form: 'markdown',
+      target: '../Items/A.md',
+      anchor: null,
+      label: '![Carta](img/a.png)',
+      embed: false,
+      contains: 1,
+    },
+    {
+      line: 1,
+      col: 1,
+      end: 20,
+      raw: '![Carta](img/a.png)',
+      form: 'markdown',
+      target: 'img/a.png',
+      anchor: null,
+      label: 'Carta',
+      embed: true,
+      nested: true,
+    },
+  ]);
+});
+
+test('findLinks: linked image with text around it and a percent-encoded target', () => {
+  assert.deepEqual(findLinks(['Vedi [![Carta](img/a.png)](../Items/Un%20registro.md) qui'], 1), [
+    {
+      line: 1,
+      col: 5,
+      end: 53,
+      raw: '[![Carta](img/a.png)](../Items/Un%20registro.md)',
+      form: 'markdown',
+      target: '../Items/Un registro.md',
+      anchor: null,
+      label: '![Carta](img/a.png)',
+      embed: false,
+      contains: 1,
+    },
+    {
+      line: 1,
+      col: 6,
+      end: 25,
+      raw: '![Carta](img/a.png)',
+      form: 'markdown',
+      target: 'img/a.png',
+      anchor: null,
+      label: 'Carta',
+      embed: true,
+      nested: true,
+    },
+  ]);
+});
+
+test('findLinks: a linked image inside inline code is not returned', () => {
+  assert.deepEqual(findLinks(['`[![Carta](img/a.png)](../Items/A.md)` ok'], 1), []);
 });
 
 test('findLinks: raw is the exact slice of its line', () => {

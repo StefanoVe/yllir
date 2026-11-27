@@ -1,23 +1,28 @@
 #!/usr/bin/env node
 // Writes the structure report of a campaign source folder as JSON and prints its summary line.
-// Usage: node convert-structure.mjs <INPUT> --out <file>
+// Usage: node convert-structure.mjs <INPUT> --out <file> [--survey <file>]
 // Exit codes: 0 ok, 2 usage error or unreadable INPUT (message on stderr).
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { buildReport } from './lib/convert-structure.mjs';
+import { buildReport, buildSurvey } from './lib/convert-structure.mjs';
 import { exitWith, runCli } from '../../../scripts/lib/cli-exit.mjs';
 
-const USAGE = 'usage: node convert-structure.mjs <INPUT> --out <file>';
+const USAGE = 'usage: node convert-structure.mjs <INPUT> --out <file> [--survey <file>]';
 
 function parseArgs(argv) {
-  const opts = { input: null, out: null };
+  const opts = { input: null, out: null, survey: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--out') {
       const value = argv[i + 1];
       if (value === undefined || value.startsWith('--')) return null;
       opts.out = value;
+      i++;
+    } else if (arg === '--survey') {
+      const value = argv[i + 1];
+      if (value === undefined || value.startsWith('--')) return null;
+      opts.survey = value;
       i++;
     } else if (arg.startsWith('--') || arg === '') {
       return null;
@@ -39,6 +44,11 @@ function main() {
   const outFile = path.resolve(args.out);
   fs.mkdirSync(path.dirname(outFile), { recursive: true });
   fs.writeFileSync(outFile, `${JSON.stringify(report, null, 2)}\n`);
+  if (args.survey !== null) {
+    const surveyFile = path.resolve(args.survey);
+    fs.mkdirSync(path.dirname(surveyFile), { recursive: true });
+    fs.writeFileSync(surveyFile, `${JSON.stringify(buildSurvey(report), null, 2)}\n`);
+  }
 
   const markdown = report.files.length;
   const images = report.images.length;

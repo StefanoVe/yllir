@@ -1,0 +1,47 @@
+{
+  "input": "{{INPUT}}",
+  "masterHeading": "Indicazioni per il master",
+  "masterConventions": {
+    "callout:secret": "master",
+    "obsidian-comment": "master"
+  },
+  "plotFolder": "Trama",
+  "folders": [
+    {
+      "path": "Luoghi",
+      "route": "move",
+      "kind": "place",
+      "target": "Luoghi"
+    },
+    {
+      "path": "Mappe",
+      "route": "move",
+      "kind": "place",
+      "target": "Luoghi"
+    },
+    {
+      "path": "Personaggi",
+      "route": "move",
+      "kind": "character",
+      "template": "npc",
+      "target": "Personaggi"
+    },
+    {
+      "path": "Fazioni",
+      "route": "move",
+      "kind": "faction",
+      "template": "faction",
+      "target": "Storia"
+    },
+    {
+      "path": "Diario",
+      "route": "full"
+    }
+  ],
+  "headingAliases": {
+    "npc": {
+      "Aspetto": "Aspetto e modi",
+      "Modo di fare": "Aspetto e modi"
+    }
+  }
+}

@@ -10,6 +10,7 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { applyPlan, validatePlan } from './convert-apply.mjs';
 import { checkLinks } from '../../../../scripts/lib/links/check-links.mjs';
+import { stripExitLine } from '../../../../scripts/lib/cli-exit.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const cli = path.join(here, '..', 'convert-apply.mjs');
@@ -172,7 +173,7 @@ test('links: wiki, label, anchor, self, markdown, missing, ambiguous, skipped, m
     const a = draftOf(root, 'Luoghi/A.md');
     assert.ok(a.includes('[B](../Personaggi/B.md), [etichetta](../Personaggi/B.md)'), a);
     assert.ok(a.includes('[B](../Personaggi/B.md#il-molo)'), a);
-    assert.ok(a.includes('[Sezione](A.md#sezione) qui.'), a);
+    assert.ok(a.includes('[Sezione](#sezione) qui.'), a);
     assert.ok(a.includes('[x](../Personaggi/B%20c.md)'), a);
     const reasons = result.plainLinks.map((l) => `${l.text}:${l.reason}`).sort();
     assert.deepEqual(reasons, ['Dup:ambiguous', 'Indice:skipped', 'Nessuno:missing', 'Pg:master-only']);
@@ -476,24 +477,65 @@ test('validatePlan returns no errors for a valid plan and writes nothing', () =>
   }
 });
 
-test('CLI: valid plan exits 0 with ok true, bad plan exits 1, missing --plan exits 2', () => {
+test('CLI: valid plan exits 0, the full result goes to --out and stdout is a compact summary', () => {
   const { root, input } = setup({ 'Luoghi/A.md': BASE_A });
   const planDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-apply-plan-'));
   try {
     const good = path.join(planDir, 'good.json');
+    const out = path.join(planDir, 'result-good.json');
     fs.writeFileSync(good, JSON.stringify(planFor(input, { documents: [aDoc()] })));
-    const ok = spawnSync(process.execPath, [cli, root, '--plan', good], { encoding: 'utf8' });
+    const ok = spawnSync(process.execPath, [cli, root, '--plan', good, '--out', out], { encoding: 'utf8' });
     assert.equal(ok.status, 0, ok.stderr);
-    assert.equal(JSON.parse(ok.stdout).ok, true);
+    assert.ok(ok.stdout.endsWith('exit: 0\n'), ok.stdout);
+    const summary = JSON.parse(stripExitLine(ok.stdout));
+    assert.equal(summary.ok, true);
+    assert.equal(summary.out, out);
+    assert.equal(summary.counts.files, 1);
+    const full = JSON.parse(fs.readFileSync(out, 'utf8'));
+    assert.equal(full.ok, true);
+    assert.deepEqual(full.files, ['Luoghi/A.md']);
 
     const bad = path.join(planDir, 'bad.json');
+    const badOut = path.join(planDir, 'result-bad.json');
     fs.writeFileSync(bad, JSON.stringify(planFor(input, { documents: [aDoc({ target: '../x.md' })] })));
-    const fail = spawnSync(process.execPath, [cli, root, '--plan', bad], { encoding: 'utf8' });
+    const fail = spawnSync(process.execPath, [cli, root, '--plan', bad, '--out', badOut], { encoding: 'utf8' });
     assert.equal(fail.status, 1);
-    assert.equal(JSON.parse(fail.stdout).ok, false);
+    assert.equal(JSON.parse(stripExitLine(fail.stdout)).ok, false);
+    assert.equal(JSON.parse(fs.readFileSync(badOut, 'utf8')).ok, false);
 
-    const usage = spawnSync(process.execPath, [cli, root], { encoding: 'utf8' });
-    assert.equal(usage.status, 2);
+    const noOut = spawnSync(process.execPath, [cli, root, '--plan', good], { encoding: 'utf8' });
+    assert.equal(noOut.status, 2);
+    const noPlan = spawnSync(process.execPath, [cli, root, '--out', out], { encoding: 'utf8' });
+    assert.equal(noPlan.status, 2);
+  } finally {
+    cleanup(root, input, planDir);
+  }
+});
+
+test('CLI: a result over 70 KB is written whole to --out and stdout still parses (piped)', () => {
+  const { root, input } = setup({});
+  const planDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-apply-big-'));
+  try {
+    // Every document has a bad target: each error message carries a long name, so the full result is large.
+    const documents = Array.from({ length: 200 }, (_, i) => ({
+      target: `../${'segmento-lungo-'.repeat(24)}${i}.md`,
+      title: 'X',
+      meta: { id: `x-${i}`, provenance: 'master' },
+      parts: [],
+    }));
+    const plan = path.join(planDir, 'big.json');
+    const out = path.join(planDir, 'result-big.json');
+    fs.writeFileSync(plan, JSON.stringify(planFor(input, { documents })));
+    const run = spawnSync(process.execPath, [cli, root, '--plan', plan, '--out', out], { encoding: 'utf8' });
+    assert.equal(run.status, 1, run.stderr);
+    const full = JSON.parse(fs.readFileSync(out, 'utf8'));
+    assert.equal(full.ok, false);
+    assert.ok(full.errors.length > 50);
+    assert.ok(fs.statSync(out).size > 70 * 1024, `result is ${fs.statSync(out).size} bytes`);
+    const summary = JSON.parse(stripExitLine(run.stdout));
+    assert.equal(summary.ok, false);
+    assert.equal(summary.errors.length, 50);
+    assert.ok(run.stdout.endsWith('exit: 1\n'));
   } finally {
     cleanup(root, input, planDir);
   }
@@ -708,4 +750,155 @@ test('master part: master true is allowed, master "yes" is bad-plan', () => {
       parts: [{ file, from: 1, to: 1, heading: null, shift: 0, master: 'yes' }],
     }],
   }), 'bad-plan');
+});
+
+test('text part: lines written as they are after their heading, listed in textParts', () => {
+  const file = 'Trama/sessione-1/Eventi/Scena.md';
+  const { root, input } = setup({ [file]: 'Prima riga.\n' });
+  try {
+    const result = applyPlan(root, planFor(input, {
+      documents: [{
+        target: file,
+        title: null,
+        meta: { id: 'scena', session: 'sessione-1', depends_on: [], provenance: 'master' },
+        parts: [
+          { file, from: 1, to: 1, heading: null, shift: 0 },
+          { text: 'Testo [[non un link]] aggiunto.\nSeconda riga.', heading: '## Extra' },
+        ],
+      }],
+    }));
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.deepEqual(result.textParts, [{ document: file, lines: 2 }]);
+    assert.equal(
+      draftOf(root, file),
+      '<!-- yllir\nid: scena\nsession: sessione-1\nprovenance: master\ndepends_on: []\n-->\n\n'
+      + 'Prima riga.\n\n## Extra\n\nTesto [[non un link]] aggiunto.\nSeconda riga.\n',
+    );
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('text part: master true goes to the reserved block, and the result lists no text part without one', () => {
+  const file = 'Trama/sessione-1/Eventi/Scena.md';
+  const { root, input } = setup({ [file]: 'Prima riga.\n' });
+  try {
+    const result = applyPlan(root, planFor(input, {
+      documents: [{
+        target: file,
+        title: null,
+        meta: { id: 'scena', session: 'sessione-1', depends_on: [], provenance: 'master' },
+        parts: [
+          { file, from: 1, to: 1, heading: null, shift: 0 },
+          { text: 'Segreto del ponte.', heading: null, master: true },
+        ],
+      }],
+    }));
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.deepEqual(result.textParts, [{ document: file, lines: 1 }]);
+    assert.equal(
+      draftOf(root, file),
+      '<!-- yllir\nid: scena\nsession: sessione-1\nprovenance: master\ndepends_on: []\n-->\n\n'
+      + 'Prima riga.\n\n<!-- master -->\n## Master\n\n### Indicazioni per il master\nSegreto del ponte.\n<!-- /master -->\n',
+    );
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('text part: a master marker or --> in the text, or a text with a file, is bad-plan', () => {
+  const file = 'Trama/sessione-1/Eventi/Scena.md';
+  assertPlanError({ [file]: 'Uno.\n' }, (input) => planFor(input, {
+    documents: [{
+      target: file, title: null,
+      meta: { id: 'scena', session: 'sessione-1', depends_on: [], provenance: 'master' },
+      parts: [{ text: 'dentro <!-- master --> qui', heading: null }],
+    }],
+  }), 'bad-plan');
+  assertPlanError({ [file]: 'Uno.\n' }, (input) => planFor(input, {
+    documents: [{
+      target: file, title: null,
+      meta: { id: 'scena', session: 'sessione-1', depends_on: [], provenance: 'master' },
+      parts: [{ text: 'testo', file, from: 1, to: 1, heading: null, shift: 0 }],
+    }],
+  }), 'bad-plan');
+});
+
+test('nested link: a linked image is rewritten inside, and the outer link keeps the rewritten image as its label', () => {
+  const scene = 'Trama/sessione-1/Eventi/Scena.md';
+  const item = 'Oggetti/A.md';
+  const { root, input } = setup({
+    [scene]: 'Il giocatore trova [![Carta](img/a.png)](../../../Oggetti/A.md) sul tavolo.\n',
+    [item]: 'Una spada.\n',
+    'Trama/sessione-1/Eventi/img/a.png': 'PNG',
+  });
+  try {
+    const result = applyPlan(root, planFor(input, {
+      documents: [
+        {
+          target: scene,
+          title: null,
+          meta: { id: 'scena', session: 'sessione-1', depends_on: [], provenance: 'master' },
+          parts: [{ file: scene, from: 1, to: 1, heading: null, shift: 0 }],
+        },
+        {
+          target: item,
+          title: 'A',
+          meta: { id: 'a', kind: 'item', provenance: 'master' },
+          parts: [{ file: item, from: 1, to: 1, heading: null, shift: 0 }],
+        },
+      ],
+      images: [{ file: 'Trama/sessione-1/Eventi/img/a.png', target: 'Oggetti/img/a.png' }],
+    }));
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.deepEqual(result.plainLinks, []);
+    assert.equal(
+      draftOf(root, scene),
+      '<!-- yllir\nid: scena\nsession: sessione-1\nprovenance: master\ndepends_on: []\n-->\n\n'
+      + 'Il giocatore trova [![Carta](../../../Oggetti/img/a.png)](../../../Oggetti/A.md) sul tavolo.\n',
+    );
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('anchor links: a same-file anchor to a dropped scene heading is the file, a heading inside a part keeps its anchor', () => {
+  const file = 'Trama/sessione-1/Eventi/Scene.md';
+  const { root, input } = setup({
+    [file]: "# Arrivo\nIl gruppo arriva.\nVedi [vedi](#rientro) e [oste](#parlare-con-loste) e [x](#nessuno) per dopo.\n# Rientro\nIl gruppo torna.\n## Parlare con l'oste\nL'oste tace.\n",
+  });
+  try {
+    const result = applyPlan(root, planFor(input, {
+      documents: [
+        {
+          target: 'Trama/sessione-1/Eventi/Arrivo.md',
+          title: null,
+          meta: { id: 'arrivo', session: 'sessione-1', depends_on: [], provenance: 'master' },
+          parts: [{ file, from: 1, to: 3, heading: null, shift: 0 }],
+        },
+        {
+          target: 'Trama/sessione-1/Eventi/Rientro.md',
+          title: null,
+          meta: { id: 'rientro', session: 'sessione-1', depends_on: ['arrivo'], provenance: 'master' },
+          parts: [{ file, from: 4, to: 7, heading: null, shift: 0 }],
+        },
+      ],
+    }));
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.deepEqual(result.plainLinks, [{
+      document: 'Trama/sessione-1/Eventi/Arrivo.md', raw: '[x](#nessuno)', text: 'x', reason: 'missing-anchor',
+    }]);
+    assert.equal(
+      draftOf(root, 'Trama/sessione-1/Eventi/Arrivo.md'),
+      '<!-- yllir\nid: arrivo\nsession: sessione-1\nprovenance: master\ndepends_on: []\n-->\n\n'
+      + 'Il gruppo arriva.\nVedi [vedi](Rientro.md) e [oste](Rientro.md#parlare-con-loste) e x per dopo.\n',
+    );
+    assert.equal(
+      draftOf(root, 'Trama/sessione-1/Eventi/Rientro.md'),
+      '<!-- yllir\nid: rientro\nsession: sessione-1\nprovenance: master\ndepends_on: [arrivo]\n-->\n\n'
+      + "Il gruppo torna.\n## Parlare con l'oste\nL'oste tace.\n",
+    );
+  } finally {
+    cleanup(root, input);
+  }
 });

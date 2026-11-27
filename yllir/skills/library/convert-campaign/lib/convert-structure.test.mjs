@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildReport } from './convert-structure.mjs';
+import { buildReport, buildSurvey } from './convert-structure.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(HERE, '../convert-structure.mjs');
@@ -209,6 +209,65 @@ test('the CLI exits 2 on a missing input or a usage error', () => {
   assert.notEqual(missing.stderr, '');
   const usage = spawnSync(process.execPath, [CLI, dir], { encoding: 'utf8' });
   assert.equal(usage.status, 2);
+});
+
+test('the survey counts each file in its depth 1 and depth 2 folders, with the first 3 samples', () => {
+  const dir = makeFolder({
+    'Root.md': '# Root\n',
+    'A/x.md': '# X\nuno\n',
+    'A/B/y.md': '# Y\nuno\ndue\n',
+    'A/B/z.md': '# Z\n> [!secret] segreto\n',
+    'A/B/2026-09-12.md': '# D\n',
+  });
+  assert.deepEqual(buildSurvey(buildReport(dir)), {
+    folders: [
+      { path: '', files: 1, lines: 1, hints: {}, conventions: {}, samples: ['Root'] },
+      {
+        path: 'A',
+        files: 4,
+        lines: 8,
+        hints: { daily: 1 },
+        conventions: { 'callout:secret': 1 },
+        samples: ['2026-09-12', 'y', 'z'],
+      },
+      {
+        path: 'A/B',
+        files: 3,
+        lines: 6,
+        hints: { daily: 1 },
+        conventions: { 'callout:secret': 1 },
+        samples: ['2026-09-12', 'y', 'z'],
+      },
+    ],
+    conventions: { 'callout:secret': 1 },
+    links: { missing: 0, ambiguous: 0 },
+  });
+});
+
+test('the CLI writes the survey with --survey, and only then', () => {
+  const dir = makeFolder({ 'Root.md': '# Root\n', 'A/x.md': '# X\n' });
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-structure-survey-'));
+  const outFile = path.join(outDir, 'report.json');
+  const surveyFile = path.join(outDir, 'survey.json');
+  const result = spawnSync(process.execPath, [CLI, dir, '--out', outFile, '--survey', surveyFile], { encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    result.stdout.split('\n')[0],
+    'files: 2, markdown: 2, images: 0, excluded: 0, conventions: 0, missing-links: 0',
+  );
+  assert.equal(
+    fs.readFileSync(surveyFile, 'utf8'),
+    `${JSON.stringify(buildSurvey(buildReport(dir)), null, 2)}\n`,
+  );
+
+  const plainDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-structure-plain-'));
+  const plainOut = path.join(plainDir, 'plain.json');
+  const plain = spawnSync(process.execPath, [CLI, dir, '--out', plainOut], { encoding: 'utf8' });
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.equal(plain.stdout, result.stdout);
+  assert.deepEqual(fs.readdirSync(plainDir), ['plain.json']);
+  const dangling = spawnSync(process.execPath, [CLI, dir, '--out', plainOut, '--survey'], { encoding: 'utf8' });
+  assert.equal(dangling.status, 2);
 });
 
 test('the obsidian fixture is reported with its traps', (t) => {

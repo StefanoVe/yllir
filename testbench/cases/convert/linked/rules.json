@@ -1,0 +1,58 @@
+{
+  "input": "{{INPUT}}",
+  "masterHeading": "Indicazioni per il master",
+  "masterConventions": {
+    "fence:master-note": "master",
+    "fence:segreto": "master",
+    "heading:master": "master",
+    "heading:segreti": "master",
+    "html-master": "master"
+  },
+  "plotFolder": "Trama",
+  "folders": [
+    {
+      "path": "Mondo",
+      "route": "move",
+      "kind": "place",
+      "target": "Mondo"
+    },
+    {
+      "path": "Gente",
+      "route": "move",
+      "kind": "character",
+      "template": "npc",
+      "target": "Personaggi"
+    },
+    {
+      "path": "Cose",
+      "route": "move",
+      "kind": "item",
+      "template": "item",
+      "item_type": "other",
+      "target": "Oggetti"
+    },
+    {
+      "path": "Trama",
+      "route": "plot"
+    },
+    {
+      "path": "Riferimenti",
+      "route": "source"
+    },
+    {
+      "path": "Da fare",
+      "route": "skip"
+    }
+  ],
+  "headingAliases": {
+    "npc": {
+      "Aspetto": "Aspetto e modi",
+      "Ruolo nel gruppo": "Ruolo"
+    },
+    "item": {
+      "Uso": "Effetti",
+      "Storia": "Effetti",
+      "Provenienza": "Descrizione"
+    }
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "files": {
+    "Mappa dei luoghi.md": {
+      "route": "skip"
+    },
+    "Gente/Personaggi minori.md": {
+      "documents": [
+        {
+          "target": "Personaggi/Mastro Eldo.md",
+          "title": "Mastro Eldo",
+          "meta": {
+            "id": "mastro-eldo",
+            "kind": "character",
+            "template": "npc",
+            "provenance": "master",
+            "location": [],
+            "sketch": true
+          },
+          "parts": [
+            {
+              "file": "Gente/Personaggi minori.md",
+              "from": 7,
+              "to": 13,
+              "heading": "## Ruolo",
+              "shift": 0
+            }
+          ]
+        },
+        {
+          "target": "Personaggi/Il Grifone del Bosco Alto.md",
+          "title": "Il Grifone del Bosco Alto",
+          "meta": {
+            "id": "grifone-bosco-alto",
+            "kind": "creature",
+            "template": "creature",
+            "provenance": "master",
+            "location": [],
+            "sketch": true
+          },
+          "parts": [
+            {
+              "file": "Gente/Personaggi minori.md",
+              "from": 17,
+              "to": 23,
+              "heading": "## Natura",
+              "shift": 0
+            }
+          ]
+        },
+        {
+          "target": "Personaggi/Sorella Olma.md",
+          "title": "Sorella Olma",
+          "meta": {
+            "id": "sorella-olma",
+            "kind": "character",
+            "template": "npc",
+            "provenance": "master",
+            "location": [],
+            "sketch": true
+          },
+          "parts": [
+            {
+              "file": "Gente/Personaggi minori.md",
+              "from": 27,
+              "to": 31,
+              "heading": "## Ruolo",
+              "shift": 0
+            }
+          ]
+        },
+        {
+          "target": "Personaggi/Tamar il Guardiano.md",
+          "title": "Tamar il Guardiano",
+          "meta": {
+            "id": "tamar",
+            "kind": "character",
+            "template": "npc",
+            "provenance": "master",
+            "location": [],
+            "sketch": true
+          },
+          "parts": [
+            {
+              "file": "Gente/Personaggi minori.md",
+              "from": 35,
+              "to": 39,
+              "heading": "## Ruolo",
+              "shift": 0
+            }
+          ]
+        }
+      ]
+    },
+    "Gente/Ilde.md": {
+      "meta": {
+        "aliases": [
+          "la Rossa"
+        ]
+      }
+    },
+    "Gente/Renza.md": {
+      "meta": {
+        "aliases": [
+          "la Rossa"
+        ]
+      }
+    }
+  }
+}

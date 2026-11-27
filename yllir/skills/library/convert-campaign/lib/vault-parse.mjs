@@ -10,6 +10,8 @@ const FENCE_CLOSE = /^\s*(`{3,}|~{3,})\s*$/;
 const HEADING = /^(#{1,6})(?:\s+(.*))?$/;
 const CALLOUT = /^> ?\[!([A-Za-z-]+)\]/;
 const LINK = /!?\[\[([^\]\n]*)\]\]|!?\[([^\]\n]*)\]\((<[^>\n]*>|[^)\s]+)(?:\s+"[^"\n]*")?\)/g;
+// A linked image: [![alt](img)](target). The outer link's label is the inner image as written.
+const NESTED_IMAGE_LINK = /\[(!\[[^\]\n]*\]\((?:<[^>\n]*>|[^)\s]+)(?:\s+"[^"\n]*")?\))\]\((<[^>\n]*>|[^)\s]+)(?:\s+"[^"\n]*")?\)/g;
 const TAG = /(?<=^|\s)#[\p{L}\p{N}_\/-]*\p{L}[\p{L}\p{N}_\/-]*/gu;
 const BLOCK_REF = /(?:^|\s)\^[A-Za-z0-9-]+\s*$/;
 const SCHEME = /^[A-Za-z][A-Za-z0-9+.-]*:/;
@@ -217,7 +219,7 @@ function wikiFields(raw, inner) {
 /** Fields of a Markdown link, or null when it points outside the campaign or to the same file. */
 function markdownFields(raw, label, targetRaw) {
   const target = targetRaw.startsWith('<') && targetRaw.endsWith('>') ? targetRaw.slice(1, -1) : targetRaw;
-  if (target.startsWith('#') || SCHEME.test(target)) return null;
+  if (SCHEME.test(target)) return null;
   const hash = target.indexOf('#');
   return {
     form: 'markdown',
@@ -240,7 +242,22 @@ export function findLinks(lines, firstLine) {
   lines.forEach((line, i) => {
     if (fenced[i]) return;
     const inline = inlineCodeMask(line);
-    for (const m of line.matchAll(LINK)) {
+    // The outer brackets of a linked image are blanked, so the inner image is read alone.
+    const blank = line.split('');
+    const outers = [];
+    for (const m of line.matchAll(NESTED_IMAGE_LINK)) {
+      const col = m.index;
+      const end = col + m[0].length;
+      const labelClose = col + 1 + m[1].length;
+      blank[col] = ' ';
+      for (let k = labelClose; k < end; k++) blank[k] = ' ';
+      if (inline.slice(col, end).some(Boolean)) continue;
+      const fields = markdownFields(m[0], m[1], m[2]);
+      if (fields === null) continue;
+      outers.push({ col, end, raw: m[0], fields, inner: [] });
+    }
+    const found = [];
+    for (const m of blank.join('').matchAll(LINK)) {
       const col = m.index;
       const end = col + m[0].length;
       if (inline.slice(col, end).some(Boolean)) continue;
@@ -248,8 +265,20 @@ export function findLinks(lines, firstLine) {
         ? wikiFields(m[0], m[1])
         : markdownFields(m[0], m[2], m[3]);
       if (fields === null) continue;
-      links.push({ line: firstLine + i, col, end, raw: m[0], ...fields });
+      const entry = { line: firstLine + i, col, end, raw: line.slice(col, end), ...fields };
+      const outer = outers.find((o) => col >= o.col && end <= o.end);
+      if (outer !== undefined) {
+        entry.nested = true;
+        outer.inner.push(entry);
+      }
+      found.push(entry);
     }
+    for (const o of outers) {
+      const entry = { line: firstLine + i, col: o.col, end: o.end, raw: o.raw, ...o.fields, contains: o.inner.length };
+      found.push(entry);
+    }
+    found.sort((a, b) => a.col - b.col);
+    links.push(...found);
   });
   return links;
 }
@@ -436,6 +465,7 @@ export function resolveLink(link, fromPath, allPaths) {
   const missing = { path: null, status: 'missing', candidates: [] };
 
   if (link.form === 'markdown') {
+    if (link.target === '') return { path: fromPath, status: 'self', candidates: [] };
     const joined = path.posix.normalize(path.posix.join(path.posix.dirname(fromPath), link.target));
     if (known.has(joined)) return found(joined);
     if (path.posix.extname(joined) === '' && known.has(`${joined}.md`)) return found(`${joined}.md`);

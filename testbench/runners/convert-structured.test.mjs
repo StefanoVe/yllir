@@ -17,11 +17,12 @@ import { fileURLToPath } from 'node:url';
 import { loadYamlMapping } from './lib/case-common.mjs';
 import { checkLinks } from '../../yllir/scripts/lib/links/check-links.mjs';
 import { findConventions, findLinks } from '../../yllir/skills/library/convert-campaign/lib/vault-parse.mjs';
+import { buildReport } from '../../yllir/skills/library/convert-campaign/lib/convert-structure.mjs';
+import { draftPlan } from '../../yllir/skills/library/convert-campaign/lib/convert-draft-plan.mjs';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..');
 const INIT = path.join(REPO, 'yllir', 'skills', 'library', 'new-campaign', 'scripts', 'init-campaign.mjs');
 const ADD_CATEGORY = path.join(REPO, 'yllir', 'scripts', 'add-category.mjs');
-const STRUCTURE = path.join(REPO, 'yllir', 'skills', 'library', 'convert-campaign', 'convert-structure.mjs');
 const APPLY = path.join(REPO, 'yllir', 'skills', 'library', 'convert-campaign', 'convert-apply.mjs');
 const ENGINE = path.join(REPO, 'yllir', 'scripts', 'engine.mjs');
 const CAMPAIGN_NAME = 'Prova strutturata';
@@ -32,6 +33,11 @@ const CASES = [
     name: 'obsidian',
     fixture: 'convert-obsidian-input',
     casesDir: path.join(REPO, 'testbench', 'cases', 'convert', 'obsidian'),
+    exceptions: [
+      { file: 'Note di campagna.md', reason: 'ambiguous-link' },
+      { file: 'Personaggi/Monti/Selva.md', reason: 'homonym' },
+      { file: 'Personaggi/Porto/Selva.md', reason: 'homonym' },
+    ],
     categories: [
       ['luoghi', 'Luoghi', 'places'],
       ['personaggi', 'Personaggi', 'subjects'],
@@ -42,6 +48,10 @@ const CASES = [
     name: 'linked',
     fixture: 'convert-linked-input',
     casesDir: path.join(REPO, 'testbench', 'cases', 'convert', 'linked'),
+    exceptions: [
+      { file: 'Mondo/Città di Brina/Fonte Nera.md', reason: 'homonym' },
+      { file: 'Mondo/Fonte Nera.md', reason: 'homonym' },
+    ],
     categories: [
       ['mondo', 'Mondo', 'places'],
       ['personaggi', 'Personaggi', 'subjects'],
@@ -54,6 +64,11 @@ const CASES = [
 
 function runNode(args) {
   return spawnSync(process.execPath, args, { encoding: 'utf8' });
+}
+
+/** A JSON file of the case, with the absolute input path in place of the token. */
+function readWithInput(file, inputDir) {
+  return JSON.parse(fs.readFileSync(file, 'utf8').replaceAll('"{{INPUT}}"', JSON.stringify(inputDir)));
 }
 
 /** The JSON a script prints, without its last line `exit: <code>`. */
@@ -199,8 +214,6 @@ function metadataOf(text) {
 function runCase(def) {
   const inputDir = path.join(REPO, 'testbench', 'fixtures', def.fixture);
   const key = loadYamlMapping(path.join(def.casesDir, 'key.yaml'));
-  const planRaw = fs.readFileSync(path.join(def.casesDir, 'plan.json'), 'utf8');
-  const plan = JSON.parse(planRaw);
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-structured-'));
   try {
     // 1. An empty Italian campaign, with the categories the plan writes into.
@@ -212,18 +225,25 @@ function runCase(def) {
       assert.equal(added.status, 0, `add-category ${folder}: ${added.stdout}${added.stderr}`);
     }
 
-    // 2. The report, with the fixture hashed before and after.
+    // 2. The report and the plan generated from the rules and the overrides, with the fixture hashed
+    // before and after. The rules and the overrides are the only files written by hand.
     const before = hashTree(inputDir);
-    const report = runNode([STRUCTURE, inputDir, '--out', path.join(tmp, 'report.json')]);
-    assert.equal(report.status, 0, `convert-structure: ${report.stdout}${report.stderr}`);
+    const report = buildReport(inputDir);
+    const rules = readWithInput(path.join(def.casesDir, 'rules.json'), inputDir);
+    const overrides = JSON.parse(fs.readFileSync(path.join(def.casesDir, 'overrides.json'), 'utf8'));
+    const drafted = draftPlan({ campaignRoot: campaign, report, rules, overrides });
+    assert.equal(drafted.ok, true, `draft plan errors: ${JSON.stringify(drafted.errors)}`);
+    assert.deepEqual(drafted.summary.exceptions, def.exceptions, 'the summary exceptions differ from the expected ones');
+    const plan = drafted.plan;
 
-    // 3. The apply of the plan, with the input path filled in.
+    // 3. The apply of the generated plan.
     const planPath = path.join(campaign, '.campaign', 'state', 'convert', 'structured-plan.json');
     fs.mkdirSync(path.dirname(planPath), { recursive: true });
-    fs.writeFileSync(planPath, planRaw.replaceAll('"{{INPUT}}"', JSON.stringify(inputDir)));
-    const applied = runNode([APPLY, campaign, '--plan', planPath]);
+    fs.writeFileSync(planPath, `${JSON.stringify(plan, null, 2)}\n`);
+    const resultPath = path.join(tmp, 'apply-result.json');
+    const applied = runNode([APPLY, campaign, '--plan', planPath, '--out', resultPath]);
     assert.equal(applied.status, 0, `convert-apply: ${applied.stdout}${applied.stderr}`);
-    const result = parseOutput(applied.stdout);
+    const result = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
     assert.equal(result.ok, true, `apply errors: ${JSON.stringify(result.errors)}`);
     assert.deepEqual(hashTree(inputDir), before, 'the input folder changed');
 

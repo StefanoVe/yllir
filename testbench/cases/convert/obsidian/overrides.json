@@ -1,0 +1,12 @@
+{
+  "files": {
+    "Note di campagna.md": {
+      "route": "move",
+      "kind": "place",
+      "target": "Luoghi"
+    },
+    "Indice personaggi.md": {
+      "route": "skip"
+    }
+  }
+}

@@ -22,6 +22,7 @@ const LIST_MARKER = /^\s*(?:[-*+]|\d+[.)])\s+/;
 const EXAMPLES_PER_CONVENTION = 2;
 const EXAMPLE_CHARS = 80;
 const LONG_FILE_LINES = 300;
+const SAMPLE_COUNT = 3;
 
 /** Walks the input folder: Markdown and image paths (sorted) and the excluded entries. */
 function walk(root) {
@@ -257,5 +258,55 @@ export function buildReport(inputDir) {
     frontmatterKeys: sortedObject(frontmatterCounts),
     conventions,
     features: sortedObject(featureCounts),
+  };
+}
+
+/** The folder keys of one Markdown path: its first segment and its first two segments; "" for a root file. */
+function folderKeysOf(rel) {
+  const segments = rel.split('/').slice(0, -1);
+  if (segments.length === 0) return [''];
+  const keys = new Set([segments[0]]);
+  if (segments.length >= 2) keys.add(`${segments[0]}/${segments[1]}`);
+  return [...keys];
+}
+
+/**
+ * Survey of a report (the only report the agent reads): one entry per folder at depth 1 and 2 ("" for the
+ * root files), sorted by path, plus the conventions (id to files) and the counts of missing and ambiguous links.
+ * Pure: it takes the report object and reads nothing.
+ */
+export function buildSurvey(report) {
+  const folders = new Map();
+  for (const file of report.files) {
+    const name = path.posix.basename(file.path).replace(/\.md$/i, '');
+    const convIds = new Set(file.conventions.map((c) => c.id));
+    for (const key of folderKeysOf(file.path)) {
+      if (!folders.has(key)) {
+        folders.set(key, { path: key, files: 0, lines: 0, hints: new Map(), conventions: new Map(), samples: [] });
+      }
+      const entry = folders.get(key);
+      entry.files++;
+      entry.lines += file.lines;
+      for (const hint of file.hints) entry.hints.set(hint, (entry.hints.get(hint) ?? 0) + 1);
+      for (const id of convIds) entry.conventions.set(id, (entry.conventions.get(id) ?? 0) + 1);
+      if (entry.samples.length < SAMPLE_COUNT) entry.samples.push(name);
+    }
+  }
+  return {
+    folders: [...folders.values()]
+      .sort((a, b) => compareStrings(a.path, b.path))
+      .map((entry) => ({
+        path: entry.path,
+        files: entry.files,
+        lines: entry.lines,
+        hints: sortedObject(entry.hints),
+        conventions: sortedObject(entry.conventions),
+        samples: entry.samples,
+      })),
+    conventions: sortedObject(report.conventions.map((c) => [c.id, c.files])),
+    links: {
+      missing: report.links.missing.length,
+      ambiguous: report.links.ambiguous.length,
+    },
   };
 }

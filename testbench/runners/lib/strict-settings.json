@@ -26,6 +26,7 @@
       "Bash(node \"*/skills/library/continuity-audit/scripts/coverage-review-cache.mjs\" *)",
       "Bash(node \"*/skills/library/continuity-audit/scripts/doctor-report.mjs\" *)",
       "Bash(node \"*/skills/library/convert-campaign/convert-apply.mjs\" *)",
+      "Bash(node \"*/skills/library/convert-campaign/convert-draft-plan.mjs\" *)",
       "Bash(node \"*/skills/library/convert-campaign/convert-extract-docx.mjs\" *)",
       "Bash(node \"*/skills/library/convert-campaign/convert-structure.mjs\" *)",
       "Bash(node \"*/skills/library/encyclopedia/scripts/encyclopedia.mjs\" *)",

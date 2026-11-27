@@ -20,6 +20,8 @@ const META_ORDER = [
 const LIST_KEYS = new Set(['location', 'participants', 'depends_on', 'characters', 'items', 'played', 'aliases']);
 const SLUG = /^[a-z0-9][a-z0-9-]*$/;
 const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg)$/i;
+// Text parts may not carry the reserved block markers or an HTML comment end (spec 8.5).
+const TEXT_PART_MARKERS = /<!-- master -->|<!-- \/master -->|-->/;
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const isImage = (p) => IMAGE_EXT.test(p);
@@ -324,7 +326,7 @@ function analyse(root, plan) {
   const bad = (message) => errors.push({ code: 'bad-plan', message });
   const fail = (code, message) => errors.push({ code, message });
   const ctx = {
-    root, plan, errors, walked: [], walkedSet: new Set(), routed: new Set(), parts: [],
+    root, plan, errors, walked: [], walkedSet: new Set(), routed: new Set(), parts: [], textParts: [],
     readRecord: null, isMasterOnly: () => false,
   };
 
@@ -404,6 +406,23 @@ function analyse(root, plan) {
     }
     if (!Array.isArray(doc.parts)) return bad(`${doc.target}: parts must be a list`);
     doc.parts.forEach((part, k) => {
+      if (isObject(part) && part.text !== undefined) {
+        // Text part (spec 8.5): lines written as they are, no file, no link rewriting, no conventions.
+        if (part.file !== undefined || part.from !== undefined || part.to !== undefined) {
+          return bad(`${doc.target}: a text part has no file, from or to`);
+        }
+        if (typeof part.text !== 'string' || TEXT_PART_MARKERS.test(part.text)) {
+          return bad(`${doc.target}: a text part must be a text without master markers or -->`);
+        }
+        if (!(part.heading === null || (typeof part.heading === 'string' && /^#{1,6}\s/.test(part.heading)))) {
+          return bad(`${doc.target}: heading must be null or a heading line`);
+        }
+        if (part.master !== undefined && typeof part.master !== 'boolean') {
+          return bad(`${doc.target}: master must be true or false`);
+        }
+        ctx.textParts.push({ doc, part });
+        return;
+      }
       if (!isObject(part) || typeof part.file !== 'string' || !isMarkdown(part.file)) {
         return bad(`${doc.target}: part needs a Markdown file`);
       }
@@ -491,6 +510,34 @@ function linkIndex(ctx) {
   return { partsOf, imageTargets, imageAlts };
 }
 
+/**
+ * Target of a link with an anchor (spec 8.5). The heading is found in the file of the link; the document
+ * holding its line gives the anchor (none when the heading is the dropped title of that document), or else
+ * the document whose first part starts right after the heading. Returns { doc, anchor }, 'missing' when no
+ * heading matches, or 'no-doc' when the heading is in no part and no part follows it.
+ */
+function anchorTarget(ctx, index, file, anchor, form) {
+  const record = ctx.readRecord(file);
+  if (!record) return 'missing';
+  const same = form === 'wiki'
+    ? (text) => text.toLowerCase() === anchor.toLowerCase()
+    : (text) => headingAnchor(text) === headingAnchor(anchor);
+  const heading = record.headings.find((h) => same(h.text));
+  if (heading === undefined) return 'missing';
+  const line = heading.line;
+  const owners = index.partsOf.get(file) ?? [];
+  const holder = owners.find((p) => line >= p.from && line <= p.to);
+  if (holder !== undefined) {
+    const dropped = ctx.droppedLines.has(`${file}:${line}`);
+    return { doc: holder.doc, anchor: dropped ? null : headingAnchor(heading.text) };
+  }
+  const after = owners
+    .filter((p) => p.from > line && record.lines.slice(line, p.from - 1).every(blank))
+    .sort((a, b) => a.from - b.from)[0];
+  if (after !== undefined) return { doc: after.doc, anchor: null };
+  return 'no-doc';
+}
+
 /** Replacement of one link: { out, plain?, note? }. Returns the text in place of the link. */
 function linkPiece(ctx, index, doc, source, link, res, inMaster) {
   const textOf = link.form === 'wiki'
@@ -516,27 +563,31 @@ function linkPiece(ctx, index, doc, source, link, res, inMaster) {
   }
   if (ctx.routed.has(res.path)) return plain(textOf, 'skipped');
 
+  const owners = index.partsOf.get(res.path) ?? [];
+  if (res.status !== 'self' && owners.length === 0) return plain(textOf, 'skipped');
+
+  // The target of an anchor: the document that holds the heading, or the one that starts right after it.
   let chosen = null;
   let anchor = null;
-  if (res.status === 'self') {
-    chosen = doc;
-  }
-  const owners = index.partsOf.get(res.path) ?? [];
-  if (res.status !== 'self') {
-    if (owners.length === 0) return plain(textOf, 'skipped');
-    chosen = owners[0].doc;
-  }
   if (link.anchor !== null) {
-    const record = ctx.readRecord(res.path);
-    const heading = record ? record.headings.find((h) => headingAnchor(h.text) === headingAnchor(link.anchor)) : undefined;
-    if (heading !== undefined) {
-      const owner = owners.find((p) => heading.line >= p.from && heading.line <= p.to);
-      const allowed = res.status !== 'self' || (owner && owner.doc === doc);
-      if (owner && allowed && !ctx.droppedLines.has(`${res.path}:${heading.line}`)) {
-        chosen = owner.doc;
-        anchor = headingAnchor(heading.text);
-      }
+    const hit = anchorTarget(ctx, index, res.path, link.anchor, link.form);
+    if (hit === 'missing' && res.status === 'self') return plain(textOf, 'missing-anchor');
+    if (hit === 'missing') {
+      // Non-self: the document of the file, without the anchor (as before).
+      chosen = owners[0].doc;
+    } else if (hit === 'no-doc') {
+      return plain(textOf, 'missing-anchor');
+    } else {
+      chosen = hit.doc;
+      anchor = hit.anchor;
     }
+  }
+  if (chosen === null) chosen = res.status === 'self' ? doc : owners[0].doc;
+
+  // Same document: a bare `#anchor`, or the file name when there is no anchor.
+  if (chosen === doc) {
+    const href = anchor ? `#${anchor}` : path.posix.basename(doc.target);
+    return { out: `[${textOf}](${href})`, note: link.embed };
   }
   if (!inMaster && ctx.isMasterOnly(chosen.target) && !ctx.isMasterOnly(doc.target)) {
     return plain(textOf, 'master-only');
@@ -545,24 +596,52 @@ function linkPiece(ctx, index, doc, source, link, res, inMaster) {
   return { out: `[${textOf}](${href})`, note: link.embed };
 }
 
-/** Rewrites the links of some lines; returns the lines and the plain-text and note records. */
+/**
+ * Rewrites the links of some lines; returns the lines and the plain-text and note records.
+ * A link inside another link's label (a linked image, `[![alt](img.png)](target.md)`) is rewritten first;
+ * the outer link then takes the rewritten inner text as its label (spec 8.5).
+ */
 function rewriteLinks(ctx, index, doc, source, lines, inMaster) {
   const links = findLinks(lines, 1);
-  const pieces = links.map((link) => {
-    const res = resolveLink(link, source, ctx.walked);
-    return linkPiece(ctx, index, doc, source, link, res, inMaster);
-  });
-  const out = lines.slice();
+  const inside = (outer, inner) => inner.line === outer.line && outer.col <= inner.col && inner.end <= outer.end
+    && (inner.col !== outer.col || inner.end !== outer.end);
+  const memo = new Map();
+  const pieceOf = (k) => {
+    if (memo.has(k)) return memo.get(k);
+    const link = links[k];
+    // `[t](#x)`: the same file (the parser gives an empty target; resolveLink does not know markdown anchors).
+    const res = link.form === 'markdown' && link.target === ''
+      ? { path: source, status: 'self', candidates: [] }
+      : resolveLink(link, source, ctx.walked);
+    const kids = links.map((_, c) => c).filter((c) => c !== k && inside(link, links[c])
+      && !links.some((_, d) => d !== k && d !== c && inside(link, links[d]) && inside(links[d], links[c])));
+    let effective = link;
+    if (kids.length > 0 && typeof link.label === 'string') {
+      let label = link.label;
+      const start = link.col + 1; // the label starts after the `[` of the outer link
+      for (const c of kids.sort((a, b) => links[b].col - links[a].col)) {
+        const child = pieceOf(c);
+        label = label.slice(0, links[c].col - start) + child.out + label.slice(links[c].end - start);
+      }
+      effective = { ...link, label };
+    }
+    const piece = linkPiece(ctx, index, doc, source, effective, res, inMaster);
+    memo.set(k, piece);
+    return piece;
+  };
   const plainLinks = [];
   let notes = 0;
-  links.forEach((link, k) => {
-    if (pieces[k].plain) plainLinks.push(pieces[k].plain);
-    if (pieces[k].note) notes++;
+  links.forEach((_, k) => {
+    const piece = pieceOf(k);
+    if (piece.plain) plainLinks.push(piece.plain);
+    if (piece.note) notes++;
   });
+  const out = lines.slice();
   for (let k = links.length - 1; k >= 0; k--) {
+    if (links.some((_, d) => d !== k && inside(links[d], links[k]))) continue; // written inside its container
     const { line, col, end } = links[k];
     const i = line - 1;
-    out[i] = out[i].slice(0, col) + pieces[k].out + out[i].slice(end);
+    out[i] = out[i].slice(0, col) + pieceOf(k).out + out[i].slice(end);
   }
   return { lines: out, plainLinks, notes };
 }
@@ -579,6 +658,7 @@ function emptyResult(errors) {
     masterBlocks: { moved: 0, fixed: 0 },
     uncovered: [],
     unrouted: [],
+    textParts: [],
   };
 }
 
@@ -604,6 +684,13 @@ export function applyPlan(campaignRoot, plan) {
   const docs = p.documents.map((doc) => {
     const state = { shared: false };
     const parts = doc.parts.map((part, k) => {
+      if (part.text !== undefined) {
+        const texts = part.text === '' ? [] : part.text.split('\n');
+        const body = trimBlank(texts);
+        const chunks = part.master === true && body.length > 0
+          ? [[...sharedHeading(state, p.masterHeading), ...body]] : [];
+        return { part, prepared: { texts, chunks, fixed: 0, dropped: null } };
+      }
       const record = ctx.readRecord(part.file);
       const prepared = preparePart(record, part, p.masterConventions, p.masterHeading, k === 0, state);
       if (prepared.dropped !== null) ctx.droppedLines.add(`${part.file}:${prepared.dropped}`);
@@ -616,6 +703,7 @@ export function applyPlan(campaignRoot, plan) {
   const drafts = [];
   const plainLinks = [];
   const features = [];
+  const textParts = [];
   let moved = 0;
   let fixed = 0;
   for (const { doc, parts } of docs) {
@@ -628,6 +716,18 @@ export function applyPlan(campaignRoot, plan) {
 
     for (const { part, prepared } of parts) {
       fixed += prepared.fixed;
+      if (part.text !== undefined) {
+        textParts.push({ document: doc.target, lines: prepared.texts.length });
+        if (part.master === true) {
+          if (prepared.chunks.length > 0) {
+            chunkCount++;
+            chunkLines.push(trimBlank(prepared.chunks[0]));
+          }
+        } else {
+          bodyParts.push({ heading: part.heading, pieces: trimBlank(prepared.texts) });
+        }
+        continue;
+      }
       if (part.master === true) {
         // A master part: its whole text (links rewritten, master-only targets allowed) goes to the reserved block.
         for (const chunk of prepared.chunks) {
@@ -740,5 +840,6 @@ export function applyPlan(campaignRoot, plan) {
     masterBlocks: { moved, fixed },
     uncovered,
     unrouted,
+    textParts,
   };
 }
