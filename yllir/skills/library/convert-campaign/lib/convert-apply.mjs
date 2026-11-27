@@ -4,6 +4,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 import { readStructure, masterOnlyChecker, compareStrings } from '../../../../scripts/lib/subjects.mjs';
 import { renderMetadata } from '../../../../scripts/lib/frontmatter.mjs';
 import { headingAnchor } from '../../../../scripts/lib/normalize.mjs';
@@ -361,7 +362,7 @@ function analyse(root, plan) {
   if (!isObject(plan.routes)) {
     bad('routes must be an object');
   } else {
-    for (const key of ['source', 'skip', 'full']) {
+    for (const key of ['source', 'skip', 'full', 'atlas']) {
       const list = plan.routes[key] ?? [];
       if (!Array.isArray(list) || list.some((p) => typeof p !== 'string')) bad(`routes.${key} must be a list of paths`);
       else for (const p of list) ctx.routed.add(p);
@@ -646,6 +647,47 @@ function rewriteLinks(ctx, index, doc, source, lines, inMaster) {
   return { lines: out, plainLinks, notes };
 }
 
+/** Campaign-relative path that stays inside the campaign (no absolute path, no `..`). */
+function safeRelative(rel) {
+  return typeof rel === 'string' && rel !== '' && !path.posix.isAbsolute(rel) && !rel.split('/').includes('..');
+}
+
+/** Files the previous apply copied (`applied-outputs.json`); a missing or broken file lists nothing. */
+function readApplied(stateDir) {
+  try {
+    const value = JSON.parse(fs.readFileSync(path.join(stateDir, 'applied-outputs.json'), 'utf8'));
+    return Array.isArray(value?.copied) ? value.copied.filter(safeRelative) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Deletes the stale copies of a previous apply that are not tracked by git. Without a git work tree
+ * nothing is deleted. Returns the deleted paths, sorted.
+ */
+function removeStale(root, candidates) {
+  if (candidates.length === 0) return [];
+  const inside = spawnSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], { encoding: 'utf8' });
+  if (inside.status !== 0 || inside.stdout.trim() !== 'true') return [];
+  const removed = [];
+  for (const rel of candidates) {
+    const tracked = spawnSync('git', ['-C', root, 'ls-files', '--error-unmatch', '--', rel], { encoding: 'utf8' });
+    if (tracked.status === 0) continue;
+    const abs = path.join(root, rel);
+    if (fs.existsSync(abs)) {
+      fs.rmSync(abs);
+      removed.push(rel);
+    }
+  }
+  return removed.sort(compareStrings);
+}
+
+/** One campaign-relative path per line, sorted, each line ending with a newline. */
+function listText(list) {
+  return [...list].sort(compareStrings).map((line) => `${line}\n`).join('');
+}
+
 function emptyResult(errors) {
   return {
     ok: false,
@@ -659,6 +701,7 @@ function emptyResult(errors) {
     uncovered: [],
     unrouted: [],
     textParts: [],
+    removedOutputs: [],
   };
 }
 
@@ -800,11 +843,19 @@ export function applyPlan(campaignRoot, plan) {
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, draft.text, 'utf8');
   }
+  const stateDir = path.join(root, '.campaign', 'state', 'convert');
+  const previous = readApplied(stateDir);
   for (const s of sources) {
     const dest = path.join(root, s.to);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.copyFileSync(path.join(p.input, s.from), dest);
   }
+  const copied = [...new Set(sources.map((s) => s.to))].sort(compareStrings);
+  const removedOutputs = removeStale(root, previous.filter((rel) => !copied.includes(rel)));
+  fs.mkdirSync(stateDir, { recursive: true });
+  fs.writeFileSync(path.join(stateDir, 'save-files.txt'), listText(drafts.map((d) => d.target)), 'utf8');
+  fs.writeFileSync(path.join(stateDir, 'save-sources.txt'), listText(copied), 'utf8');
+  fs.writeFileSync(path.join(stateDir, 'applied-outputs.json'), `${JSON.stringify({ copied }, null, 2)}\n`, 'utf8');
 
   const usedFiles = [...new Set(ctx.parts.map((x) => x.file))].sort(compareStrings);
   const droppedKeys = [];
@@ -841,5 +892,6 @@ export function applyPlan(campaignRoot, plan) {
     uncovered,
     unrouted,
     textParts,
+    removedOutputs,
   };
 }

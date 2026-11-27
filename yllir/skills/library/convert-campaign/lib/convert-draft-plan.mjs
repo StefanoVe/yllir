@@ -11,6 +11,7 @@ import { parseYamlLite } from '../../../../scripts/lib/yaml-lite.mjs';
 import { findLinks, headings, resolveLink } from './vault-parse.mjs';
 
 const ROUTES = ['move', 'plot', 'source', 'skip', 'full'];
+const IMAGE_ROLES = new Set(['under-title', 'battlemap', 'atlas', 'none']);
 const OVERRIDE_RULE_FIELDS = ['route', 'kind', 'template', 'item_type', 'target'];
 const LOCATION_KINDS = new Set(['place', 'character', 'creature', 'item']);
 const FORBIDDEN_IN_NAMES = /[/\\:*?"<>|]/g;
@@ -180,6 +181,22 @@ export function validateRules(rules, overrides = {}) {
   if (overrides.setAside !== undefined
     && (!Array.isArray(overrides.setAside) || overrides.setAside.some((f) => typeof f !== 'string'))) {
     badOv('setAside must be a list of paths');
+  }
+  if (overrides.images !== undefined) {
+    if (!isObject(overrides.images)) {
+      badOv('images must be an object');
+    } else {
+      for (const [image, entry] of Object.entries(overrides.images)) {
+        if (!isObject(entry) || !IMAGE_ROLES.has(entry.role)) {
+          badOv(`${image}: unknown image role`);
+          continue;
+        }
+        if ((entry.role === 'under-title' || entry.role === 'battlemap') && !filled(entry.document)) {
+          badOv(`${image}: ${entry.role} needs document`);
+        }
+        if (entry.alt !== undefined && typeof entry.alt !== 'string') badOv(`${image}: alt must be a text`);
+      }
+    }
   }
   return errors;
 }
@@ -402,6 +419,60 @@ function replaceLines(parts, file, from, to, text) {
   return { parts: out, hit };
 }
 
+/** Relative href from the folder of `fromTarget` to `toTarget`, each segment encoded as the apply does. */
+function hrefTo(fromTarget, toTarget) {
+  const encode = (text) => encodeURIComponent(text).replace(/\(/g, '%28').replace(/\)/g, '%29');
+  return path.posix.relative(path.posix.dirname(fromTarget), toTarget).split('/').map(encode).join('/');
+}
+
+/** Removes the given line numbers from the parts of one file (a part left with no line disappears). */
+function cutLines(parts, file, lineNumbers) {
+  if (lineNumbers.length === 0) return parts;
+  const cut = new Set(lineNumbers);
+  const out = [];
+  for (const part of parts) {
+    if (part.file !== file) {
+      out.push(part);
+      continue;
+    }
+    let heading = part.heading;
+    let run = null;
+    const flush = () => {
+      if (run !== null) {
+        out.push({ ...part, from: run[0], to: run[1], heading });
+        heading = null;
+        run = null;
+      }
+    };
+    for (let n = part.from; n <= part.to; n++) {
+      if (cut.has(n)) {
+        flush();
+      } else if (run === null) {
+        run = [n, n];
+      } else {
+        run[1] = n;
+      }
+    }
+    flush();
+  }
+  return out;
+}
+
+/** Line numbers in from..to whose whole text is an embed of the image (the line is only that embed). */
+function embedLinesOf(lines, file, imagePath, allPaths, from, to) {
+  const found = [];
+  for (let n = from; n <= to; n++) {
+    const line = lines[n - 1];
+    if (line === undefined) continue;
+    for (const link of findLinks([line], n)) {
+      if (link.embed && line.trim() === link.raw && resolveLink(link, file, allPaths).path === imagePath) {
+        found.push(n);
+      }
+    }
+  }
+  return found;
+}
+
 /** Image entries of the embeds of the parts: the first document that embeds an image gives its folder. */
 function imagesOf(documents, linesOf, allPaths) {
   const byFile = new Map();
@@ -482,6 +553,15 @@ export function draftPlan({ campaignRoot, report, rules, overrides = {} }) {
     const route = effective.get(file).route;
     if (route !== 'move' && route !== 'plot') {
       errors.push({ code: 'bad-overrides', message: `${file}: documents need a move or plot route` });
+    }
+  }
+  for (const [image, entry] of Object.entries(ov.images ?? {})) {
+    if (!report.images.some((i) => i.path === image)) {
+      errors.push({ code: 'bad-overrides', message: `images: ${image} is not an image of the report` });
+    }
+    if ((entry.role === 'under-title' || entry.role === 'battlemap')
+      && (effective.get(entry.document)?.route !== 'move' || replaced.has(entry.document))) {
+      errors.push({ code: 'bad-overrides', message: `${image}: document ${entry.document} is not a move file` });
     }
   }
   if (errors.length > 0) return failure(errors);
@@ -712,7 +792,7 @@ export function draftPlan({ campaignRoot, report, rules, overrides = {} }) {
   }
 
   // Routes: every file that is not a document source. Files with no document and no route are unrouted.
-  const routes = { source: [], skip: [], full: [] };
+  const routes = { source: [], skip: [], full: [], atlas: [] };
   for (const file of reportFiles) {
     const route = aside.has(file) ? 'source' : effective.get(file).route;
     if (route === 'move' || route === 'plot') continue;
@@ -726,7 +806,62 @@ export function draftPlan({ campaignRoot, report, rules, overrides = {} }) {
   for (const key of Object.keys(routes)) routes[key].sort(compareStrings);
 
   const documents = all.map((e) => e.doc);
-  const images = imagesOf(documents, linesOf, allPaths);
+  let images = imagesOf(documents, linesOf, allPaths);
+  // Image roles (spec 8.6): the default copies of 8.2 change only for the images that have an entry.
+  const imageRoles = ov.images ?? {};
+  const usedTargets = new Set(images.map((i) => i.target));
+  for (const image of Object.keys(imageRoles).sort(compareStrings)) {
+    const entry = imageRoles[image];
+    const existing = images.find((i) => i.file === image);
+    images = images.filter((i) => i.file !== image);
+    if (entry.role === 'none') continue;
+    if (entry.role === 'atlas') {
+      routes.atlas.push(image);
+      continue;
+    }
+    const owner = all.find((e) => e.origin === 'move' && e.file === entry.document);
+    if (owner === undefined) {
+      errors.push({ code: 'bad-overrides', message: `${image}: document ${entry.document} is not a move document of the plan` });
+      continue;
+    }
+    const doc = owner.doc;
+    let target = existing?.target;
+    if (target === undefined) {
+      const name = path.posix.basename(image).replace(/ /g, '-');
+      const folder = path.posix.dirname(doc.target);
+      const ext = path.posix.extname(name);
+      const stem = name.slice(0, name.length - ext.length);
+      target = `${folder}/img/${name}`;
+      for (let n = 2; usedTargets.has(target); n++) target = `${folder}/img/${stem}-${n}${ext}`;
+    }
+    usedTargets.add(target);
+    const alt = entry.alt ?? '';
+    if (entry.role === 'under-title') {
+      doc.image = { file: image, target, alt };
+      // The embed is left out only when it is the first non-blank line after the H1.
+      const info = reportByPath.get(entry.document);
+      const lines = linesOf(entry.document);
+      const h1 = info.headings.find((h) => h.level === 1);
+      const first = firstNonBlank(lines, h1 ? h1.line + 1 : info.bodyStart, lines.length);
+      if (first !== null) {
+        doc.parts = cutLines(doc.parts ?? [], entry.document, embedLinesOf(lines, entry.document, image, allPaths, first, first));
+      }
+    } else {
+      images.push({ file: image, target });
+      let parts = doc.parts ?? [];
+      for (const file of new Set(parts.filter((p) => p.file !== undefined).map((p) => p.file))) {
+        const lines = linesOf(file);
+        const found = parts.filter((p) => p.file === file)
+          .flatMap((p) => embedLinesOf(lines, file, image, allPaths, p.from, p.to));
+        parts = cutLines(parts, file, found);
+      }
+      const heading = language === 'en' ? '## Map' : '## Mappa';
+      doc.parts = [...parts, { text: `${heading}\n\n![${alt}](${hrefTo(doc.target, target)})`, heading: null }];
+    }
+  }
+  if (errors.length > 0) return failure(errors);
+  images.sort((a, b) => compareStrings(a.file, b.file));
+  routes.atlas.sort(compareStrings);
 
   const count = (origin) => all.filter((e) => e.origin === origin).length;
   const kinds = new Map();
@@ -742,6 +877,7 @@ export function draftPlan({ campaignRoot, report, rules, overrides = {} }) {
       skip: routes.skip.length,
       full: routes.full.length,
       images: images.length,
+      atlas: routes.atlas.length,
     },
     kinds: Object.fromEntries([...kinds].sort((a, b) => compareStrings(a[0], b[0]))),
     sketches: documents.filter((d) => d.meta?.sketch === true).length,

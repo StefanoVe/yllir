@@ -90,7 +90,7 @@ test('move place: one document, title from the H1, one part from bodyStart, exac
     id: 'fenvale', kind: 'place', provenance: 'master', location: [], aliases: ['Porto Grigio'],
   });
   assert.deepEqual(doc.parts, [{ file: 'Mondo/Fenvale.md', from: 4, to: 6, heading: null, shift: 0 }]);
-  assert.deepEqual(plan.routes, { source: [], skip: [], full: [] });
+  assert.deepEqual(plan.routes, { source: [], skip: [], full: [], atlas: [] });
   assert.equal(summary.counts.move, 1);
 });
 
@@ -498,6 +498,109 @@ test('replace plan: validatePlan accepts the text part', () => {
     {
       folders: [{ path: 'NPCs', route: 'move', kind: 'character', template: 'npc', target: 'Personaggi' }],
       overrides: { files: { 'NPCs/Marta.md': { replace: [{ from: 9, to: 10, text: '| HP | 10 |' }] } } },
+    },
+  );
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.deepEqual(validatePlan(root, result.plan), []);
+});
+
+const PLACE = [{ path: 'Mondo', route: 'move', kind: 'place', target: 'Luoghi' }];
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
+
+test('image under-title: the embed first after the H1 is left out of the parts, the image goes under the title', () => {
+  const { result } = draft(
+    { 'img/porto.png': PNG, 'Mondo/Fenvale.md': '# Fenvale\n\n![[porto.png]]\n\nTesto.\n' },
+    { folders: PLACE, overrides: { images: { 'img/porto.png': { role: 'under-title', document: 'Mondo/Fenvale.md', alt: 'Il porto' } } } },
+  );
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  const doc = docOf(result.plan, 'Luoghi/Fenvale.md');
+  assert.deepEqual(doc.image, { file: 'img/porto.png', target: 'Luoghi/img/porto.png', alt: 'Il porto' });
+  assert.deepEqual(doc.parts.map((p) => [p.from, p.to]), [[1, 2], [4, 5]]);
+  assert.deepEqual(result.plan.images, []);
+});
+
+test('image under-title: an embed that is not the first line stays where it is, the image still goes under the title', () => {
+  const { result } = draft(
+    { 'img/lago.png': PNG, 'Mondo/Lago.md': '# Lago\n\nTesto.\n\n![[lago.png]]\n' },
+    { folders: PLACE, overrides: { images: { 'img/lago.png': { role: 'under-title', document: 'Mondo/Lago.md', alt: 'Il lago' } } } },
+  );
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  const doc = docOf(result.plan, 'Luoghi/Lago.md');
+  assert.equal(doc.image.target, 'Luoghi/img/lago.png');
+  assert.deepEqual(doc.parts.map((p) => [p.from, p.to]), [[1, 5]]);
+});
+
+test('image battlemap: copied, its embed line left out, and a Mappa text part with the relative href appended', () => {
+  const { result } = draft(
+    { 'img/pianta.png': PNG, 'Mondo/Torre.md': '# Torre\n\n![[pianta.png]]\n\nTesto.\n' },
+    { folders: PLACE, overrides: { images: { 'img/pianta.png': { role: 'battlemap', document: 'Mondo/Torre.md', alt: 'Pianta della torre' } } } },
+  );
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  const doc = docOf(result.plan, 'Luoghi/Torre.md');
+  assert.deepEqual(result.plan.images, [{ file: 'img/pianta.png', target: 'Luoghi/img/pianta.png' }]);
+  assert.deepEqual(doc.parts.slice(0, 2).map((p) => [p.from, p.to]), [[1, 2], [4, 5]]);
+  assert.deepEqual(doc.parts[2], { text: '## Mappa\n\n![Pianta della torre](img/pianta.png)', heading: null });
+});
+
+test('image atlas: not copied, listed in routes.atlas, its embeds stay for the apply to make plain text', () => {
+  const { result } = draft(
+    { 'img/mappa-del-mondo.png': PNG, 'Mondo/Mondo.md': '# Mondo\n\n![[mappa-del-mondo.png]]\n' },
+    { folders: PLACE, overrides: { images: { 'img/mappa-del-mondo.png': { role: 'atlas' } } } },
+  );
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.deepEqual(result.plan.images, []);
+  assert.deepEqual(result.plan.routes.atlas, ['img/mappa-del-mondo.png']);
+  assert.equal(result.summary.counts.atlas, 1);
+  assert.deepEqual(docOf(result.plan, 'Luoghi/Mondo.md').parts.map((p) => [p.from, p.to]), [[1, 3]]);
+});
+
+test('image none: not copied and not routed, its embed stays for the apply', () => {
+  const { result } = draft(
+    { 'Items/img/bozza.png': PNG, 'Mondo/Bozza.md': '# Bozza\n\n![[bozza.png]]\n' },
+    { folders: PLACE, overrides: { images: { 'Items/img/bozza.png': { role: 'none' } } } },
+  );
+  assert.equal(result.ok, true, JSON.stringify(result.errors));
+  assert.deepEqual(result.plan.images, []);
+  assert.deepEqual(result.plan.routes.atlas, []);
+});
+
+test('image roles: bad entries are bad-overrides', () => {
+  const base = { input: '/tmp/x', masterHeading: 'M', masterConventions: {}, folders: [] };
+  assert.equal(validateRules(base, { images: { 'a.png': { role: 'bogus' } } })[0].code, 'bad-overrides');
+  assert.equal(validateRules(base, { images: { 'a.png': { role: 'under-title' } } })[0].code, 'bad-overrides');
+  const notMove = draft(
+    { 'Riferimenti/Note.md': '# Note\n', 'img/x.png': PNG },
+    { folders: [{ path: 'Riferimenti', route: 'source' }], overrides: { images: { 'img/x.png': { role: 'battlemap', document: 'Riferimenti/Note.md' } } } },
+  );
+  assert.equal(notMove.result.ok, false);
+  assert.equal(notMove.result.errors[0].code, 'bad-overrides');
+  const notInReport = draft(
+    { 'Mondo/A.md': '# A\n' },
+    { folders: PLACE, overrides: { images: { 'img/missing.png': { role: 'none' } } } },
+  );
+  assert.equal(notInReport.result.ok, false);
+  assert.equal(notInReport.result.errors[0].code, 'bad-overrides');
+});
+
+test('image roles: the plan with each role passes validatePlan', () => {
+  const { root, result } = draft(
+    {
+      'img/porto.png': PNG,
+      'Mondo/Fenvale.md': '# Fenvale\n\n![[porto.png]]\n\nTesto.\n',
+      'img/pianta.png': PNG,
+      'Mondo/Torre.md': '# Torre\n\n![[pianta.png]]\n\nTesto.\n',
+      'img/mappa-del-mondo.png': PNG,
+      'Mondo/Mondo.md': '# Mondo\n\n![[mappa-del-mondo.png]]\n',
+    },
+    {
+      folders: PLACE,
+      overrides: {
+        images: {
+          'img/porto.png': { role: 'under-title', document: 'Mondo/Fenvale.md', alt: 'Il porto' },
+          'img/pianta.png': { role: 'battlemap', document: 'Mondo/Torre.md', alt: 'Pianta' },
+          'img/mappa-del-mondo.png': { role: 'atlas' },
+        },
+      },
     },
   );
   assert.equal(result.ok, true, JSON.stringify(result.errors));

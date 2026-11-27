@@ -373,3 +373,54 @@ test('review FIX is recorded (exit 0), and commit still refuses with review-miss
   assert.equal(refused.json.errors[0].code, 'review-missing');
   assert.equal(git(dir, ['rev-list', '--count', 'HEAD']), before);
 });
+
+function writeList(dir, name, text) {
+  const full = path.join(dir, '.campaign/state', name);
+  fs.mkdirSync(path.dirname(full), { recursive: true });
+  fs.writeFileSync(full, text);
+  return full;
+}
+
+test('check reads the drafts listed in --files-from, merged with --files without duplicates', (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const alone = cli(['check', dir, '--files', MIRA_PATH]);
+  assert.equal(alone.status, 0, alone.stdout);
+
+  const listed = writeList(dir, 'files.txt', `${MIRA_PATH}\n`);
+  const fromFile = cli(['check', dir, '--files-from', listed]);
+  assert.equal(fromFile.status, 0, fromFile.stdout);
+  assert.deepEqual(fromFile.json.finalFiles, alone.json.finalFiles);
+
+  const merged = writeList(dir, 'merged.txt', `${MIRA_PATH}   \n`);
+  const both = cli(['check', dir, '--files', MIRA_PATH, '--files-from', merged]);
+  assert.equal(both.status, 0, both.stdout);
+  assert.deepEqual(both.json.finalFiles, alone.json.finalFiles);
+});
+
+test('--files-from ignores blank lines and # comments, trims trailing spaces', (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const listed = writeList(dir, 'files.txt', `# the drafts of tonight\n\n   \n${MIRA_PATH}  \n# end\n`);
+  const result = cli(['check', dir, '--files-from', listed]);
+  assert.equal(result.status, 0, result.stdout);
+  assert.deepEqual(result.json.finalFiles, ['Personaggi/Morvalle/Borgo Cenere/Mira Sanna.md']);
+});
+
+test('--sources-from is read for check the same way', (t) => {
+  const dir = makeCampaign(t);
+  writeDraft(dir, MIRA_PATH, MIRA);
+  const listed = writeList(dir, 'sources.txt', `# nothing here\n`);
+  const result = cli(['check', dir, '--files', MIRA_PATH, '--sources-from', listed]);
+  assert.equal(result.status, 0, result.stdout);
+});
+
+test('a missing --files-from or --sources-from file is a usage error with exit 2', (t) => {
+  const dir = makeCampaign(t);
+  const missing = path.join(dir, '.campaign/state/absent.txt');
+  const files = cli(['check', dir, '--files-from', missing]);
+  assertUsage(files);
+  assert.match(files.json.message, /absent\.txt/);
+  assertUsage(cli(['check', dir, '--sources-from', missing]));
+  assertUsage(cli(['commit', dir, '--files-from', missing, '--message', 'x']));
+});

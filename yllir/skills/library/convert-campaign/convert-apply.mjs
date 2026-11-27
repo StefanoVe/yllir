@@ -33,6 +33,7 @@ function summarise(result, out) {
       uncoveredLines: uncovered.reduce((sum, u) => sum + u.lines.length, 0),
       unrouted: (result.unrouted ?? []).length,
       textParts: (result.textParts ?? []).length,
+      removedOutputs: (result.removedOutputs ?? []).length,
     },
     masterBlocks: result.masterBlocks ?? { moved: 0, fixed: 0 },
     out,

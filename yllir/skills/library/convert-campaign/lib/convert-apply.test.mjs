@@ -902,3 +902,98 @@ test('anchor links: a same-file anchor to a dropped scene heading is the file, a
     cleanup(root, input);
   }
 });
+
+const SCENA = 'Trama/sessione-1/Eventi/Scena.md';
+const sceneDoc = (images) => planFor(null, { documents: [{
+  target: SCENA, title: null,
+  meta: { id: 'scena', session: 'sessione-1', depends_on: [], provenance: 'master' },
+  parts: [{ file: SCENA, from: 1, to: 1, heading: null, shift: 0 }],
+}], images });
+
+function gitInit(root) {
+  assert.equal(spawnSync('git', ['-C', root, 'init', '-q']).status, 0);
+}
+
+test('save lists: the two txt files have the exact content, sorted, and applied-outputs lists the copies', () => {
+  const { root, input } = setup({ [SCENA]: 'Testo.\n', 'Trama/img/a.png': 'A', 'Trama/img/b.png': 'B' });
+  try {
+    const plan = sceneDoc([
+      { file: 'Trama/img/b.png', target: 'Oggetti/img/b.png' },
+      { file: 'Trama/img/a.png', target: 'Oggetti/img/a.png' },
+    ]);
+    plan.input = input;
+    const result = applyPlan(root, plan);
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.deepEqual(result.removedOutputs, []);
+    const state = path.join(root, '.campaign', 'state', 'convert');
+    assert.equal(fs.readFileSync(path.join(state, 'save-files.txt'), 'utf8'), `${SCENA}\n`);
+    assert.equal(fs.readFileSync(path.join(state, 'save-sources.txt'), 'utf8'), 'Oggetti/img/a.png\nOggetti/img/b.png\n');
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(state, 'applied-outputs.json'), 'utf8')), {
+      copied: ['Oggetti/img/a.png', 'Oggetti/img/b.png'],
+    });
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('save lists: a second apply that drops an image removes the untracked copy and lists it', () => {
+  const { root, input } = setup({ [SCENA]: 'Testo.\n', 'Trama/img/a.png': 'A' });
+  try {
+    gitInit(root);
+    const first = sceneDoc([{ file: 'Trama/img/a.png', target: 'Oggetti/img/a.png' }]);
+    first.input = input;
+    assert.equal(applyPlan(root, first).ok, true);
+    assert.equal(fs.existsSync(path.join(root, 'Oggetti/img/a.png')), true);
+
+    const second = sceneDoc([]);
+    second.input = input;
+    const result = applyPlan(root, second);
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.deepEqual(result.removedOutputs, ['Oggetti/img/a.png']);
+    assert.equal(fs.existsSync(path.join(root, 'Oggetti/img/a.png')), false);
+    assert.equal(fs.readFileSync(path.join(root, '.campaign', 'state', 'convert', 'save-sources.txt'), 'utf8'), '');
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('save lists: a git-tracked copy is never removed', () => {
+  const { root, input } = setup({ [SCENA]: 'Testo.\n', 'Trama/img/a.png': 'A' });
+  try {
+    gitInit(root);
+    const first = sceneDoc([{ file: 'Trama/img/a.png', target: 'Oggetti/img/a.png' }]);
+    first.input = input;
+    assert.equal(applyPlan(root, first).ok, true);
+    spawnSync('git', ['-C', root, 'add', '-A']);
+    const commit = spawnSync('git', ['-C', root, '-c', 'user.name=test', '-c', 'user.email=test@example.com',
+      'commit', '-q', '-m', 'tracked']);
+    assert.equal(commit.status, 0, commit.stderr?.toString());
+
+    const second = sceneDoc([]);
+    second.input = input;
+    const result = applyPlan(root, second);
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.deepEqual(result.removedOutputs, []);
+    assert.equal(fs.existsSync(path.join(root, 'Oggetti/img/a.png')), true);
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('routes.atlas: an embed of an atlas image is plain text with reason image-not-copied', () => {
+  const { root, input } = setup({ [SCENA]: 'Vedi ![[mappa.png]] qui.\n', 'Trama/img/mappa.png': 'PNG' });
+  try {
+    const plan = sceneDoc([]);
+    plan.input = input;
+    plan.routes.atlas = ['Trama/img/mappa.png'];
+    const result = applyPlan(root, plan);
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.deepEqual(result.plainLinks, [{
+      document: SCENA, raw: '![[mappa.png]]', text: 'mappa.png', reason: 'image-not-copied',
+    }]);
+    assert.equal(draftOf(root, SCENA).endsWith('\nVedi mappa.png qui.\n'), true, draftOf(root, SCENA));
+    assert.equal(fs.existsSync(path.join(root, 'Trama/img/mappa.png')), false);
+  } finally {
+    cleanup(root, input);
+  }
+});

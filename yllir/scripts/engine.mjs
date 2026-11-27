@@ -4,8 +4,9 @@
 // and ends with `exit: <code>`.
 // Usage: node engine.mjs <command> <root> [options]
 //   context <root> [--subjects "a,b"] [--place id] [--session id] [--out .campaign/state/<file>]
-//   check   <root> [--files "a,b"] [--deletes "c"] [--sources "d"]
-//   commit  <root> [--files "a,b"] [--deletes "c"] [--sources "d"] --message "<text>" [--note "<text>"]
+//   check   <root> [--files "a,b"] [--files-from <file>] [--deletes "c"] [--sources "d"] [--sources-from <file>]
+//   commit  <root> [--files "a,b"] [--files-from <file>] [--deletes "c"] [--sources "d"] [--sources-from <file>] --message "<text>" [--note "<text>"]
+//     (--files-from and --sources-from read campaign-relative paths, one per line; blank lines and lines starting with # are ignored)
 //   review  <root> --outcome APPLY|FIX --drafts-hash <hash>   (records the batch reviewer's answer for the last check)
 //   query   <root> <name> [args...]
 //   index   <root>
@@ -35,8 +36,8 @@ import { exitWith } from './lib/cli-exit.mjs';
 const USAGE = [
   'usage: node engine.mjs <command> <root> [options]',
   '  context <root> [--subjects "a,b"] [--place id] [--session id] [--out .campaign/state/<file>]',
-  '  check   <root> [--files "a,b"] [--deletes "c"] [--sources "d"]',
-  '  commit  <root> [--files "a,b"] [--deletes "c"] [--sources "d"] --message "<text>" [--note "<text>"]',
+  '  check   <root> [--files "a,b"] [--files-from <file>] [--deletes "c"] [--sources "d"] [--sources-from <file>]',
+  '  commit  <root> [--files "a,b"] [--files-from <file>] [--deletes "c"] [--sources "d"] [--sources-from <file>] --message "<text>" [--note "<text>"]',
   '  review  <root> --outcome APPLY|FIX --drafts-hash <hash>',
   '  query   <root> <name> [args...]',
   '  index   <root>',
@@ -49,8 +50,8 @@ const USAGE = [
 
 const COMMANDS = {
   context: ['subjects', 'place', 'session', 'out'],
-  check: ['files', 'deletes', 'sources'],
-  commit: ['files', 'deletes', 'sources', 'message', 'note'],
+  check: ['files', 'files-from', 'deletes', 'sources', 'sources-from'],
+  commit: ['files', 'files-from', 'deletes', 'sources', 'sources-from', 'message', 'note'],
   review: ['outcome', 'drafts-hash'],
   query: null, // positional: <name> [args...], no options
   index: [],
@@ -106,6 +107,30 @@ function listOption(options, name) {
   return options[name] === undefined ? [] : splitList(options[name]);
 }
 
+/**
+ * Campaign-relative paths of a list file: one per line, trailing spaces trimmed,
+ * blank lines and lines starting with `#` ignored. The path is relative to the
+ * current working directory, or absolute. A missing or unreadable file is a usage error.
+ */
+function readListFile(file) {
+  let text;
+  try {
+    text = fs.readFileSync(path.resolve(file), 'utf8');
+  } catch {
+    usageError(`cannot read list file '${file}'`);
+  }
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trimEnd())
+    .filter((line) => line !== '' && !line.startsWith('#'));
+}
+
+/** The `--name` list followed by the lines of the `--name-from` file, duplicates removed. */
+function mergedList(options, name) {
+  const fromFile = options[`${name}-from`] === undefined ? [] : readListFile(options[`${name}-from`]);
+  return [...new Set([...listOption(options, name), ...fromFile])];
+}
+
 /** --out must be a file under .campaign/state/ of the campaign. */
 function checkedOutPath(out) {
   const parts = out.split('/');
@@ -134,9 +159,9 @@ async function run(parsed) {
     }
     case 'check': {
       const result = await checkBatch(root, {
-        files: listOption(options, 'files'),
+        files: mergedList(options, 'files'),
         deletes: listOption(options, 'deletes'),
-        sources: listOption(options, 'sources'),
+        sources: mergedList(options, 'sources'),
       });
       return { code: result.ok ? 0 : 1, value: result };
     }
@@ -145,9 +170,9 @@ async function run(parsed) {
         usageError('--message is required');
       }
       const result = await commitBatch(root, {
-        files: listOption(options, 'files'),
+        files: mergedList(options, 'files'),
         deletes: listOption(options, 'deletes'),
-        sources: listOption(options, 'sources'),
+        sources: mergedList(options, 'sources'),
         message: options.message,
         note: options.note ?? '',
       });
