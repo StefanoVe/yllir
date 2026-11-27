@@ -1,15 +1,15 @@
 ---
 name: convert-campaign
-description: Library skill. Converts a whole existing campaign written in files or photos (notes as text or Word, PDFs, scans) into a Yllir campaign: keeps every original as a source, transcribes and checks it, and after a yes to an outline writes the documents, the seed and the past sessions in batches. Invoked by the entry skill when the master hands over a whole written campaign, many files or one long document.
+description: Library skill. Converts a whole existing campaign written in files or photos (notes as text or Word, PDFs, scans) into a Yllir campaign: keeps every original as a source, transcribes and checks it, and after a yes to an outline writes the documents, the seed and the past sessions in batches. Invoked by the entry skill when the master hands over a whole written campaign, many files or one long document. A campaign already written as linked Markdown files is moved and split without rewriting the master's text.
 user-invocable: false
-allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" *), Bash(node */scripts/add-category.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/today.mjs" *), Bash(node */scripts/today.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/import/scripts/ingest-inventory.mjs" *), Bash(node */skills/library/import/scripts/ingest-inventory.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/import/scripts/ingest-acquire.mjs" *), Bash(node */skills/library/import/scripts/ingest-acquire.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/import/scripts/ingest-check.mjs" *), Bash(node */skills/library/import/scripts/ingest-check.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/convert-campaign/convert-extract-docx.mjs" *), Bash(node */skills/library/convert-campaign/convert-extract-docx.mjs *), Read, Write, Edit, Agent, Skill, Glob, Grep
+allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/add-category.mjs" *), Bash(node */scripts/add-category.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/today.mjs" *), Bash(node */scripts/today.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/import/scripts/ingest-inventory.mjs" *), Bash(node */skills/library/import/scripts/ingest-inventory.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/import/scripts/ingest-acquire.mjs" *), Bash(node */skills/library/import/scripts/ingest-acquire.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/import/scripts/ingest-check.mjs" *), Bash(node */skills/library/import/scripts/ingest-check.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/convert-campaign/convert-extract-docx.mjs" *), Bash(node */skills/library/convert-campaign/convert-extract-docx.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/convert-campaign/convert-structure.mjs" *), Bash(node */skills/library/convert-campaign/convert-structure.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/convert-campaign/convert-apply.mjs" *), Bash(node */skills/library/convert-campaign/convert-apply.mjs *), Read, Write, Edit, Agent, Skill, Glob, Grep
 ---
 
 # Convert a whole campaign
 
 You are the AUTHOR. This skill turns a whole written campaign into a Yllir campaign. It is for many files or one long document. A few single pieces of material are the job of `import`, not of this skill. Run commands from the campaign root (the folder that contains `campaign.yaml`), exactly as written, with nothing added.
 
-The work runs in two stages. Stage 1 brings every file in as a source and reads it. Stage 2 proposes the outline, waits for a yes, and then writes the campaign in batches. Stage 1 never writes the canon. Stage 2 writes the canon only after the master's yes.
+The work runs in two stages. Stage 1 brings every file in as a source and reads it. Stage 2 proposes the outline, waits for a yes, and then writes the campaign in batches. Stage 1 never writes the canon. Stage 2 writes the canon only after the master's yes. When the master gives a folder that holds Markdown files, Step 4b first brings over, without rewriting, every file that is already one or more subjects; only the rest goes through Stages 1 and 2.
 
 **Failures and wording.** Fixed failure sentences are in the Failures paragraph of Step 9. Words for the master come from the lexicon: never say a technical term.
 
@@ -45,7 +45,77 @@ The work runs in two stages. Stage 1 brings every file in as a source and reads 
 5. Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/today.mjs"`. Its first line is DATE (`YYYY-MM-DD`). Exit code not 0: the Failures sentence, and stop.
 6. PROVENANCE is what the master said about where the material comes from, in a few words, with every double quote and line break removed. If the master said nothing, PROVENANCE is `unknown`.
 7. Create `.campaign/state/convert/` if it is missing, and write `.campaign/state/convert/progress.json` with this content (Write tool):
-   `{"stage":"acquire","next":"acquire","provenance":"<PROVENANCE>","date":"<DATE>","files":[...the FILES paths...],"kinds":{},"ids":{},"done":[]}`
+   `{"stage":"acquire","next":"acquire","provenance":"<PROVENANCE>","date":"<DATE>","files":[...the FILES paths...],"kinds":{},"ids":{},"done":[],"structured":null}`
+
+**Step 4b — Structured mode: files already split by subject.**
+
+Rules for this step: the master's text is never reworded, only moved. INPUT is never changed: it is the master's own folder, and it stays as it is. Never say to the master: front-matter, vault, wiki-link, link syntax, script, JSON, plan file, route. The plan file `.campaign/state/convert/structured-plan.json` is the only record of the decisions of this step.
+
+1. **When it runs.** At least one path the master shared is a folder (INPUT) that holds `.md` files. Otherwise skip to Step 5. On a resume: if `progress.json` field `structured` is `"done"`, skip to Step 5 with FILES replaced by the `routes.full` list of the plan, plus the non-Markdown files of FILES (item 12). If it is `"plan"`, read `.campaign/state/convert/structured-plan.json` and go to item 8.
+2. **Report.** Run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/convert-campaign/convert-structure.mjs" "<INPUT>" --out .campaign/state/convert/structure.json`. Exit 2: FAILED (Step 9). Otherwise read `.campaign/state/convert/structure.json` with the Read tool. It holds `files` (one entry per Markdown file, with its `hints`), `images`, `links` (with `missing` and `ambiguous`) and `conventions` (with `examples`).
+3. **Routes.** Decide one route for each Markdown file of the report. Decide freely and fast: do not ask the master about routes. Use the hints of the report:
+   - `move`: the file is one subject (a place, a character, a creature, an item, a faction or an event).
+   - `split`: the file holds several subjects (hint `multi-subject`). Each piece becomes its own document, and you choose its kind and template.
+   - `source`: long reference material that is not one subject (hint `long`, a list, a chronicle of years). It is kept whole.
+   - `skip`: a generated list of links (hint `index`), a to-do list (hint `todo`), or anything that is not campaign content.
+   - `full`: free notes, daily notes (hint `daily`), played sessions (hint `session`), or a file whose subject is unclear.
+   Read a Markdown file only when the report does not settle its route. Read at most 300 lines per round.
+   Images: decide the role of each image of `images`. It is the image under the title of the sheet that embeds it (the plan's `documents[].image`), or the base picture of the atlas or of a battle map (the plan's `images`, with its target in the folder that the atlas or the place uses), or none (not copied).
+4. **Kinds, folders, templates.** Choose the kind of each document as Step 7 item 3 says for the full path, and its template as Step 7b item 1. Ids: lowercase letters, digits and hyphens, unique in the campaign. File names follow content-format 1.5: the title is the file name. Two different subjects with the same name get two different file names, for example with their place: never merge homonyms. `aliases` come from the `aliases` key of the file. Write `location` and `relations` only from what the text states. Every place, character, creature and item has `location`: the list of place ids the text states, or `[]` when it states none. Every document has `provenance: master`.
+5. **Template sections.** The required sections are: `npc` and `vendor`: `Ruolo` (English `Role`), `Aspetto e modi` (`Appearance and manner`), `Al tavolo` (`At the table`), `Statistiche` (`Statistics`), and for `vendor` also `Assortimento` (`Stock`); `enemy` and `creature`: `Natura` (`Nature`), `Statistiche` (`Statistics`). Any other template has no required section: its parts need no heading. For each part, set its `heading` in the plan to the heading of the section it belongs to, in the campaign language, so that the master's lines go under it. Never reword a line.
+   - When the master's text gives nothing for a required section, and the first required section is covered, set `sketch: true` in the document's `meta`.
+   - When even the first required section has no text, write that section after the apply, in the draft under `.campaign/drafts/`, as a short invented text, and add the document to `invented` in `progress.json` (Step 7b item 5).
+   - An item (`template: item`) always gets an empty master block from the apply, even when the master's notes have no private text: this is expected, do not fill it.
+6. **Questions, ONE at a time**, each ending with a question mark, in the campaign language, in plain words.
+   - For each convention id of the report except `html-master` (it is always master-only, never asked): ask whether its text is only for the master, showing the first example of the report exactly as it is in the master's files. Italian example: «Nei tuoi file ci sono dei riquadri come questo: "> [!secret] Il pozzo…". Sono note solo per te?» The answer goes into `masterConventions` of the plan: `master` or `public`. A convention the master says is public stays in place, as it is.
+   - Homonyms (two subjects with the same name: the report's `links.ambiguous`) and contradictions that you notice while reading are never decided by you. They are not asked here: they go into the message of item 8 as questions.
+   - Never one question per file.
+7. **Plan.** Write `.campaign/state/convert/structured-plan.json` with the Write tool, in this exact shape (one document with one part, and one image, as an example):
+
+   ```json
+   {
+     "input": "/absolute/path/to/the/master/folder",
+     "masterHeading": "Indicazioni per il master",
+     "masterConventions": { "callout:secret": "master", "obsidian-comment": "master", "html-comment": "public" },
+     "documents": [
+       {
+         "target": "Luoghi/Fenvale.md",
+         "title": "Fenvale",
+         "meta": {
+           "id": "fenvale", "kind": "place", "provenance": "master", "location": [],
+           "aliases": ["Porto Grigio"], "relations": [ { "to": "gilda-del-sale", "type": "depends-on" } ]
+         },
+         "image": { "file": "img/fenvale.png", "target": "Luoghi/img/fenvale.png", "alt": "Il porto di Fenvale al tramonto" },
+         "parts": [
+           { "file": "Luoghi/Fenvale.md", "from": 6, "to": 41, "heading": null, "shift": 0 }
+         ]
+       }
+     ],
+     "images": [ { "file": "img/mappa.png", "target": "Atlante/mappa.png" } ],
+     "routes": { "source": ["Riferimenti/Bestiario.md"], "skip": ["Indice.md"], "full": ["Diario/2026-09-12.md"] }
+   }
+   ```
+
+   - Every convention id of the report has an entry in `masterConventions`.
+   - `masterHeading` is «Indicazioni per il master» in Italian, «Notes for the master» in English.
+   - Every Markdown file of the report is either in `routes` or in at least one part of a document.
+   - Set `progress.json` field `structured` to `"plan"`.
+8. **Message to the master.** Show the plan in plain words and ask ONE question: whether to proceed. Say how many documents are brought over as they are, how many files are split and into how many documents, how many are kept whole as references, how many are left out (they stay in the master's folder) and how many go through the slow reading; the kinds (places, characters…); how the private notes will be read; and the homonyms and contradictions as questions. Italian example: «Ho guardato la tua campagna: 120 schede le porto così come sono, 6 file li divido in 23 schede, 2 li tengo interi come riferimento, 14 restano fuori (elenchi e cose da fare) e 9 note le leggo con calma. Non cambio nemmeno una parola del tuo testo. Due persone si chiamano Selva: le tengo separate. Procedo?» Nothing is written before the yes. A change the master asks for changes the plan, and the plan is shown again with the same question.
+9. **Apply.** Run `node "${CLAUDE_PLUGIN_ROOT}/skills/library/convert-campaign/convert-apply.mjs" . --plan .campaign/state/convert/structured-plan.json`.
+   - Exit 1: read `errors`, fix the plan, and run again. At most 3 rounds, then FAILED (Step 9).
+   - Exit 2: FAILED (Step 9).
+   - Exit 0: read the result:
+     - `uncovered`: lines of a moved or split file that no document holds. Each must be a heading that became a title, or text you decided to leave out on purpose (a to-do line). Otherwise add a part to the plan that holds it, and apply again. The master's text is never lost.
+     - `plainLinks`, `droppedKeys`, `features`, `unrouted`: keep them for the final message (item 12). An `unrouted` file goes to the `full` route.
+10. **Source route.** For each `source` file, acquire it as Step 5.3 items 1 to 3 do: inventory with its own file `.campaign/state/convert/inventory-structured-source.json`, acquire with kind `other`, and record its id in `progress.json`. Do NOT transcribe it and do NOT review it: the original is already digital text. Its card stays `acquired`.
+11. **Save ALL documents in ONE check and ONE commit.** The master's links join documents across the whole campaign, so a link to a document of a later batch would fail the check.
+    - Run `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" check . --files "<every file of the apply result, comma-separated>" --sources "<the sources of the apply result, plus the card and the original of every source of item 10, comma-separated>"`. Read `finalFiles`, `reviewRequired` and `errors`. Exit 1: fix the drafts and run `check` again, at most 3 rounds, then FAILED (Step 9).
+    - Batch review: launch `yllir:batch-reviewer` through the Agent tool, once for every group of at most 25 drafts, all in the same message. Each one gets the keys of Step 8 item 3 (`CAMPAIGN_ROOT`, `DRAFTS`, `FINAL_FILES`, `SEED`, `INTENT`), with `DRAFTS` set to its group. The reviewer judges only secrets in public text and contradictions, and never rewrites.
+    - If an answer is `FIX`, apply its fixes ONLY to the metadata, or by moving a sentence into the master block, never by rewording. Then run `check` and the reviewer of that group again, at most 3 rounds, then FAILED (Step 9).
+    - Record the review with `node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" review . --outcome APPLY --drafts-hash <draftsHash from the last check>` only when every group answered `APPLY`.
+    - Run `commit` with the same `--files` and `--sources` as the last `check`, and `--message` in the campaign language, like «Campagna portata dai tuoi file: 120 schede.». Then the link review of `authoring.md` section 7 step 6, as in Step 8 item 4. Errors: FAILED (Step 9).
+    - Set `progress.json` field `structured` to `"done"`.
+12. **Then the rest.** Continue with Step 5 for the files of the `full` route and for the non-Markdown files of FILES (FILES is replaced by that list). If that list is empty, go to Step 9. The final message (Step 9) adds, in plain words: the links that became plain names (and the names), the extra information of the notes that was not kept (from `droppedKeys`, said as «some labels at the top of the notes», never «front-matter»), the special parts of the notes left as they are (`features`: queries, tags), and the files left out, by name.
 
 **Step 5 — Stage 1, acquisition: one kind per file.**
 
@@ -207,10 +277,11 @@ The work runs in two stages. Stage 1 brings every file in as a source and reads 
 
 **Step 9 — Finish and message to the master.**
 
-1. Count what was done: the documents written in this run (`written`), the past sessions written (`sessions`), the statements still waiting (their open questions), the sources left out, and the inventions (`progress.json`, `invented`). Set the card `status` to `integrated` (Edit tool) for a card whose statements are all integrated and whose questions are all answered; otherwise it stays `transcribed`.
+1. Count what was done: the documents written in this run (`written`), the structured documents (the documents of Step 4b), the past sessions written (`sessions`), the statements still waiting (their open questions), the sources left out, and the inventions (`progress.json`, `invented`). Set the card `status` to `integrated` (Edit tool) for a card whose statements are all integrated and whose questions are all answered; otherwise it stays `transcribed`.
 2. Set `stage` to `done` in `progress.json` when every batch is saved and no question is open; otherwise set `stage` to `waiting` and `next` to the first step still open.
 3. Write ONE message in the campaign language, in plain words, with no ids, paths, locators, statuses, technical words or backticks:
    - one sentence: how many documents were brought in, saved with their originals;
+   - when Step 4b ran: one or two sentences, in plain words, with how many documents were brought over as they are, how many files were split and into how many documents, how many were kept whole as references, how many were left out, and the points of Step 4b item 12;
    - one sentence: how many documents were written, and the main names (at most 5);
    - one sentence: how many past sessions were written as chronicle pages, and that the sessions without a date are waiting for their date;
    - one sentence for each batch that was not saved, and what is blocked;

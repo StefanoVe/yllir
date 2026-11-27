@@ -1,0 +1,470 @@
+{
+  "input": "{{INPUT}}",
+  "masterHeading": "Indicazioni per il master",
+  "masterConventions": {
+    "fence:segreto": "master",
+    "heading:segreti": "master",
+    "html-master": "master"
+  },
+  "documents": [
+    {
+      "target": "Mondo/Città di Brina/Città di Brina.md",
+      "title": "Città di Brina",
+      "meta": {
+        "id": "citta-di-brina",
+        "kind": "place",
+        "provenance": "master",
+        "location": []
+      },
+      "image": {
+        "file": "img/brina.png",
+        "target": "Mondo/Città di Brina/img/brina.png",
+        "alt": "Le mura di Brina"
+      },
+      "parts": [
+        {
+          "file": "Mondo/Città di Brina.md",
+          "from": 1,
+          "to": 19,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Mondo/Bosco Alto.md",
+      "title": "Bosco Alto",
+      "meta": {
+        "id": "bosco-alto",
+        "kind": "place",
+        "provenance": "master",
+        "location": []
+      },
+      "parts": [
+        {
+          "file": "Mondo/Bosco Alto.md",
+          "from": 1,
+          "to": 15,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Mondo/Cava Rossa.md",
+      "title": "Cava Rossa",
+      "meta": {
+        "id": "cava-rossa",
+        "kind": "place",
+        "provenance": "master",
+        "location": []
+      },
+      "parts": [
+        {
+          "file": "Mondo/Cava Rossa.md",
+          "from": 1,
+          "to": 17,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Mondo/Fonte Nera (sorgente).md",
+      "title": "Fonte Nera (sorgente)",
+      "meta": {
+        "id": "fonte-nera-sorgente",
+        "kind": "place",
+        "provenance": "master",
+        "location": []
+      },
+      "parts": [
+        {
+          "file": "Mondo/Fonte Nera.md",
+          "from": 1,
+          "to": 13,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Mondo/Ponte Lungo.md",
+      "title": "Ponte Lungo",
+      "meta": {
+        "id": "ponte-lungo",
+        "kind": "place",
+        "provenance": "master",
+        "location": [
+          "citta-di-brina"
+        ]
+      },
+      "parts": [
+        {
+          "file": "Mondo/Ponte Lungo.md",
+          "from": 1,
+          "to": 15,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Mondo/Città di Brina/Fonte Nera (taverna).md",
+      "title": "Fonte Nera (taverna)",
+      "meta": {
+        "id": "fonte-nera-taverna",
+        "kind": "place",
+        "provenance": "master",
+        "location": [
+          "citta-di-brina"
+        ]
+      },
+      "parts": [
+        {
+          "file": "Mondo/Città di Brina/Fonte Nera.md",
+          "from": 1,
+          "to": 13,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Mondo/Città di Brina/Piazza del Mercato.md",
+      "title": "Piazza del Mercato",
+      "meta": {
+        "id": "piazza-del-mercato",
+        "kind": "place",
+        "provenance": "master",
+        "location": [
+          "citta-di-brina"
+        ]
+      },
+      "parts": [
+        {
+          "file": "Mondo/Città di Brina/Piazza del Mercato.md",
+          "from": 1,
+          "to": 11,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Personaggi/Ilde.md",
+      "title": "Ilde",
+      "meta": {
+        "id": "ilde",
+        "kind": "character",
+        "template": "npc",
+        "provenance": "master",
+        "location": [
+          "citta-di-brina"
+        ],
+        "aliases": [
+          "la Rossa"
+        ],
+        "sketch": true
+      },
+      "parts": [
+        {
+          "file": "Gente/Ilde.md",
+          "from": 3,
+          "to": 3,
+          "heading": "## Ruolo",
+          "shift": 0
+        },
+        {
+          "file": "Gente/Ilde.md",
+          "from": 11,
+          "to": 16,
+          "heading": null,
+          "shift": 0
+        },
+        {
+          "file": "Gente/Ilde.md",
+          "from": 7,
+          "to": 7,
+          "heading": "## Aspetto e modi",
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Personaggi/Renza.md",
+      "title": "Renza",
+      "meta": {
+        "id": "renza",
+        "kind": "character",
+        "template": "npc",
+        "provenance": "master",
+        "location": [],
+        "aliases": [
+          "la Rossa"
+        ],
+        "sketch": true
+      },
+      "parts": [
+        {
+          "file": "Gente/Renza.md",
+          "from": 3,
+          "to": 3,
+          "heading": "## Ruolo",
+          "shift": 0
+        },
+        {
+          "file": "Gente/Renza.md",
+          "from": 11,
+          "to": 16,
+          "heading": null,
+          "shift": 0
+        },
+        {
+          "file": "Gente/Renza.md",
+          "from": 20,
+          "to": 20,
+          "heading": null,
+          "shift": 0
+        },
+        {
+          "file": "Gente/Renza.md",
+          "from": 7,
+          "to": 7,
+          "heading": "## Aspetto e modi",
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Personaggi/Capitano Brenno.md",
+      "title": "Capitano Brenno",
+      "meta": {
+        "id": "capitano-brenno",
+        "kind": "character",
+        "template": "npc",
+        "provenance": "master",
+        "location": [],
+        "sketch": true
+      },
+      "parts": [
+        {
+          "file": "Gente/Capitano Brenno.md",
+          "from": 3,
+          "to": 3,
+          "heading": "## Ruolo",
+          "shift": 0
+        },
+        {
+          "file": "Gente/Capitano Brenno.md",
+          "from": 7,
+          "to": 7,
+          "heading": null,
+          "shift": 0
+        },
+        {
+          "file": "Gente/Capitano Brenno.md",
+          "from": 11,
+          "to": 11,
+          "heading": null,
+          "shift": 0
+        },
+        {
+          "file": "Gente/Capitano Brenno.md",
+          "from": 15,
+          "to": 15,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Personaggi/Mastro Eldo.md",
+      "title": "Mastro Eldo",
+      "meta": {
+        "id": "mastro-eldo",
+        "kind": "character",
+        "template": "npc",
+        "provenance": "master",
+        "location": [],
+        "sketch": true
+      },
+      "parts": [
+        {
+          "file": "Gente/Personaggi minori.md",
+          "from": 3,
+          "to": 3,
+          "heading": "## Ruolo",
+          "shift": 0
+        },
+        {
+          "file": "Gente/Personaggi minori.md",
+          "from": 7,
+          "to": 13,
+          "heading": null,
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Personaggi/Il Grifone del Bosco Alto.md",
+      "title": "Il Grifone del Bosco Alto",
+      "meta": {
+        "id": "grifone-bosco-alto",
+        "kind": "creature",
+        "template": "creature",
+        "provenance": "master",
+        "location": [
+          "bosco-alto"
+        ],
+        "sketch": true
+      },
+      "parts": [
+        {
+          "file": "Gente/Personaggi minori.md",
+          "from": 17,
+          "to": 23,
+          "heading": "## Natura",
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Personaggi/Sorella Olma.md",
+      "title": "Sorella Olma",
+      "meta": {
+        "id": "sorella-olma",
+        "kind": "character",
+        "template": "npc",
+        "provenance": "master",
+        "location": [],
+        "sketch": true
+      },
+      "parts": [
+        {
+          "file": "Gente/Personaggi minori.md",
+          "from": 27,
+          "to": 31,
+          "heading": "## Ruolo",
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Personaggi/Tamar il Guardiano.md",
+      "title": "Tamar il Guardiano",
+      "meta": {
+        "id": "tamar",
+        "kind": "character",
+        "template": "npc",
+        "provenance": "master",
+        "location": [],
+        "sketch": true
+      },
+      "parts": [
+        {
+          "file": "Gente/Personaggi minori.md",
+          "from": 35,
+          "to": 39,
+          "heading": "## Ruolo",
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Oggetti/Spada di Brina.md",
+      "title": "Spada di Brina",
+      "meta": {
+        "id": "spada-di-brina",
+        "kind": "item",
+        "template": "item",
+        "item_type": "other",
+        "provenance": "master",
+        "location": []
+      },
+      "parts": [
+        {
+          "file": "Cose/Spada di Brina.md",
+          "from": 3,
+          "to": 3,
+          "heading": "## In breve",
+          "shift": 0
+        },
+        {
+          "file": "Cose/Spada di Brina.md",
+          "from": 7,
+          "to": 7,
+          "heading": "## Descrizione",
+          "shift": 0
+        },
+        {
+          "file": "Cose/Spada di Brina.md",
+          "from": 15,
+          "to": 15,
+          "heading": "## Effetti",
+          "shift": 0
+        },
+        {
+          "file": "Cose/Spada di Brina.md",
+          "from": 11,
+          "to": 11,
+          "heading": "## Origine",
+          "shift": 0
+        }
+      ]
+    },
+    {
+      "target": "Oggetti/Lanterna di Bosco.md",
+      "title": "Lanterna di Bosco",
+      "meta": {
+        "id": "lanterna-di-bosco",
+        "kind": "item",
+        "template": "item",
+        "item_type": "other",
+        "provenance": "master",
+        "location": []
+      },
+      "parts": [
+        {
+          "file": "Cose/Lanterna di Bosco.md",
+          "from": 3,
+          "to": 3,
+          "heading": "## In breve",
+          "shift": 0
+        },
+        {
+          "file": "Cose/Lanterna di Bosco.md",
+          "from": 11,
+          "to": 11,
+          "heading": "## Descrizione",
+          "shift": 0
+        },
+        {
+          "file": "Cose/Lanterna di Bosco.md",
+          "from": 7,
+          "to": 7,
+          "heading": "## Effetti",
+          "shift": 0
+        },
+        {
+          "file": "Cose/Lanterna di Bosco.md",
+          "from": 15,
+          "to": 15,
+          "heading": "## Origine",
+          "shift": 0
+        }
+      ]
+    }
+  ],
+  "images": [],
+  "routes": {
+    "source": [
+      "Riferimenti/Cronologia del mondo.md"
+    ],
+    "skip": [
+      "Mappa dei luoghi.md",
+      "Da fare/Idee.md"
+    ],
+    "full": []
+  }
+}

@@ -1,0 +1,19 @@
+case: convert-linked
+kind: convert
+fixture: convert-linked-input
+# Structured mode of issue #138: the input is a folder of notes linked by hand with relative Markdown
+# links (no front-matter, no wiki links), with a long reference file and a multi-subject file.
+# The runner copies the fixture next to an empty campaign that init-campaign.mjs creates;
+# {{INPUT_DIR}} in the prompt is replaced by the absolute path of that copy.
+# The answer key is key.yaml, outside the folder the agent reads.
+# One turn: the master asks to bring the files in and the agent runs the structured convert.
+# Not mapped to run-suite yet: run it by hand with this runner, like convert/basic.
+runs: 1
+prompt: |
+  La mia campagna è già divisa in file collegati tra loro, puoi portarla qui? È in {{INPUT_DIR}}
+reply: |
+  sì, va bene così
+# Not measured yet: 16 notes, one of them longer than 300 lines.
+limits:
+  max_minutes: 20
+  max_tool_calls: 250

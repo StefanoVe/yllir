@@ -1,0 +1,74 @@
+# Answer key of convert/obsidian (structured mode, issue #138). The runner reads it from the repository;
+# it is never copied next to the input or the campaign. Sources: testbench/fixtures/convert-obsidian-input.
+#
+# R1 each input file is handled as its route says: move = one document; full = through the convert
+#    path; skip = stays only in the input; source = handled by the import scripts. Nothing is unrouted.
+# R2 nothing under .obsidian/ and no canvas is copied or converted (excluded).
+# L1 every wiki link to an existing note becomes a working link or plain text, never a broken link.
+# L2 the link to the missing note (missing_links) is plain text in the document, not a link.
+# L3 the ambiguous plain link (ambiguous_links) is plain text, never a guess at one of the candidates.
+# H1 two documents are about the homonym (homonym_name), one per file (homonym_files).
+# H2 one of them says homonym_words[0], the other one says homonym_words[1].
+# H3 no document about the homonym says both words: the two people are not merged.
+# A1 each subject with the shared alias (shared_alias_subjects) keeps it in its own aliases;
+#    neither takes the other's, and no separate document is titled with the alias.
+# P1 the hypothesis (hypothesis_phrase) appears only as a hypothesis, never as an accusation.
+# C1 the outline's contradictions section names contradiction.subject with both figures.
+# C2 the final message names the contradiction with both figures: reported, not decided.
+# S1 each secret (secret_texts) appears in public text only inside a master-only block.
+# S2 each secret is kept: at least one master-only block holds it.
+# F1 front-matter keys other than aliases are listed as dropped; aliases are kept.
+# E1 the embedded images (images) are copied to the campaign and embedded there.
+# I1 the input folder is unchanged.
+
+routes:
+  move:
+    - Luoghi/Porto Grigio.md
+    - Luoghi/Torre Grigia.md
+    - Luoghi/Faro Basso.md
+    - Luoghi/Bosco di Erba.md
+    - Personaggi/Porto/Selva.md
+    - Personaggi/Monti/Selva.md
+    - Personaggi/Porto/Corrado.md
+    - Personaggi/Monti/Teodo.md
+    - Personaggi/Sindaco Ilario.md
+    - Personaggi/Gerda.md
+    - Personaggi/Brisa.md
+    - Fazioni/Lega del Sale.md
+    - Fazioni/Ordine del Faro.md
+    - Note di campagna.md
+    - Mappe/Panoramica della regione.md
+  split: []
+  source: []
+  skip:
+    - Indice personaggi.md
+    - Mappe/relazioni.canvas
+  full:
+    - Diario/2026-10-03.md
+    - Diario/2026-10-17.md
+split_pieces: []
+homonym_name: Selva
+homonym_words: [pescatrice, eremita]
+homonym_files:
+  - Personaggi/Porto/Selva.md
+  - Personaggi/Monti/Selva.md
+shared_alias: il Vecchio
+shared_alias_subjects: [Corrado, Teodo]
+hypothesis_phrase: forse il sindaco ha venduto le mappe ai contrabbandieri
+secret_texts:
+  - la chiave di ossidiana
+  - il passaggio sotto il faro
+contradiction:
+  subject: Torre Grigia
+  small: sette piani
+  large: dodici piani
+missing_links:
+  - "[[Torre del Silenzio]]"
+ambiguous_links:
+  - "[[Selva]]"
+excluded:
+  - .obsidian/
+  - Mappe/relazioni.canvas
+images:
+  - img/porto.png
+  - Mappe/regione.png

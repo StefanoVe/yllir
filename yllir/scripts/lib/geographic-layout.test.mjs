@@ -58,6 +58,21 @@ test('plans common-ancestor canonical sheets, precise subject views, event views
   } finally { cleanup(root); }
 });
 
+test('a link to a sheet whose file name has parentheses is rewritten with encoded parentheses', () => {
+  const { root, put } = fixture();
+  try {
+    put('People/Selva (Porto).md', '---\nid: selva\nlocation: [port]\n---\n# Selva\n');
+    put('People/Ada.md', '---\nid: ada\nlocation: [port, market]\n---\n# Ada\n[Selva](Selva%20%28Porto%29.md)\n');
+    const plan = planGeographicLayout(root);
+    assert.equal(plan.status, 'ready', JSON.stringify(plan.errors));
+    const rewrite = plan.rewrites.find((r) => r.file === 'People/World/Coast/Ada.md');
+    assert(rewrite, 'Ada is rewritten after its move');
+    assert.match(rewrite.content, /Selva%20%28Porto%29\.md\)/);
+    const targets = [...rewrite.content.matchAll(/\]\(([^)]*)\)/g)].map((m) => m[1]);
+    assert(targets.length > 0 && targets.every((t) => !t.includes('(') && !t.includes(')')), JSON.stringify(targets));
+  } finally { cleanup(root); }
+});
+
 test('place and sheet metadata is read in the comment form as well as the dashes form', () => {
   const { root, put } = fixture();
   try {

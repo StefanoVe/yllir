@@ -1,0 +1,326 @@
+# Cronologia del mondo
+
+Elenco degli anni più noti, in ordine. Gli eventi minori sono raccolti in una riga ciascuno.
+
+## Anni
+
+- Anno 100: si firma il primo accordo tra i mercanti del sale.
+- Anno 101: una piena allaga il quartiere basso di Brina.
+- Anno 102: nasce il consiglio dei barcaioli.
+- Anno 103: il tempio sul colle amplia la sala di preghiera.
+- Anno 104: la guardia riceve le prime lance di ferro.
+- Anno 105: un incendio distrugge due botteghe di stoffe.
+- Anno 106: un carro di sale attraversa il fiume per la prima volta.
+- Anno 107: la fucina del quartiere basso produce una lama nuova.
+- Anno 108: una cometa appare sopra le creste del Bosco Alto.
+- Anno 109: il mercato cambia il giorno di apertura.
+- Anno 110: muore il primo capo della guardia di Brina.
+- Anno 111: il consiglio approva le nuove mura di pietra.
+- Anno 112: un mercante di spezie apre la sua bottega in piazza.
+- Anno 113: la sorgente scura viene recintata con un muretto.
+- Anno 114: le cave di arenaria danno lavoro a trenta uomini.
+- Anno 115: una nave di Corvi risale il fiume fino al guado.
+- Anno 116: nasce una scuola per i figli dei barcaioli.
+- Anno 117: il tempio riceve in dono una campana di bronzo.
+- Anno 118: la taverna della fonte cambia padrone.
+- Anno 119: un inverno lungo blocca i carri per quaranta giorni.
+- Anno 120: il consiglio stabilisce il pedaggio sul ponte.
+- Anno 121: si scava il secondo pozzo nel quartiere alto.
+- Anno 122: un maestro di mappe disegna la prima carta della valle.
+- Anno 123: la guardia pattuglia le mura ogni notte.
+- Anno 124: i pescatori fondano una confraternita del fiume.
+- Anno 125: una frana chiude la strada del bosco per un mese.
+- Anno 126: arriva a Brina una compagnia di cantastorie.
+- Anno 127: il mercato del giovedì diventa il più grande della regione.
+- Anno 128: nasce il primo registro dei nati in città.
+- Anno 129: una tempesta abbatte il vecchio faggio sulla collina.
+- Anno 130: il consiglio nomina un tesoriere per la prima volta.
+- Anno 131: si costruisce una stalla comune fuori dalle mura.
+- Anno 132: la fucina produce chiavi per le porte del palazzo.
+- Anno 133: un viaggiatore porta notizie dalle isole del sud.
+- Anno 134: il tempio apre un ospizio per i malati.
+- Anno 135: la cava più profonda viene abbandonata per l'acqua.
+- Anno 136: si istituisce la festa del primo raccolto.
+- Anno 137: un gruppo di minatori torna dalle montagne.
+- Anno 138: la guardia sequestra un carico di sale non registrato.
+- Anno 139: il ponte viene riparato con pietre nuove.
+- Anno 140: nasce una locanda vicino alla porta a sud.
+- Anno 141: si discute per la prima volta di un nuovo quartiere.
+- Anno 142: un cane da guardia salva due bambini dal fiume.
+- Anno 143: il consiglio vieta i carri pesanti nel quartiere alto.
+- Anno 144: la sorgente scura produce acqua anche in estate.
+- Anno 145: si firma la pace tra i barcaioli e i mercanti.
+- Anno 146: una donna apre la prima scuola di canto in città.
+- Anno 147: il grifone appare per la prima volta sopra il bosco.
+- Anno 148: un mastro vetraio si stabilisce nel quartiere basso.
+- Anno 149: la piazza viene pavimentata con lastre di arenaria.
+- Anno 150: il consiglio celebra i cento anni della città.
+- Anno 151: la guardia adotta un nuovo registro delle porte.
+- Anno 152: una carestia costringe molte famiglie a lasciare la valle.
+- Anno 153: il mercato del pesce si sposta sulla riva bassa.
+- Anno 154: nasce un ordine di monache dedito alle cure.
+- Anno 155: un terremoto lesiona il muro est delle mura.
+- Anno 156: si costruisce un nuovo lavatoio sul fiume.
+- Anno 157: il primo pittore di insegne lavora in piazza.
+- Anno 158: un mercante scompare con il carico di stoffe.
+- Anno 159: il consiglio affida la cura del tempio alle monache.
+- Anno 160: un inverno mite permette due raccolti nella valle.
+- Anno 161: la lanterna di bosco diventa l'oggetto più venduto.
+- Anno 162: un corriere a cavallo porta lettere dalla capitale.
+- Anno 163: si riparano le botteghe colpite dal fuoco.
+- Anno 164: un gruppo di cacciatori torna con la pelle di un cervo bianco.
+- Anno 165: il pozzo del quartiere alto viene chiuso per l'acqua cattiva.
+- Anno 166: la confraternita dei pescatori compra una barca nuova.
+- Anno 167: un maestro d'armi apre una palestra vicino alla caserma.
+- Anno 168: il consiglio tassa il vino importato dal sud.
+- Anno 169: nasce un mercato delle pulci nel vicolo dei ferri.
+- Anno 170: una nave carica di grano attracca alla riva bassa.
+- Anno 171: si registra il primo censimento dei carri.
+- Anno 172: una compagnia di attori recita nella piazza per tre sere.
+- Anno 173: la guardia scopre un tunnel sotto il muro nord.
+- Anno 174: il tesoriere presenta il bilancio in consiglio.
+- Anno 175: un cavaliere di passaggio chiede ospitalità al tempio.
+- Anno 176: si costruisce un abbeveratoio per i cavalli alla porta.
+- Anno 177: l'ospizio del tempio ospita venti malati in un inverno.
+- Anno 178: un falegname costruisce la prima sedia pieghevole.
+- Anno 179: il mercato delle stoffe chiude per un mese di lutto.
+- Anno 180: si scava un canale di scolo per la piazza bassa.
+- Anno 181: la sorgente scura attira pellegrini da tre valli.
+- Anno 182: un barcaiolo costruisce la barca più veloce del fiume.
+- Anno 183: il consiglio approva un regolamento per le taverne.
+- Anno 184: la fucina del quartiere basso chiude per debiti.
+- Anno 185: una pioggia di cenere copre le creste per un giorno.
+- Anno 186: nasce la festa delle lanterne sul fiume.
+- Anno 187: la guardia riceve una nuova divisa di cuoio.
+- Anno 188: un mercante di sale apre un magazzino vicino al ponte.
+- Anno 189: si scavano nuove fosse per la cava abbandonata.
+- Anno 190: il tempio ottiene il diritto di tenere un registro dei nati.
+- Anno 191: la piazza ospita la prima fiera dei mestieri.
+- Anno 192: un bambino ritrova una moneta di ferro sulla riva.
+- Anno 193: il consiglio nomina un giudice per le liti sui carri.
+- Anno 194: una colonna di mercanti sale verso i passi alti.
+- Anno 195: il vecchio mulino sul fiume viene ricostruito.
+- Anno 196: nasce una biblioteca piccola nel palazzo del consiglio.
+- Anno 197: un viandante porta la notizia di una guerra lontana.
+- Anno 198: la scuola dei barcaioli riceve il primo maestro di mappe.
+- Anno 199: il consiglio festeggia i duecento anni della fonte.
+- Anno 200: si conclude la prima grande revisione delle leggi.
+- Anno 201: la guardia pattuglia il bosco con i cani per due mesi.
+- Anno 202: un pittore dipinge lo stemma della città sulla porta sud.
+- Anno 203: una piena minore danneggia il lavatoio del fiume.
+- Anno 204: si apre una via nuova tra il quartiere alto e la piazza.
+- Anno 205: il primo mercato notturno chiude dopo una rissa.
+- Anno 206: i cantastorie fissano la storia della spada.
+- Anno 207: il tempio riceve un'icona dal monastero del passo.
+- Anno 208: un falco reale si posa sul campanile del tempio.
+- Anno 209: la sorgente scura viene visitata da un gruppo di studiosi.
+- Anno 210: il consiglio decide di pagare i guardiani in argento.
+- Anno 211: un incendio nel bosco brucia due valli di faggi.
+- Anno 212: nasce un'accademia di canto nel vicolo dei cantori.
+- Anno 213: la fucina produce per la prima volta chiavi di acciaio.
+- Anno 214: un carro carico di vino si ribalta sul ponte.
+- Anno 215: il quartiere basso ottiene un proprio rappresentante.
+- Anno 216: si installa una campana d'allarme sulla torre della porta.
+- Anno 217: un maestro di scherma vince il torneo della piazza.
+- Anno 218: la confraternita dei pescatori apre una mensa per i poveri.
+- Anno 219: la strada della cava viene riasfaltata con pietre bianche.
+- Anno 220: un mercante di stoffe fonda la sua compagnia di carri.
+- Anno 221: il consiglio riceve una lettera dalla capitale.
+- Anno 222: una donna trova un anello d'argento nel canale.
+- Anno 223: il grifone torna sulle creste dopo quattro anni.
+- Anno 224: si costruisce una nuova cappella vicino alla sorgente.
+- Anno 225: il tesoriere propone di ridurre il pedaggio del ponte.
+- Anno 226: l'accademia di canto presenta la sua prima opera.
+- Anno 227: un gruppo di barcaioli sfida la corrente del fiume.
+- Anno 228: il primo orologio pubblico viene messo sulla torre.
+- Anno 229: la guardia cambia i turni delle porte d'inverno.
+- Anno 230: una famiglia di vetrai si trasferisce nel vicolo dei ferri.
+- Anno 231: si chiude la cava più vecchia per una frana.
+- Anno 232: il mercato del giovedì introduce i banchi coperti.
+- Anno 233: un cacciatore porta in città la pelle di un orso.
+- Anno 234: nasce la confraternita dei carrai della valle.
+- Anno 235: la festa delle lanterne attira mercanti da tre regioni.
+- Anno 236: il tempio apre una seconda sala per i bambini.
+- Anno 237: un maestro di mappe disegna la carta dei guadi.
+- Anno 238: il consiglio vota una legge sul sale non registrato.
+- Anno 239: un viaggiatore descrive le isole del sud in un libro.
+- Anno 240: il pozzo nel quartiere alto viene riaperto dopo anni.
+- Anno 241: la guardia intercetta un carico di vino di contrabbando.
+- Anno 242: si ripara il tetto del palazzo dopo una tempesta.
+- Anno 243: un gruppo di monache parte per il monastero del passo.
+- Anno 244: la piazza bassa ospita un concerto di cantori.
+- Anno 245: si costruisce un secondo ponte di legno a valle.
+- Anno 246: il secondo ponte di legno crolla dopo un inverno.
+- Anno 247: la lanterna del faggio viene brevettata dagli artigiani.
+- Anno 248: un mercante di spezie vende il suo magazzino al consiglio.
+- Anno 249: nasce il primo giornale della valle, scritto a mano.
+- Anno 250: si festeggiano i cinquant'anni del mercato del giovedì.
+- Anno 251: la guardia riceve l'ordine di pattugliare le creste.
+- Anno 252: una bambina trova un libro di mappe sotto il pavimento.
+- Anno 253: il consiglio amplia il mercato verso la porta est.
+- Anno 254: l'accademia di canto apre una sede nel quartiere alto.
+- Anno 255: si chiude l'ospizio del tempio per mancanza di fondi.
+- Anno 256: un fabbro inventa un nuovo tipo di serratura.
+- Anno 257: la strada del passo viene riparata con sabbia e ghiaia.
+- Anno 258: nasce un club di giocatori di dadi nella taverna sul retro.
+- Anno 259: si contano duecento carri registrati in città.
+- Anno 260: un inverno rigido gela il fiume per tre settimane.
+- Anno 261: la guardia riceve la prima barca a remi per il fiume.
+- Anno 262: un vecchio mulino viene trasformato in magazzino.
+- Anno 263: i barcaioli eleggono una nuova guida per la confraternita.
+- Anno 264: il tempio invia monache alle valli di montagna.
+- Anno 265: un mercante di vino apre una cantina sotto la piazza.
+- Anno 266: il consiglio istituisce un premio per il miglior fabbro.
+- Anno 267: si scopre una vena d'argento nelle vecchie cave.
+- Anno 268: la vena d'argento viene chiusa dopo due mesi.
+- Anno 269: nasce un'osteria nuova nel vicolo dei cantori.
+- Anno 270: il grifone viene avvistato sopra il passo alto.
+- Anno 271: un falegname costruisce il primo banco per i libri.
+- Anno 272: la campana del tempio viene rifusa dopo una crepa.
+- Anno 273: si inaugura la nuova sala del consiglio.
+- Anno 274: un corriere porta la notizia della pace con il sud.
+- Anno 275: il mercato del pesce riceve un permesso speciale.
+- Anno 276: un pozzo profondo viene scavato nel cortile del palazzo.
+- Anno 277: la guardia cambia la divisa per la festa del raccolto.
+- Anno 278: nasce un'associazione di madri per l'asilo del quartiere.
+- Anno 279: si piantano nuovi faggi sulle creste per il ritorno del bosco.
+- Anno 280: un mercante di stoffe porta il primo telaio meccanico.
+- Anno 281: la cava più profonda riapre con nuovi operai.
+- Anno 282: il consiglio nomina un revisore dei conti.
+- Anno 283: il lavatoio sul fiume viene coperto con un tetto.
+- Anno 284: un gruppo di studenti visita la sorgente scura.
+- Anno 285: la festa delle lanterne viene spostata a primavera.
+- Anno 286: nasce la prima sala di lettura pubblica.
+- Anno 287: un cacciatore sostiene di aver visto un grifone bianco.
+- Anno 288: la guardia costruisce una torretta alla porta nord.
+- Anno 289: la fucina del quartiere basso produce cento chiavi in un anno.
+- Anno 290: il tempio ottiene un terreno vicino alla fonte.
+- Anno 291: un mercante di sale fa causa al consiglio per un dazio.
+- Anno 292: la causa termina con un accordo di compromesso.
+- Anno 293: si ripara la sbarra del ponte dopo un urto di carro.
+- Anno 294: nasce una squadra di pompieri volontari nel quartiere alto.
+- Anno 295: i barcaioli costruiscono un molo nuovo a valle.
+- Anno 296: un maestro di canto torna dal sud con nuovi spartiti.
+- Anno 297: il mercato delle pulci viene spostato nel vicolo dei ferri.
+- Anno 298: la sorgente scura viene dichiarata bene comune.
+- Anno 299: il consiglio celebra i tre secoli della prima pietra.
+- Anno 300: si scrive la cronaca ufficiale della città.
+- Anno 301: la guardia riceve un nuovo cane addestrato al fiuto.
+- Anno 302: un inverno lungo costringe le botteghe a chiudere per due mesi.
+- Anno 303: nasce una confraternita di scrivani nel palazzo.
+- Anno 304: la strada del bosco viene allargata per i carri pesanti.
+- Anno 305: il tempio riceve una biblioteca dal monastero del passo.
+- Anno 306: si discute di una nuova cinta di mura attorno al quartiere basso.
+- Anno 307: un falco porta un messaggio legato alla zampa dalla valle.
+- Anno 308: un fabbricante di lanterne apre un negozio in piazza.
+- Anno 309: la vena d'argento torna a dare piccoli frammenti.
+- Anno 310: il consiglio decide di non costruire la nuova cinta.
+- Anno 311: nasce un mercato dei libri sotto il portico del tempio.
+- Anno 312: la piena del fiume danneggia il vecchio guado.
+- Anno 313: si ricostruisce il guado con pilastri di legno.
+- Anno 314: un viaggiatore disegna la mappa delle quattro valli.
+- Anno 315: la guardia controlla i carri del sale una volta a settimana.
+- Anno 316: l'accademia di canto vince un premio nella capitale.
+- Anno 317: un maestro vetraio costruisce finestre colorate per il tempio.
+- Anno 318: la confraternita dei pescatori compie cent'anni di attività.
+- Anno 319: un cane da guardia viene premiato in piazza.
+- Anno 320: il mercato del giovedì raddoppia lo spazio dei banchi.
+- Anno 321: si riapre l'ospizio del tempio con dodici letti.
+- Anno 322: una compagnia di carrai attraversa il passo per la prima volta.
+- Anno 323: il consiglio nomina due nuovi guardiani per la porta sud.
+- Anno 324: la cava abbandonata viene usata come deposito di legna.
+- Anno 325: un giovane mastro fabbro apre bottega nel quartiere basso.
+- Anno 326: si pubblica il registro dei carri aggiornato.
+- Anno 327: nasce una piccola fiera d'autunno nella piazza alta.
+- Anno 328: la festa delle lanterne ottiene un corteo di barche.
+- Anno 329: un ponte di corda viene teso sopra il canale stretto.
+- Anno 330: il ponte di corda cede e viene sostituito da una passerella.
+- Anno 331: la guardia intercetta una lettera scritta in una lingua straniera.
+- Anno 332: il tesoriere presenta un bilancio in pareggio.
+- Anno 333: il grifone nidifica per la prima volta vicino alla fonte.
+- Anno 334: un cacciatore viene multato per aver turbato il nido.
+- Anno 335: si istituisce una guardia forestale sulle creste.
+- Anno 336: un gruppo di monache apre una farmacia nel tempio.
+- Anno 337: la piazza bassa viene illuminata con lanterne a olio.
+- Anno 338: un incendio nel mulino costringe a una lunga ricostruzione.
+- Anno 339: il consiglio approva un piano per le strade del quartiere alto.
+- Anno 340: si celebrano i quattrocento anni della prima pietra del muro.
+- Anno 341: una nave da carico porta sale dal mare del sud.
+- Anno 342: il mercato del sale viene spostato vicino alla porta est.
+- Anno 343: la taverna della fonte organizza la prima gara di canto.
+- Anno 344: un maestro di mappe rileva il corso del fiume con uno strumento.
+- Anno 345: nasce un ospedale piccolo nel quartiere basso.
+- Anno 346: una donna costruisce un telaio in legno di faggio.
+- Anno 347: il consiglio vieta la caccia nel bosco per una stagione.
+- Anno 348: una piena leggera lascia fango sulle botteghe del fiume.
+- Anno 349: la scuola dei barcaioli apre una classe di navigazione.
+- Anno 350: si chiude l'anno con una grande festa nel quartiere alto.
+- Anno 351: un mercante porta in città i primi vetri soffiati.
+- Anno 352: la guardia costruisce un posto di guardia sul ponte.
+- Anno 353: un bambino scrive la prima poesia della biblioteca.
+- Anno 354: il consiglio stanzia fondi per la manutenzione del guado.
+- Anno 355: la fucina produce una lama per il torneo della piazza.
+- Anno 356: il tempio accoglie un pellegrinaggio dalla valle alta.
+- Anno 357: la vena d'argento si esaurisce del tutto.
+- Anno 358: la cava viene riaperta per la pietra da costruzione.
+- Anno 359: un nuovo quartiere sorge oltre le mura di levante.
+- Anno 360: la sorgente scura resta asciutta per una settimana.
+- Anno 361: la confraternita dei carrai ottiene un proprio stemma.
+- Anno 362: un bando del consiglio regola le luci notturne.
+- Anno 363: l'accademia di canto presenta una cantata sul fiume.
+- Anno 364: si restaura il campanile del tempio con pietra bianca.
+- Anno 365: il mercato del giovedì compie due secoli di storia.
+- Anno 366: un cane da caccia riporta un cucciolo di grifone al bosco.
+- Anno 367: la guardia riceve una cassa di armi dal sud.
+- Anno 368: nasce una piccola locanda per i pellegrini al passo.
+- Anno 369: il tesoriere propone un fondo per le vedove dei barcaioli.
+- Anno 370: si pubblica un libro sulla storia delle quattro valli.
+- Anno 371: un terremoto leggero fa cadere un camino in piazza.
+- Anno 372: il consiglio assegna la sala del tempio alla scuola.
+- Anno 373: un mercante di spezie apre un deposito nel vicolo dei cantori.
+- Anno 374: la festa delle lanterne cambia percorso lungo il fiume.
+- Anno 375: una famiglia di mugnai ricostruisce il vecchio mulino.
+- Anno 376: si sigla un patto di non aggressione con la valle alta.
+- Anno 377: un ragazzo ritrova una lanterna di bosco sepolta sotto un faggio.
+- Anno 378: la biblioteca della piazza riceve cento nuovi volumi.
+- Anno 379: il consiglio discute di una nuova tassa sui banchi del mercato.
+- Anno 380: la guardia riprende i pattugliamenti notturni sulle creste.
+- Anno 381: nasce un'associazione di artigiani del ferro.
+- Anno 382: un maestro di scherma insegna alle donne del quartiere basso.
+- Anno 383: il ponte viene chiuso per tre giorni per una verifica.
+- Anno 384: un carro di pietra da costruzione attraversa il fiume.
+- Anno 385: il tempio festeggia il ritorno della campana restaurata.
+- Anno 386: si contano trecento botteghe nella città e nel quartiere basso.
+- Anno 387: la sorgente scura viene analizzata da un farmacista di passaggio.
+- Anno 388: un inverno mite fa fiorire i mandorli nel cortile del palazzo.
+- Anno 389: il consiglio approva la costruzione di una nuova porta a ovest.
+- Anno 390: la guardia riceve un ordine di riservatezza per i registri.
+- Anno 391: la confraternita dei pescatori pubblica le regole del fiume.
+- Anno 392: si chiude la scuola dei cantori per mancanza di allievi.
+- Anno 393: un viandante porta una pietra con iscrizioni dal monte.
+- Anno 394: la cava di arenaria dà lavoro a cinquanta uomini.
+- Anno 395: il mercato delle pulci diventa un mercato stabile.
+- Anno 396: un barcaiolo salva un gruppo di mercanti dalla piena.
+- Anno 397: si restaura la sala di lettura con finestre nuove.
+- Anno 398: il grifone viene protetto da un editto del consiglio.
+- Anno 399: il consiglio celebra i quattrocento anni della città.
+- Anno 400: si scrive il secondo libro della cronaca ufficiale.
+- Anno 401: la guardia riceve una nuova sede vicino alla porta nord.
+- Anno 402: un artigiano costruisce una lanterna con vetro blu.
+- Anno 403: il tempio ospita una mostra di mappe della valle.
+- Anno 404: nasce un mercato del pesce coperto sulla riva bassa.
+- Anno 405: una donna guida un convoglio di carri sul passo alto.
+- Anno 406: il consiglio limita il numero dei banchi nel mercato.
+- Anno 407: la fonte scura viene attrezzata con una piccola cisterna.
+- Anno 408: un mastro vetraio trasferisce la sua bottega al vicolo dei ferri.
+- Anno 409: si rinnova il registro dei nati e dei morti.
+- Anno 410: una compagnia di attori torna in città dopo vent'anni.
+- Anno 411: la piazza alta viene dotata di panchine di pietra.
+- Anno 412: un incendio di carri nel quartiere basso viene spento in ore.
+- Anno 413: il consiglio istituisce una festa per i barcaioli.
+- Anno 414: nasce la prima sala per le riunioni dei mercanti.
+- Anno 415: il ponte di legno a valle viene smantellato.
+- Anno 416: la guardia pubblica un regolamento per le porte notturne.
+- Anno 417: un cacciatore porta un corno di grifone al tempio.
+- Anno 418: si conclude la costruzione della nuova torretta sul fiume.
+- Anno 419: il consiglio approva la cronaca dei primi quattrocento anni.

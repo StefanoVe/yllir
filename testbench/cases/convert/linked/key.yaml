@@ -1,0 +1,71 @@
+# Answer key of convert/linked (structured mode, issue #138). The runner reads it from the repository;
+# it is never copied next to the input or the campaign. Sources: testbench/fixtures/convert-linked-input.
+#
+# R1 each input file is handled as its route says: move = one document; split = its headings become
+#    separate documents (split_pieces); source = handled by the import scripts (long reference file);
+#    skip = stays only in the input; full = through the convert path. Nothing is unrouted.
+# R2 the long reference file (more than 300 lines) is handled as a source, not copied whole as a document.
+# L1 every relative link to an existing file, and every anchor (#heading), resolves in the campaign.
+# L2 no link is left pointing to a file that was not converted: links to skipped or unrouted files are plain text.
+# H1 two places are called homonym_name, one per folder (homonym_files), and each keeps its own description.
+# H2 one of them says homonym_words[0], the other one says homonym_words[1].
+# H3 no document about the homonym says both words: the two places are not merged.
+# A1 the shared alias (shared_alias) is said of two people (shared_alias_subjects); each keeps it on its own
+#    document and neither document takes the other's identity.
+# P1 the hypothesis (hypothesis_phrase) appears only as a hypothesis, never as an accusation.
+# C1 the outline's contradictions section names contradiction.subject with both figures.
+# C2 the final message names the contradiction with both figures: reported, not decided.
+# S1 each secret (secret_texts) appears in public text only inside a master-only block, or a master-only section.
+# S2 each secret is kept: at least one master-only block holds it.
+# S3 the master block of the Renza file and the Segreti section of the Ilde file never reach public text.
+# M1 the generated map (Mappa dei luoghi.md) and the to-do file are not turned into public documents.
+# I1 the input folder is unchanged.
+
+routes:
+  move:
+    - Mondo/Città di Brina.md
+    - Mondo/Fonte Nera.md
+    - Mondo/Ponte Lungo.md
+    - Mondo/Cava Rossa.md
+    - Mondo/Bosco Alto.md
+    - Mondo/Città di Brina/Fonte Nera.md
+    - Mondo/Città di Brina/Piazza del Mercato.md
+    - Gente/Ilde.md
+    - Gente/Renza.md
+    - Gente/Capitano Brenno.md
+    - Cose/Spada di Brina.md
+    - Cose/Lanterna di Bosco.md
+  split:
+    - Gente/Personaggi minori.md
+  source:
+    - Riferimenti/Cronologia del mondo.md
+  skip:
+    - Mappa dei luoghi.md
+    - Da fare/Idee.md
+  full: []
+split_pieces:
+  - Mastro Eldo, il mercante
+  - Il Grifone del Bosco Alto
+  - Sorella Olma
+  - Tamar il Guardiano
+homonym_name: Fonte Nera
+homonym_words: [sorgente, taverna]
+homonym_files:
+  - Mondo/Fonte Nera.md
+  - Mondo/Città di Brina/Fonte Nera.md
+shared_alias: la Rossa
+shared_alias_subjects: [Ilde, Renza]
+hypothesis_phrase: forse il capitano della guardia protegge i ladri
+secret_texts:
+  - il vero padre di Ilde
+  - il debito con la Corporazione
+  - la cripta è vuota
+contradiction:
+  subject: Ponte Lungo
+  small: ottant'anni fa
+  large: duecento anni fa
+missing_links: []
+ambiguous_links: []
+excluded: []
+images:
+  - img/brina.png

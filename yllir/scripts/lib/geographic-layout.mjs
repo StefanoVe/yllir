@@ -340,7 +340,7 @@ function rewriteMarkdownLinks(text, source, output, moveMap) {
     const destination = moveMap.get(resolved) ?? resolved;
     if (output === source && destination === resolved) return target;
     const next = path.posix.relative(path.posix.dirname(output), destination) || path.posix.basename(destination);
-    return `${encodeURI(next).replaceAll('%2F', '/')}${match[2] ?? ''}`;
+    return `${encodeURI(next).replaceAll('%2F', '/').replaceAll('(', '%28').replaceAll(')', '%29')}${match[2] ?? ''}`;
   };
   let fenced = false;
   return text.split(/(?<=\n)/).map((line) => {

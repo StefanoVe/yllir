@@ -1,0 +1,18 @@
+case: convert-obsidian
+kind: convert
+fixture: convert-obsidian-input
+# Structured mode of issue #138: the input is an Obsidian vault (wiki links, front-matter, callouts,
+# comments, dataview, canvas). The runner copies the fixture next to an empty campaign that
+# init-campaign.mjs creates; {{INPUT_DIR}} in the prompt is replaced by the absolute path of that copy.
+# The answer key is key.yaml, outside the folder the agent reads.
+# One turn: the master asks to bring the files in and the agent runs the structured convert.
+# Not mapped to run-suite yet: run it by hand with this runner, like convert/basic.
+runs: 1
+prompt: |
+  La mia campagna è già divisa in file collegati tra loro, puoi portarla qui? È in {{INPUT_DIR}}
+reply: |
+  sì, va bene così
+# Not measured yet: a vault of 18 notes with links, callouts and a canvas.
+limits:
+  max_minutes: 20
+  max_tool_calls: 250
