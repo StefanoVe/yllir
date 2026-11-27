@@ -105,6 +105,20 @@ test('quotes inside event names become single quotes in the mermaid labels only'
   assert.match(text, /^- \[Il "capo" parla\]\(Eventi\/Il%20"capo"%20parla\.md\)$/m);
 });
 
+test('event file names with parentheses are encoded in the link target', () => {
+  const text = renderSessionMap(
+    session({
+      events: [event('avviso', "L'avviso (granchio)", [], "Trama/Il faro/Eventi/L'avviso (granchio).md")],
+    }),
+  );
+  const line = text.split('\n').find((l) => l.startsWith("- [L'avviso (granchio)]"));
+  assert.ok(line, 'the event line is present');
+  const target = /\]\((.*)\)$/.exec(line)[1];
+  assert.equal(target, "Eventi/L'avviso%20%28granchio%29.md");
+  assert.ok(target.includes('%28') && target.includes('%29'));
+  assert.doesNotMatch(target, /[()]/);
+});
+
 test('a dependency on an event outside the session gives no edge and does not crash', () => {
   const text = renderSessionMap(
     session({

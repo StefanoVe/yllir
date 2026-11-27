@@ -20,9 +20,9 @@ function mermaidLabel(name) {
   return name.replace(/"/g, "'");
 }
 
-/** Relative links keep the name as text and encode only the spaces of the target. */
+/** Relative links keep the name as text and encode the spaces and parentheses of the target. */
 function linkTarget(target) {
-  return target.replace(/ /g, '%20');
+  return target.replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
 }
 
 /**

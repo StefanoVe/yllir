@@ -228,6 +228,30 @@ test('relative links are rewritten from the old place to the new one, with and w
   assert.match(diario, /\[un punto\]\(\.\.\/Trama\/Sessione%201\/Sessione%201\.md\)/);
 });
 
+test('a link to a scene whose file name has parentheses encodes them in the target', (t) => {
+  const root = makeCampaign(t, {
+    'Trama/Ombre/Sessione 1.md': [
+      '---', 'id: s1', 'depends_on: []', 'location: []', '---', '',
+      '# Arrivo', '', 'Primo.', '',
+      "# L'avviso (granchio)", '', 'Secondo.', '',
+    ].join('\n'),
+    'Cronaca/Diario.md': [
+      '---', 'id: diario', 'played: [s1]', '---', '',
+      "Vedi [l'avviso](../Trama/Ombre/Sessione%201.md#l'avviso-%28granchio%29).",
+      '',
+    ].join('\n'),
+  });
+  const result = migrateSessions(root);
+  assert.deepEqual(result.errors, []);
+  assert.ok(exists(root, "Trama/Sessione 1/Eventi/L'avviso (granchio).md"));
+
+  const diario = read(root, 'Cronaca/Diario.md');
+  const target = /\[l'avviso\]\((.*?)\)\./.exec(diario)[1];
+  assert.equal(target, "../Trama/Sessione%201/Eventi/L'avviso%20%28granchio%29.md");
+  assert.ok(target.includes('%28') && target.includes('%29'));
+  assert.doesNotMatch(target, /[()]/);
+});
+
 test('a link to a file that is not migrated is left as it is', (t) => {
   const root = makeCampaign(t, {
     'Cronaca/Diario.md': '---\nid: diario\nplayed: []\n---\n\n[x](../Trama/Altra.md#q)\n',

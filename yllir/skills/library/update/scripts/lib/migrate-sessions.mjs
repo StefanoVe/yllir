@@ -357,7 +357,7 @@ function rewriteTarget(target, fromDir, toDir, mode, lookup) {
 }
 
 function encodeSpaces(target) {
-  return target.replace(/ /g, '%20');
+  return target.replace(/ /g, '%20').replace(/\(/g, '%28').replace(/\)/g, '%29');
 }
 
 function safeDecode(value) {
