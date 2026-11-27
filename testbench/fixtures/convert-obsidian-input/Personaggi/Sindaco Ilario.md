@@ -13,3 +13,5 @@ Ha buoni rapporti con la [[Lega del Sale]]. Con la Torre Grigia non ha mai avuto
 ## Dubbi
 
 Alcuni cittadini dicono che sia troppo vicino ai mercanti del sale.
+
+Al mercato si mormora: «forse il sindaco ha venduto le mappe ai contrabbandieri».

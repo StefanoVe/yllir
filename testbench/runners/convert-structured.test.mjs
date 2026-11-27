@@ -5,10 +5,6 @@
 // are checked on the drafts. No model, no network.
 //
 // Usage: node --test testbench/runners/convert-structured.test.mjs
-//
-// The diary files (Diario/*.md) are on the `full` route in key.yaml: the agent run sends them through the
-// existing convert path. This offline test turns them into event documents only to exercise the traps
-// (the ambiguous [[Selva]] link and the hypothesis phrase exist only in them).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -222,10 +218,23 @@ function runCase(def) {
     // 4. Coverage: every Markdown file is routed, uncovered lines are headings only, one document per target.
     assert.deepEqual(result.unrouted, [], 'unrouted Markdown files');
     assert.equal(result.files.length, plan.documents.length, 'one draft per document');
+    // The opening lines of a split file before its first subject are in no document (author decision):
+    // the key names them in split_intro, and they are the only non-heading lines allowed to be uncovered.
+    const introFile = key.split_intro?.file ?? null;
+    const introLines = (key.split_intro?.lines ?? []).map(Number);
+    if (introFile !== null) {
+      assert.ok(result.uncovered.some((gap) => gap.file === introFile), `${introFile} has no uncovered intro`);
+    }
     for (const gap of result.uncovered) {
       const lines = readLines(path.join(inputDir, gap.file));
       for (const n of gap.lines) {
-        assert.ok(lines[n - 1].startsWith('#'), `uncovered line ${gap.file}:${n} is not a heading: ${lines[n - 1]}`);
+        const allowed = lines[n - 1].startsWith('#') || (gap.file === introFile && introLines.includes(n));
+        assert.ok(allowed, `uncovered line ${gap.file}:${n} is neither a heading nor the split intro: ${lines[n - 1]}`);
+      }
+      if (gap.file === introFile) {
+        const headingLines = lines.map((l, i) => (l.startsWith('#') ? i + 1 : 0)).filter((n) => n > 0);
+        const expected = [...headingLines, ...introLines].sort((a, b) => a - b);
+        assert.deepEqual([...gap.lines].sort((a, b) => a - b), expected, `uncovered lines of ${introFile}`);
       }
     }
 

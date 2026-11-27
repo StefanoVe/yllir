@@ -292,16 +292,9 @@
       "parts": [
         {
           "file": "Gente/Personaggi minori.md",
-          "from": 3,
-          "to": 3,
-          "heading": "## Ruolo",
-          "shift": 0
-        },
-        {
-          "file": "Gente/Personaggi minori.md",
           "from": 7,
           "to": 13,
-          "heading": null,
+          "heading": "## Ruolo",
           "shift": 0
         }
       ]

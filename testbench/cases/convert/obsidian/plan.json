@@ -127,7 +127,7 @@
         {
           "file": "Note di campagna.md",
           "from": 1,
-          "to": 15,
+          "to": 17,
           "heading": null,
           "shift": 0
         }
@@ -349,6 +349,13 @@
           "to": 15,
           "heading": null,
           "shift": 0
+        },
+        {
+          "file": "Personaggi/Sindaco Ilario.md",
+          "from": 17,
+          "to": 17,
+          "heading": null,
+          "shift": 0
         }
       ]
     },
@@ -515,48 +522,6 @@
           "shift": 0
         }
       ]
-    },
-    {
-      "target": "Storia/Serata del 3 ottobre.md",
-      "title": "Serata del 3 ottobre",
-      "meta": {
-        "id": "serata-3-ottobre",
-        "kind": "event",
-        "template": "event",
-        "provenance": "master",
-        "location": [],
-        "when": 3
-      },
-      "parts": [
-        {
-          "file": "Diario/2026-10-03.md",
-          "from": 3,
-          "to": 11,
-          "heading": "## Accaduto",
-          "shift": 0
-        }
-      ]
-    },
-    {
-      "target": "Storia/Serata del 17 ottobre.md",
-      "title": "Serata del 17 ottobre",
-      "meta": {
-        "id": "serata-17-ottobre",
-        "kind": "event",
-        "template": "event",
-        "provenance": "master",
-        "location": [],
-        "when": 17
-      },
-      "parts": [
-        {
-          "file": "Diario/2026-10-17.md",
-          "from": 3,
-          "to": 15,
-          "heading": "## Accaduto",
-          "shift": 0
-        }
-      ]
     }
   ],
   "images": [
@@ -571,6 +536,9 @@
       "Indice personaggi.md",
       "Mappe/relazioni.canvas"
     ],
-    "full": []
+    "full": [
+      "Diario/2026-10-03.md",
+      "Diario/2026-10-17.md"
+    ]
   }
 }

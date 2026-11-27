@@ -13,3 +13,5 @@ Nel nord si parla anche di [[Torre del Silenzio]], ma nessuna scheda la descrive
 - Chiarire chi comanda al porto.
 - Decidere il destino della torre.
 - Portare la mappa completa al tavolo.
+
+Si dice che [[Selva]] conosca ogni sentiero del Bosco di Erba.

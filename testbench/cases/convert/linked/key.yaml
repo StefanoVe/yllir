@@ -69,3 +69,7 @@ ambiguous_links: []
 excluded: []
 images:
   - img/brina.png
+split_intro:
+  file: "Gente/Personaggi minori.md"
+  lines:
+    - 3
