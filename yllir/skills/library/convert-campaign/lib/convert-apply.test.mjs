@@ -626,3 +626,86 @@ test('spec 5.1: a level-1 heading inside a part with shift 0 is still bad-headin
     }],
   }), 'bad-heading-level');
 });
+
+test('master part: public lines 1-3 and 7-9, lines 4-6 go whole to the reserved block under the shared heading', () => {
+  const file = 'Trama/sessione-1/Eventi/Scena.md';
+  const { root, input } = setup({
+    [file]: 'Prima riga.\nSeconda riga.\nTerza riga.\nSegreto uno.\nSegreto due.\nSegreto tre.\nQuarta riga.\nQuinta riga.\nSesta riga.\n',
+  });
+  try {
+    const result = applyPlan(root, planFor(input, {
+      documents: [{
+        target: file,
+        title: null,
+        meta: { id: 'scena', session: 'sessione-1', depends_on: [], provenance: 'master' },
+        parts: [
+          { file, from: 1, to: 3, heading: null, shift: 0 },
+          { file, from: 4, to: 6, heading: '## Ignorato', shift: 0, master: true },
+          { file, from: 7, to: 9, heading: null, shift: 0 },
+        ],
+      }],
+    }));
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.deepEqual(result.uncovered, []);
+    assert.deepEqual(result.masterBlocks, { moved: 1, fixed: 0 });
+    assert.equal(
+      draftOf(root, file),
+      '<!-- yllir\nid: scena\nsession: sessione-1\nprovenance: master\ndepends_on: []\n-->\n\n'
+      + 'Prima riga.\nSeconda riga.\nTerza riga.\n\nQuarta riga.\nQuinta riga.\nSesta riga.\n'
+      + '\n<!-- master -->\n## Master\n\n### Indicazioni per il master\nSegreto uno.\nSegreto due.\nSegreto tre.\n<!-- /master -->\n',
+    );
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('master part: a link to a master-only target stays a link in the reserved block', () => {
+  const scene = 'Trama/sessione-1/Eventi/Scena.md';
+  const map = 'Giocatori/Mappa.md';
+  const { root, input } = setup({
+    [scene]: 'Testo pubblico.\nLa [[Mappa]] nasconde il passaggio.\n',
+    [map]: '# Mappa\nLa mappa.\n',
+  });
+  try {
+    const result = applyPlan(root, planFor(input, {
+      documents: [
+        {
+          target: scene,
+          title: null,
+          meta: { id: 'scena', session: 'sessione-1', depends_on: [], provenance: 'master' },
+          parts: [
+            { file: scene, from: 1, to: 1, heading: null, shift: 0 },
+            { file: scene, from: 2, to: 2, heading: null, shift: 0, master: true },
+          ],
+        },
+        {
+          target: map,
+          title: 'Mappa',
+          meta: { id: 'mappa', provenance: 'master' },
+          parts: [{ file: map, from: 2, to: 2, heading: null, shift: 0 }],
+        },
+      ],
+    }));
+    assert.equal(result.ok, true, JSON.stringify(result.errors));
+    assert.equal(
+      draftOf(root, scene),
+      '<!-- yllir\nid: scena\nsession: sessione-1\nprovenance: master\ndepends_on: []\n-->\n\n'
+      + 'Testo pubblico.\n\n<!-- master -->\n## Master\n\n### Indicazioni per il master\n'
+      + 'La [Mappa](../../../Giocatori/Mappa.md) nasconde il passaggio.\n<!-- /master -->\n',
+    );
+  } finally {
+    cleanup(root, input);
+  }
+});
+
+test('master part: master true is allowed, master "yes" is bad-plan', () => {
+  const file = 'Trama/sessione-1/Eventi/Scena.md';
+  assertPlanError({ [file]: 'Uno.\n' }, (input) => planFor(input, {
+    documents: [{
+      target: file,
+      title: null,
+      meta: { id: 'scena', session: 'sessione-1', depends_on: [], provenance: 'master' },
+      parts: [{ file, from: 1, to: 1, heading: null, shift: 0, master: 'yes' }],
+    }],
+  }), 'bad-plan');
+});

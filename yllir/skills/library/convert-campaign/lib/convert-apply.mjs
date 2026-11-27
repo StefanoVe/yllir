@@ -208,6 +208,13 @@ function makeReader(input) {
   };
 }
 
+/** The shared `### <masterHeading>` of a document: returned once per document (state.shared). */
+function sharedHeading(state, masterHeading) {
+  if (state.shared) return [];
+  state.shared = true;
+  return [`### ${masterHeading}`];
+}
+
 /**
  * Public lines of one part, after the master conventions are moved out, the shift applied and
  * the first H1 of the first part dropped. Links and features are handled by the caller.
@@ -216,6 +223,22 @@ function preparePart(record, part, masterConventions, masterHeading, isFirst, st
   const L = record.lines;
   const { from, to } = part;
   const src = (a, b) => L.slice(a - 1, b);
+  if (part.master === true) {
+    // A master part writes nothing in the public body: its lines (shifted) go whole to the reserved block.
+    // Its conventions are not processed on their own, and its heading is ignored.
+    const texts = src(from, to);
+    let levelError = false;
+    for (const h of headings(texts, 1)) {
+      const want = h.level + part.shift;
+      if (h.level === 1 && want < 2) levelError = true;
+      texts[h.line - 1] = setLevel(texts[h.line - 1], Math.min(6, Math.max(2, want)));
+    }
+    const body = trimBlank(texts);
+    return {
+      texts: [], srcLines: [], chunks: body.length > 0 ? [[...sharedHeading(state, masterHeading), ...body]] : [],
+      fixed: 0, levelError, dropped: null,
+    };
+  }
   const inPart = (c) => c.start >= from && c.end <= to;
   const candidates = record.conventions.filter((c) => masterConventions[c.id] === 'master' && inPart(c));
   const moved = candidates.filter((c) => !candidates.some((o) => o !== c
@@ -224,11 +247,7 @@ function preparePart(record, part, masterConventions, masterHeading, isFirst, st
   const cuts = new Map();
   const chunks = [];
   let fixed = 0;
-  const shared = () => {
-    if (state.shared) return [];
-    state.shared = true;
-    return [`### ${masterHeading}`];
-  };
+  const shared = () => sharedHeading(state, masterHeading);
 
   for (const c of moved) {
     if (c.id === 'html-master') {
@@ -399,6 +418,9 @@ function analyse(root, plan) {
         return bad(`${doc.target}: heading must be null or a heading line`);
       }
       if (!Number.isInteger(part.shift)) return bad(`${doc.target}: shift must be an integer`);
+      if (part.master !== undefined && typeof part.master !== 'boolean') {
+        return bad(`${doc.target}: master must be true or false`);
+      }
       if (part.from < record.bodyStart) {
         return fail('frontmatter-overlap', `part ${part.file}:${part.from}-${part.to} overlaps the front-matter`);
       }
@@ -606,6 +628,16 @@ export function applyPlan(campaignRoot, plan) {
 
     for (const { part, prepared } of parts) {
       fixed += prepared.fixed;
+      if (part.master === true) {
+        // A master part: its whole text (links rewritten, master-only targets allowed) goes to the reserved block.
+        for (const chunk of prepared.chunks) {
+          chunkCount++;
+          const r = rewriteLinks(ctx, index, doc, part.file, chunk, true);
+          for (const pl of r.plainLinks) plainLinks.push({ document: doc.target, ...pl });
+          chunkLines.push(trimBlank(r.lines));
+        }
+        continue;
+      }
       const rewritten = rewriteLinks(ctx, index, doc, part.file, prepared.texts, false);
       for (const pl of rewritten.plainLinks) plainLinks.push({ document: doc.target, ...pl });
       if (rewritten.notes) counts.set('note-embed', (counts.get('note-embed') ?? 0) + rewritten.notes);
