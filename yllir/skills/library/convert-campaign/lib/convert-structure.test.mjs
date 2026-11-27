@@ -9,7 +9,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { buildReport, buildSurvey } from './convert-structure.mjs';
+import { createHash } from 'node:crypto';
+import { buildReport, buildSnapshotReport, buildSurvey } from './convert-structure.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const CLI = path.resolve(HERE, '../convert-structure.mjs');
@@ -26,6 +27,29 @@ function makeFolder(files) {
     fs.writeFileSync(file, content);
   }
   return root;
+}
+
+/** A hash of every file and folder of a tree (relative paths and contents), to prove it is unchanged. */
+function treeHash(root) {
+  const hash = createHash('sha256');
+  const visit = (rel) => {
+    const absolute = rel === '' ? root : path.join(root, rel);
+    for (const entry of fs.readdirSync(absolute, { withFileTypes: true }).sort((a, b) => (a.name < b.name ? -1 : 1))) {
+      const child = rel === '' ? entry.name : `${rel}/${entry.name}`;
+      hash.update(`${child}|${entry.isDirectory() ? 'dir' : 'file'}\n`);
+      if (entry.isDirectory()) visit(child);
+      else hash.update(fs.readFileSync(path.join(root, child)));
+    }
+  };
+  visit('');
+  return hash.digest('hex');
+}
+
+/** A scratch folder inside the working directory, for the snapshot tests (removed by the caller). */
+function scratchInsideCwd(name) {
+  const dir = path.join(process.cwd(), '.claude', 'scratchpad', `${name}-${process.pid}`);
+  fs.rmSync(dir, { recursive: true, force: true });
+  return dir;
 }
 
 function fileOf(report, rel) {
@@ -297,4 +321,79 @@ test('the linked fixture is reported with its conventions and a long file', (t) 
   assert.ok(ids.includes('fence:segreto'));
   assert.ok(report.files.some((f) => f.hints.includes('long')));
   assert.ok(!fileOf(report, 'Gente/Ilde.md').hints.includes('multi-subject'));
+});
+
+test('the snapshot copies the walked files byte for byte, not the excluded ones, and the report reads it', () => {
+  const dir = makeFolder({
+    '.obsidian/app.json': '{}',
+    'Note/a.md': '# A\n[[B]]\n',
+    'B.md': '# B\n',
+    'img/x.png': 'png-bytes',
+    'scene.canvas': '{}',
+    'doc.pdf': 'pdf',
+  });
+  const snap = scratchInsideCwd('snapshot-copy');
+  try {
+    const before = treeHash(dir);
+    const report = buildSnapshotReport(dir, snap);
+    assert.equal(fs.readFileSync(path.join(snap, 'Note/a.md'), 'utf8'), '# A\n[[B]]\n');
+    assert.equal(fs.readFileSync(path.join(snap, 'img/x.png'), 'utf8'), 'png-bytes');
+    assert.deepEqual(fs.readdirSync(snap).sort(), ['B.md', 'Note', 'img']);
+    assert.equal(report.input, path.resolve(snap));
+    assert.deepEqual(report.files.map((f) => f.path), ['B.md', 'Note/a.md']);
+    assert.deepEqual(report.excluded, [
+      { path: '.obsidian/', reason: 'tool-folder' },
+      { path: 'doc.pdf', reason: 'other-type' },
+      { path: 'scene.canvas', reason: 'canvas' },
+    ]);
+    assert.equal(treeHash(dir), before);
+  } finally {
+    fs.rmSync(snap, { recursive: true, force: true });
+  }
+});
+
+test('a second snapshot run replaces the folder, and a folder outside the working directory is refused', () => {
+  const dir = makeFolder({ 'A.md': '# A\n' });
+  const snap = scratchInsideCwd('snapshot-replace');
+  try {
+    buildSnapshotReport(dir, snap);
+    fs.writeFileSync(path.join(snap, 'stale.md'), '# old\n');
+    const report = buildSnapshotReport(dir, snap);
+    assert.deepEqual(fs.readdirSync(snap), ['A.md']);
+    assert.deepEqual(report.files.map((f) => f.path), ['A.md']);
+
+    assert.throws(() => buildSnapshotReport(dir, path.join(os.tmpdir(), 'yllir-snapshot-outside')), /inside the current folder/);
+    assert.throws(() => buildSnapshotReport(dir, process.cwd()), /inside the current folder/);
+  } finally {
+    fs.rmSync(snap, { recursive: true, force: true });
+  }
+});
+
+test('the CLI with --snapshot writes the report of the snapshot, exits 2 outside the working directory', () => {
+  const dir = makeFolder({ 'A.md': '# A\n', '.obsidian/app.json': '{}' });
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'yllir-structure-snap-'));
+  const outFile = path.join(outDir, 'report.json');
+  const snap = scratchInsideCwd('snapshot-cli');
+  try {
+    const before = treeHash(dir);
+    const result = spawnSync(process.execPath, [CLI, dir, '--out', outFile, '--snapshot', snap], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(
+      result.stdout.split('\n')[0],
+      'files: 1, markdown: 1, images: 0, excluded: 1, conventions: 0, missing-links: 0',
+    );
+    const written = JSON.parse(fs.readFileSync(outFile, 'utf8'));
+    assert.equal(written.input, path.resolve(snap));
+    assert.equal(treeHash(dir), before);
+
+    const outside = spawnSync(
+      process.execPath,
+      [CLI, dir, '--out', outFile, '--snapshot', path.join(os.tmpdir(), 'yllir-snapshot-cli-outside')],
+      { encoding: 'utf8' },
+    );
+    assert.equal(outside.status, 2);
+    assert.notEqual(outside.stderr, '');
+  } finally {
+    fs.rmSync(snap, { recursive: true, force: true });
+  }
 });

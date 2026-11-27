@@ -310,3 +310,39 @@ export function buildSurvey(report) {
     },
   };
 }
+
+/** True when `child` is strictly inside `parent` (both absolute and resolved). */
+function isStrictlyInside(child, parent) {
+  const rel = path.relative(parent, child);
+  return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+/**
+ * Report of a copy of the input (the --snapshot option). Copies every walked Markdown and image file of
+ * INPUT, byte for byte, to snapshotDir (removed first), then builds the report on the copy. Tool folders,
+ * canvas and other types are not copied; `excluded` still lists them as read from INPUT. INPUT is only read.
+ * Refuses (throws) a snapshotDir that is not strictly inside the current working directory, or that
+ * overlaps INPUT.
+ */
+export function buildSnapshotReport(inputDir, snapshotDir, cwd = process.cwd()) {
+  const root = path.resolve(inputDir);
+  const snapshot = path.resolve(snapshotDir);
+  const workdir = path.resolve(cwd);
+  if (!isStrictlyInside(snapshot, workdir)) {
+    throw new Error(`the snapshot folder must be inside the current folder: ${snapshot}`);
+  }
+  if (snapshot === root || isStrictlyInside(snapshot, root) || isStrictlyInside(root, snapshot)) {
+    throw new Error(`the snapshot folder must not overlap the input folder: ${snapshot}`);
+  }
+  const walked = walk(root);
+  fs.rmSync(snapshot, { recursive: true, force: true });
+  fs.mkdirSync(snapshot, { recursive: true });
+  for (const rel of [...walked.markdown, ...walked.images]) {
+    const target = path.join(snapshot, ...rel.split('/'));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(path.join(root, ...rel.split('/')), target);
+  }
+  const report = buildReport(snapshot);
+  report.excluded = walked.excluded;
+  return report;
+}
