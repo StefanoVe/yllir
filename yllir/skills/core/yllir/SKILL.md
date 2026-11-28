@@ -1,13 +1,13 @@
 ---
 name: yllir
-description: Entry point of Yllir. Invoke it first for every message of the master in a Yllir campaign folder or in an empty folder. It recognises what the master wants and runs the right process.
+description: Entry point of Yllir. Invoke it ONLY for messages in a confirmed Yllir campaign folder (one with campaign.yaml), or when the user explicitly asks to start a new Yllir campaign or to convert an existing campaign into Yllir; never for general use of Claude in other folders or tasks. It recognises what the master wants and runs the right process.
 user-invocable: true
 allowed-tools: Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/session-start.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/engine.mjs" *), Bash(node */scripts/engine.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/issue-report.mjs" *), Bash(node */scripts/issue-report.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/scripts/generate-instructions.mjs" *), Bash(node */skills/core/yllir/scripts/generate-instructions.mjs *), Bash(node "${CLAUDE_PLUGIN_ROOT}/scripts/versions.mjs" *), Bash(node "${CLAUDE_PLUGIN_ROOT}/skills/library/update/scripts/update-campaign.mjs" *), Bash(claude plugin update *), Bash(claude plugin marketplace update *), Read, Write, Edit, Agent, Skill, WebSearch, WebFetch
 ---
 
 # Yllir entry point
 
-You receive every message of the master in a campaign folder or in an empty folder. You check the folder, keep the master's words, then either answer yourself or invoke exactly one process skill with the Skill tool. You write no campaign document in this skill: the processes do, following `authoring.md`.
+You are used only in a Yllir campaign folder, or when the master explicitly asks for a new campaign or a conversion of an existing one. Outside those cases do not use Yllir, do not mention it, and answer as an ordinary assistant. You check the folder, keep the master's words, then either answer yourself or invoke exactly one process skill with the Skill tool. You write no campaign document in this skill: the processes do, following `authoring.md`.
 
 **Commands.** Run each command exactly as written, as one single command: nothing before it, nothing after it, no `;`, `&&`, `|`, `2>&1`, `echo`, `cat`, `mkdir` or `cd`. Run every command from the campaign root. Every script ends its output with `exit: <code>`: read that line. If a command is refused, run it again exactly as written; if it is refused again, say the fixed sentence of the lexicon for an operation that could not be completed, and stop.
 
@@ -18,9 +18,10 @@ You receive every message of the master in a campaign folder or in an empty fold
 **Step 2 — Lexicon.** Read `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/lexicon.md`. From now on, every sentence to the master uses only its words, in the campaign language: `language.main` in `campaign.yaml`, or, in an empty folder, the language the master writes in.
 
 **Step 3 — Folder.** Use the `folder` value from Step 1.
+- No Yllir intent: `folder: empty` or `folder: other` and the master's message neither asks for a new Yllir campaign nor for bringing in or converting an existing campaign: stop this skill, say nothing about Yllir, and answer the master's message as an ordinary assistant.
 - `git: missing`: say in one sentence that the campaign needs a free program called Git to keep its saved versions, and that you will guide the installation if the master wants. Write nothing. Stop.
-- `folder: empty`, or `folder: unfinished` (a campaign was started and not finished): invoke `yllir:new-campaign` with the Skill tool, the master's message as its args. Tell the master nothing technical about an earlier attempt. Stop after the process.
-- `folder: other`: say in plain words that the notes must go into a campaign that exists first, and ask one question: should a new campaign be created in an empty folder, so that the material can be brought in right after? Write nothing. Stop.
+- `folder: empty` with an explicit request for a new campaign, or `folder: unfinished` (a campaign was started and not finished): invoke `yllir:new-campaign` with the Skill tool, the master's message as its args. Tell the master nothing technical about an earlier attempt. Stop after the process.
+- `folder: other` and the master explicitly gave existing campaign material or asked to convert it: say in plain words that the notes must go into a campaign that exists first, and ask one question: should a new campaign be created in an empty folder, so that the material can be brought in right after? Write nothing. Stop.
 - `folder: campaign`: go on to Step 4.
 
 **Step 4 — Health (silent).**
@@ -32,7 +33,7 @@ You receive every message of the master in a campaign folder or in an empty fold
 
 **Step 6 — Recognise the request** by its meaning, not by keywords. Before the first process or the first question about the world in this conversation, read `${CLAUDE_PLUGIN_ROOT}/skills/core/yllir/authoring.md` with the Read tool, once. Then do exactly one of the following, except that a message during a game in progress may need both live-session bullets, one after the other.
 
-- **Create a campaign** (the folder is empty, or the master asks for a new one): invoke `yllir:new-campaign`.
+- **Create a campaign** (the master asks for a new one): invoke `yllir:new-campaign`.
 - **Build or enlarge the world** (regions, villages full of characters, factions, history): invoke `yllir:build-world`.
 - **Create or change one document** from a description, including expanding a sketch: invoke `yllir:write-document`.
 - **Switch a writing setting** of the campaign («scrivi senza chiedere», «da ora in poi non chiedermelo», «chiedimelo di nuovo», «non generare le immagini degli oggetti», «genera di nuovo le immagini degli oggetti»): invoke `yllir:write-document`, which changes only that setting in `campaign.yaml` (`workflow.auto_accept` or `workflow.auto_item_images`) as its Step 4b points 6 and 7 say, and no document.

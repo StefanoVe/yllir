@@ -89,3 +89,76 @@ test('--json still prints the check as JSON', (t) => {
   assert.equal(result.status, 0);
   assert.doesNotThrow(() => JSON.parse(result.stdout));
 });
+
+/** Runs the hook in hook mode: no positional root, the root comes from CLAUDE_PROJECT_DIR. */
+function runHookMode(projectDir, { home, fakeHome }) {
+  const env = {
+    ...process.env,
+    HOME: fakeHome,
+    USERPROFILE: fakeHome,
+    YLLIR_HOME_DIR: home,
+    YLLIR_PUBLISHED_SOURCE: path.join(fakeHome, 'no-published-source'),
+    CLAUDE_PROJECT_DIR: projectDir,
+  };
+  return spawnSync(process.execPath, [CLI], { encoding: 'utf8', env });
+}
+
+test('hook mode in an empty folder prints nothing and exits 0', (t) => {
+  const home = tempDir(t, 'yllir-hook-home-');
+  const fakeHome = tempDir(t, 'yllir-hook-fake-');
+  const root = tempDir(t, 'yllir-hook-root-');
+
+  const result = runHookMode(root, { home, fakeHome });
+
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, '');
+});
+
+test('hook mode in a non-campaign folder with files prints nothing and exits 0', (t) => {
+  const home = tempDir(t, 'yllir-hook-home-');
+  const fakeHome = tempDir(t, 'yllir-hook-fake-');
+  const root = tempDir(t, 'yllir-hook-root-');
+  fs.writeFileSync(path.join(root, 'package.json'), '{}\n');
+
+  const result = runHookMode(root, { home, fakeHome });
+
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, '');
+});
+
+test('hook mode in a campaign folder still prints the check', (t) => {
+  const home = tempDir(t, 'yllir-hook-home-');
+  const fakeHome = tempDir(t, 'yllir-hook-fake-');
+  const root = tempDir(t, 'yllir-hook-root-');
+  fs.writeFileSync(path.join(root, 'campaign.yaml'), 'name: Test\n');
+
+  const result = runHookMode(root, { home, fakeHome });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, new RegExp(HEADER.replace(/[()]/g, '\\$&')));
+  assert.match(result.stdout, /^folder: (campaign|unfinished)$/m);
+});
+
+test('explicit root argument on an empty folder still prints the check', (t) => {
+  const home = tempDir(t, 'yllir-hook-home-');
+  const fakeHome = tempDir(t, 'yllir-hook-fake-');
+  const root = tempDir(t, 'yllir-hook-root-');
+
+  const result = runHook([root], { home, fakeHome });
+
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, new RegExp(HEADER.replace(/[()]/g, '\\$&')));
+  assert.match(result.stdout, /^folder: empty$/m);
+});
+
+test('hook mode outside a campaign still keeps the framework path', (t) => {
+  const home = tempDir(t, 'yllir-hook-home-');
+  const fakeHome = tempDir(t, 'yllir-hook-fake-');
+  const root = tempDir(t, 'yllir-hook-root-');
+
+  const result = runHookMode(root, { home, fakeHome });
+
+  assert.equal(result.status, 0);
+  assert.equal(result.stdout, '');
+  assert.equal(fs.readFileSync(path.join(home, '.yllir', 'framework-path'), 'utf8'), `${FRAMEWORK_ROOT}\n`);
+});

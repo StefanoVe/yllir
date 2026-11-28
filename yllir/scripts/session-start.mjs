@@ -9,6 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { formatCheck, sessionCheck } from './lib/session-check.mjs';
+import { isCampaign } from './lib/feedback-hook.mjs';
 import { writeFrameworkPath } from './launcher/framework-path.mjs';
 
 const HEADER = 'YLLIR SESSION CHECK (for the assistant, not for the master)';
@@ -26,10 +27,18 @@ function keepFrameworkPath() {
   }
 }
 
+/**
+ * The text to print, or null for silence. Hook mode (no root argument, no --json)
+ * is silent outside a campaign, so Yllir engages only in a confirmed campaign.
+ * An explicit root or --json always prints, whatever the folder.
+ */
 function render(argv) {
   const json = argv.includes('--json');
   const given = argv.find((arg) => !arg.startsWith('--'));
   const root = path.resolve(given ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
+  if (given === undefined && !json && !isCampaign(root)) {
+    return null;
+  }
   try {
     const result = sessionCheck(root);
     return json ? JSON.stringify(result, null, 2) : formatCheck(result);
@@ -39,5 +48,8 @@ function render(argv) {
 }
 
 keepFrameworkPath();
-process.stdout.write(`${render(process.argv.slice(2))}\n`);
+const text = render(process.argv.slice(2));
+if (text !== null) {
+  process.stdout.write(`${text}\n`);
+}
 process.exitCode = 0;

@@ -1,6 +1,6 @@
 import { after, describe, test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -221,5 +221,45 @@ describe('user-prompt CLI', () => {
     const root = tempDir();
     execFileSync(process.execPath, [CLI, root], { encoding: 'utf8' });
     assert.deepEqual(listFiles(root), []);
+  });
+});
+
+describe('user-prompt CLI in hook mode', () => {
+  /** Runs the hook with no positional root: the root comes from CLAUDE_PROJECT_DIR. */
+  function runHookMode(projectDir, extraEnv = {}) {
+    return spawnSync(process.execPath, [CLI], {
+      encoding: 'utf8',
+      env: { ...process.env, CLAUDE_PROJECT_DIR: projectDir, YLLIR_FEEDBACK: '', ...extraEnv },
+    });
+  }
+
+  test('an empty folder prints nothing and exits 0', () => {
+    const root = tempDir();
+    const result = runHookMode(root);
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout, '');
+  });
+
+  test('a non-campaign folder with files prints nothing and exits 0', () => {
+    const root = tempDir();
+    fs.writeFileSync(path.join(root, 'package.json'), '{}\n');
+    const result = runHookMode(root);
+    assert.equal(result.status, 0);
+    assert.equal(result.stdout, '');
+  });
+
+  test('a campaign folder still prints the turn check', () => {
+    const root = campaign();
+    const result = runHookMode(root);
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /^YLLIR TURN CHECK \(for the assistant, not for the master\)$/m);
+  });
+
+  test('a non-campaign folder records no feedback even with feedback on', () => {
+    const root = tempDir();
+    fs.writeFileSync(path.join(root, 'package.json'), '{}\n');
+    const before = listFiles(root);
+    runHookMode(root, { YLLIR_FEEDBACK: '1' });
+    assert.deepEqual(listFiles(root), before);
   });
 });

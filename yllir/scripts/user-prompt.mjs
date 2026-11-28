@@ -16,6 +16,8 @@ process.env.GIT_OPTIONAL_LOCKS = '0';
 
 const given = process.argv.slice(2).find((arg) => !arg.startsWith('--'));
 const root = path.resolve(given ?? process.env.CLAUDE_PROJECT_DIR ?? process.cwd());
+// Hook mode (no root argument): silent outside a campaign. An explicit root always prints.
+const hookMode = given === undefined;
 
 try {
   const input = readHookInput();
@@ -31,9 +33,11 @@ try {
   // Feedback never changes the turn check: any failure is ignored.
 }
 
-try {
-  process.stdout.write(`${turnCheck(root)}\n`);
-} catch {
-  // turnCheck does not throw; this guards the write itself.
+if (!hookMode || isCampaign(root)) {
+  try {
+    process.stdout.write(`${turnCheck(root)}\n`);
+  } catch {
+    // turnCheck does not throw; this guards the write itself.
+  }
 }
 process.exitCode = 0;
